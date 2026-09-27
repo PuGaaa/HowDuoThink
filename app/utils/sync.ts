@@ -1,0 +1,66 @@
+/** Web 社区同步：拉取 casepack（已发布关卡包），本地校验后落 storage。
+ *  v1 范围：拉取 + 落库 + 计数展示；远端关卡的章节合并与游玩放 M3。 */
+import { API_BASE } from '../config'
+
+export interface SyncResult {
+  version: number
+  count: number
+  error: string
+}
+
+const KEY_VERSION = 'think_pack_version'
+const KEY_PACK = 'think_casepack_v1'
+
+export function getPackVersion(): number {
+  const v = uni.getStorageSync(KEY_VERSION)
+  return Number(v) || 0
+}
+
+export function getPackCount(): number {
+  const raw = uni.getStorageSync(KEY_PACK)
+  if (raw == null) return 0
+  const str = raw as string
+  if (str.length === 0) return 0
+  try {
+    const arr = JSON.parse(str) as any[]
+    return arr.length
+  } catch (e) {
+    return 0
+  }
+}
+
+export function fetchCasepack(cb: (r: SyncResult) => void) {
+  uni.request({
+    url: API_BASE + '/api/casepack?since=' + getPackVersion(),
+    method: 'GET',
+    timeout: 8000,
+    success: (res) => {
+      try {
+        const data = res.data as { version: number, count: number, cases: any[] }
+        if (data == null || data.version == null || !Array.isArray(data.cases)) {
+          cb({ version: 0, count: 0, error: '数据格式异常' })
+          return
+        }
+        if (data.cases.length === 0) {
+          cb({ version: data.version, count: 0, error: '' })
+          return
+        }
+        // 最小字段校验（App 端防丢字段第二道门）
+        for (const c of data.cases) {
+          if (!c.id || !c.title || !c.actions || !c.lessons) {
+            cb({ version: 0, count: 0, error: 'casepack 字段缺失' })
+            return
+          }
+        }
+        uni.setStorageSync(KEY_PACK, JSON.stringify(data.cases))
+        uni.setStorageSync(KEY_VERSION, String(data.version))
+        cb({ version: data.version, count: data.cases.length, error: '' })
+      } catch (e) {
+        cb({ version: 0, count: 0, error: '解析失败' })
+      }
+    },
+    fail: () => {
+      cb({ version: 0, count: 0, error: '无法连接社区服务' })
+    },
+  })
+}

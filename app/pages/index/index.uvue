@@ -15,6 +15,9 @@
           <text class="header__streak-num">{{ streakCount }} 天</text>
         </view>
       </view>
+      <view v-if="packSynced" class="packchip" @click="onPackTap">
+        <text class="packchip__text">☁ 社区关卡已同步 · {{ packCount }} 个待上线</text>
+      </view>
 
       <!-- 继续闯关 -->
       <view v-if="continueCase" class="continue" @click="openPlay(continueCaseId)">
@@ -70,6 +73,7 @@ import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress, getStreak, CaseProgress } from '../../utils/storage'
 import { getTotals } from '../../utils/storage'
 import { rankOf, starsOf } from '../../utils/scoring'
+import { fetchCasepack, getPackCount } from '../../utils/sync'
 
 const rankName = ref('')
 const rankNext = ref('')
@@ -80,6 +84,8 @@ const continueTitle = ref('')
 const continueMeta = ref('')
 const continueChapterLabel = ref('')
 const hasContinue = ref(false)
+const packCount = ref(0)
+const packSynced = ref(false)
 
 class ChapterVM {
   no: string = ''
@@ -101,6 +107,13 @@ const rk = rankOf(totals.solved)
 rankName.value = rk.name
 rankNext.value = rk.remain > 0 ? '再破案 ' + rk.remain + ' 关晋升「' + rk.nextName + '」' : '已是最高称号'
 streakCount.value = getStreak().count
+packCount.value = getPackCount()
+fetchCasepack((r) => {
+  if (r.error.length === 0 && r.count > 0) {
+    packCount.value = getPackCount()
+    packSynced.value = true
+  }
+})
 
 function starsLabel(g: string): string {
   const n = starsOf(g)
@@ -150,6 +163,10 @@ const continueCase = computed((): boolean => hasContinue.value)
 
 function openPlay(id: string) {
   uni.navigateTo({ url: '/pages/play/play?id=' + id })
+}
+
+function onPackTap() {
+  uni.showToast({ title: '社区关卡将在下个版本开放游玩', icon: 'none' })
 }
 
 function openChapter(i: number) {
@@ -232,6 +249,20 @@ function openChapter(i: number) {
   font-size: 24rpx;
   font-weight: bold;
   color: #8A6D1F;
+}
+.packchip {
+  background-color: #EAF4FC;
+  border-radius: 18rpx;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #BFE0F5;
+  padding: 16rpx 22rpx;
+  margin-bottom: 22rpx;
+}
+.packchip__text {
+  font-size: 22rpx;
+  color: #4A7FB5;
+  font-weight: bold;
 }
 .continue {
   position: relative;

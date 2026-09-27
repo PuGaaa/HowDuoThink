@@ -12,3 +12,8 @@ node_modules/
 # 编辑器
 .idea/
 .vscode/
+
+# server 运行时
+server/data.db*
+server/__pycache__/
+__pycache__/
