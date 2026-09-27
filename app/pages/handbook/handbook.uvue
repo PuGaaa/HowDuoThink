@@ -1,0 +1,300 @@
+<template>
+  <view class="page">
+    <view class="content">
+      <text class="title">手册</text>
+
+      <!-- 收集图鉴卡 -->
+      <view class="rankcard">
+        <image class="rankcard__avatar" src="/static/mascots/frog-96.png" mode="aspectFit"></image>
+        <view class="rankcard__body">
+          <text class="rankcard__label">收集图鉴</text>
+          <text class="rankcard__name">已相遇 {{ met }} / 5 只</text>
+          <view class="rankcard__track">
+            <view class="rankcard__fill" :style="'width:' + metPct + '%'"></view>
+          </view>
+          <text class="rankcard__next">克服同一偏误 3 次，解锁它们的认可</text>
+        </view>
+      </view>
+
+      <!-- 动物图鉴 -->
+      <text class="sec">内心小动物图鉴</text>
+      <view class="dex">
+        <view v-for="(d, i) in dexList" :key="d.id" :class="d.met ? 'dexcard' : 'dexcard dexcard--off'">
+          <view :class="d.met ? 'dexcard__badge' : 'dexcard__badge dexcard__badge--off'">
+            <image class="dexcard__avatar" :src="'/static/mascots/' + d.id + '-96.png'" mode="aspectFit"></image>
+          </view>
+          <text :class="d.met ? 'dexcard__name' : 'dexcard__name dexcard__name--off'">{{ d.name }}</text>
+          <text class="dexcard__trait">{{ d.trait }}</text>
+          <text class="dexcard__quote">{{ d.quote }}</text>
+          <text :class="d.met ? 'dexcard__count' : 'dexcard__count dexcard__count--off'">{{ d.count }}</text>
+        </view>
+      </view>
+
+      <!-- 收集的检查单 -->
+      <text class="sec">收集的检查单</text>
+      <view v-if="lessonCards.length == 0" class="empty">
+        <text class="empty__text">破案后，手册会开始变厚</text>
+      </view>
+      <view v-for="(lc, i) in lessonCards" :key="'lc' + i" class="lesson">
+        <text class="lesson__text">☑ {{ lc.text }}</text>
+        <text class="lesson__src">{{ lc.src }}</text>
+      </view>
+
+      <text class="footer">破案更多关卡，手册会越来越厚</text>
+    </view>
+    <tabbar active="handbook"></tabbar>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue'
+import { ALL_CASES, getCaseById } from '../../data/cases'
+import { getMascotStats, getCaseProgress } from '../../utils/storage'
+import tabbar from '../../components/tabbar/tabbar.uvue'
+
+class DexVM {
+  id: string = ''
+  name: string = ''
+  trait: string = ''
+  quote: string = ''
+  count: string = ''
+  met: boolean = false
+}
+
+class LessonCard {
+  text: string = ''
+  src: string = ''
+}
+
+const met = ref(0)
+const metPct = ref(0)
+const dexList = ref<DexVM[]>([])
+const lessonCards = ref<LessonCard[]>([])
+
+const stats = getMascotStats()
+const defs = [
+  { id: 'frog', name: '恐怖蛙', trait: '报错恐慌', quote: '呱——好多红色！完了完了要背锅了！', n: stats.frog },
+  { id: 'otter', name: '惊讶濑', trait: '意外 = 信息', quote: '纳尼？！证据它自己说话了！', n: stats.otter },
+  { id: 'snail', name: '不行蜗', trait: '盲扫', quote: '（慢慢探头）这两个动作，好像啥也没查出来。', n: stats.snail },
+  { id: 'rabbit', name: '垂耳兔', trait: '过早锁定', quote: '（摇头）证据还不够，你只是想结束它。', n: stats.rabbit },
+  { id: 'dino', name: '三角龙', trait: '挫败陪伴', quote: '（蹲下）这题是真难。坐一会儿。', n: stats.dino },
+]
+let metCount = 0
+const list: DexVM[] = []
+for (let i = 0; i < defs.length; i++) {
+  const d = defs[i]
+  const vm = new DexVM()
+  vm.id = d.id
+  vm.name = d.name
+  vm.trait = d.trait
+  vm.quote = d.quote
+  vm.met = d.n > 0
+  vm.count = d.n > 0 ? '出场 ' + d.n + ' 次' : '尚未相遇'
+  if (vm.met) metCount++
+  list.push(vm)
+}
+dexList.value = list
+met.value = metCount
+metPct.value = Math.round((metCount * 100) / 5)
+
+// 收集的检查单：已破案案例的全部 lessons
+const cards: LessonCard[] = []
+for (let i = 0; i < ALL_CASES.length; i++) {
+  const c = ALL_CASES[i]
+  const p = getCaseProgress(c.id)
+  if (p == null || !p.solved) continue
+  for (let j = 0; j < c.lessons.length; j++) {
+    const lc = new LessonCard()
+    lc.text = c.lessons[j].text
+    lc.src = '《' + c.title + '》 · ' + c.domain
+    cards.push(lc)
+  }
+}
+lessonCards.value = cards
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF9F4;
+  width: 100%;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 24rpx 32rpx 200rpx;
+  padding-top: 100rpx;
+}
+.content {
+  display: flex;
+  flex-direction: column;
+}
+.title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #4A4458;
+  text-align: center;
+  margin-top: 40rpx;
+  margin-bottom: 24rpx;
+}
+.rankcard {
+  display: flex;
+  flex-direction: row;
+  background-color: #4A4458;
+  border-radius: 30rpx;
+  padding: 32rpx;
+  margin-bottom: 30rpx;
+  box-shadow: 0 10rpx 0 0 #37323F;;
+}
+.rankcard__avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 60rpx;
+  background-color: #5E5770;
+}
+.rankcard__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin-left: 26rpx;
+}
+.rankcard__label {
+  font-size: 20rpx;
+  color: #C9C2DA;
+}
+.rankcard__name {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+  margin-top: 8rpx;
+}
+.rankcard__track {
+  height: 16rpx;
+  border-radius: 8rpx;
+  background-color: #5E5770;
+  margin-top: 18rpx;
+}
+.rankcard__fill {
+  height: 16rpx;
+  border-radius: 8rpx;
+  background-color: #FFC94D;
+}
+.rankcard__next {
+  font-size: 20rpx;
+  color: #C9C2DA;
+  margin-top: 12rpx;
+}
+.sec {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-bottom: 20rpx;
+}
+.dex {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.dexcard {
+  display: flex;
+  flex-direction: column;
+  width: 48%;
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #FFF1E7;
+  padding: 26rpx;
+  margin-bottom: 22rpx;
+  box-shadow: 0 6rpx 0 0 #EFE5D6;;
+}
+.dexcard--off {
+  border-color: #F5E6DA;
+  opacity: 0.6;
+}
+.dexcard__badge {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 44rpx;
+  background-color: #FFF1E7;
+}
+.dexcard__badge--off {
+  background-color: #FBF3EB;
+}
+.dexcard__avatar {
+  width: 88rpx;
+  height: 88rpx;
+}
+.dexcard__name {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-top: 16rpx;
+}
+.dexcard__name--off {
+  color: #AFA8BD;
+}
+.dexcard__trait {
+  font-size: 19rpx;
+  color: #AFA8BD;
+  margin-top: 6rpx;
+}
+.dexcard__quote {
+  font-size: 21rpx;
+  color: #7A7290;
+  margin-top: 12rpx;
+  line-height: 32rpx;
+}
+.dexcard__count {
+  font-size: 20rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+  margin-top: 12rpx;
+}
+.dexcard__count--off {
+  color: #AFA8BD;
+}
+.empty {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 40rpx;
+  margin-bottom: 16rpx;
+}
+.empty__text {
+  font-size: 23rpx;
+  color: #AFA8BD;
+}
+.lesson {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 4rpx 16rpx rgba(74, 68, 88, 0.05);;
+}
+.lesson__text {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #4A4458;
+  line-height: 36rpx;
+}
+.lesson__src {
+  font-size: 20rpx;
+  color: #6FB8E8;
+  margin-top: 12rpx;
+}
+.footer {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  text-align: center;
+  margin-top: 10rpx;
+}
+</style>

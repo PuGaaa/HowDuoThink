@@ -1,0 +1,75 @@
+<template>
+  <view class="tabbar">
+    <view class="tabbar__inner">
+      <view v-for="(tb, i) in tabs" :key="tb.key" class="tabbar__item" @click="go(tb.key)">
+        <image class="tabbar__icon" :src="active === tb.key ? tb.iconOn : tb.iconOff" mode="aspectFit"></image>
+        <text :class="active === tb.key ? 'tabbar__label tabbar__label--on' : 'tabbar__label'">{{ tb.label }}</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = defineProps({
+  active: { type: String, default: 'adventure' },
+})
+
+const tabs = [
+  { key: 'adventure', label: '冒险', url: '/pages/index/index', iconOn: '/static/icons/flag-coral.png', iconOff: '/static/icons/flag-ink3.png' },
+  { key: 'handbook', label: '手册', url: '/pages/handbook/handbook', iconOn: '/static/icons/book-coral.png', iconOff: '/static/icons/book-ink3.png' },
+  { key: 'me', label: '我的', url: '/pages/profile/profile', iconOn: '/static/icons/user-coral.png', iconOff: '/static/icons/user-ink3.png' },
+]
+
+function go(key: string) {
+  if (key === props.active) return
+  for (let i = 0; i < tabs.length; i++) {
+    if (tabs[i].key === key) {
+      uni.redirectTo({ url: tabs[i].url })
+      return
+    }
+  }
+}
+</script>
+
+<style>
+.tabbar {
+  position: fixed;
+  bottom: 24rpx;
+  left: 24rpx;
+  right: 24rpx;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 432rpx;
+  background-color: rgba(255, 255, 255, 0.92);
+  border-radius: 44rpx;
+  border-width: 1rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  box-shadow: 0 8rpx 0 0 #E2D6C6;
+}
+.tabbar__inner {
+  display: flex;
+  flex-direction: row;
+  padding: 14rpx 8rpx;
+}
+.tabbar__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  padding: 8rpx 0 6rpx;
+}
+.tabbar__icon {
+  width: 52rpx;
+  height: 52rpx;
+}
+.tabbar__label {
+  font-size: 23rpx;
+  color: #AFA8BD;
+  margin-top: 8rpx;
+}
+.tabbar__label--on {
+  color: #FF8A5C;
+  font-weight: bold;
+}
+</style>

@@ -1,0 +1,52 @@
+<template>
+  <view class="navbar">
+    <view class="navbar__capsule" @click="back">
+      <image class="navbar__chevron" src="/static/icons/chevl-ink.png" mode="aspectFit"></image>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+function back() {
+  let depth = 1
+  try {
+    depth = uni.getCurrentPages().length
+  } catch (e) {
+    depth = 1
+  }
+  if (depth > 1) {
+    uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/index/index' }) })
+  } else {
+    uni.reLaunch({ url: '/pages/index/index' })
+  }
+}
+</script>
+
+<style>
+/* iOS 26 风格：悬浮玻璃圆胶囊返回键（常驻左上，内容从其下滚过） */
+.navbar {
+  position: fixed;
+  top: calc(var(--status-bar-height) + 16rpx);
+  left: 24rpx;
+  z-index: 100;
+}
+.navbar__capsule {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 40rpx;
+  background-color: rgba(255, 255, 255, 0.72);
+  border-width: 1rpx;
+  border-style: solid;
+  border-color: rgba(255, 255, 255, 0.95);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(20rpx);
+  box-shadow: 0 6rpx 0 0 #E8DCCB;
+}
+.navbar__chevron {
+  width: 36rpx;
+  height: 36rpx;
+}
+</style>

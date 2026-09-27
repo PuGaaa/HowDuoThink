@@ -1,0 +1,17 @@
+<script setup lang="uts">
+import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
+
+onLaunch(() => {
+  console.log('App Launch')
+})
+onShow(() => {})
+onHide(() => {})
+</script>
+
+<style>
+/* 全局样式：蒸汽模式仅支持 class 选择器（BEM），页面共用背景色 */
+uni-page-body,
+.page {
+  background-color: #f4f5f7;
+}
+</style>

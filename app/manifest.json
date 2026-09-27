@@ -1,0 +1,25 @@
+{
+  "name": "排错推理训练场",
+  "appid": "00000000000000000000000000000000",
+  "description": "诊断推理训练器：看症状 → 建立假设 → 按验证成本排序 → 定位根因",
+  "versionName": "0.1.0",
+  "versionCode": 100,
+  "locale": "zh-Hans",
+  "uni-app-x": {
+    "vapor": true,
+    "vapor-render-target": "bytecode",
+    "flex-direction": "column",
+    "styleIsolationVersion": "2"
+  },
+  "web": {
+    "title": "排错推理训练场",
+    "router": {
+      "mode": "hash",
+      "base": "/"
+    },
+    "devServer": {
+      "port": 5173,
+      "https": false
+    }
+  }
+}

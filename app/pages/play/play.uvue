@@ -1,0 +1,1265 @@
+<template>
+  <view class="page">
+    <navbar></navbar>
+    <view v-if="loaded" class="content">
+      <text class="pagetitle">诊断现场</text>
+
+      <!-- 成本条 -->
+      <view class="costbar">
+        <view class="costbar__left">
+          <image class="costbar__bolt" src="/static/icons/bolt-lemon.png" mode="aspectFit"></image>
+          <text class="costbar__num">已花 {{ playerCost }}</text>
+        </view>
+        <text class="costbar__sub">错误指认 {{ wrongCount }}/2 · 专家基准复盘揭晓</text>
+      </view>
+
+      <!-- 故障现场 -->
+      <view class="scene">
+        <view class="scene__tag">
+          <text class="scene__tag-text">故障现场</text>
+        </view>
+        <text class="scene__title">{{ title }}</text>
+        <text class="scene__role">{{ role }}</text>
+        <view class="scene__arch">
+          <text class="scene__arch-text">{{ arch }}</text>
+        </view>
+        <view v-for="(s, i) in symptoms" :key="'s' + i" :class="'evidence evbg--' + s.type">
+          <view class="evidence__head">
+            <image v-if="s.type === 'error'" class="evidence__icon" src="/static/icons/alert-red.png" mode="aspectFit"></image>
+            <image v-else-if="s.type === 'chat'" class="evidence__icon" src="/static/icons/chat-sky.png" mode="aspectFit"></image>
+            <image v-else class="evidence__icon" src="/static/icons/clock-ink2.png" mode="aspectFit"></image>
+            <text class="evidence__title">{{ s.title }}</text>
+          </view>
+          <text class="evidence__text">{{ s.text }}</text>
+        </view>
+        <view class="evidence evidence--time">
+          <text class="evidence__text">⏱ {{ timeline }}</text>
+        </view>
+        <text class="scene__hint">{{ hint }}</text>
+      </view>
+
+      <!-- 终局条 -->
+      <view v-if="finished" class="donebar">
+        <text class="donebar__text">{{ solved ? '破案！正在生成复盘……' : '两次错误指认，本案未破。' }}</text>
+        <view v-if="!solved" class="primarybtn" @click="goReview">
+          <text class="primarybtn__text">看复盘</text>
+        </view>
+      </view>
+    </view>
+
+    <view v-else class="loading">
+      <text class="loading__text">正在调取现场……</text>
+    </view>
+
+    <!-- 内心小动物：悬浮弹窗 -->
+    <mascot :show="mascotShow" :who="mascotWho" :line="mascotLine"></mascot>
+
+    <!-- 阶段 FAB -->
+    <view v-if="loaded && !finished && !drawerOpen" class="fab" @click="toggleDrawer">
+      <text class="fab__text">{{ fabLabel }}</text>
+      <image class="fab__chevron" :src="drawerOpen ? '/static/icons/chevl-ink.png' : '/static/icons/arrowr-white.png'" :style="drawerOpen ? 'transform: rotate(90deg)' : 'transform: rotate(-90deg)'" mode="aspectFit"></image>
+    </view>
+
+    <!-- 抽屉遮罩 -->
+    <view :class="drawerOpen ? 'mask mask--show' : 'mask'" @click="closeDrawer"></view>
+
+    <!-- 底部抽屉：三段式（假设板 / 验证动作 / 指认根因） -->
+    <view :class="drawerOpen ? 'drawer drawer--open' : 'drawer'">
+      <view class="drawer__handle"></view>
+      <view class="seg">
+        <view :class="drawerTab === 'board' ? 'seg__item seg__item--on' : 'seg__item'" @click="drawerTab = 'board'">
+          <text :class="drawerTab === 'board' ? 'seg__text seg__text--on' : 'seg__text'">假设板</text>
+        </view>
+        <view :class="drawerTab === 'actions' ? 'seg__item seg__item--on' : 'seg__item'" @click="drawerTab = 'actions'">
+          <text :class="drawerTab === 'actions' ? 'seg__text seg__text--on' : 'seg__text'">验证动作</text>
+        </view>
+        <view :class="drawerTab === 'identify' ? 'seg__item seg__item--on' : 'seg__item'" @click="drawerTab = 'identify'">
+          <text :class="drawerTab === 'identify' ? 'seg__text seg__text--on' : 'seg__text'">指认根因</text>
+        </view>
+      </view>
+
+      <!-- 假设板 tab：勾选你的怀疑（全程可编辑） -->
+      <view v-if="drawerTab === 'board'" class="drawer__body">
+        <view class="drawer__anchor">
+          <text class="drawer__anchor-text">⏱ {{ timeline }}</text>
+        </view>
+        <scroll-view class="drawer__scroll" scroll-y>
+          <view
+            v-for="(h, i) in hyps"
+            :key="h.id"
+            :class="isSelected(h.id) ? 'hyp hyp--on' : 'hyp'"
+            @click="toggleHypothesis(h.id)"
+          >
+            <view v-if="isSelected(h.id)" class="hyp__box hyp__box--on">
+              <image class="hyp__check" src="/static/icons/check-white.png" mode="aspectFit"></image>
+            </view>
+            <view v-else class="hyp__box"></view>
+            <text :class="isSelected(h.id) ? 'hyp__text hyp__text--on' : 'hyp__text'">{{ h.text }}</text>
+          </view>
+          <view v-for="(n, i) in freeNotes" :key="'n' + i" class="freenote">
+            <text class="freenote__text">✎ {{ n }}</text>
+          </view>
+          <view class="noterow">
+            <input class="noterow__input" v-model="noteInput" placeholder="自由备注（可选）：此刻你在怀疑什么" />
+            <text class="noterow__btn" @click="addNote">＋</text>
+          </view>
+        </scroll-view>
+        <view class="primarybtn" @click="submitHypotheses">
+          <text class="primarybtn__text">{{ hypothesesLocked ? '更新我的怀疑' : '就这些，开查！' }}</text>
+        </view>
+      </view>
+
+      <!-- 验证动作 tab：按假设分节，其余隐藏 -->
+      <view v-else-if="drawerTab === 'actions'" class="drawer__body">
+        <scroll-view class="drawer__scroll" scroll-y>
+          <view v-if="verifySections.length == 0" class="emptyhint">
+            <text class="emptyhint__text">先勾选你的怀疑，这里才会出现对应的验证手段</text>
+            <view class="emptyhint__btn" @click="drawerTab = 'board'">
+              <text class="emptyhint__btn-text">去假设板</text>
+            </view>
+          </view>
+
+          <view v-for="(sec, si) in verifySections" :key="'sec' + si" class="vsec">
+            <view class="vsec__head">
+              <view class="vsec__dot"></view>
+              <text class="vsec__title">{{ sec.text }}</text>
+            </view>
+            <view v-for="(a, i) in sec.acts" :key="a.id" class="actwrap">
+              <view :class="isTaken(a.id) ? 'act act--done' : 'act'" @click="executeAction(a)">
+                <view class="act__main">
+                  <view class="act__headrow">
+                    <text :class="isTaken(a.id) ? 'act__name act__name--done' : 'act__name'">{{ a.name }}</text>
+                    <view v-if="a.danger" class="act__danger">
+                      <text class="act__danger-text">变更</text>
+                    </view>
+                  </view>
+                  <text class="act__desc">{{ a.desc }}</text>
+                </view>
+                <view class="act__cost">
+                  <image class="act__bolt" src="/static/icons/bolt-coral.png" mode="aspectFit"></image>
+                  <text class="act__cost-num">{{ a.cost }}</text>
+                  <text v-if="isTaken(a.id)" class="act__done">已执行 ✓</text>
+                </view>
+              </view>
+              <view v-if="isTaken(a.id)" :class="'evcard evcard--inline evbg--' + evOf(a.id).type">
+                <view class="evcard__head">
+                  <image class="evcard__icon" :src="typeIcon(evOf(a.id).type)" mode="aspectFit"></image>
+                  <text class="evcard__title">{{ evOf(a.id).title }}</text>
+                </view>
+                <text class="evcard__text">{{ evOf(a.id).text }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view v-if="globalActs.length > 0" class="vsec">
+            <view class="vsec__head">
+              <view class="vsec__dot vsec__dot--global"></view>
+              <text class="vsec__title">通用侦查</text>
+            </view>
+            <view v-for="(a, i) in globalActs" :key="a.id" class="actwrap">
+              <view :class="isTaken(a.id) ? 'act act--done' : 'act'" @click="executeAction(a)">
+                <view class="act__main">
+                  <view class="act__headrow">
+                    <text :class="isTaken(a.id) ? 'act__name act__name--done' : 'act__name'">{{ a.name }}</text>
+                    <view v-if="a.danger" class="act__danger">
+                      <text class="act__danger-text">变更</text>
+                    </view>
+                  </view>
+                  <text class="act__desc">{{ a.desc }}</text>
+                </view>
+                <view class="act__cost">
+                  <image class="act__bolt" src="/static/icons/bolt-coral.png" mode="aspectFit"></image>
+                  <text class="act__cost-num">{{ a.cost }}</text>
+                  <text v-if="isTaken(a.id)" class="act__done">已执行 ✓</text>
+                </view>
+              </view>
+              <view v-if="isTaken(a.id)" :class="'evcard evcard--inline evbg--' + evOf(a.id).type">
+                <view class="evcard__head">
+                  <image class="evcard__icon" :src="typeIcon(evOf(a.id).type)" mode="aspectFit"></image>
+                  <text class="evcard__title">{{ evOf(a.id).title }}</text>
+                </view>
+                <text class="evcard__text">{{ evOf(a.id).text }}</text>
+              </view>
+            </view>
+          </view>
+          <text class="drawer__note">换怀疑？回假设板勾选，验证线会跟着变</text>
+        </scroll-view>
+      </view>
+
+      <!-- 指认根因 tab -->
+      <view v-else class="drawer__body">
+        <scroll-view class="drawer__scroll" scroll-y>
+          <view v-if="wrongCount > 0" class="reguide">
+            <text class="reguide__text">垂耳兔：你的证据链指向了别处。回假设板重新推演，或者再看一遍证据。</text>
+            <view class="reguide__btn" @click="drawerTab = 'board'">
+              <text class="reguide__btn-text">回假设板</text>
+            </view>
+          </view>
+          <view v-for="(c, i) in causes" :key="c.id" class="cause" @click="identifyPick = c.id">
+            <view :class="identifyPick === c.id ? 'cause__dot cause__dot--on' : 'cause__dot'"></view>
+            <text class="cause__text">{{ c.text }}</text>
+          </view>
+          <text class="drawer__note">垂耳兔提醒：咬合的证据链比答案本身值钱</text>
+        </scroll-view>
+        <view class="primarybtn" @click="confirmIdentify">
+          <text class="primarybtn__text">就是它！</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref, computed } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
+import navbar from '../../components/navbar/navbar.uvue'
+import mascot from '../../components/mascot/mascot.uvue'
+import { getCaseById } from '../../data/cases'
+import { CaseAction, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
+import { SessionEvent, MascotEventRec, SessionRecord, saveSession } from '../../utils/storage'
+import { computeGrade } from '../../utils/scoring'
+import {
+  MascotAppearance,
+  onSceneOpen,
+  onActionResolved,
+  onWrongIdentify,
+  onEliminated,
+  onOverspend,
+} from '../../utils/mascot'
+
+const loaded = ref(false)
+const title = ref('')
+const role = ref('')
+const arch = ref('')
+const timeline = ref('')
+const hint = ref('')
+const symptoms = ref<Evidence[]>([])
+const hyps = ref<HypothesisOption[]>([])
+const acts = ref<CaseAction[]>([])
+const causes = ref<RootCauseOption[]>([])
+
+const caseId = ref('')
+const expertCost = ref(1)
+const restartActionId = ref('')
+
+const selected = ref<string[]>([])
+const freeNotes = ref<string[]>([])
+const noteInput = ref('')
+const hypothesesLocked = ref(false)
+
+const taken = ref<string[]>([])
+const evidences = ref<Evidence[]>([])
+class EvRec {
+  id: string = ''
+  ev: Evidence | null = null
+}
+const evByAct = ref<EvRec[]>([])
+const events = ref<SessionEvent[]>([])
+const mascotEvents = ref<MascotEventRec[]>([])
+const lowStreak = ref(0)
+const otterCd = ref(0)
+// 假设效应状态机：静默运行，复盘时揭晓（玩家界面不显示）
+class HStateRec {
+  id: string = ''
+  status: string = ''
+}
+const hStates = ref<HStateRec[]>([])
+const hBets = ref<string[]>([])
+
+const drawerOpen = ref(false)
+const drawerTab = ref('board')
+const identifyPick = ref('')
+const wrongCount = ref(0)
+const finished = ref(false)
+const solved = ref(false)
+const frustratedShown = ref(false)
+
+const mascotShow = ref(false)
+const mascotWho = ref('frog')
+const mascotLine = ref('')
+let hideTimer = 0
+
+const playerCost = computed((): number => {
+  let sum = 0
+  for (let i = 0; i < events.value.length; i++) {
+    if (events.value[i].kind === 'action') {
+      sum += events.value[i].cost
+    }
+  }
+  return sum
+})
+
+class SectionVM {
+  id: string = ''
+  text: string = ''
+  acts: CaseAction[] = []
+}
+
+const verifySections = computed((): SectionVM[] => {
+  const secs: SectionVM[] = []
+  for (let i = 0; i < hyps.value.length; i++) {
+    const h = hyps.value[i]
+    if (!isSelected(h.id)) continue
+    const bound: CaseAction[] = []
+    for (let j = 0; j < acts.value.length; j++) {
+      const a = acts.value[j]
+      if (a.tests.length === 0) continue
+      for (let k = 0; k < a.tests.length; k++) {
+        if (a.tests[k] === h.id) { bound.push(a); break }
+      }
+    }
+    if (bound.length == 0) continue
+    const vm = new SectionVM()
+    vm.id = h.id
+    vm.text = h.text
+    vm.acts = bound
+    secs.push(vm)
+  }
+  return secs
+})
+
+const globalActs = computed((): CaseAction[] => {
+  const globals: CaseAction[] = []
+  for (let j = 0; j < acts.value.length; j++) {
+    if (acts.value[j].tests.length === 0) globals.push(acts.value[j])
+  }
+  return globals
+})
+
+const fabLabel = computed((): string => {
+  if (drawerOpen.value) {
+    return '收起'
+  }
+  if (!hypothesesLocked.value) {
+    return selected.value.length > 0 ? '假设板 · 已圈 ' + selected.value.length + ' 个' : '立个假设'
+  }
+  return '开查 · 已花 ' + playerCost.value + ' ⚡'
+})
+
+onLoad((query : OnLoadOptions) => {
+  const id = query['id']
+  const c = id != null ? getCaseById(id as string) : null
+  if (c == null) {
+    uni.showToast({ title: '案例不存在', icon: 'none' })
+    setTimeout(() => {
+      uni.navigateBack({})
+    }, 800)
+    return
+  }
+  caseId.value = c.id
+  title.value = c.title
+  role.value = c.scene.role
+  arch.value = c.scene.architecture
+  timeline.value = c.scene.timeline
+  hint.value = c.scene.impactHint
+  symptoms.value = c.scene.symptoms
+  hyps.value = c.hypotheses
+  acts.value = c.actions
+  causes.value = shuffleCauses(c.rootCauses)
+  expertCost.value = c.expertCost
+  restartActionId.value = c.restartActionId
+  loaded.value = true
+
+  const hs: HStateRec[] = []
+  for (let i = 0; i < c.hypotheses.length; i++) {
+    const h = new HStateRec()
+    h.id = c.hypotheses[i].id
+    h.status = 'open'
+    hs.push(h)
+  }
+  hStates.value = hs
+  hBets.value = []
+
+  const types: string[] = []
+  for (let i = 0; i < c.scene.symptoms.length; i++) {
+    types.push(c.scene.symptoms[i].type)
+  }
+  appear(onSceneOpen(types))
+})
+
+function toggleDrawer() {
+  drawerOpen.value = !drawerOpen.value
+}
+
+function closeDrawer() {
+  drawerOpen.value = false
+}
+
+function shuffleCauses(list: RootCauseOption[]): RootCauseOption[] {
+  const arr: RootCauseOption[] = []
+  for (let i = 0; i < list.length; i++) arr.push(list[i])
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const tmp = arr[i]
+    arr[i] = arr[j]
+    arr[j] = tmp
+  }
+  return arr
+}
+
+function typeIcon(t: string): string {
+  if (t === 'error') return '/static/icons/alert-red.png'
+  if (t === 'log') return '/static/icons/term-dark.png'
+  if (t === 'code') return '/static/icons/term-dark.png'
+  return '/static/icons/chat-sky.png'
+}
+
+function isSelected(id: string): boolean {
+  for (let i = 0; i < selected.value.length; i++) {
+    if (selected.value[i] === id) return true
+  }
+  return false
+}
+
+function toggleHypothesis(id: string) {
+  if (isSelected(id)) {
+    const next: string[] = []
+    for (let i = 0; i < selected.value.length; i++) {
+      if (selected.value[i] !== id) next.push(selected.value[i])
+    }
+    selected.value = next
+  } else {
+    selected.value.push(id)
+  }
+}
+
+function addNote() {
+  const n = noteInput.value.trim()
+  if (n.length === 0) return
+  freeNotes.value.push(n)
+  noteInput.value = ''
+}
+
+function submitHypotheses() {
+  if (selected.value.length === 0 && freeNotes.value.length === 0) {
+    uni.showToast({ title: '至少先立一个假设', icon: 'none' })
+    return
+  }
+  if (hypothesesLocked.value) {
+    // 验证阶段编辑假设板 = 返回重新假设
+    let labels = ''
+    for (let i = 0; i < selected.value.length; i++) {
+      const h = findHypothesis(selected.value[i])
+      if (h != null) labels += (labels.length > 0 ? '、' : '') + h.text
+    }
+    pushEvent('hypothesis', '', '', 0, '重新假设：' + (labels.length > 0 ? labels : '（清空）'), false)
+    drawerOpen.value = false
+    drawerTab.value = 'actions'
+    uni.showToast({ title: '假设板已更新，验证线已切换', icon: 'none' })
+    return
+  }
+  for (let i = 0; i < selected.value.length; i++) {
+    const h = findHypothesis(selected.value[i])
+    if (h != null) {
+      pushEvent('hypothesis', '', '', 0, '怀疑：' + h.text, false)
+    }
+  }
+  for (let i = 0; i < freeNotes.value.length; i++) {
+    pushEvent('hypothesis', '', '', 0, '备注：' + freeNotes.value[i], false)
+  }
+  hypothesesLocked.value = true
+  drawerOpen.value = false
+  drawerTab.value = 'actions'
+  uni.showToast({ title: '假设已立，开始验证', icon: 'none' })
+}
+
+function findHypothesis(id: string): HypothesisOption | null {
+  for (let i = 0; i < hyps.value.length; i++) {
+    if (hyps.value[i].id === id) return hyps.value[i]
+  }
+  return null
+}
+
+function isTaken(id: string): boolean {
+  for (let i = 0; i < taken.value.length; i++) {
+    if (taken.value[i] === id) return true
+  }
+  return false
+}
+
+function evOf(id: string): Evidence {
+  for (let i = 0; i < evByAct.value.length; i++) {
+    if (evByAct.value[i].id === id) return evByAct.value[i].ev
+  }
+  const fallback: Evidence = { type: 'text', title: '【未找到证据记录】', text: 'DEBUG: evByAct 未命中 id=' + id }
+  return fallback
+}
+
+function executeAction(a: CaseAction) {
+  if (isTaken(a.id)) return
+  if (a.danger) {
+    uni.showModal({
+      title: '状态变更动作',
+      content: '「' + a.name + '」将花 ' + a.cost + ' ⚡ 且可能破坏现场。确定执行？',
+      success: (res) => {
+        if (res.confirm) {
+          doExecute(a)
+        }
+      },
+    })
+  } else {
+    doExecute(a)
+  }
+}
+
+// 假设效应静默记账：excluded/confirmed 为终态，不被升降权覆盖
+function applyHypothesisEffects(a: CaseAction) {
+  for (let i = 0; i < a.hypotheses.length; i++) {
+    const eff = a.hypotheses[i]
+    for (let j = 0; j < hStates.value.length; j++) {
+      if (hStates.value[j].id !== eff.id) continue
+      const cur = hStates.value[j].status
+      if ((cur === 'excluded' || cur === 'confirmed') && eff.status !== 'confirmed') continue
+      hStates.value[j].status = eff.status
+    }
+  }
+}
+
+function doExecute(a: CaseAction) {
+  taken.value.push(a.id)
+  evidences.value.push(a.result)
+  const rec = new EvRec()
+  rec.id = a.id
+  rec.ev = a.result
+  evByAct.value.push(rec)
+  applyHypothesisEffects(a)
+  pushEvent('action', a.id, a.gain, a.cost, '验证：' + a.name + '（-' + a.cost + ' ⚡）', a.danger)
+
+  const r = onActionResolved(lowStreak.value, a.gain, otterCd.value)
+  lowStreak.value = r.lowStreak
+  otterCd.value = r.otterCooldown
+  if (r.appearance != null) {
+    appear(r.appearance)
+    return
+  }
+  if (!frustratedShown.value) {
+    const o = onOverspend(playerCost.value, expertCost.value)
+    if (o != null) {
+      frustratedShown.value = true
+      appear(o)
+    }
+  }
+}
+
+function pushEvent(kind: string, actionId: string, gain: string, cost: number, text: string, danger: boolean) {
+  const ev: SessionEvent = { kind: kind, actionId: actionId, gain: gain, cost: cost, text: text, danger: danger }
+  events.value.push(ev)
+}
+
+function appear(m: MascotAppearance | null) {
+  if (m == null) return
+  mascotWho.value = m.id
+  mascotLine.value = m.line
+  mascotShow.value = true
+  const rec: MascotEventRec = { id: m.id, emoji: m.emoji, line: m.line, afterEventIndex: events.value.length - 1 }
+  mascotEvents.value.push(rec)
+  if (hideTimer > 0) {
+    clearTimeout(hideTimer)
+  }
+  hideTimer = setTimeout(() => {
+    mascotShow.value = false
+  }, 2800)
+}
+
+function confirmIdentify() {
+  if (identifyPick.value.length === 0) {
+    uni.showToast({ title: '先圈定一个根因', icon: 'none' })
+    return
+  }
+  const c = findCause(identifyPick.value)
+  if (c == null) return
+  if (c.correct) {
+    solved.value = true
+    finished.value = true
+    drawerOpen.value = false
+    pushEvent('identify', '', '', 0, '指认根因：' + c.text, false)
+    finishAndSave()
+    setTimeout(() => {
+      goReview()
+    }, 900)
+  } else {
+    wrongCount.value++
+    pushEvent('identify', '', '', 0, '错误指认：' + c.text, false)
+    drawerTab.value = 'identify'
+    appear(onWrongIdentify())
+    if (wrongCount.value >= 2) {
+      finished.value = true
+      appear(onEliminated())
+      finishAndSave()
+    } else if (!frustratedShown.value) {
+      const o = onOverspend(playerCost.value, expertCost.value)
+      if (o != null) {
+        frustratedShown.value = true
+        appear(o)
+      }
+    }
+  }
+}
+
+function finishAndSave() {
+  const grade = computeGrade(solved.value, playerCost.value, expertCost.value, wrongCount.value)
+  const rec: SessionRecord = {
+    caseId: caseId.value,
+    solved: solved.value,
+    playerCost: playerCost.value,
+    expertCost: expertCost.value,
+    wrongIdentifies: wrongCount.value,
+    grade: grade,
+    events: events.value,
+    mascotEvents: mascotEvents.value,
+    hStates: hStates.value,
+  }
+  saveSession(rec)
+}
+
+function goReview() {
+  uni.navigateTo({ url: '/pages/review/review' })
+}
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF9F4;
+  width: 100%;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 24rpx 32rpx 220rpx;
+}
+.content {
+  display: flex;
+  flex-direction: column;
+  padding-top: 110rpx;
+}
+.pagetitle {
+  font-size: 44rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-bottom: 20rpx;
+}
+.loading {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  padding: 60rpx;
+}
+.loading__text {
+  font-size: 26rpx;
+  color: #8A919C;
+}
+
+/* 成本条 */
+.costbar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background-color: #4A4458;
+  border-radius: 20rpx;
+  padding: 20rpx 28rpx;
+  margin-bottom: 22rpx;
+  box-shadow: 0 8rpx 0 0 #35303F;;
+}
+.costbar__left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex: 1;
+}
+.costbar__bolt {
+  width: 34rpx;
+  height: 34rpx;
+  margin-right: 10rpx;
+}
+.costbar__num {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #FFC94D;
+}
+.costbar__sub {
+  font-size: 20rpx;
+  color: #C9C2DA;
+}
+
+/* 现场 */
+.scene {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 22rpx;
+  box-shadow: 0 6rpx 0 0 #EFE5D6;;
+}
+.scene__tag {
+  background-color: #FFF1E7;
+  border-radius: 22rpx;
+  padding: 8rpx 22rpx;
+  align-self: flex-start;
+}
+.scene__tag-text {
+  font-size: 20rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+}
+.scene__title {
+  font-size: 38rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-top: 16rpx;
+}
+.scene__role {
+  font-size: 25rpx;
+  color: #7A7290;
+  margin-top: 14rpx;
+  line-height: 40rpx;
+}
+.scene__arch {
+  display: flex;
+  flex-direction: row;
+  background-color: #FBF3EB;
+  border-radius: 16rpx;
+  padding: 18rpx 22rpx;
+  margin-top: 18rpx;
+}
+.scene__arch-text {
+  font-size: 22rpx;
+  color: #7A7290;
+  line-height: 36rpx;
+  flex: 1;
+}
+.scene__hint {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+  margin-top: 18rpx;
+}
+
+/* 证据卡：统一排版，背景色区分类型 */
+.evidence {
+  display: flex;
+  flex-direction: column;
+  background-color: #FBF3EB;
+  border-radius: 18rpx;
+  padding: 20rpx;
+  margin-top: 18rpx;
+  box-shadow: 0 5rpx 0 0 #EFE5D6;;
+}
+.evbg--error {
+  background-color: #FDEDED;
+  box-shadow: 0 5rpx 0 0 #F0CFCF;
+}
+.evbg--log {
+  background-color: #FFF6DE;
+  box-shadow: 0 5rpx 0 0 #EBD48A;
+}
+.evbg--code {
+  background-color: #E9F7F1;
+  box-shadow: 0 5rpx 0 0 #C8E8DA;
+}
+.evbg--text {
+  background-color: #EAF4FC;
+  box-shadow: 0 5rpx 0 0 #CDE1F0;
+}
+.evbg--time {
+  background-color: #F3F0F8;
+  box-shadow: 0 5rpx 0 0 #DDD8E8;
+}
+.evidence__head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.evidence__icon {
+  width: 32rpx;
+  height: 32rpx;
+  margin-right: 12rpx;
+}
+.evidence__title {
+  font-size: 23rpx;
+  font-weight: bold;
+  color: #4A4458;
+  flex: 1;
+}
+.evidence__text {
+  font-size: 22rpx;
+  color: #52606D;
+  margin-top: 12rpx;
+  line-height: 38rpx;
+}
+
+/* 终局 */
+.donebar {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  box-shadow: 0 6rpx 0 0 #EFE5D6;;
+}
+.donebar__text {
+  font-size: 28rpx;
+  color: #4A4458;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* FAB */
+.fab {
+  position: fixed;
+  bottom: 34rpx;
+  left: 24rpx;
+  right: 24rpx;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 432rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  background-color: #FF8A5C;
+  border-radius: 46rpx;
+  padding: 26rpx;
+  z-index: 98;
+  box-shadow: 0 8rpx 0 0 #E06B38;;
+}
+.fab__text {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+  margin-right: 10rpx;
+}
+.fab__chevron {
+  width: 28rpx;
+  height: 28rpx;
+}
+
+/* 遮罩 + 抽屉 */
+.mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(42, 39, 51, 0.4);
+  opacity: 0;
+  z-index: 96;
+  pointer-events: none;
+}
+.mask--show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.drawer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 480px;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF9F4;
+  border-radius: 40rpx 40rpx 0 0;
+  padding: 16rpx 32rpx 170rpx;
+  transform: translateY(110%);
+  transition-property: transform;
+  transition-duration: 260ms;
+  transition-timing-function: ease-out;
+  z-index: 97;
+  box-shadow: 0 -6rpx 0 0 #EFE5D6;;
+}
+.drawer--open {
+  transform: translateY(0);
+}
+.drawer__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.drawer__handle {
+  width: 88rpx;
+  height: 8rpx;
+  border-radius: 4rpx;
+  background-color: #E8E2D8;
+  margin: 0 auto 20rpx;
+}
+.drawer__anchor {
+  display: flex;
+  flex-direction: row;
+  background-color: #FBF3EB;
+  border-radius: 14rpx;
+  padding: 12rpx 18rpx;
+  margin-bottom: 16rpx;
+}
+.drawer__anchor-text {
+  font-size: 20rpx;
+  color: #7A7290;
+  flex: 1;
+}
+.drawer__scroll {
+  flex: 1;
+}
+.drawer__note {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  margin-top: 14rpx;
+  text-align: center;
+}
+
+/* 分段器 */
+.seg {
+  display: flex;
+  flex-direction: row;
+  background-color: #FBF3EB;
+  border-radius: 18rpx;
+  padding: 6rpx;
+  margin-bottom: 20rpx;
+}
+.seg__item {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  border-radius: 14rpx;
+  padding: 14rpx;
+}
+.seg__item--on {
+  background-color: #FF8A5C;
+}
+.seg__text {
+  font-size: 25rpx;
+  color: #7A7290;
+}
+.seg__text--on {
+  color: #FFFFFF;
+  font-weight: bold;
+}
+
+/* 验证动作：按假设分节 */
+.vsec {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 26rpx;
+}
+.vsec__head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 14rpx;
+}
+.vsec__dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 7rpx;
+  background-color: #FF8A5C;
+  margin-right: 12rpx;
+}
+.vsec__dot--global {
+  background-color: #6FB8E8;
+}
+.vsec__title {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #4A4458;
+  flex: 1;
+}
+.emptyhint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30rpx 20rpx;
+}
+.emptyhint__text {
+  font-size: 23rpx;
+  color: #AFA8BD;
+  text-align: center;
+  line-height: 34rpx;
+}
+.emptyhint__btn {
+  background-color: #FFF1E7;
+  border-radius: 30rpx;
+  padding: 14rpx 36rpx;
+  margin-top: 18rpx;
+}
+.emptyhint__btn-text {
+  font-size: 23rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+}
+
+/* 动作行 + 内嵌证据 */
+.actwrap {
+  display: flex;
+  flex-direction: column;
+}
+.act {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  padding: 22rpx;
+  margin-bottom: 14rpx;
+  box-shadow: 0 5rpx 0 0 #EFE5D6;;
+}
+.act--done {
+  opacity: 0.55;
+}
+.act__main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.act__headrow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.act__name {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #4A4458;
+  flex: 1;
+}
+.act__name--done {
+  color: #7A7290;
+}
+.act__danger {
+  background-color: #E86A6A;
+  border-radius: 8rpx;
+  padding: 4rpx 12rpx;
+  margin-left: 14rpx;
+}
+.act__danger-text {
+  font-size: 18rpx;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+.act__desc {
+  font-size: 22rpx;
+  color: #AFA8BD;
+  margin-top: 8rpx;
+}
+.act__cost {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: 16rpx;
+}
+.act__bolt {
+  width: 30rpx;
+  height: 30rpx;
+}
+.act__cost-num {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+}
+.act__done {
+  font-size: 19rpx;
+  color: #5FC9A5;
+  font-weight: bold;
+  margin-top: 6rpx;
+}
+.evcard {
+  display: flex;
+  flex-direction: column;
+  border-left-width: 4rpx;
+  border-left-style: solid;
+  border-left-color: #FFD3BC;
+  padding: 14rpx 0 14rpx 18rpx;
+  margin-top: 10rpx;
+}
+.evcard--inline {
+  background-color: #FBF3EB;
+  border-radius: 14rpx;
+  padding: 16rpx 18rpx;
+  margin: -6rpx 0 16rpx 10rpx;
+}
+.evcard__head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.evcard__icon {
+  width: 28rpx;
+  height: 28rpx;
+  margin-right: 10rpx;
+}
+.evcard__title {
+  font-size: 23rpx;
+  font-weight: bold;
+  color: #4A4458;
+  flex: 1;
+}
+.evcard__text {
+  font-size: 22rpx;
+  color: #52606D;
+  margin-top: 8rpx;
+  line-height: 36rpx;
+}
+
+/* 假设板行 + 指认行 */
+.hyp {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  border-radius: 16rpx;
+  padding: 18rpx;
+  margin-bottom: 12rpx;
+  background-color: #FFFFFF;
+  box-shadow: 0 5rpx 0 0 #EFE5D6;;
+}
+.hyp--on {
+  border-color: #FF8A5C;
+  background-color: #FFF1E7;
+}
+.hyp__box {
+  width: 34rpx;
+  height: 34rpx;
+  border-radius: 10rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #E3E6EB;
+  margin-right: 18rpx;
+}
+.hyp__box--on {
+  background-color: #FF8A5C;
+  border-color: #FF8A5C;
+}
+.hyp__check {
+  width: 34rpx;
+  height: 34rpx;
+}
+.hyp__text {
+  font-size: 25rpx;
+  color: #7A7290;
+  line-height: 38rpx;
+  flex: 1;
+}
+.hyp__text--on {
+  color: #4A4458;
+  font-weight: 500;
+}
+.freenote {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 10rpx;
+}
+.freenote__text {
+  font-size: 23rpx;
+  color: #8A6D1F;
+}
+.noterow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 8rpx;
+}
+.noterow__input {
+  flex: 1;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  border-radius: 16rpx;
+  padding: 14rpx 20rpx;
+  font-size: 23rpx;
+  color: #4A4458;
+}
+.noterow__btn {
+  font-size: 34rpx;
+  color: #FF8A5C;
+  padding: 10rpx 20rpx;
+}
+.cause {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  border-radius: 16rpx;
+  padding: 18rpx;
+  margin-bottom: 14rpx;
+  background-color: #FFFFFF;
+  box-shadow: 0 5rpx 0 0 #EFE5D6;;
+}
+.cause__dot {
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 15rpx;
+  border-width: 2.5rpx;
+  border-style: solid;
+  border-color: #D5DEE9;
+  margin-right: 16rpx;
+  margin-top: 4rpx;
+}
+.cause__dot--on {
+  border-color: #FF8A5C;
+  background-color: #FF8A5C;
+}
+.cause__text {
+  font-size: 25rpx;
+  color: #4A4458;
+  line-height: 38rpx;
+  flex: 1;
+}
+.reguide {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF6DE;
+  border-radius: 18rpx;
+  border-width: 1rpx;
+  border-style: solid;
+  border-color: #F2D98C;
+  padding: 20rpx;
+  margin-bottom: 20rpx;
+}
+.reguide__text {
+  font-size: 22rpx;
+  color: #8A6D1F;
+  line-height: 34rpx;
+}
+.reguide__btn {
+  align-self: flex-start;
+  background-color: #FFFFFF;
+  border-radius: 26rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #FF8A5C;
+  padding: 10rpx 24rpx;
+  margin-top: 14rpx;
+}
+.reguide__btn-text {
+  font-size: 21rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+}
+
+/* 主按钮 */
+.primarybtn {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  background-color: #FF8A5C;
+  border-radius: 46rpx;
+  padding: 22rpx;
+  margin-top: 18rpx;
+}
+.primarybtn__text {
+  font-size: 28rpx;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+</style>

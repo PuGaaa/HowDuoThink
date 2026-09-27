@@ -1,0 +1,82 @@
+<template>
+  <view :class="visible ? 'mascot' : 'mascot mascot--hidden'">
+    <view class="mascot__badge">
+      <image class="mascot__avatar" :src="'/static/mascots/' + who + '-96.png'" mode="aspectFit"></image>
+    </view>
+    <text class="mascot__line">{{ line }}</text>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { computed } from 'vue'
+
+const props = defineProps({
+  show: { type: Boolean, default: false },
+  who: { type: String, default: 'frog' },
+  line: { type: String, default: '' },
+})
+
+const visible = computed((): boolean => {
+  return props.show && props.who.length > 0
+})
+</script>
+
+<style>
+/* 内心小动物气泡：悬浮弹窗（动效规范第 3 条），不占内容流 */
+.mascot {
+  position: fixed;
+  bottom: 140rpx;
+  left: 24rpx;
+  right: 24rpx;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 432rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background-color: #FFF6DE;
+  border-radius: 24rpx;
+  border-width: 1rpx;
+  border-style: solid;
+  border-color: #F2D98C;
+  padding: 16rpx 22rpx;
+  opacity: 1;
+  transition-property: opacity;
+  transition-duration: 180ms;
+  animation-name: mascot-pop;
+  animation-duration: 380ms;
+  animation-timing-function: ease-out;
+  z-index: 90;
+  box-shadow: 0 8rpx 0 0 #E8D49A;
+}
+@keyframes mascot-pop {
+  0% { transform: translateY(24rpx) scale(0.92); opacity: 0; }
+  60% { transform: translateY(-4rpx) scale(1.02); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.mascot--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.mascot__badge {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 36rpx;
+  background-color: #FFFFFF;
+  border-width: 1rpx;
+  border-style: solid;
+  border-color: #F2D98C;
+  margin-right: 18rpx;
+}
+.mascot__avatar {
+  width: 72rpx;
+  height: 72rpx;
+}
+.mascot__line {
+  font-size: 26rpx;
+  color: #8A6D1F;
+  font-weight: 500;
+  flex: 1;
+  line-height: 38rpx;
+}
+</style>

@@ -1,0 +1,52 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "排错推理训练场"
+      }
+    },
+    {
+      "path": "pages/chapter/chapter",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "章节详情"
+      }
+    },
+    {
+      "path": "pages/play/play",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "诊断现场"
+      }
+    },
+    {
+      "path": "pages/review/review",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "复盘室"
+      }
+    },
+    {
+      "path": "pages/handbook/handbook",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "诊断手册"
+      }
+    },
+    {
+      "path": "pages/profile/profile",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "我的"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "排错推理训练场",
+    "navigationBarBackgroundColor": "#FFF9F4",
+    "backgroundColor": "#FFF9F4"
+  }
+}

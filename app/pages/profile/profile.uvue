@@ -1,0 +1,262 @@
+<template>
+  <view class="page">
+    <view class="content">
+      <text class="title">我的</text>
+
+      <!-- 档案卡 -->
+      <view class="profile">
+        <image class="profile__avatar" src="/static/mascots/frog-96.png" mode="aspectFit"></image>
+        <text class="profile__rank">{{ rankName }}</text>
+        <text class="profile__meta">本地档案 · 第 {{ useDayN }} 天 · 累计破案 {{ solvedCount }} 关</text>
+        <text class="profile__next">{{ rankNextTip }}</text>
+      </view>
+
+      <!-- 统计 -->
+      <view class="stats">
+        <view class="statcard">
+          <text class="statcard__v">{{ streakCount }} 天</text>
+          <text class="statcard__k">连续 streak</text>
+        </view>
+        <view class="statcard">
+          <text class="statcard__v">{{ solvedCount }}</text>
+          <text class="statcard__k">累计破案</text>
+        </view>
+        <view class="statcard">
+          <text class="statcard__v">{{ lessonCount }}</text>
+          <text class="statcard__k">检查单</text>
+        </view>
+      </view>
+
+      <!-- 账号 -->
+      <view class="account">
+        <text class="account__title">账号</text>
+        <text class="account__desc">v0 进度保存在本机。登录后可多端同步、\n参与排行榜与每日挑战。</text>
+        <view class="account__btn" @click="onLogin">
+          <text class="account__btn-text">登录 / 注册 · 即将开放</text>
+        </view>
+      </view>
+
+      <!-- 通用 -->
+      <text class="sec">通用</text>
+      <view v-for="(row, i) in rows" :key="'r' + i" class="row" @click="onRow(row.value)">
+        <text class="row__label">{{ row.label }}</text>
+        <text class="row__value">{{ row.value }}</text>
+        <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
+      </view>
+    </view>
+    <tabbar active="me"></tabbar>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue'
+import { ALL_CASES } from '../../data/cases'
+import { getCaseProgress, getStreak, useDay, getTotals } from '../../utils/storage'
+import { rankOf } from '../../utils/scoring'
+import tabbar from '../../components/tabbar/tabbar.uvue'
+
+class RowVM {
+  label: string = ''
+  value: string = ''
+}
+
+const rankName = ref('')
+const rankNextTip = ref('')
+const useDayN = ref(1)
+const solvedCount = ref(0)
+const streakCount = ref(0)
+const lessonCount = ref(0)
+const rows = ref<RowVM[]>([])
+
+const totals = getTotals(
+  ALL_CASES.map((c) => c.id),
+  ALL_CASES.map((c) => c.lessons.length)
+)
+solvedCount.value = totals.solved
+lessonCount.value = totals.lessons
+useDayN.value = useDay()
+streakCount.value = getStreak().count
+const rk = rankOf(totals.solved)
+rankName.value = rk.name
+rankNextTip.value = rk.remain > 0 ? '距「' + rk.nextName + '」还差 ' + rk.remain + ' 关' : '已是最高称号'
+
+const r1 = new RowVM()
+r1.label = '学习提醒'
+r1.value = '每天 21:30'
+const r2 = new RowVM()
+r2.label = '每日一题'
+r2.value = '即将上线'
+const r3 = new RowVM()
+r3.label = '检查单云同步'
+r3.value = '即将上线'
+const r4 = new RowVM()
+r4.label = '关于排错推理训练场'
+r4.value = 'v0.1'
+rows.value = [r1, r2, r3, r4]
+
+function onLogin() {
+  uni.showToast({ title: '登录功能即将开放', icon: 'none' })
+}
+
+function onRow(v: string) {
+  uni.showToast({ title: v, icon: 'none' })
+}
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF9F4;
+  width: 100%;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 24rpx 32rpx 200rpx;
+  padding-top: 100rpx;
+}
+.content {
+  display: flex;
+  flex-direction: column;
+}
+.title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #4A4458;
+  text-align: center;
+  margin-top: 40rpx;
+  margin-bottom: 24rpx;
+}
+.profile {
+  display: flex;
+  flex-direction: column;
+  background-color: #4A4458;
+  border-radius: 30rpx;
+  padding: 36rpx 32rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 10rpx 0 0 #37323F;;
+}
+.profile__avatar {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 64rpx;
+  background-color: #5E5770;
+}
+.profile__rank {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+  margin-top: 20rpx;
+}
+.profile__meta {
+  font-size: 21rpx;
+  color: #C9C2DA;
+  margin-top: 12rpx;
+}
+.profile__next {
+  font-size: 20rpx;
+  color: #FFC94D;
+  margin-top: 10rpx;
+}
+.stats {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+/* 三卡等宽自适应 */
+.statcard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 31%;
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  padding: 26rpx;
+  box-shadow: 0 6rpx 0 0 #EFE5D6;;
+}
+.statcard__v {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+}
+.statcard__k {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  margin-top: 8rpx;
+}
+.account {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #FFD3BC;
+  padding: 28rpx;
+  margin-bottom: 28rpx;
+  box-shadow: 0 8rpx 0 0 #F3CFA9;;
+}
+.account__title {
+  font-size: 26rpx;
+  font-weight: bold;
+  color: #4A4458;
+}
+.account__desc {
+  font-size: 21rpx;
+  color: #AFA8BD;
+  margin-top: 12rpx;
+  line-height: 34rpx;
+}
+.account__btn {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  background-color: #FFF1E7;
+  border-radius: 34rpx;
+  padding: 18rpx;
+  margin-top: 20rpx;
+}
+.account__btn-text {
+  font-size: 23rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+}
+.sec {
+  font-size: 26rpx;
+  font-weight: bold;
+  color: #7A7290;
+  margin-bottom: 16rpx;
+}
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  padding: 26rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 5rpx 0 0 #EFE5D6;;
+}
+.row__label {
+  font-size: 25rpx;
+  font-weight: 500;
+  color: #4A4458;
+  flex: 1;
+}
+.row__value {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  margin-right: 12rpx;
+}
+.row__chevron {
+  width: 24rpx;
+  height: 24rpx;
+}
+</style>

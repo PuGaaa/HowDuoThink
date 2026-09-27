@@ -1,0 +1,247 @@
+<template>
+  <view class="page">
+    <navbar></navbar>
+    <view class="content">
+      <!-- 章头 -->
+      <view class="hero">
+        <view class="hero__no">
+          <text class="hero__no-text">{{ ch.no }}</text>
+        </view>
+        <text class="hero__name">{{ ch.name }}</text>
+        <text class="hero__pact">层契约：{{ ch.pact }}</text>
+        <text class="hero__meta">进度 {{ solvedInChapter }}/{{ ch.cases.length }} · 通关解锁层契约拼图</text>
+      </view>
+
+      <!-- 关卡路径 -->
+      <view v-for="(node, i) in nodes" :key="node.id">
+        <view v-if="i > 0" class="conn"></view>
+        <view :class="node.live ? 'node node--live' : 'node'" @click="openCase(node)">
+          <view :class="node.live ? 'node__icon node__icon--live' : 'node__icon'">
+            <image v-if="node.live" class="node__bolt" src="/static/icons/bolt-white.png" mode="aspectFit"></image>
+          </view>
+          <view class="node__body">
+            <text :class="node.live ? 'node__title' : 'node__title node__title--locked'">{{ node.title }}</text>
+            <text class="node__meta">{{ node.meta }}</text>
+          </view>
+          <text v-if="node.live" class="node__stars">{{ node.stars }}</text>
+          <view v-else class="node__offchip">
+            <text class="node__offchip-text">即将上线</text>
+          </view>
+        </view>
+      </view>
+      <text class="footer">通关本章，解锁「{{ ch.name }}」层契约拼图</text>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
+import { CHAPTERS } from '../../data/chapters'
+import { ALL_CASES, getCaseById } from '../../data/cases'
+import { getCaseProgress } from '../../utils/storage'
+import { starsOf } from '../../utils/scoring'
+import navbar from '../../components/navbar/navbar.uvue'
+
+class NodeVM {
+  id: string = ''
+  title: string = ''
+  meta: string = ''
+  stars: string = ''
+  live: boolean = false
+}
+
+const ch = ref(CHAPTERS[0])
+const nodes = ref<NodeVM[]>([])
+const solvedInChapter = ref(0)
+
+onLoad((query : OnLoadOptions) => {
+  const iv = query['i']
+  let idx = 0
+  if (iv != null) {
+    idx = Number(iv as string)
+  }
+  if (idx < 0 || idx >= CHAPTERS.length) idx = 0
+  ch.value = CHAPTERS[idx]
+  const list: NodeVM[] = []
+  let solved = 0
+  for (let i = 0; i < ch.value.cases.length; i++) {
+    const c = getCaseById(ch.value.cases[i])
+    const vm = new NodeVM()
+    if (c == null) {
+      vm.id = ch.value.cases[i]
+      vm.title = lockedTitle(ch.value.cases[i])
+      vm.meta = '★★ 标准'
+      vm.live = false
+    } else {
+      vm.id = c.id
+      vm.title = c.title
+      vm.live = true
+      const p = getCaseProgress(c.id)
+      const best = p != null && p.bestGrade.length > 0 ? p.bestGrade : ''
+      const stars = best.length > 0 ? starsOf(best) : 0
+      let sl = ''
+      for (let k = 0; k < 3; k++) sl += k < stars ? '★' : '☆'
+      vm.stars = sl
+      vm.meta = '★★ 标准 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡' : '未挑战')
+      if (p != null && p.solved) solved++
+    }
+    list.push(vm)
+  }
+  nodes.value = list
+  solvedInChapter.value = solved
+})
+
+function lockedTitle(id: string): string {
+  const map = { 'dns-hijack': 'DNS 代理劫持', 'cors-101': 'CORS 失败', 'nginx-trap': 'Nginx 配置陷阱', 'pool-exhausted': '数据库连接池耗尽', 'cache-drift': '缓存不一致', 'race-condition': '竞态条件', 'white-screen': '前端白屏', 'dep-hell': '依赖版本冲突', 'oom-leak': 'OOM 内存泄漏' }
+  const v = map[id]
+  return v ?? id
+}
+
+function openCase(node: NodeVM) {
+  if (!node.live) {
+    uni.showToast({ title: '本题即将上线', icon: 'none' })
+    return
+  }
+  uni.navigateTo({ url: '/pages/play/play?id=' + node.id })
+}
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF9F4;
+  width: 100%;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 32rpx;
+}
+.content {
+  display: flex;
+  flex-direction: column;
+  padding-top: 120rpx;
+}
+.hero {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF1E7;
+  border-radius: 24rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #FFD3BC;
+  padding: 28rpx;
+  margin-bottom: 28rpx;
+  box-shadow: 0 8rpx 0 0 #F3CFA9;;
+}
+.hero__no {
+  background-color: #FF8A5C;
+  border-radius: 22rpx;
+  padding: 8rpx 20rpx;
+  align-self: flex-start;
+}
+.hero__no-text {
+  font-size: 18rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.hero__name {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-top: 16rpx;
+}
+.hero__pact {
+  font-size: 22rpx;
+  color: #7A7290;
+  margin-top: 12rpx;
+  line-height: 34rpx;
+}
+.hero__meta {
+  font-size: 20rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+  margin-top: 14rpx;
+}
+.conn {
+  width: 4rpx;
+  height: 26rpx;
+  margin-left: 108rpx;
+  border-left-width: 3rpx;
+  border-left-style: dashed;
+  border-left-color: #FFB5C8;
+}
+.node {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  border-width: 2rpx;
+  border-style: dashed;
+  border-color: #F5E6DA;
+  padding: 22rpx;
+  box-shadow: 0 5rpx 0 0 #EFE5D6;;
+}
+.node--live {
+  border-style: solid;
+  border-color: #FF8A5C;
+  box-shadow: 0 6rpx 0 0 #F3CFA9;;
+}
+.node__icon {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 28rpx;
+  background-color: #FBF3EB;
+  margin-right: 22rpx;
+}
+.node__icon--live {
+  background-color: #FF8A5C;
+}
+.node__bolt {
+  width: 44rpx;
+  height: 44rpx;
+  margin: 22rpx;
+}
+.node__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.node__title {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #4A4458;
+}
+.node__title--locked {
+  color: #7A7290;
+}
+.node__meta {
+  font-size: 22rpx;
+  color: #AFA8BD;
+  margin-top: 8rpx;
+}
+.node__stars {
+  font-size: 30rpx;
+  color: #FFC94D;
+  font-weight: bold;
+}
+.node__offchip {
+  border-width: 1.5rpx;
+  border-style: dashed;
+  border-color: #F5E6DA;
+  border-radius: 26rpx;
+  padding: 8rpx 20rpx;
+}
+.node__offchip-text {
+  font-size: 18rpx;
+  color: #AFA8BD;
+}
+.footer {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  text-align: center;
+  margin-top: 26rpx;
+}
+</style>

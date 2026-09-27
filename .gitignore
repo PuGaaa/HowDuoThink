@@ -1,0 +1,14 @@
+# HBuilderX / uni-app
+unpackage/
+.hbuilderx/
+
+# Node
+node_modules/
+*.log
+
+# macOS
+.DS_Store
+
+# 编辑器
+.idea/
+.vscode/
