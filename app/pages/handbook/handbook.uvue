@@ -7,30 +7,13 @@
       <view class="rankcard">
         <image class="rankcard__avatar" src="/static/mascots/frog-96.png" mode="aspectFit"></image>
         <view class="rankcard__body">
-          <text class="rankcard__label">收集图鉴</text>
-          <text class="rankcard__name">已相遇 {{ met }} / 5 只</text>
-          <view class="rankcard__track">
-            <view class="rankcard__fill" :style="'width:' + metPct + '%'"></view>
-          </view>
-          <text class="rankcard__next">克服同一偏误 3 次，解锁它们的认可</text>
+          <text class="rankcard__label">诊断手册</text>
+          <text class="rankcard__name">{{ lessonCount }} 条检查单</text>
+          <text class="rankcard__next">来自 {{ solvedCount }} 次破案 · 每破一案，手册厚一页</text>
         </view>
       </view>
 
       <!-- 动物图鉴 -->
-      <text class="sec">内心小动物图鉴</text>
-      <view class="dex">
-        <view v-for="(d, i) in dexList" :key="d.id" :class="d.met ? 'dexcard' : 'dexcard dexcard--off'">
-          <view :class="d.met ? 'dexcard__badge' : 'dexcard__badge dexcard__badge--off'">
-            <image class="dexcard__avatar" :src="'/static/mascots/' + d.id + '-96.png'" mode="aspectFit"></image>
-          </view>
-          <text :class="d.met ? 'dexcard__name' : 'dexcard__name dexcard__name--off'">{{ d.name }}</text>
-          <text class="dexcard__trait">{{ d.trait }}</text>
-          <text class="dexcard__quote">{{ d.quote }}</text>
-          <text :class="d.met ? 'dexcard__count' : 'dexcard__count dexcard__count--off'">{{ d.count }}</text>
-        </view>
-      </view>
-
-      <!-- 收集的检查单 -->
       <text class="sec">收集的检查单</text>
       <view v-if="lessonCards.length == 0" class="empty">
         <text class="empty__text">破案后，手册会开始变厚</text>
@@ -48,56 +31,18 @@
 
 <script setup lang="uts">
 import { ref } from 'vue'
-import { ALL_CASES, getCaseById } from '../../data/cases'
-import { getMascotStats, getCaseProgress } from '../../utils/storage'
+import { ALL_CASES } from '../../data/cases'
+import { getCaseProgress } from '../../utils/storage'
 import tabbar from '../../components/tabbar/tabbar.uvue'
-
-class DexVM {
-  id: string = ''
-  name: string = ''
-  trait: string = ''
-  quote: string = ''
-  count: string = ''
-  met: boolean = false
-}
 
 class LessonCard {
   text: string = ''
   src: string = ''
 }
 
-const met = ref(0)
-const metPct = ref(0)
-const dexList = ref<DexVM[]>([])
+const lessonCount = ref(0)
+const solvedCount = ref(0)
 const lessonCards = ref<LessonCard[]>([])
-
-const stats = getMascotStats()
-const defs = [
-  { id: 'frog', name: '恐怖蛙', trait: '报错恐慌', quote: '呱——好多红色！完了完了要背锅了！', n: stats.frog },
-  { id: 'otter', name: '惊讶濑', trait: '意外 = 信息', quote: '纳尼？！证据它自己说话了！', n: stats.otter },
-  { id: 'snail', name: '不行蜗', trait: '盲扫', quote: '（慢慢探头）这两个动作，好像啥也没查出来。', n: stats.snail },
-  { id: 'rabbit', name: '垂耳兔', trait: '过早锁定', quote: '（摇头）证据还不够，你只是想结束它。', n: stats.rabbit },
-  { id: 'dino', name: '三角龙', trait: '挫败陪伴', quote: '（蹲下）这题是真难。坐一会儿。', n: stats.dino },
-]
-let metCount = 0
-const list: DexVM[] = []
-for (let i = 0; i < defs.length; i++) {
-  const d = defs[i]
-  const vm = new DexVM()
-  vm.id = d.id
-  vm.name = d.name
-  vm.trait = d.trait
-  vm.quote = d.quote
-  vm.met = d.n > 0
-  vm.count = d.n > 0 ? '出场 ' + d.n + ' 次' : '尚未相遇'
-  if (vm.met) metCount++
-  list.push(vm)
-}
-dexList.value = list
-met.value = metCount
-metPct.value = Math.round((metCount * 100) / 5)
-
-// 收集的检查单：已破案案例的全部 lessons
 const cards: LessonCard[] = []
 for (let i = 0; i < ALL_CASES.length; i++) {
   const c = ALL_CASES[i]
@@ -111,6 +56,8 @@ for (let i = 0; i < ALL_CASES.length; i++) {
   }
 }
 lessonCards.value = cards
+lessonCount.value = cards.length
+solvedCount.value = cards.length > 0 ? 1 : 0
 </script>
 
 <style>
@@ -189,71 +136,6 @@ lessonCards.value = cards
   font-weight: bold;
   color: #4A4458;
   margin-bottom: 20rpx;
-}
-.dex {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: space-between;
-}
-.dexcard {
-  display: flex;
-  flex-direction: column;
-  width: 48%;
-  background-color: #FFFFFF;
-  border-radius: 24rpx;
-  border-width: 2rpx;
-  border-style: solid;
-  border-color: #FFF1E7;
-  padding: 26rpx;
-  margin-bottom: 22rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;;
-}
-.dexcard--off {
-  border-color: #F5E6DA;
-  opacity: 0.6;
-}
-.dexcard__badge {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 44rpx;
-  background-color: #FFF1E7;
-}
-.dexcard__badge--off {
-  background-color: #FBF3EB;
-}
-.dexcard__avatar {
-  width: 88rpx;
-  height: 88rpx;
-}
-.dexcard__name {
-  font-size: 27rpx;
-  font-weight: bold;
-  color: #4A4458;
-  margin-top: 16rpx;
-}
-.dexcard__name--off {
-  color: #AFA8BD;
-}
-.dexcard__trait {
-  font-size: 19rpx;
-  color: #AFA8BD;
-  margin-top: 6rpx;
-}
-.dexcard__quote {
-  font-size: 21rpx;
-  color: #7A7290;
-  margin-top: 12rpx;
-  line-height: 32rpx;
-}
-.dexcard__count {
-  font-size: 20rpx;
-  font-weight: bold;
-  color: #FF8A5C;
-  margin-top: 12rpx;
-}
-.dexcard__count--off {
-  color: #AFA8BD;
 }
 .empty {
   display: flex;
