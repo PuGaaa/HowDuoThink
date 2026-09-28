@@ -49,7 +49,7 @@
             <text class="part__desc">{{ part.desc }}</text>
           </view>
           <view :class="openParts[part.id] ? 'part__chev part__chev--open' : 'part__chev'">
-            <image class="part__chev-img" src="/static/icons/arrowr-coral.png" :style="openParts[part.id] ? 'transform: rotate(-90deg)' : 'transform: rotate(90deg)'" mode="aspectFit"></image>
+            <image class="part__chev-img" :src="openParts[part.id] ? '/static/icons/arrowr-white.png' : '/static/icons/arrowr-coral.png'" :style="openParts[part.id] ? 'transform: rotate(-90deg)' : 'transform: rotate(90deg)'" mode="aspectFit"></image>
           </view>
         </view>
         <view v-if="openParts[part.id]" class="part__body">
