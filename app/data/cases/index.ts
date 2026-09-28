@@ -7,6 +7,10 @@ import { dnsHijackCase } from './dns-hijack'
 import { whiteScreenCase } from './white-screen'
 import { depHellCase } from './dep-hell'
 import { cacheDriftCase } from './cache-drift'
+import { slowQueryCase } from './slow-query'
+import { oomLeakCase } from './oom-leak'
+import { msgOrderCase } from './msg-order'
+import { nginxTrapCase } from './nginx-trap'
 import { oversellRaceCase } from './oversell-race'
 import { idempotentFailCase } from './idempotent-fail'
 import { logSamplingCase } from './log-sampling'
@@ -19,6 +23,10 @@ export const ALL_CASES: DiagnosisCase[] = [
   corsCase,
   poolExhaustedCase,
   cacheDriftCase,
+  slowQueryCase,
+  oomLeakCase,
+  msgOrderCase,
+  nginxTrapCase,
   whiteScreenCase,
   depHellCase,
   oversellRaceCase,

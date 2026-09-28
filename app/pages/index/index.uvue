@@ -67,7 +67,7 @@
           ></chapter-cube>
         </view>
       </view>
-      <text class="footer">全部 10 关 · 每关一朵层契约拼图</text>
+      <text class="footer">全部 {{ totalLevels }} 关 · 每关一朵层契约拼图</text>
     </view>
     <tabbar active="adventure"></tabbar>
   </view>
@@ -142,6 +142,7 @@ function openChapter(chapterId: string) {
 }
 const packCount = ref(0)
 const packSynced = ref(false)
+const totalLevels = ref(ALL_CASES.length)
 
 // 竖版内容骨架在 mounted 前就需要空数组占位
 const totals = getTotals(
@@ -153,10 +154,14 @@ rankName.value = rk.name
 rankNext.value = rk.remain > 0 ? '再破案 ' + rk.remain + ' 关晋升「' + rk.nextName + '」' : '已是最高称号'
 streakCount.value = getStreak().count
 packCount.value = getPackCount()
+// 关卡总数：本地注册表与已同步关卡包取大者（包内含社区关）
+totalLevels.value = packCount.value > totalLevels.value ? packCount.value : totalLevels.value
 fetchCasepack((r) => {
   if (r.error.length === 0 && r.count > 0) {
     packCount.value = getPackCount()
     packSynced.value = true
+    // 关卡总数以"本地 + 远端去重"为准（远端含社区关，与本地重 ids 不重复计）
+    totalLevels.value = packCount.value > ALL_CASES.length ? packCount.value : ALL_CASES.length
   }
 })
 

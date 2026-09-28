@@ -56,7 +56,10 @@
               <text class="rmascot__note">{{ item.note }}</text>
             </view>
           </view>
-          <text v-else class="revent__text">{{ item.text }}</text>
+          <view v-else class="revent">
+            <image v-if="item.icon.length > 0" class="revent__icon" :src="item.icon" mode="aspectFit"></image>
+            <text class="revent__text">{{ item.text }}</text>
+          </view>
         </view>
       </view>
 
@@ -133,6 +136,7 @@ class HBoardVM {
 
 interface ReplayItem {
   isMascot: boolean
+  icon: string
   text: string
   who: string
   note: string
@@ -269,8 +273,7 @@ function buildReplay(events: SessionEvent[], mascots: MascotEventRec[]) {
     }
   }
   for (let i = 0; i < events.length; i++) {
-    const icon = eventIcon(events[i].kind)
-    const item: ReplayItem = { isMascot: false, text: icon + events[i].text, who: '', note: '' }
+    const item: ReplayItem = { isMascot: false, icon: eventIcon(events[i].kind), text: events[i].text, who: '', note: '' }
     items.push(item)
     for (let j = 0; j < mascots.length; j++) {
       if (mascots[j].afterEventIndex === i) {
@@ -284,6 +287,7 @@ function buildReplay(events: SessionEvent[], mascots: MascotEventRec[]) {
 function mascotItem(m: MascotEventRec): ReplayItem {
   const item: ReplayItem = {
     isMascot: true,
+    icon: '',
     text: m.line,
     who: m.id,
     note: reviewNote(m.id),
@@ -521,10 +525,17 @@ function replay() {
 .revent {
   display: flex;
   flex-direction: row;
+  align-items: flex-start;
   border-left-width: 4rpx;
   border-left-style: solid;
   border-left-color: #F0E7DC;
   padding: 10rpx 0 10rpx 16rpx;
+}
+.revent__icon {
+  width: 30rpx;
+  height: 30rpx;
+  margin-right: 12rpx;
+  margin-top: 4rpx;
 }
 .revent__text {
   font-size: 23rpx;
