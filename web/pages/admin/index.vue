@@ -16,7 +16,18 @@ onMounted(async () => {
       return
     }
     subs.value = await api.get('/api/admin/submissions')
-    cases.value = await api.get('/api/admin/cases')
+    const cl: any = await api.get('/api/admin/cases')
+    // 补齐 payload 里的元数据（part/chapterId/typeTags）
+    for (const c of cl) {
+      try {
+        const d: any = await api.get('/api/admin/cases/' + c.id)
+        c.part = d.payload?.part || ''
+        c.chapterId = d.payload?.chapterId || ''
+        c.typeTags = (d.payload?.typeTags || []).join('/')
+        c.submissionId = d.payload?.submissionId || ''
+      } catch {}
+    }
+    cases.value = cl
   } catch (e: any) {
     denied.value = true
   }
@@ -83,7 +94,13 @@ async function makeDraft(sid: string) {
             <NuxtLink :to="'/admin/cases/' + c.id" style="font-weight: 700; color: var(--ink); text-decoration: none">{{ c.title || c.id }}</NuxtLink>
             <span class="chip">{{ c.status }}{{ c.version ? ' · v' + c.version : '' }}</span>
           </div>
-          <div class="muted" style="margin-top: 6px">{{ c.id }} · {{ c.domain || '—' }} · {{ c.layer || '层契约待补' }}</div>
+          <div class="muted" style="margin: 6px 0">{{ c.id }} · {{ c.domain || '—' }} · {{ c.layer || '层契约待补' }}</div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px">
+            <span v-if="c.part" class="chip" style="background: var(--coral-soft); color: var(--coral)">{{ c.part }}</span>
+            <span v-if="c.chapterId" class="chip" style="background: var(--sky-soft); color: var(--sky)">{{ c.chapterId }}</span>
+            <span v-if="c.typeTags" class="chip">{{ c.typeTags }}</span>
+            <span v-if="c.submissionId" class="chip" style="background: var(--mint-soft); color: var(--mint-deep)">来自投稿</span>
+          </div>
         </div>
       </div>
     </template>

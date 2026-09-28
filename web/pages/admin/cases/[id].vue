@@ -8,11 +8,46 @@ const msg = ref('')
 const errs = ref<string[]>([])
 const placeholderHits = computed(() => (payloadText.value.match(/（待补充/g) || []).length)
 
+const meta = reactive({ part: '', chapterId: '', order: 1, typeTags: '' })
+const PARTS = [
+  { id: 'apprentice', name: '侦探学徒篇' },
+  { id: 'engineer', name: '一线工兵篇' },
+  { id: 'master', name: '资深值班篇' },
+]
+const CHAPTER_LIST = [
+  { id: 'access', name: '接入层之夜' },
+  { id: 'build', name: '构建与依赖' },
+  { id: 'data', name: '数据的脾气' },
+  { id: 'runtime', name: '运行时暗面' },
+  { id: 'concurrency', name: '并发迷宫' },
+  { id: 'observability', name: '可观测性迷雾' },
+]
+
 onMounted(async () => {
   const r: any = await api.get('/api/admin/cases/' + cid.value)
   status.value = r.status
   payloadText.value = JSON.stringify(r.payload, null, 2)
+  meta.part = r.payload.part || 'engineer'
+  meta.chapterId = r.payload.chapterId || ''
+  meta.order = r.payload.order || 1
+  meta.typeTags = (r.payload.typeTags || []).join(', ')
 })
+
+async function saveMeta() {
+  msg.value = ''
+  errs.value = []
+  try {
+    await api.patch('/api/admin/cases/' + cid.value + '/meta', {
+      part: meta.part,
+      chapterId: meta.chapterId,
+      order: Number(meta.order) || 1,
+      typeTags: meta.typeTags.split(/[,，]/).map((s: string) => s.trim()).filter(Boolean),
+    })
+    msg.value = '✓ 元数据已保存'
+  } catch (e: any) {
+    msg.value = e?.data?.detail || String(e)
+  }
+}
 
 async function save() {
   msg.value = ''
@@ -56,6 +91,40 @@ async function publish() {
       待补充占位：<b :style="placeholderHits > 0 ? 'color: var(--coral-deep)' : 'color: var(--mint-deep)'">{{ placeholderHits }}</b> 处
       （tests 绑定 / 效应标注 / 干扰假设 需人工设计——这是创作，不是填表）
     </p>
+
+    <div class="card metacard">
+      <div class="metacard__title">三级架构元数据</div>
+      <div class="metarow">
+        <div class="metarow__f">
+          <label>篇</label>
+          <select v-model="meta.part">
+            <option value="apprentice">侦探学徒篇</option>
+            <option value="engineer">一线工兵篇</option>
+            <option value="master">资深值班篇</option>
+          </select>
+        </div>
+        <div class="metarow__f">
+          <label>章</label>
+          <select v-model="meta.chapterId">
+            <option value="access">接入层之夜</option>
+            <option value="build">构建与依赖</option>
+            <option value="data">数据的脾气</option>
+            <option value="runtime">运行时暗面</option>
+            <option value="concurrency">并发迷宫</option>
+            <option value="observability">可观测性迷雾</option>
+          </select>
+        </div>
+        <div class="metarow__f">
+          <label>章内排序</label>
+          <input v-model.number="meta.order" type="number" min="1" />
+        </div>
+      </div>
+      <div class="metarow__f" style="margin-top: 10px">
+        <label>机理标签（逗号分隔：config/dependency/race/resource/capacity/cert/timing/data）</label>
+        <input v-model="meta.typeTags" placeholder="config, cert" />
+      </div>
+      <button class="btn btn--ghost" style="padding: 8px 18px; font-size: 13px; margin-top: 10px" @click="saveMeta">保存元数据</button>
+    </div>
 
     <textarea v-model="payloadText" spellcheck="false"
       style="width: 100%; min-height: 520px; font-family: Menlo, monospace; font-size: 12.5px; line-height: 1.6;

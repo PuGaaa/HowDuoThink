@@ -362,12 +362,17 @@ def draft_from_submission(sid: str) -> dict:
     lesson_list = [{"text": l, "principle": "（待补充：这一层的契约）"} for l in lessons]
     lesson_list.append({"text": "（待补充检查单）", "principle": "（待补充原理）"})
     pid = "c-" + sid.replace("s-", "")
+    part_guess = {"network": "access", "data": "data", "build": "build", "runtime": "runtime", "concurrency": "concurrency", "deploy": "access"}.get(s["domain_hint"] or "", "")
     return {
         "id": pid,
         "title": title,
         "intro": title,
         "domain": s["domain_hint"] or "network",
         "layer": "（待补充层契约）",
+        "part": part_guess or "apprentice",
+        "chapterId": part_guess or "",
+        "order": 99,
+        "typeTags": [],
         "difficulty": 1,
         "scene": {
             "role": "（待补充：玩家角色代入）",
@@ -396,6 +401,31 @@ def draft_from_submission(sid: str) -> dict:
         "expertChain": chain,
         "lessons": lesson_list,
     }
+
+
+@app.patch("/api/admin/cases/{cid}/meta")
+def update_case_meta(cid: str, body: dict, uid: str = Depends(current_user)):
+    """结构化更新三级架构元数据（part/chapterId/order/typeTags），不动正文。"""
+    if not uid:
+        raise HTTPException(401, "未登录")
+    require_editor(uid)
+    rows = db.q("SELECT payload FROM cases WHERE id=?", (cid,))
+    if not rows:
+        raise HTTPException(404, "不存在")
+    payload = db.jload(rows[0]["payload"], {})
+    valid_parts = {"apprentice", "engineer", "master"}
+    if body.get("part") and body["part"] not in valid_parts:
+        raise HTTPException(400, "part 非法")
+    if body.get("part"):
+        payload["part"] = body["part"]
+    if "chapterId" in body:
+        payload["chapterId"] = body["chapterId"]
+    if "order" in body:
+        payload["order"] = int(body["order"])
+    if "typeTags" in body:
+        payload["typeTags"] = [str(t).strip() for t in body["typeTags"] if str(t).strip()]
+    db.ex("UPDATE cases SET payload=? WHERE id=?", (db.jdump(payload), cid))
+    return {"ok": True, "meta": {"part": payload.get("part"), "chapterId": payload.get("chapterId"), "order": payload.get("order"), "typeTags": payload.get("typeTags")}}
 
 
 @app.post("/api/admin/submissions/{sid}/draft")
