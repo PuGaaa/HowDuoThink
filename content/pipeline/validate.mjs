@@ -25,6 +25,14 @@ for (const f of files) {
   const errors = []
   const warns = []
 
+  // —— 前置检查：单引号字符串内的裸换行（求值会报 Invalid token）——
+  const badStr = src.match(/text: '[^'\n]*\n[^']*'/)
+  if (badStr) {
+    console.error(`✗ ${f}: text 字段含裸换行（TS 单引号字符串不能跨行，用 \\n 转义）`)
+    totalFailed++
+    continue
+  }
+
   // —— 加载：剥掉 import 与 export，用 Function 求值出案例对象 ——
   const nameMatch = src.match(/export\s+const\s+(\w+)/)
   if (!nameMatch) {

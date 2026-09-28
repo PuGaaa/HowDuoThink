@@ -83,6 +83,10 @@ class CasePayload(BaseModel):
     intro: str = Field(min_length=1, max_length=80)
     domain: str
     layer: str = Field(min_length=1, max_length=120)
+    part: str = Field(default='engineer')
+    chapter_id: str = Field(default='', alias='chapterId')
+    order: int = Field(default=1)
+    type_tags: list[str] = Field(default_factory=list, alias='typeTags')
     difficulty: int = Field(ge=1, le=3)
     scene: SceneIn
     hypotheses: list[HypothesisIn] = Field(min_length=3, max_length=8)

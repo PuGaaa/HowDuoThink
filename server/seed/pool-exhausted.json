@@ -1,0 +1,301 @@
+{
+  "id": "pool-exhausted",
+  "title": "下单体突然卡死",
+  "intro": "运营活动开始 10 分钟后，下单接口全线超时，但 CPU 和内存都很安静。",
+  "domain": "data",
+  "layer": "连接池：池是共享资源，任何租户不还，所有人都借不到",
+  "part": "engineer",
+  "chapterId": "data",
+  "order": 1,
+  "typeTags": [
+    "resource",
+    "capacity"
+  ],
+  "difficulty": 2,
+  "scene": {
+    "role": "你是「鲜到家」电商的下单服务后端，今晚运营有大促预热活动。",
+    "architecture": "用户 App → 下单服务 → 连接池(max=20) → MySQL 主库",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "下单服务 error.log",
+        "text": "2026-10-12 20:10:11 [error] GetConnection timeout: waited 5000ms, pool active=20/20\n...（同类错误每秒刷屏）"
+      },
+      {
+        "type": "text",
+        "title": "监控大盘",
+        "text": "下单接口 P99 从 200ms 飙到 5000ms+；CPU 15%、内存平稳、MySQL QPS 反而比平时低——\"机器不忙，业务却卡死\"。"
+      }
+    ],
+    "timeline": "20:10 大促预热活动开始后 10 分钟内故障 ｜ 无任何发版（最近一次发布在三天前）",
+    "impactHint": "下单全挂，但商品浏览正常——范围先画清楚。"
+  },
+  "hypotheses": [
+    {
+      "id": "h-slow",
+      "text": "某类慢查询占住连接不放，池被吃光",
+      "excludeActionId": "a-slowquery"
+    },
+    {
+      "id": "h-leak",
+      "text": "代码漏还连接（连接泄漏）",
+      "excludeActionId": "a-stack"
+    },
+    {
+      "id": "h-mysql",
+      "text": "MySQL 本身故障或过载",
+      "excludeActionId": "a-mysql"
+    },
+    {
+      "id": "h-traffic",
+      "text": "流量太大，池太小",
+      "excludeActionId": "a-poolstat"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-impact",
+      "name": "查影响范围",
+      "desc": "哪些接口受影响，读接口是否正常",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [
+        {
+          "id": "h-mysql",
+          "status": "down"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "影响范围",
+        "text": "仅下单/支付等写接口超时；商品浏览、搜索全部正常（同样走 MySQL 读库）。\nCPU 15%、内存平稳——\"机器很闲，业务却卡死\"。"
+      }
+    },
+    {
+      "id": "a-errorlog",
+      "name": "读下单服务 error.log",
+      "desc": "定位报错发生在哪一层",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "log",
+        "title": "error.log 关键行",
+        "text": "GetConnection timeout: waited 5000ms, pool active=20/20\n—— 全部报错集中在【服务 ↔ 连接池】借连接阶段\n没有 SQL 执行报错、没有数据库驱动报错"
+      }
+    },
+    {
+      "id": "a-poolstat",
+      "name": "查连接池实时状态",
+      "desc": "active/idle/wait 指标与 20 分钟前的对比",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-traffic"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-traffic",
+          "status": "down"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "连接池指标",
+        "text": "active=20/20（满）  idle=0  wait=87\n20:00 之前：active=4~6，idle=14\n→ 20:10 后连接被全部借走且不归还"
+      }
+    },
+    {
+      "id": "a-slowquery",
+      "name": "查 MySQL 慢查询与 processlist",
+      "desc": "有没有 SQL 执行了几十秒还在跑",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-slow"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-slow",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "log",
+        "title": "processlist 关键行",
+        "text": "Time=180s  State=Sending data\nSQL: SELECT ... FROM orders WHERE user_id IN (...5000 个参数...) —— 大促批量导出任务\n共 6 条同类查询，各占住 1 个连接，耗时 3~5 分钟"
+      }
+    },
+    {
+      "id": "a-stack",
+      "name": "抓借连接处的线程堆栈",
+      "desc": "看连接被借走后在代码里停在哪一行",
+      "cost": 2,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-leak",
+        "h-slow"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-leak",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "线程堆栈抽样",
+        "text": "87 个线程全部 WAITING 在 GetConnection（排队等连接）\n拿到连接的 20 个线程：18 个在等待 SQL 响应（网络读），2 个在执行批量导出\n→ 连接都有归还路径，只是\"还得很慢\"——不是泄漏"
+      }
+    },
+    {
+      "id": "a-mysql",
+      "name": "查 MySQL 自身健康度",
+      "desc": "CPU/连接数/慢查询总数的数据库侧视角",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-mysql"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-mysql",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "MySQL 侧",
+        "text": "CPU 8%，连接数 23/500，无锁等待。数据库自己很健康——它只是被 6 条大查询占着干活。"
+      }
+    },
+    {
+      "id": "a-netprobe",
+      "name": "抓服务到 MySQL 的网络包",
+      "desc": "tcpdump 看连接层面的网络交互",
+      "cost": 3,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-mysql"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-mysql",
+          "status": "down"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "网络包抽样",
+        "text": "TCP 连接建立正常、无重传/无 RST——网络层干净。3⚡ 只排除了网络问题（本来优先级就低）。"
+      }
+    },
+    {
+      "id": "a-restart",
+      "name": "重启下单服务",
+      "desc": "【状态变更】重启释放所有连接",
+      "cost": 8,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "重启结果",
+        "text": "重启后 3 分钟内正常，随后批量导出任务再次跑起来，连接重新被吃光。\n问题复发 = 有一只手在持续拿走连接。"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-slow",
+      "text": "大促批量导出任务的慢查询长时间占用连接，池被打满，正常下单借不到连接",
+      "correct": true
+    },
+    {
+      "id": "rc-leak",
+      "text": "代码缺陷导致连接借出后未归还（连接泄漏）",
+      "correct": false
+    },
+    {
+      "id": "rc-mysql",
+      "text": "MySQL 数据库故障导致所有 SQL 变慢",
+      "correct": false
+    },
+    {
+      "id": "rc-traffic",
+      "text": "大促流量上涨，20 个连接的池配太小不够用",
+      "correct": false
+    }
+  ],
+  "expertCost": 6,
+  "restartActionId": "a-restart",
+  "expertChain": [
+    {
+      "thought": "下单全挂但商品浏览正常——读库正常，先圈定问题在写链路。",
+      "update": "范围画圈：不是全局故障，聚焦下单服务的写链路。",
+      "actionId": "a-impact",
+      "why": "1⚡ 买形状：写挂读好的故障，候选假设立刻从\"全局灾难\"收缩到\"写链路独有资源\"。",
+      "conclusion": "只有写接口挂 → 聚焦下单服务与写连接。"
+    },
+    {
+      "thought": "报错集中在\"借连接超时\"，没有任何 SQL 执行报错——问题不在数据库，在池。",
+      "update": "假设空间收缩：池耗尽成为主嫌疑，数据库故障降权。",
+      "actionId": "a-errorlog",
+      "why": "1⚡ 分层：借不到连接和 SQL 慢是两类完全不同的问题，先分层再深挖。",
+      "conclusion": "pool active=20/20 → 池被打满，接下来查\"谁占着\"。"
+    },
+    {
+      "thought": "池满有两种可能：流量真大（池太小）或有连接被长期占用。先看池的实时指标对比 20 分钟前。",
+      "update": "h-traffic 与 h-slow 并列，先做便宜的区分。",
+      "actionId": "a-poolstat",
+      "why": "2⚡ 直接区分\"池太小\"和\"被占住\"：idle=0 且 active 满，流量类假设降权。",
+      "conclusion": "20:10 前 active 只有 4~6 → 不是流量不够，是连接被占住不还。"
+    },
+    {
+      "thought": "连接被占住 = 有人在跑慢 SQL 或泄漏。看 processlist 直接找元凶。",
+      "update": "h-slow 升权为第一嫌疑。",
+      "actionId": "a-slowquery",
+      "why": "2⚡ 实锤动作：processlist 直接列出正在执行的 SQL 与耗时——比翻代码快且确定。",
+      "conclusion": "6 条批量导出慢查询各占 1 连接 3~5 分钟 → 实锤：慢查询吃光连接池。"
+    },
+    {
+      "thought": "证据链闭合了吗？池满（实锤）+ 元凶（processlist）+ 时间线（活动开始）三点齐。停。",
+      "update": "停止收集，转入处置。",
+      "actionId": "",
+      "why": "继续查堆栈/数据库都不会改变行动（杀掉导出任务 + 慢查询治理）。",
+      "conclusion": "处置：杀掉批量导出任务，池立即恢复；导出任务改到读从库 + 加慢查询熔断。"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "\"机器不忙业务卡死\"先查资源池：池满时一切请求都在排队。",
+      "principle": "连接池是所有请求共享的瓶颈资源：池满的症状（排队超时）与数据库故障相似，但数据库侧视角完全不同——分层看池指标是第一动作。"
+    },
+    {
+      "text": "慢查询是连接池耗尽的头号成因：一条 3 分钟的 SQL = 3 分钟少一个连接。",
+      "principle": "连接是租借制共享资源：占用时长 × 频率 决定池的承载力，任何长事务/慢查询都在向所有请求\"征税\"。"
+    },
+    {
+      "text": "重启能救急但不能结案：问题复发说明存在持续占用的手。",
+      "principle": "重启释放的是症状不是根因——复发的故障必须找到\"持续存在的元凶\"，否则每次重启只是下一轮故障的倒计时。"
+    }
+  ]
+}
