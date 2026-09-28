@@ -344,6 +344,122 @@ function onPackTap() {
   font-size: 20rpx;
   color: #AFA8BD;
 }
+
+/* 篇-章两级导航 */
+.part {
+  margin-bottom: 22rpx;
+}
+.part__head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  padding: 24rpx;
+  box-shadow: 0 5rpx 0 0 #EFE5D6;
+}
+.part__head--open {
+  background-color: #FFF1E7;
+  border-color: #FFD3BC;
+  border-bottom-left-radius: 8rpx;
+  border-bottom-right-radius: 8rpx;
+  box-shadow: none;
+}
+.part__left {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.part__name {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #4A4458;
+}
+.part__desc {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  margin-top: 6rpx;
+}
+.part__chev {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 26rpx;
+  background-color: #FFF1E7;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+.part__chev--open {
+  background-color: #FF8A5C;
+}
+.part__chev-img {
+  width: 28rpx;
+  height: 28rpx;
+}
+.part__body {
+  background-color: #FFF1E7;
+  border-radius: 0 0 20rpx 20rpx;
+  margin-top: -10rpx;
+  padding: 14rpx 16rpx 8rpx;
+}
+.chapter {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  background-color: #FFFFFF;
+  border-radius: 18rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  box-shadow: 0 4rpx 0 0 #F3CFA9;
+}
+.chapter__no {
+  background-color: #FF8A5C;
+  border-radius: 18rpx;
+  padding: 6rpx 18rpx;
+  align-self: flex-start;
+}
+.chapter__no-text {
+  font-size: 18rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.chapter__name {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-top: 14rpx;
+}
+.chapter__pact {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  margin-top: 8rpx;
+  lines: 1;
+  text-overflow: ellipsis;
+}
+.chapter__track {
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: #FFF1E7;
+  margin-top: 20rpx;
+}
+.chapter__fill {
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: #FF8A5C;
+}
+.chapter__count {
+  font-size: 21rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+  align-self: flex-end;
+  margin-top: -26rpx;
+}
 .grid {
   display: flex;
   flex-direction: row;
