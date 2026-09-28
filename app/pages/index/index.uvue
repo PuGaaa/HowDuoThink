@@ -41,11 +41,16 @@
       </view>
       <view v-for="(part, pi) in parts" :key="part.id" class="part">
         <view class="part__head" @click="togglePart(part.id)">
-          <view class="part__headrow">
-            <text class="part__name">{{ part.name }}</text>
-            <text class="part__chev">{{ openParts[part.id] ? '⌃' : '⌄' }}</text>
+          <view class="part__left">
+            <view class="part__titlerow">
+              <text class="part__name">{{ part.name }}</text>
+              <text class="part__chcount">{{ partChCount(part.id) }} 章</text>
+            </view>
+            <text class="part__desc">{{ part.desc }}</text>
           </view>
-          <text class="part__desc">{{ part.desc }}</text>
+          <view :class="openParts[part.id] ? 'part__chev part__chev--open' : 'part__chev'">
+            <image class="part__chev-img" src="/static/icons/arrowr-coral.png" :style="openParts[part.id] ? 'transform: rotate(-90deg)' : 'transform: rotate(90deg)'" mode="aspectFit"></image>
+          </view>
         </view>
         <view v-if="openParts[part.id]" class="part__body">
           <chapter-cube
@@ -117,6 +122,10 @@ function chaptersOfPart(partId: string): ChapterVM[] {
   }
   return out
 }
+function partChCount(partId: string): number {
+  return chaptersOfPart(partId).length
+}
+
 function partProgress(chapterId: string) {
   const list = casesInChapter(chapterId)
   let solved = 0
@@ -362,6 +371,20 @@ function onPackTap() {
   justify-content: space-between;
   padding: 26rpx 28rpx;
 }
+.part__titlerow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.part__chcount {
+  font-size: 20rpx;
+  font-weight: bold;
+  color: #AFA8BD;
+  background-color: #FBF3EB;
+  border-radius: 18rpx;
+  padding: 4rpx 16rpx;
+  margin-left: 14rpx;
+}
 .part__head--open {
   border-bottom-width: 2rpx;
   border-bottom-style: dashed;
@@ -391,9 +414,11 @@ function onPackTap() {
   flex-direction: row;
   align-items: center;
   justify-content: center;
+  transition-property: transform;
+  transition-duration: 200ms;
 }
 .part__chev--open {
-  background-color: #E86F3F;
+  background-color: #FF8A5C;
 }
 .part__chev-img {
   width: 30rpx;
