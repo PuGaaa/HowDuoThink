@@ -164,6 +164,20 @@ export function getMascotStats(): MascotStats {
   }
 }
 
+/** 检查单核对次数（指认前打开核对即计数） */
+const KEY_CHECKUSE = 'think_checkuse_v1'
+
+export function bumpChecklistUse(): number {
+  const n = getChecklistUse() + 1
+  uni.setStorageSync(KEY_CHECKUSE, String(n))
+  return n
+}
+
+export function getChecklistUse(): number {
+  const v = uni.getStorageSync(KEY_CHECKUSE)
+  return Number(v) || 0
+}
+
 /** 连续天数（每次 saveSession 触发） */
 export interface StreakData {
   last: string

@@ -1,4 +1,5 @@
 import { DiagnosisCase } from '../../types/case'
+import { getCaseProgress } from '../../utils/storage'
 import { sslChainCase } from './ssl-chain'
 import { poolExhaustedCase } from './pool-exhausted'
 import { corsCase } from './cors-101'
@@ -47,4 +48,36 @@ export function getCaseById(id: string): DiagnosisCase | null {
     }
   }
   return null
+}
+
+export class CollectedLesson {
+  text: string = ''
+  src: string = ''
+}
+
+/** 已破案案例的全部检查单（本地 + 远端 casepack），可排除当前关 */
+export function getCollectedLessons(excludeCaseId: string): CollectedLesson[] {
+  const out: CollectedLesson[] = []
+  const merged: DiagnosisCase[] = []
+  for (let i = 0; i < ALL_CASES.length; i++) merged.push(ALL_CASES[i])
+  const raw = uni.getStorageSync('think_casepack_v1')
+  if (raw != null && (raw as string).length > 0) {
+    try {
+      const remote = JSON.parse(raw as string) as DiagnosisCase[]
+      for (let i = 0; i < remote.length; i++) merged.push(remote[i])
+    } catch (e) {}
+  }
+  for (let i = 0; i < merged.length; i++) {
+    const c = merged[i]
+    if (c.id === excludeCaseId) continue
+    const p = getCaseProgress(c.id)
+    if (p == null || !p.solved) continue
+    for (let j = 0; j < c.lessons.length; j++) {
+      const item = new CollectedLesson()
+      item.text = c.lessons[j].text
+      item.src = '《' + c.title + '》'
+      out.push(item)
+    }
+  }
+  return out
 }

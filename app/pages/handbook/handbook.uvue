@@ -9,7 +9,7 @@
         <view class="rankcard__body">
           <text class="rankcard__label">诊断手册</text>
           <text class="rankcard__name">{{ lessonCount }} 条检查单</text>
-          <text class="rankcard__next">来自 {{ solvedCount }} 次破案 · 每破一案，手册厚一页</text>
+          <text class="rankcard__next">来自 {{ solvedCount }} 次破案 · 诊断中核对过 {{ checkUse }} 次</text>
         </view>
       </view>
 
@@ -32,7 +32,7 @@
 <script setup lang="uts">
 import { ref } from 'vue'
 import { ALL_CASES } from '../../data/cases'
-import { getCaseProgress } from '../../utils/storage'
+import { getCaseProgress, getChecklistUse } from '../../utils/storage'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class LessonCard {
@@ -43,6 +43,7 @@ class LessonCard {
 const lessonCount = ref(0)
 const solvedCount = ref(0)
 const lessonCards = ref<LessonCard[]>([])
+const checkUse = ref(0)
 const cards: LessonCard[] = []
 for (let i = 0; i < ALL_CASES.length; i++) {
   const c = ALL_CASES[i]
@@ -56,6 +57,7 @@ for (let i = 0; i < ALL_CASES.length; i++) {
   }
 }
 lessonCards.value = cards
+checkUse.value = getChecklistUse()
 lessonCount.value = cards.length
 solvedCount.value = cards.length > 0 ? 1 : 0
 </script>

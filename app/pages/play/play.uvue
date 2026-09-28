@@ -189,6 +189,21 @@
       <!-- 指认根因 tab -->
       <view v-else class="drawer__body">
         <scroll-view class="drawer__scroll" scroll-y>
+          <view class="checklist">
+            <view class="checklist__head" @click="toggleChecklist">
+              <text class="checklist__title">📜 指认前核对：我的检查单（{{ collected.length }}）</text>
+              <text class="checklist__chev">{{ checklistOpen ? '⌃' : '⌄' }}</text>
+            </view>
+            <view v-if="checklistOpen">
+              <view v-for="(cl, i) in collected" :key="'cl' + i" class="checklist__item">
+                <text class="checklist__item-text">☑ {{ cl.text }}</text>
+                <text class="checklist__item-src">{{ cl.src }}</text>
+              </view>
+              <view v-if="collected.length == 0" class="checklist__empty">
+                <text class="checklist__empty-text">还没有收集的检查单——破案后会在这里积累</text>
+              </view>
+            </view>
+          </view>
           <view v-if="wrongCount > 0" class="reguide">
             <text class="reguide__text">垂耳兔：你的证据链指向了别处。回假设板重新推演，或者再看一遍证据。</text>
             <view class="reguide__btn" @click="drawerTab = 'board'">
@@ -214,9 +229,9 @@ import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import navbar from '../../components/navbar/navbar.uvue'
 import mascot from '../../components/mascot/mascot.uvue'
-import { getCaseById } from '../../data/cases'
+import { getCaseById, getCollectedLessons, CollectedLesson } from '../../data/cases'
 import { CaseAction, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
-import { SessionEvent, MascotEventRec, SessionRecord, saveSession } from '../../utils/storage'
+import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse } from '../../utils/storage'
 import { computeGrade } from '../../utils/scoring'
 import {
   MascotAppearance,
@@ -268,6 +283,9 @@ const hBets = ref<string[]>([])
 
 const drawerOpen = ref(false)
 const drawerTab = ref('board')
+const checklistOpen = ref(false)
+const checklistTouched = ref(false)
+const collected = ref<CollectedLesson[]>([])
 const identifyPick = ref('')
 const wrongCount = ref(0)
 const finished = ref(false)
@@ -358,6 +376,7 @@ onLoad((query : OnLoadOptions) => {
   causes.value = shuffleCauses(c.rootCauses)
   expertCost.value = c.expertCost
   restartActionId.value = c.restartActionId
+  collected.value = getCollectedLessons(c.id)
   loaded.value = true
 
   const hs: HStateRec[] = []
@@ -383,6 +402,14 @@ function toggleDrawer() {
 
 function closeDrawer() {
   drawerOpen.value = false
+}
+
+function toggleChecklist() {
+  checklistOpen.value = !checklistOpen.value
+  if (checklistOpen.value && !checklistTouched.value) {
+    checklistTouched.value = true
+    bumpChecklistUse()
+  }
 }
 
 function shuffleCauses(list: RootCauseOption[]): RootCauseOption[] {
@@ -1214,6 +1241,54 @@ function goReview() {
   color: #4A4458;
   line-height: 38rpx;
   flex: 1;
+}
+/* 指认前核对检查单 */
+.checklist {
+  background-color: #FFF6DE;
+  border-radius: 16rpx;
+  border-width: 1rpx;
+  border-style: solid;
+  border-color: #F2D98C;
+  padding: 16rpx 18rpx;
+  margin-bottom: 16rpx;
+}
+.checklist__head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.checklist__title {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #8A6D1F;
+  flex: 1;
+}
+.checklist__chev {
+  font-size: 22rpx;
+  color: #B08F4A;
+}
+.checklist__item {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 12rpx;
+  padding: 12rpx 16rpx;
+  margin-top: 10rpx;
+}
+.checklist__item-text {
+  font-size: 22rpx;
+  color: #4A4458;
+  line-height: 34rpx;
+}
+.checklist__item-src {
+  font-size: 19rpx;
+  color: #B08F4A;
+  margin-top: 4rpx;
+}
+.checklist__empty-text {
+  font-size: 21rpx;
+  color: #B08F4A;
 }
 .reguide {
   display: flex;
