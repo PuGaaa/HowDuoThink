@@ -47,18 +47,18 @@
           </view>
           <text class="part__desc">{{ part.desc }}</text>
         </view>
-        <view v-if="openParts[part.id]">
-          <view v-for="(ch, ci) in chaptersOfPart(part.id)" :key="ch.id" :class="'chapter chapter--' + part.id" @click="openChapter(ch.id)">
-            <view class="chapter__no">
-              <text class="chapter__no-text">{{ ch.no }}</text>
-            </view>
-            <text class="chapter__name">{{ ch.name }}</text>
-            <text class="chapter__pact">{{ ch.pact }}</text>
-            <view class="chapter__track">
-              <view class="chapter__fill" :style="'width:' + partProgress(ch.id).pct + 'rpx'"></view>
-            </view>
-            <text class="chapter__count">{{ partProgress(ch.id).solved }}/{{ partProgress(ch.id).total }}</text>
-          </view>
+        <view v-if="openParts[part.id]" class="part__body">
+          <chapter-cube
+            v-for="(ch, ci) in chaptersOfPart(part.id)"
+            :key="ch.id"
+            :chapter-no="ch.no"
+            :name="ch.name"
+            :pact="ch.pact"
+            :solved="partProgress(ch.id).solved"
+            :total="partProgress(ch.id).total"
+            :accent="part.id"
+            @tap="openChapter(ch.id)"
+          ></chapter-cube>
         </view>
       </view>
       <text class="footer">全部 10 关 · 每关一朵层契约拼图</text>
@@ -71,6 +71,7 @@
 import { ref, computed } from 'vue'
 import { CHAPTERS, PARTS, casesInChapter } from '../../data/chapters'
 import tabbar from '../../components/tabbar/tabbar.uvue'
+import chapterCube from '../../components/chapter-cube/chapter-cube.uvue'
 import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress, getStreak, CaseProgress } from '../../utils/storage'
 import { getTotals } from '../../utils/storage'
@@ -392,7 +393,7 @@ function onPackTap() {
   justify-content: center;
 }
 .part__chev--open {
-  background-color: #FF8A5C;
+  background-color: #E86F3F;
 }
 .part__chev-img {
   width: 30rpx;
@@ -406,73 +407,7 @@ function onPackTap() {
   padding: 20rpx 24rpx 26rpx;
 }
 /* 章 = 各篇专属色的小立方体（2 列网格） */
-.chapter {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  width: 344rpx;
-  border-radius: 20rpx;
-  padding: 24rpx;
-  margin-bottom: 18rpx;
-  box-shadow: 0 6rpx 0 0 rgba(74, 68, 88, 0.08);
-}
-/* apprentice 篇：珊瑚色积木 */
-.chapter--apprentice {
-  background-color: #FFF1E7;
-  box-shadow: 0 6rpx 0 0 #F3CFA9;
-}
-/* engineer 篇：薄荷色积木 */
-.chapter--engineer {
-  background-color: #E9F7F1;
-  box-shadow: 0 6rpx 0 0 #BFE3CD;
-}
-/* master 篇：天空蓝色积木 */
-.chapter--master {
-  background-color: #EAF4FC;
-  box-shadow: 0 6rpx 0 0 #C5DFF2;
-}
-.chapter__no {
-  background-color: #FFFFFF;
-  border-radius: 16rpx;
-  padding: 6rpx 16rpx;
-  align-self: flex-start;
-}
-.chapter__no-text {
-  font-size: 18rpx;
-  font-weight: bold;
-  color: #7A7290;
-}
-.chapter__name {
-  font-size: 29rpx;
-  font-weight: bold;
-  color: #4A4458;
-  margin-top: 14rpx;
-}
-.chapter__pact {
-  font-size: 20rpx;
-  color: #7A7290;
-  margin-top: 8rpx;
-  lines: 2;
-  text-overflow: ellipsis;
-}
-.chapter__track {
-  height: 12rpx;
-  border-radius: 6rpx;
-  background-color: rgba(255, 255, 255, 0.85);
-  margin-top: 18rpx;
-}
-.chapter__fill {
-  height: 12rpx;
-  border-radius: 6rpx;
-  background-color: #FF8A5C;
-}
-.chapter__count {
-  font-size: 21rpx;
-  font-weight: bold;
-  color: #7A7290;
-  align-self: flex-end;
-  margin-top: -28rpx;
-}
+
 .grid {
   display: flex;
   flex-direction: row;

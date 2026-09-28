@@ -1,0 +1,100 @@
+<template>
+  <view :class="'cubecube cubecube--' + accent" @click="$emit('tap')">
+    <view class="cubecube__no">
+      <text class="cubecube__no-text">{{ chapterNo }}</text>
+    </view>
+    <text class="cubecube__name">{{ name }}</text>
+    <text class="cubecube__pact">{{ pact }}</text>
+    <view class="cubecube__track">
+      <view class="cubecube__fill" :style="'width:' + fillPct + '%'"></view>
+    </view>
+    <text class="cubecube__count">{{ solved }}/{{ total }}</text>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { computed } from 'vue'
+
+const props = defineProps({
+  /** 章 id */
+  id: { type: String, default: '' },
+  chapterNo: { type: String, default: '' },
+  name: { type: String, default: '' },
+  pact: { type: String, default: '' },
+  solved: { type: Number, default: 0 },
+  total: { type: Number, default: 0 },
+  /** 篇 id：决定积木色系 apprentice/engineer/master */
+  accent: { type: String, default: 'apprentice' },
+})
+
+const fillPct = computed((): number => {
+  if (props.total <= 0) return 0
+  return Math.round((props.solved * 100) / props.total)
+})
+</script>
+
+<style>
+/* 章积木组件：多邻国式实体积木。色系按篇加重（底色饱和 + 厚硬边） */
+.cubecube {
+  display: flex;
+  flex-direction: column;
+  width: 344rpx;
+  border-radius: 22rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+}
+.cubecube--apprentice {
+  background-color: #FFE3D1;
+  box-shadow: 0 8rpx 0 0 #F0A97E;
+}
+.cubecube--engineer {
+  background-color: #CDEEDF;
+  box-shadow: 0 8rpx 0 0 #7FCBAD;
+}
+.cubecube--master {
+  background-color: #D4E9FB;
+  box-shadow: 0 8rpx 0 0 #85B8E0;
+}
+.cubecube__no {
+  background-color: #FFFFFF;
+  border-radius: 16rpx;
+  padding: 6rpx 16rpx;
+  align-self: flex-start;
+}
+.cubecube__no-text {
+  font-size: 18rpx;
+  font-weight: bold;
+  color: #7A7290;
+}
+.cubecube__name {
+  font-size: 29rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-top: 14rpx;
+}
+.cubecube__pact {
+  font-size: 20rpx;
+  color: #6B6480;
+  margin-top: 8rpx;
+  lines: 2;
+  text-overflow: ellipsis;
+}
+.cubecube__track {
+  height: 14rpx;
+  border-radius: 7rpx;
+  background-color: rgba(255, 255, 255, 0.9);
+  margin-top: 18rpx;
+}
+.cubecube__fill {
+  height: 14rpx;
+  border-radius: 7rpx;
+  background-color: #E86F3F;
+}
+.cubecube__count {
+  font-size: 21rpx;
+  font-weight: bold;
+  color: #4A4458;
+  align-self: flex-end;
+  margin-top: -26rpx;
+}
+</style>
