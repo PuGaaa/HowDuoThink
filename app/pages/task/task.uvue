@@ -1,0 +1,317 @@
+<template>
+  <view class="page">
+    <view class="content">
+      <text class="title">任务</text>
+
+      <!-- 今日进度环 -->
+      <view class="ringcard">
+        <view class="ringcard__left">
+          <text class="ringcard__label">今日任务</text>
+          <text class="ringcard__name">{{ doneDaily }} / {{ totalDaily }}</text>
+          <text class="ringcard__streak">🔥 连续 {{ streakCount }} 天</text>
+        </view>
+        <view class="ringcard__ring">
+          <view class="ringcard__ring-bg"></view>
+          <view class="ringcard__ring-fill" :style="'background: conic-gradient(#FF8A5C ' + ringPct + '%, rgba(255,255,255,0.25) 0)'"></view>
+          <view class="ringcard__hole"></view>
+        </view>
+      </view>
+
+      <!-- 每日任务 -->
+      <text class="sec">每日任务</text>
+      <view v-for="(t, i) in dailyList" :key="t.id" class="task">
+        <text class="task__icon">{{ t.icon }}</text>
+        <view class="task__body">
+          <text class="task__title">{{ t.title }}</text>
+          <view class="task__track">
+            <view class="task__fill" :style="'width:' + t.pct + '%'"></view>
+          </view>
+        </view>
+        <text v-if="t.done" class="task__done">✓</text>
+        <text v-else class="task__prog">{{ t.cur }}/{{ t.goal }}</text>
+      </view>
+
+      <!-- 每周任务 -->
+      <text class="sec">每周任务</text>
+      <view v-for="(t, i) in weeklyList" :key="'w' + i" class="task">
+        <text class="task__icon">{{ t.icon }}</text>
+        <view class="task__body">
+          <text class="task__title">{{ t.title }}</text>
+          <view class="task__track">
+            <view class="task__fill" :style="'width:' + t.pct + '%'"></view>
+          </view>
+        </view>
+        <text v-if="t.done" class="task__done">✓</text>
+        <text v-else class="task__prog">{{ t.cur }}/{{ t.goal }}</text>
+      </view>
+
+      <!-- 成长任务 -->
+      <text class="sec">成长任务</text>
+      <view v-for="(t, i) in growthList" :key="'g' + i" class="task">
+        <text class="task__icon">{{ t.icon }}</text>
+        <view class="task__body">
+          <text class="task__title">{{ t.title }}</text>
+          <view class="task__track">
+            <view class="task__fill" :style="'width:' + t.pct + '%'"></view>
+          </view>
+        </view>
+        <text v-if="t.done" class="task__done">✓</text>
+        <text v-else class="task__prog">{{ t.cur }}/{{ t.goal }}</text>
+      </view>
+
+      <!-- 分享海报 -->
+      <view class="postbtn" @click="goPoster">
+        <text class="postbtn__text">🖼 生成我的侦探档案海报</text>
+      </view>
+    </view>
+    <tabbar active="task"></tabbar>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref, computed } from 'vue'
+import { DAILY_TASKS, WEEKLY_TASKS, GROWTH_TASKS, TaskDef } from '../../data/tasks'
+import { getTaskDaily, getTaskWeekly, getCaseProgress, getChecklistUse, getStreak } from '../../utils/storage'
+import { rankOf, starsOf } from '../../utils/scoring'
+import { ALL_CASES } from '../../data/cases'
+import tabbar from '../../components/tabbar/tabbar.uvue'
+
+class TaskVM {
+  id: string = ''
+  icon: string = ''
+  title: string = ''
+  goal: number = 0
+  cur: number = 0
+  pct: number = 0
+  done: boolean = false
+}
+
+const streakCount = ref(getStreak().count)
+const doneDaily = ref(0)
+const totalDaily = ref(DAILY_TASKS.length)
+const ringPct = ref(0)
+const dailyList = ref<TaskVM[]>([])
+const weeklyList = ref<TaskVM[]>([])
+const growthList = ref<TaskVM[]>([])
+
+function buildLists() {
+  const dl: TaskVM[] = []
+  let done = 0
+  for (let i = 0; i < DAILY_TASKS.length; i++) {
+    const t = DAILY_TASKS[i]
+    const cur = t.metric === 'checkuse' ? getChecklistUse() : getTaskDaily(t.metric)
+    const d = cur >= t.goal
+    if (d) done++
+    var v = new TaskVM()
+    v.id = t.id
+    v.icon = t.icon
+    v.title = t.title
+    v.goal = t.goal
+    v.cur = cur > t.goal ? t.goal : cur
+    v.pct = t.goal > 0 ? Math.min(100, Math.round((v.cur * 100) / t.goal)) : 0
+    v.done = d
+    dl.push(v)
+  }
+  dailyList.value = dl
+  doneDaily.value = done
+  ringPct.value = Math.round((done * 100) / DAILY_TASKS.length)
+
+  const wl: TaskVM[] = []
+  for (let i = 0; i < WEEKLY_TASKS.length; i++) {
+    const t = WEEKLY_TASKS[i]
+    const cur = getTaskWeekly(t.metric)
+    var w2 = new TaskVM()
+    w2.id = t.id
+    w2.icon = t.icon
+    w2.title = t.title
+    w2.goal = t.goal
+    var c2 = cur > t.goal ? t.goal : cur
+    w2.cur = c2
+    w2.pct = t.goal > 0 ? Math.min(100, Math.round((c2 * 100) / t.goal)) : 0
+    w2.done = cur >= t.goal
+    wl.push(w2)
+  }
+  weeklyList.value = wl
+
+  const gl: TaskVM[] = []
+  let solved = 0
+  for (let i = 0; i < ALL_CASES.length; i++) {
+    const p = getCaseProgress(ALL_CASES[i].id)
+    if (p != null && p.solved) solved++
+  }
+  const rk = rankOf(solved)
+  var g1 = new TaskVM()
+  g1.id = 'g-rank'
+  g1.icon = '🎖'
+  g1.title = '晋升「主治工程师」'
+  g1.goal = 3
+  g1.cur = solved >= 3 ? 3 : solved
+  g1.pct = Math.min(100, Math.round((g1.cur * 100) / 3))
+  g1.done = solved >= 3
+  gl.push(g1)
+  var g2 = new TaskVM()
+  g2.id = 'g-all'
+  g2.icon = '🗺'
+  g2.title = '全部章节通关'
+  g2.goal = ALL_CASES.length
+  g2.cur = solved
+  g2.pct = Math.min(100, Math.round((solved * 100) / ALL_CASES.length))
+  g2.done = solved >= ALL_CASES.length
+  gl.push(g2)
+  growthList.value = gl
+}
+
+
+buildLists()
+
+function goPoster() {
+  uni.navigateTo({ url: '/pages/post/post' })
+}
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF9F4;
+  width: 100%;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 100rpx 32rpx 200rpx;
+}
+.content {
+  display: flex;
+  flex-direction: column;
+}
+.title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #4A4458;
+  text-align: center;
+  margin-top: 40rpx;
+  margin-bottom: 24rpx;
+}
+.ringcard {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #4A4458;
+  border-radius: 24rpx;
+  padding: 30rpx;
+  margin-bottom: 28rpx;
+}
+.ringcard__left {
+  display: flex;
+  flex-direction: column;
+}
+.ringcard__label {
+  font-size: 20rpx;
+  color: #C9C2DA;
+}
+.ringcard__name {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+  margin-top: 8rpx;
+}
+.ringcard__streak {
+  font-size: 20rpx;
+  color: #FFC94D;
+  margin-top: 10rpx;
+}
+.ringcard__ring {
+  width: 110rpx;
+  height: 110rpx;
+  border-radius: 55rpx;
+  position: relative;
+}
+.ringcard__ring-bg {
+  position: absolute;
+  top: 0; left: 0; width: 110rpx; height: 110rpx;
+  border-radius: 55rpx;
+  background-color: #5E5770;
+}
+.ringcard__ring-fill {
+  position: absolute;
+  top: 0; left: 0; width: 110rpx; height: 110rpx;
+  border-radius: 55rpx;
+}
+.ringcard__hole {
+  position: absolute;
+  top: 18rpx; left: 18rpx;
+  width: 74rpx; height: 74rpx;
+  border-radius: 37rpx;
+  background-color: #4A4458;
+}
+.sec {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-bottom: 18rpx;
+}
+.task {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  padding: 22rpx;
+  margin-bottom: 16rpx;
+}
+.task__icon {
+  font-size: 34rpx;
+  margin-right: 18rpx;
+}
+.task__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.task__title {
+  font-size: 25rpx;
+  color: #4A4458;
+}
+.task__track {
+  height: 10rpx;
+  border-radius: 5rpx;
+  background-color: #FBF3EB;
+  margin-top: 10rpx;
+}
+.task__fill {
+  height: 10rpx;
+  border-radius: 5rpx;
+  background-color: #FF8A5C;
+}
+.task__done {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #5FC9A5;
+}
+.task__prog {
+  font-size: 21rpx;
+  font-weight: bold;
+  color: #AFA8BD;
+}
+.postbtn {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  background-color: #FFFFFF;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #FF8A5C;
+  border-radius: 46rpx;
+  padding: 22rpx;
+  margin-top: 20rpx;
+}
+.postbtn__text {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+}
+</style>

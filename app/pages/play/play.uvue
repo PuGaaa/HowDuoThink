@@ -231,7 +231,7 @@ import navbar from '../../components/navbar/navbar.uvue'
 import mascot from '../../components/mascot/mascot.uvue'
 import { getCaseById, getCollectedLessons, CollectedLesson } from '../../data/cases'
 import { CaseAction, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
-import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse } from '../../utils/storage'
+import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse, bumpTask } from '../../utils/storage'
 import { computeGrade } from '../../utils/scoring'
 import {
   MascotAppearance,
@@ -409,6 +409,7 @@ function toggleChecklist() {
   if (checklistOpen.value && !checklistTouched.value) {
     checklistTouched.value = true
     bumpChecklistUse()
+    bumpTask('checkuse', 1)
   }
 }
 
@@ -487,7 +488,9 @@ function submitHypotheses() {
   hypothesesLocked.value = true
   drawerOpen.value = false
   drawerTab.value = 'actions'
-  uni.showToast({ title: '假设已立，开始验证', icon: 'none' })
+  if (selected.value.length >= 2) {
+    bumpTask('hypo', selected.value.length)
+  }
 }
 
 function findHypothesis(id: string): HypothesisOption | null {
@@ -586,6 +589,13 @@ function appear(m: MascotAppearance | null) {
   hideTimer = setTimeout(() => {
     mascotShow.value = false
   }, 2800)
+}
+
+function findCause(id: string): RootCauseOption | null {
+  for (let i = 0; i < causes.value.length; i++) {
+    if (causes.value[i].id === id) return causes.value[i]
+  }
+  return null
 }
 
 function confirmIdentify() {

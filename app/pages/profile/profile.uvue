@@ -36,6 +36,16 @@
         </view>
       </view>
 
+      <!-- 手册 + 海报入口 -->
+      <view class="entryrow" @click="goHandbook">
+        <text class="entryrow__label">📘 我的手册</text>
+        <text class="entryrow__v">{{ lessonCount }} 条检查单</text>
+      </view>
+      <view class="entryrow" @click="goPoster">
+        <text class="entryrow__label">🖼 侦探档案海报</text>
+        <text class="entryrow__v">生成分享</text>
+      </view>
+
       <!-- 通用 -->
       <text class="sec">通用</text>
       <view v-for="(row, i) in rows" :key="'r' + i" class="row" @click="onRow(row.value)">
@@ -93,6 +103,14 @@ const r4 = new RowVM()
 r4.label = '关于排错推理训练场'
 r4.value = 'v0.1'
 rows.value = [r1, r2, r3, r4]
+
+function goHandbook() {
+  uni.navigateTo({ url: '/pages/handbook/handbook' })
+}
+
+function goPoster() {
+  uni.navigateTo({ url: '/pages/post/post' })
+}
 
 function onLogin() {
   uni.showToast({ title: '登录功能即将开放', icon: 'none' })
@@ -230,6 +248,28 @@ function onRow(v: string) {
   font-weight: bold;
   color: #7A7290;
   margin-bottom: 16rpx;
+}
+.entryrow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #FFFFFF;
+  border-radius: 18rpx;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #FFD3BC;
+  padding: 24rpx;
+  margin-bottom: 14rpx;
+}
+.entryrow__label {
+  font-size: 25rpx;
+  font-weight: bold;
+  color: #4A4458;
+}
+.entryrow__v {
+  font-size: 21rpx;
+  color: #AFA8BD;
 }
 .row {
   display: flex;

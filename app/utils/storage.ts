@@ -84,6 +84,10 @@ export function getCaseProgress(caseId: string): CaseProgress | null {
 export function saveSession(record: SessionRecord): void {
   uni.setStorageSync(KEY_SESSION, JSON.stringify(record))
   touchStreak()
+  if (record.solved) {
+    bumpTask('win', 1)
+    bumpTask('casewin7', 1)
+  }
 
   // 合并案例进度
   const key = KEY_CASE + record.caseId
@@ -264,4 +268,75 @@ export function getTotals(allCaseIds: string[], lessonsPerCase: number[]): Total
   if (m.dino > 0) met++
   const t: Totals = { solved: solved, lessons: lessons, metMascots: met }
   return t
+}
+
+/** 任务进度：每日（date 重置）与每周（weekKey 重置）分开存。
+ *  metric 计数由各埋点调用 bumpTask(metric) 累加。 */
+export interface TaskProgress {
+  day: string
+  week: string
+  daily: { [key: string]: number }
+  weekly: { [key: string]: number }
+}
+
+const KEY_TASKS = 'think_tasks_v1'
+
+function dayStr(d: Date): string {
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  return d.getFullYear() + '-' + (m < 10 ? '0' + m : String(m)) + '-' + (day < 10 ? '0' + day : String(day))
+}
+
+function weekStr(d: Date): string {
+  // 简化周键：以周一日期为周标识
+  const day = d.getDay()
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((day + 6) % 7))
+  return dayStr(monday)
+}
+
+function emptyProgress(): TaskProgress {
+  const now = new Date()
+  const t: TaskProgress = { day: '', week: '', daily: {}, weekly: {} }
+  t.day = dayStr(now)
+  t.week = weekStr(now)
+  return t
+}
+
+function loadTasks(): TaskProgress {
+  const raw = uni.getStorageSync(KEY_TASKS)
+  if (raw == null || (raw as string).length === 0) {
+    return emptyProgress()
+  }
+  try {
+    const t = JSON.parse(raw as string) as TaskProgress
+    const now = new Date()
+    if (t.day !== dayStr(now)) {
+      t.day = dayStr(now)
+      t.daily = {}
+    }
+    if (t.week !== weekStr(now)) {
+      t.week = weekStr(now)
+      t.weekly = {}
+    }
+    return t
+  } catch (e) {
+    return emptyProgress()
+  }
+}
+
+export function bumpTask(metric: string, n: number): void {
+  const t = loadTasks()
+  if (t.daily[metric] == null) t.daily[metric] = 0
+  t.daily[metric] = t.daily[metric] + n
+  if (t.weekly[metric] == null) t.weekly[metric] = 0
+  t.weekly[metric] = t.weekly[metric] + n
+  uni.setStorageSync(KEY_TASKS, JSON.stringify(t))
+}
+
+export function getTaskDaily(metric: string): number {
+  return loadTasks().daily[metric] || 0
+}
+
+export function getTaskWeekly(metric: string): number {
+  return loadTasks().weekly[metric] || 0
 }

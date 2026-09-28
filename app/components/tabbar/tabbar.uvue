@@ -16,7 +16,7 @@ const props = defineProps({
 
 const tabs = [
   { key: 'adventure', label: '冒险', url: '/pages/index/index', iconOn: '/static/icons/flag-coral.png', iconOff: '/static/icons/flag-ink3.png' },
-  { key: 'handbook', label: '手册', url: '/pages/handbook/handbook', iconOn: '/static/icons/book-coral.png', iconOff: '/static/icons/book-ink3.png' },
+  { key: 'task', label: '任务', url: '/pages/task/task', iconOn: '/static/icons/star-lemon.png', iconOff: '/static/icons/star-empty.png' },
   { key: 'me', label: '我的', url: '/pages/profile/profile', iconOn: '/static/icons/user-coral.png', iconOff: '/static/icons/user-ink3.png' },
 ]
 

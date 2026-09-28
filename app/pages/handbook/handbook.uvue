@@ -1,5 +1,6 @@
 <template>
   <view class="page">
+    <navbar></navbar>
     <view class="content">
       <text class="title">手册</text>
 
