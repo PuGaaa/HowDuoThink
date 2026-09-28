@@ -260,8 +260,11 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
 .lmask { position: fixed; inset: 0; background: rgba(42, 39, 51, 0.45); backdrop-filter: blur(3px); z-index: 98; }
 .lmodal__back--accent { color: var(--coral); font-weight: 700; }
 .lmodal {
-  position: fixed; bottom: 0; left: 0; right: 0; margin: 0 auto; max-width: 440px;
-  background: var(--bg); border-radius: 24px 24px 0 0; padding: 18px 28px 40px; z-index: 99;
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: calc(100% - 40px); max-width: 440px; margin: 0;
+  background: var(--bg); border-radius: 18px; padding: 26px 28px;
+  max-height: 86vh; overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(42, 39, 51, 0.28);
 }
 .lmodal__title { font-size: 19px; margin: 0 0 20px; text-align: center; font-weight: 800; }
 .ghbtn { display: flex; align-items: center; justify-content: center; width: 100%; background: var(--ink); box-shadow: 0 5px 0 #37323F; }
