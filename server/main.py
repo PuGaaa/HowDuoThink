@@ -133,6 +133,17 @@ def me(uid: SessionCookie):
     return {"id": r["id"], "login": r["login"], "name": r["name"], "avatar": r["avatar"], "role": r["role"]}
 
 
+@app.patch("/api/me")
+def update_me(body: dict, uid: str = Depends(current_user)):
+    name = str(body.get("name", "")).strip()[:40]
+    if not name:
+        raise HTTPException(400, "昵称不能为空")
+    db.ex("UPDATE users SET name=? WHERE id=?", (name, uid))
+    rows = db.q("SELECT id, login, name, avatar, role FROM users WHERE id=?", (uid,))
+    r = rows[0]
+    return {"id": r["id"], "login": r["login"], "name": r["name"], "avatar": r["avatar"], "role": r["role"]}
+
+
 # ---------- 投稿 ----------
 
 @app.post("/api/submissions")

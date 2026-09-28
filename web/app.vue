@@ -1,15 +1,34 @@
 <script setup lang="ts">
 const api = useApi()
 const user = ref<any>(null)
+const menuOpen = ref(false)
+const menuRef = ref<HTMLElement | null>(null)
+
+// 登录弹窗
 const showLogin = ref(false)
 const pwLogin = ref(false)
 const loginForm = reactive({ login: '', password: '' })
 const loginErr = ref('')
 const loginBusy = ref(false)
 
+// 个人信息编辑
+const editOpen = ref(false)
+const editName = ref('')
+const editErr = ref('')
+const editBusy = ref(false)
+
 onMounted(async () => {
   try { user.value = await api.get('/api/me') } catch { user.value = null }
+  document.addEventListener('click', onDocClick)
 })
+onUnmounted(() => document.removeEventListener('click', onDocClick))
+function onDocClick(e: MouseEvent) {
+  if (menuRef.value && !menuRef.value.contains(e.target as Node)) menuOpen.value = false
+}
+
+async function refreshMe() {
+  try { user.value = await api.get('/api/me') } catch { user.value = null }
+}
 
 function openLogin() {
   showLogin.value = true
@@ -37,7 +56,31 @@ async function passwordLogin() {
 async function logout() {
   await $fetch('http://localhost:8000/api/auth/logout', { method: 'POST', credentials: 'include' })
   user.value = null
+  menuOpen.value = false
+  await navigateTo('/')
 }
+
+function openEdit() {
+  menuOpen.value = false
+  editName.value = user.value?.name || ''
+  editErr.value = ''
+  editOpen.value = true
+}
+
+async function saveProfile() {
+  editErr.value = ''
+  editBusy.value = true
+  try {
+    user.value = await api.patch('/api/me', { name: editName.value })
+    editOpen.value = false
+  } catch (e: any) {
+    editErr.value = e?.data?.detail || '保存失败'
+  } finally {
+    editBusy.value = false
+  }
+}
+
+const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.value.role))
 </script>
 
 <template>
@@ -47,12 +90,24 @@ async function logout() {
       <nav class="topbar__nav">
         <NuxtLink to="/solutions" class="topbar__link">解决逻辑</NuxtLink>
         <NuxtLink to="/submit" class="topbar__link">投稿</NuxtLink>
-        <NuxtLink to="/me" class="topbar__link">我的</NuxtLink>
-        <template v-if="user">
-          <img :src="user.avatar || '/favicon.ico'" class="topbar__avatar" :title="user.name || user.login" />
-          <button class="topbar__logout" @click="logout">退出</button>
-        </template>
-        <button v-else class="topbar__link topbar__loginbtn" @click="openLogin">登录</button>
+        <div ref="menuRef" class="usermenu">
+          <template v-if="user">
+            <button class="usermenu__trigger" @click="menuOpen = !menuOpen">
+              <img :src="user.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2228%22 height=%2228%22%3E%3Crect fill=%22%23E9F7F1%22 width=%2228%22 height=%2228%22 rx=%2214%22/%3E%3C/svg%3E'" class="topbar__avatar" :title="user.name || user.login" />
+            </button>
+            <div v-if="menuOpen" class="usermenu__drop">
+              <div class="usermenu__who">
+                <div class="usermenu__name">{{ user.name }}</div>
+                <div class="usermenu__login">@{{ user.login }} · {{ user.role }}</div>
+              </div>
+              <button class="usermenu__item" @click="openEdit">个人信息</button>
+              <NuxtLink to="/me" class="usermenu__item" @click="menuOpen = false">我的投稿</NuxtLink>
+              <NuxtLink v-if="isAdmin" to="/admin" class="usermenu__item usermenu__item--admin" @click="menuOpen = false">管理端</NuxtLink>
+              <button class="usermenu__item usermenu__item--logout" @click="logout">退出登录</button>
+            </div>
+          </template>
+          <button v-else class="topbar__link topbar__loginbtn" @click="openLogin">登录</button>
+        </div>
       </nav>
     </header>
     <main class="main"><NuxtPage /></main>
@@ -87,20 +142,53 @@ async function logout() {
         <button class="lmodal__back" @click="pwLogin = false">← 其他登录方式</button>
       </template>
     </div>
+
+    <!-- 个人信息编辑弹窗 -->
+    <div v-if="editOpen" class="lmask" @click="editOpen = false"></div>
+    <div v-if="editOpen" class="lmodal">
+      <div class="lmodal__handle"></div>
+      <h2 class="lmodal__title">个人信息</h2>
+      <div class="field">
+        <label>昵称</label>
+        <input v-model="editName" maxlength="40" @keyup.enter="saveProfile" />
+      </div>
+      <div class="field">
+        <label>登录方式</label>
+        <div class="muted">{{ user?.login.startsWith('pw-') ? '账号密码' : 'GitHub · @' + user?.login }}</div>
+      </div>
+      <p v-if="editErr" style="color: var(--red); font-size: 13px; margin: 0 0 10px">{{ editErr }}</p>
+      <button class="btn" style="width: 100%" :disabled="editBusy" @click="saveProfile">{{ editBusy ? '保存中…' : '保存' }}</button>
+      <button class="lmodal__back" @click="editOpen = false">取消</button>
+    </div>
   </div>
 </template>
 
 <style>
 @import '~/assets/css/main.css';
-.topbar__avatar { width: 28px; height: 28px; border-radius: 50%; }
-.topbar__logout { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 12px; color: var(--ink2); cursor: pointer; }
-.topbar__logout:hover { color: var(--red); border-color: var(--red); }
+.topbar__avatar { width: 32px; height: 32px; border-radius: 50%; }
 .topbar__loginbtn { background: var(--coral); color: #fff !important; border-radius: 999px; padding: 6px 18px; font-weight: 700; }
+.usermenu { position: relative; }
+.usermenu__trigger { background: none; border: 0; padding: 0; cursor: pointer; display: block; }
+.usermenu__drop {
+  position: absolute; right: 0; top: 42px; min-width: 200px;
+  background: #fff; border-radius: 14px; box-shadow: 0 6px 0 var(--edge-cream); padding: 8px;
+  z-index: 50;
+}
+.usermenu__who { padding: 10px 12px 12px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.usermenu__name { font-weight: 800; font-size: 14px; color: var(--ink); }
+.usermenu__login { font-size: 12px; color: var(--ink3); margin-top: 2px; }
+.usermenu__item {
+  display: block; width: 100%; text-align: left; background: none; border: 0;
+  padding: 9px 12px; border-radius: 8px; font-size: 13.5px; color: var(--ink);
+  cursor: pointer; text-decoration: none;
+}
+.usermenu__item:hover { background: var(--well); }
+.usermenu__item--admin { color: var(--coral); font-weight: 700; }
+.usermenu__item--logout { color: var(--red); }
 .lmask { position: fixed; inset: 0; background: rgba(42, 39, 51, 0.45); z-index: 98; }
 .lmodal {
   position: fixed; bottom: 0; left: 0; right: 0; margin: 0 auto; max-width: 440px;
   background: var(--bg); border-radius: 24px 24px 0 0; padding: 18px 28px 40px; z-index: 99;
-  box-shadow: 0 -8px 0 rgba(74, 68, 88, 0.06);
 }
 .lmodal__handle { width: 64px; height: 6px; border-radius: 3px; background: var(--line); margin: 0 auto 18px; }
 .lmodal__title { font-size: 20px; margin: 0 0 18px; text-align: center; }
