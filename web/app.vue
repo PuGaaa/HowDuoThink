@@ -265,6 +265,7 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
   background: var(--bg); border-radius: 18px; padding: 26px 28px;
   max-height: 86vh; overflow-y: auto;
   box-shadow: 0 24px 64px rgba(42, 39, 51, 0.28);
+  z-index: 99;
 }
 .lmodal__title { font-size: 19px; margin: 0 0 20px; text-align: center; font-weight: 800; }
 .ghbtn { display: flex; align-items: center; justify-content: center; width: 100%; background: var(--ink); box-shadow: 0 5px 0 #37323F; }
