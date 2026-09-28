@@ -22,7 +22,9 @@ const ALL_CHAPTERS = [
   { id: 'concurrency', part: 'master', name: '并发迷宫' },
   { id: 'observability', part: 'master', name: '可观测性迷雾' },
 ]
-const chapterOptions = ALL_CHAPTERS
+const chapterOptions = computed(() => {
+  return ALL_CHAPTERS.filter((c) => c.part === meta.part)
+})
 
 onMounted(async () => {
   const r: any = await api.get('/api/admin/cases/' + cid.value)
@@ -43,7 +45,6 @@ const CHAPTER_PART_MAP: { [key: string]: string } = {
 async function saveMeta() {
   msg.value = ''
   errs.value = []
-  // 章变更时自动同步篇
   const ch = ALL_CHAPTERS.find((c) => c.id === meta.chapterId)
   if (ch) meta.part = CHAPTER_PART_MAP[meta.chapterId] || meta.part
   try {
@@ -92,20 +93,26 @@ async function publish() {
 </script>
 
 <template>
-  <div>
-    <div style="display: flex; justify-content: space-between; align-items: center">
-      <h1 style="font-size: 22px; margin: 0">Case 编辑 · {{ cid }}</h1>
-      <span class="chip">{{ status }}</span>
+  <div class="page">
+    <div class="pagehead">
+      <NuxtLink to="/admin" class="backlink">← 返回管理端</NuxtLink>
+      <div class="pagehead__row">
+        <h1 class="pagehead__title">Case 编辑</h1>
+        <span class="statuschip">{{ status }}</span>
+      </div>
+      <p class="pagehead__id">{{ cid }}</p>
+      <div class="placeholderbar">
+        <span>待补充占位</span>
+        <b :class="placeholderHits > 0 ? 'hot' : 'ok'">{{ placeholderHits }}</b>
+        <span class="dim">处（tests 绑定 / 效应标注 / 干扰假设 需人工设计——这是创作，不是填表）</span>
+      </div>
     </div>
-    <p class="muted">
-      待补充占位：<b :style="placeholderHits > 0 ? 'color: var(--coral-deep)' : 'color: var(--mint-deep)'">{{ placeholderHits }}</b> 处
-      （tests 绑定 / 效应标注 / 干扰假设 需人工设计——这是创作，不是填表）
-    </p>
 
-    <div class="card metacard">
-      <div class="metacard__title">三级架构元数据</div>
-      <div class="metarow">
-        <div class="metarow__f">
+    <!-- 三级架构元数据 -->
+    <section class="panel">
+      <h2 class="panel__title">三级架构元数据</h2>
+      <div class="metagrid">
+        <div class="mfield">
           <label>篇</label>
           <select v-model="meta.part">
             <option value="apprentice">侦探学徒篇</option>
@@ -113,37 +120,104 @@ async function publish() {
             <option value="master">资深值班篇</option>
           </select>
         </div>
-        <div class="metarow__f">
+        <div class="mfield">
           <label>章</label>
           <select v-model="meta.chapterId">
             <option v-for="co in chapterOptions" :key="co.id" :value="co.id">{{ co.name }}</option>
           </select>
         </div>
-        <div class="metarow__f">
+        <div class="mfield">
           <label>章内排序</label>
           <input v-model.number="meta.order" type="number" min="1" />
         </div>
       </div>
-      <div class="metarow__f" style="margin-top: 10px">
-        <label>机理标签（逗号分隔：config/dependency/race/resource/capacity/cert/timing/data）</label>
+      <div class="mfield mfield--full">
+        <label>机理标签（逗号分隔）</label>
         <input v-model="meta.typeTags" placeholder="config, cert" />
+        <span class="mfield__vocab">词表：config / dependency / race / resource / capacity / cert / timing / data</span>
       </div>
-      <button class="btn btn--ghost" style="padding: 8px 18px; font-size: 13px; margin-top: 10px" @click="saveMeta">保存元数据</button>
-    </div>
+      <button class="metabtn" @click="saveMeta">保存元数据</button>
+    </section>
 
-    <textarea v-model="payloadText" spellcheck="false"
-      style="width: 100%; min-height: 520px; font-family: Menlo, monospace; font-size: 12.5px; line-height: 1.6;
-             border: 2px solid var(--line); border-radius: 14px; padding: 16px; background: #fff; color: var(--ink)"></textarea>
+    <!-- JSON 编辑器 -->
+    <section class="panel panel--code">
+      <h2 class="panel__title">Case Payload（JSON）</h2>
+      <textarea v-model="payloadText" spellcheck="false" class="jsoneditor"></textarea>
+    </section>
 
-    <div v-if="msg" style="margin: 10px 0; font-weight: 700">{{ msg }}</div>
-    <ul v-if="errs.length" style="color: var(--red)">
-      <li v-for="(e, i) in errs" :key="i">{{ e }}</li>
+    <!-- 消息 -->
+    <div v-if="msg" class="msgbar">{{ msg }}</div>
+    <ul v-if="errs.length" class="errlist">
+      <li v-for="(e, i) in errs" :key="i" class="errlist__item">{{ e }}</li>
     </ul>
 
-    <div style="display: flex; gap: 12px; margin: 16px 0">
-      <button class="btn btn--ghost" @click="save">保存草稿</button>
-      <button class="btn" @click="publish">发布（过门禁）</button>
+    <!-- 操作 -->
+    <div class="actions">
+      <button class="actionbtn actionbtn--ghost" @click="save">保存草稿</button>
+      <button class="actionbtn actionbtn--primary" @click="publish">发布（过门禁）</button>
     </div>
-    <p class="muted">发布 = Pydantic 结构校验 + 门禁红线（排除路径/影响面动作/专家链首末步/危险动作）+ version 递增 + 文章投影。App 端 casepack 拉取后可见。</p>
+    <p class="deployhint">发布 = Pydantic 结构校验 + 门禁红线（排除路径/影响面动作/专家链首末步/危险动作）+ version 递增 + 文章投影。App 端 casepack 拉取后可见。</p>
   </div>
 </template>
+
+<style>
+.page {
+  max-width: 760px; margin: 0 auto; padding: 28px 24px 80px;
+  font-family: -apple-system, 'PingFang SC', sans-serif; color: #4A4458;
+}
+.pagehead { margin-bottom: 24px; }
+.pagehead__row { display: flex; align-items: center; gap: 14px; }
+.pagehead__title { font-size: 24px; font-weight: 800; color: #4A4458; margin: 0; }
+.pagehead__id { font-size: 13px; color: #AFA8BD; margin: 6px 0 0; }
+.statuschip { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 14px; background: #E9F7F1; color: #2E7D5B; }
+.backlink { font-size: 13px; color: #AFA8BD; text-decoration: none; display: inline-block; margin-bottom: 14px; }
+.backlink:hover { color: var(--coral); }
+.placeholderbar { font-size: 13px; margin: 14px 0 22px; }
+.placeholderbar .hot { color: var(--coral-deep); font-size: 16px; }
+.placeholderbar .ok { color: var(--mint-deep); font-size: 16px; }
+.placeholderbar .dim { color: #AFA8BD; font-size: 12px; }
+
+.panel { background: #fff; border-radius: 16px; border: 2px solid #F5E6DA; padding: 22px 24px; margin-bottom: 20px; }
+.panel__title { font-size: 16px; font-weight: 800; color: #4A4458; margin: 0 0 16px; }
+
+.metagrid { display: flex; gap: 16px; margin-bottom: 14px; }
+.mfield { flex: 1; }
+.mfield--full { margin-top: 4px; }
+.mfield label { display: block; font-size: 12px; font-weight: 700; color: #7A7290; margin-bottom: 5px; }
+.mfield select, .mfield input {
+  width: 100%; border: 2px solid #F5E6DA; border-radius: 10px;
+  padding: 9px 14px; font-size: 14px; color: #4A4458; background: #FFF9F4;
+}
+.mfield select:focus, .mfield input:focus { outline: none; border-color: var(--coral); }
+.mfield__vocab { font-size: 11px; color: #C5C0D0; margin-top: 4px; display: block; }
+.metabtn {
+  background: #FFF1E7; color: var(--coral-deep); border: 2px solid #FFD3BC;
+  border-radius: 10px; padding: 8px 22px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.metabtn:hover { background: #FFD3BC; }
+
+.jsoneditor {
+  width: 100%; min-height: 480px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; line-height: 1.7;
+  border: 2px solid #F5E6DA; border-radius: 14px; padding: 18px;
+  background: #FFFDFB; color: #3A3440; resize: vertical;
+}
+.jsoneditor:focus { outline: none; border-color: var(--coral); }
+
+.msgbar { text-align: center; font-weight: 700; font-size: 14px; color: var(--mint-deep); background: #E9F7F1; border-radius: 10px; padding: 10px; margin: 14px 0; }
+.errlist { color: var(--red); font-size: 13px; padding-left: 18px; margin: 10px 0; }
+
+.actions { display: flex; gap: 14px; margin: 20px 0; }
+.actionbtn {
+  flex: 1; border-radius: 999px; padding: 14px 28px;
+  font-size: 15px; font-weight: 800; cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.actionbtn:active { transform: translateY(3px); }
+.actionbtn--primary { background: var(--coral); color: #fff; border: 0; box-shadow: 0 5px 0 var(--coral-deep); }
+.actionbtn--primary:active { box-shadow: 0 1px 0 var(--coral-deep); }
+.actionbtn--ghost { background: #fff; color: var(--coral); border: 2.5px solid var(--coral); box-shadow: 0 5px 0 #F3CFA9; }
+.actionbtn--ghost:active { box-shadow: 0 1px 0 #F3CFA9; }
+
+.deployhint { font-size: 12px; color: #C5C0D0; text-align: center; margin-top: 30px; }
+</style>
