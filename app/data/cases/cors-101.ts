@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 第 1 章 · 接入层之夜（CORS 教学关）
  * 教学点：CORS 是浏览器的安全机制不是服务器错误；报错在浏览器控制台而非服务端日志；预检请求。
- * 专家路径：impact(1) + console(1) + serverlog(1) + options(2) = 5⚡
+ * 专家路径：impact(1) + console(1) + serverlog(1) + options(2) = 5⚡︎
  * 双路径：console 与 serverlog 可互换
  */
 export const corsCase: DiagnosisCase = {
@@ -121,7 +121,7 @@ export const corsCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '网络面板',
-        text: '请求正常发出、Origin 头正确、响应体完整——网络层没有问题。2⚡ 排除了本来就不太可能的怀疑。',
+        text: '请求正常发出、Origin 头正确、响应体完整——网络层没有问题。2⚡︎ 排除了本来就不太可能的怀疑。',
       },
     },
     {
@@ -185,24 +185,24 @@ export const corsCase: DiagnosisCase = {
 
   expertChain: [
     {
-      thought: '前端说"接口挂了"，但我先用 1⚡ 圈影响面：是一个页面还是所有调用方？',
+      thought: '前端说"接口挂了"，但我先用 1⚡︎ 圈影响面：是一个页面还是所有调用方？',
       update: 'App/小程序/老页面都正常 → 只有新环境的浏览器有问题。',
       actionId: 'a-impact',
-      why: '1⚡ 的形状判断直接分叉：所有调用方挂是服务端问题，单个客户端挂是客户端环境问题。',
+      why: '1⚡︎ 的形状判断直接分叉：所有调用方挂是服务端问题，单个客户端挂是客户端环境问题。',
       conclusion: '只有新浏览器页面挂 → 服务端故障假设大幅降权。',
     },
     {
       thought: '控制台报错写得很清楚：CORS policy。但先别急着下结论，看服务端视角。',
       update: 'CORS 假设升权，但需要服务端证据收线。',
       actionId: 'a-serverlog',
-      why: '1⚡ 排除"接口真挂了"——前后端各看半边，交叉验证是联调纠纷的破局点。',
+      why: '1⚡︎ 排除"接口真挂了"——前后端各看半边，交叉验证是联调纠纷的破局点。',
       conclusion: '服务端 200 零报错 → "接口挂"只存在于浏览器侧，CORS 假设基本坐实。',
     },
     {
       thought: 'CORS 的机制是：浏览器先发 OPTIONS 预检问"允许谁"。看预检的响应头就是实锤。',
       update: '准备实锤。',
       actionId: 'a-options',
-      why: '2⚡ 直接看预检响应头：缺 Access-Control-Allow-Origin 就是铁证，还能顺手看到该配什么。',
+      why: '2⚡︎ 直接看预检响应头：缺 Access-Control-Allow-Origin 就是铁证，还能顺手看到该配什么。',
       conclusion: '实锤：CORS 配置缺 Allow-Origin。修复：服务端把 localhost:3000 加入允许来源。',
     },
     {

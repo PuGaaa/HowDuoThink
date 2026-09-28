@@ -79,7 +79,7 @@ onLoad((query : OnLoadOptions) => {
     let sl = ''
     for (let k = 0; k < 3; k++) sl += k < stars ? '★' : '☆'
     vm.stars = sl
-    vm.meta = '★★ 标准 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡' : '未挑战')
+    vm.meta = '★★ 标准 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
     if (p != null && p.solved) solved++
     list.push(vm)
   }

@@ -66,6 +66,51 @@ function iconSvg(name, color, o = {}) {
     case 'alert': g.c(12, 12, 8, o.f ?? C.red); g.r(11, 6.8, 2, 6.4, C.white, { rx: 1 }); g.c(12, 15.9, 1.3, C.white); break;
     case 'chat': g.p('M4.4 6.4 A2.6 2.6 0 0 1 7 3.8 H17 A2.6 2.6 0 0 1 19.6 6.4 V13 A2.6 2.6 0 0 1 17 15.6 H10.4 L6 19.4 V15.6 A2.6 2.6 0 0 1 4.4 13 Z', { f: o.f ?? C.skySoft, st: o.st ?? C.sky, sw: 1.6 }); break;
     case 'clock': g.c(12, 12, 8.2, 'none', { st, sw: 2.2 }); g.p('M12 7.4 V12 L15.2 14.2', { st, sw: 2.2 }); break;
+    case 'trophy':
+      g.p('M7 3.4 H17 V8 A5 5 0 0 1 7 8 Z', { f: o.f ?? color });
+      g.p('M7 4.6 H4.2 A0.6 0.6 0 0 0 4.2 5.8 H7 M17 4.6 H19.8 A0.6 0.6 0 0 1 19.8 5.8 H17', { st, sw: 2 });
+      g.l(12, 13, 12, 16.4, st, { sw: 2.2 });
+      g.l(9, 19.4, 15, 19.4, st, { sw: 2.2 });
+      break;
+    case 'scroll':
+      g.r(5, 4, 12.4, 16, o.f ?? 'none', { rx: 2, st, sw: 2 });
+      g.l(8.6, 8, 14.6, 8, st, { sw: 1.8 });
+      g.l(8.6, 11.4, 14.6, 11.4, st, { sw: 1.8 });
+      g.l(8.6, 14.8, 12.4, 14.8, st, { sw: 1.8 });
+      break;
+    case 'bulb':
+      g.p('M12 3.2 A6.2 6.2 0 0 1 15.6 14.6 L15.6 16 H8.4 L8.4 14.6 A6.2 6.2 0 0 1 12 3.2 Z', { f: o.f ?? color });
+      g.l(9.6, 18.2, 14.4, 18.2, st, { sw: 2 });
+      break;
+    case 'puzzle':
+      g.p('M9.2 4.4 A2.2 2.2 0 0 1 13.6 4.4 L17.4 4.4 V8.2 A2.2 2.2 0 0 0 17.4 12.6 V19.6 H13.6 A2.2 2.2 0 0 0 9.2 19.6 L4.6 19.6 V15.8 A2.2 2.2 0 0 1 4.6 11.4 L4.6 4.4 Z', { f: o.f ?? color });
+      break;
+    case 'medal':
+      g.c(12, 9, 5.2, 'none', { st, sw: 2.2 });
+      g.p('M8.6 13.4 L6.4 20.4 L12 17.6 L17.6 20.4 L15.4 13.4', { f: o.f ?? 'none', st, sw: 2 });
+      break;
+    case 'map':
+      g.p('M4.4 6 L9.4 4 L14.6 6 L19.6 4 V18 L14.6 20 L9.4 18 L4.4 20 Z', { f: o.f ?? 'none', st, sw: 2 });
+      g.l(9.4, 4, 9.4, 18, st, { sw: 1.6 });
+      g.l(14.6, 6, 14.6, 20, st, { sw: 1.6 });
+      break;
+    case 'clipboard':
+      g.r(5.4, 4.6, 13.2, 15.4, o.f ?? 'none', { rx: 2, st, sw: 2 });
+      g.r(9.4, 3.2, 5.2, 3.6, o.f ?? color, { rx: 1 });
+      g.l(8.4, 10, 15.6, 10, st, { sw: 1.8 });
+      g.l(8.4, 13.4, 15.6, 13.4, st, { sw: 1.8 });
+      break;
+    case 'cloud':
+      g.p('M7 18.4 A4 4 0 0 1 7.6 10.5 A5.2 5.2 0 0 1 17.6 9.4 A3.8 3.8 0 0 1 17 17 H8 A3.4 3.4 0 0 1 7 18.4 Z', { f: o.f ?? color });
+      break;
+    case 'pen':
+      g.p('M4.6 19.4 L5.4 15.6 L15.8 5.2 A1.8 1.8 0 0 1 18.4 5.2 L18.8 5.6 A1.8 1.8 0 0 1 18.8 8.2 L8.4 18.6 Z', { f: o.f ?? color });
+      break;
+    case 'target':
+      g.c(12, 12, 8.2, 'none', { st, sw: 2 });
+      g.c(12, 12, 4.6, 'none', { st, sw: 2 });
+      g.c(12, 12, 1.4, o.f ?? color);
+      break;
     case 'heart': g.p('M12 20 C7.5 16.5 4 13.6 4 10.2 A4.2 4.2 0 0 1 12 7.6 A4.2 4.2 0 0 1 20 10.2 C20 13.6 16.5 16.5 12 20 Z', { f: o.f ?? color }); break;
     case 'term': g.r(3.6, 4.6, 16.8, 14.8, o.f ?? C.termBg, { rx: 3 }); g.p('M7 9.5 L9.6 12 L7 14.5', { st: C.termGreen, sw: 1.8 }); g.l(11.4, 14.5, 16, 14.5, C.termInk, { sw: 1.8 }); break;
   }
@@ -86,9 +131,23 @@ const JOBS = [
   ['chat', 'sky', 'chat-sky'],
   ['clock', 'ink2', 'clock-ink2'],
   ['check', 'white', 'check-white'],
-  ['term', 'default', 'term-dark'],
+  ['term', 'termdark', 'term-dark'],
+  ['trophy', 'lemon', 'trophy-lemon'],
+  ['scroll', 'coral', 'scroll-coral'],
+  ['bulb', 'sky', 'bulb-sky'],
+  ['puzzle', 'sky', 'puzzle-sky'],
+  ['medal', 'coral', 'medal-coral'],
+  ['map', 'sky', 'map-sky'],
+  ['clipboard', 'coral', 'clipboard-coral'],
+  ['clipboard', 'ink3', 'clipboard-ink3'],
+  ['cloud', 'sky', 'cloud-sky'],
+  ['pen', 'coral', 'pen-coral'],
+  ['target', 'coral', 'target-coral'],
+  ['target', 'white', 'target-white'],
+  ['search', 'ink', 'search-ink'],
+  ['clock', 'white', 'clock-white'],
 ];
-const COLORS = { ...C, empty: '#E8E2D8', mintdeep: C.mintDeep };
+const COLORS = { ...C, empty: '#E8E2D8', mintdeep: C.mintDeep, termdark: '#3A3440' };
 
 for (const [name, colorKey, outName] of JOBS) {
   writeFileSync(join(OUT, outName + '.svg'), iconSvg(name, COLORS[colorKey]));

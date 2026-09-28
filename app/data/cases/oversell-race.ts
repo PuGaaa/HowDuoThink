@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 第 5 章 · 并发迷宫（秒杀超卖 L3）
  * 教学点：check-then-act 竞态；并发故障的证据在毫秒级时间线里；"请求都在排队"假象。
- * 专家路径：impact(1) + orderlog(1) + code(2) = 4⚡（redis 2⚡ 为可选加固证据）
+ * 专家路径：impact(1) + orderlog(1) + code(2) = 4⚡︎（redis 2⚡︎ 为可选加固证据）
  */
 export const oversellRaceCase: DiagnosisCase = {
   id: 'oversell-race',
@@ -189,28 +189,28 @@ export const oversellRaceCase: DiagnosisCase = {
       thought: '财务说超卖 37 件——先别信也别慌，用自己的数据验证：查订单分布。',
       update: '实锤超卖为真：137 单真实支付、用户各不相同。h-stat、h-dup 双双降权。',
       actionId: 'a-impact',
-      why: '1⚡ 先验证问题真实性并拿到时间形状——"3 秒集中成交"直接指向并发窗口。',
+      why: '1⚡︎ 先验证问题真实性并拿到时间形状——"3 秒集中成交"直接指向并发窗口。',
       conclusion: '超卖为真 + 集中在 3 秒内 → 并发竞态假设升权。',
     },
     {
       thought: '毫秒时间线是并发故障的核心证据：售罄后为何还能成交 3 秒？',
       update: '实锤"检查通过但库存已空"的窗口存在——两步逻辑假设升权。',
       actionId: 'a-orderlog',
-      why: '1⚡ 的毫秒时间线直接展示竞态窗口的 existence，这是并发案最关键的证据形态。',
+      why: '1⚡︎ 的毫秒时间线直接展示竞态窗口的 existence，这是并发案最关键的证据形态。',
       conclusion: '售罄后 3 秒内继续成交 → 检查发生在扣减之前，竞态实锤方向确认。',
     },
     {
       thought: '两套账本要分清责任：Redis 预扣是对的，DB 多卖——问题锁定 DB 扣减代码。',
       update: 'h-cache 排除；h-race 待代码实锤。',
       actionId: 'a-redis',
-      why: '2⚡ 分清"哪一层在说谎"：预扣层正常说明流量被正确挡住，DB 层多卖说明扣减逻辑有洞。',
+      why: '2⚡︎ 分清"哪一层在说谎"：预扣层正常说明流量被正确挡住，DB 层多卖说明扣减逻辑有洞。',
       conclusion: 'Redis 正常、DB 超卖 → 读 DB 扣库存代码。',
     },
     {
       thought: '代码就在眼前：SELECT 查库存、if 判断、UPDATE 扣减——两步之间没有原子性保护。',
       update: 'h-race 实锤。DB 行锁只保护 UPDATE，不保护两步之间的判断。',
       actionId: 'a-code',
-      why: '2⚡ 读代码是竞态案的最终实锤——所有时间线证据都在这里得到机制解释。',
+      why: '2⚡︎ 读代码是竞态案的最终实锤——所有时间线证据都在这里得到机制解释。',
       conclusion: '实锤：check-then-act 竞态。修复：原子扣减（UPDATE ... WHERE stock>0）或分布式锁 + 唯一约束兜底。',
     },
     {

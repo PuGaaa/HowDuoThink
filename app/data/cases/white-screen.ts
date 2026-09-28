@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 第 2 章 · 构建与依赖（白屏教学关）
  * 教学点：白屏=运行时 JS 报错中断渲染；资源 404 与接口报错是两类指纹；本地正常线上挂 = 环境差异。
- * 专家路径：impact(1) + console(1) + resources(2) = 4⚡
+ * 专家路径：impact(1) + console(1) + resources(2) = 4⚡︎
  */
 export const whiteScreenCase: DiagnosisCase = {
   id: 'white-screen',
@@ -187,21 +187,21 @@ export const whiteScreenCase: DiagnosisCase = {
       thought: '"我本地好好的"是最危险的结论——本地跑的是源码，用户跑的是打包产物，环境不同。先圈范围。',
       update: '白屏的是无缓存的新用户 → 问题在新版本的资源链路上。',
       actionId: 'a-impact',
-      why: '1⚡ 圈范围：有缓存用户正常 = 新旧资源交替问题，这是构建部署类的经典指纹。',
+      why: '1⚡︎ 圈范围：有缓存用户正常 = 新旧资源交替问题，这是构建部署类的经典指纹。',
       conclusion: '只有首次打开的新用户白屏 → 聚焦新版本静态资源加载。',
     },
     {
       thought: '白屏 = 渲染没执行 = 运行时 JS 挂了。让用户截图控制台，现场就在那里。',
       update: 'JS 运行时报错实锤：Unexpected token \'<\'。',
       actionId: 'a-console',
-      why: '1⚡ 拿到最关键线索：JS 文件内容是 HTML——「拿到的东西不对」比「代码写错了」更值得怀疑。',
+      why: '1⚡︎ 拿到最关键线索：JS 文件内容是 HTML——「拿到的东西不对」比「代码写错了」更值得怀疑。',
       conclusion: 'JS 文件内容是 HTML → 排除代码 bug，指向资源 404（404 页面返回了 HTML）。',
     },
     {
       thought: '顺着"内容不对"查：资源请求的响应码是什么。',
       update: 'h-res 升权为第一。',
       actionId: 'a-resources',
-      why: '2⚡ 实锤：404 + CDN 缓存旧清单——完整因果链闭合。',
+      why: '2⚡︎ 实锤：404 + CDN 缓存旧清单——完整因果链闭合。',
       conclusion: '实锤：CDN 缓存策略问题，新 HTML 引用的 JS 在部分节点 404。',
     },
     {

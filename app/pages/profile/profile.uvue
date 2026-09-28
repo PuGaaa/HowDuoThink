@@ -38,11 +38,13 @@
 
       <!-- 手册 + 海报入口 -->
       <view class="entryrow" @click="goHandbook">
-        <text class="entryrow__label">📘 我的手册</text>
+        <image class="entryrow__icon" src="/static/icons/book-coral.png" mode="aspectFit"></image>
+        <text class="entryrow__label">我的手册</text>
         <text class="entryrow__v">{{ lessonCount }} 条检查单</text>
       </view>
       <view class="entryrow" @click="goPoster">
-        <text class="entryrow__label">🖼 侦探档案海报</text>
+        <image class="entryrow__icon" src="/static/icons/pen-coral.png" mode="aspectFit"></image>
+        <text class="entryrow__label">侦探档案海报</text>
         <text class="entryrow__v">生成分享</text>
       </view>
 

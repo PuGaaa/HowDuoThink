@@ -19,14 +19,14 @@
           <view class="cmp__track">
             <view class="cmp__fill cmp__fill--you" :style="'width:' + youPct + '%'"></view>
           </view>
-          <text class="cmp__val">{{ playerCost }}⚡</text>
+          <text class="cmp__val">{{ playerCost }}⚡︎</text>
         </view>
         <view class="cmp">
           <text class="cmp__label">专家</text>
           <view class="cmp__track">
             <view class="cmp__fill cmp__fill--expert" style="width: 100%"></view>
           </view>
-          <text class="cmp__val">{{ expertCost }}⚡</text>
+          <text class="cmp__val">{{ expertCost }}⚡︎</text>
         </view>
       </view>
 
@@ -103,7 +103,7 @@
         <text class="lessons__title">带走的诊断检查单</text>
         <text class="lessons__layer">本题的层契约：{{ layer }}</text>
         <view v-for="(l, i) in lessons" :key="'l' + i" class="lesson">
-          <text class="lesson__text">☑ {{ l.text }}</text>
+          <text class="lesson__text">✓ {{ l.text }}</text>
           <text class="lesson__principle">{{ l.principle }}</text>
         </view>
       </view>
@@ -256,7 +256,7 @@ function actionName(actionId: string): string {
   const c = getCaseById(caseId.value)
   if (c == null) return actionId
   for (let i = 0; i < c.actions.length; i++) {
-    if (c.actions[i].id === actionId) return c.actions[i].name + '（-' + c.actions[i].cost + ' ⚡）'
+    if (c.actions[i].id === actionId) return c.actions[i].name + '（-' + c.actions[i].cost + ' ⚡︎）'
   }
   return actionId
 }
@@ -270,7 +270,7 @@ function buildReplay(events: SessionEvent[], mascots: MascotEventRec[]) {
   }
   for (let i = 0; i < events.length; i++) {
     const icon = eventIcon(events[i].kind)
-    const item: ReplayItem = { isMascot: false, text: icon + ' ' + events[i].text, who: '', note: '' }
+    const item: ReplayItem = { isMascot: false, text: icon + events[i].text, who: '', note: '' }
     items.push(item)
     for (let j = 0; j < mascots.length; j++) {
       if (mascots[j].afterEventIndex === i) {
@@ -292,9 +292,9 @@ function mascotItem(m: MascotEventRec): ReplayItem {
 }
 
 function eventIcon(kind: string): string {
-  if (kind === 'hypothesis') return '🤔'
-  if (kind === 'action') return '🔍'
-  return '🎯'
+  if (kind === 'hypothesis') return '/static/icons/bulb-sky.png'
+  if (kind === 'action') return '/static/icons/search-ink.png'
+  return '/static/icons/target-coral.png'
 }
 
 function goNext() {

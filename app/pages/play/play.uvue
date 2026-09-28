@@ -32,8 +32,12 @@
           </view>
           <text class="evidence__text">{{ s.text }}</text>
         </view>
-        <view class="evidence evidence--time">
-          <text class="evidence__text">⏱ {{ timeline }}</text>
+        <view class="evidence evbg--time">
+          <view class="evidence__head">
+            <image class="evidence__icon" src="/static/icons/clock-ink2.png" mode="aspectFit"></image>
+            <text class="evidence__title">时间线</text>
+          </view>
+          <text class="evidence__text">{{ timeline }}</text>
         </view>
         <text class="scene__hint">{{ hint }}</text>
       </view>
@@ -81,7 +85,7 @@
       <!-- 假设板 tab：勾选你的怀疑（全程可编辑） -->
       <view v-if="drawerTab === 'board'" class="drawer__body">
         <view class="drawer__anchor">
-          <text class="drawer__anchor-text">⏱ {{ timeline }}</text>
+          <text class="drawer__anchor-text">{{ timeline }}</text>
         </view>
         <scroll-view class="drawer__scroll" scroll-y>
           <view
@@ -97,7 +101,8 @@
             <text :class="isSelected(h.id) ? 'hyp__text hyp__text--on' : 'hyp__text'">{{ h.text }}</text>
           </view>
           <view v-for="(n, i) in freeNotes" :key="'n' + i" class="freenote">
-            <text class="freenote__text">✎ {{ n }}</text>
+            <image class="freenote__icon" src="/static/icons/pen-coral.png" mode="aspectFit"></image>
+            <text class="freenote__text">{{ n }}</text>
           </view>
           <view class="noterow">
             <input class="noterow__input" v-model="noteInput" placeholder="自由备注（可选）：此刻你在怀疑什么" />
@@ -191,12 +196,12 @@
         <scroll-view class="drawer__scroll" scroll-y>
           <view class="checklist">
             <view class="checklist__head" @click="toggleChecklist">
-              <text class="checklist__title">📜 指认前核对：我的检查单（{{ collected.length }}）</text>
+              <text class="checklist__title">指认前核对：我的检查单（{{ collected.length }}）</text>
               <text class="checklist__chev">{{ checklistOpen ? '⌃' : '⌄' }}</text>
             </view>
             <view v-if="checklistOpen">
               <view v-for="(cl, i) in collected" :key="'cl' + i" class="checklist__item">
-                <text class="checklist__item-text">☑ {{ cl.text }}</text>
+                <text class="checklist__item-text">✓ {{ cl.text }}</text>
                 <text class="checklist__item-src">{{ cl.src }}</text>
               </view>
               <view v-if="collected.length == 0" class="checklist__empty">
@@ -351,7 +356,7 @@ const fabLabel = computed((): string => {
   if (!hypothesesLocked.value) {
     return selected.value.length > 0 ? '假设板 · 已圈 ' + selected.value.length + ' 个' : '立个假设'
   }
-  return '开查 · 已花 ' + playerCost.value + ' ⚡'
+  return '开查 · 已花 ' + playerCost.value + ' ⚡︎'
 })
 
 onLoad((query : OnLoadOptions) => {
@@ -520,7 +525,7 @@ function executeAction(a: CaseAction) {
   if (a.danger) {
     uni.showModal({
       title: '状态变更动作',
-      content: '「' + a.name + '」将花 ' + a.cost + ' ⚡ 且可能破坏现场。确定执行？',
+      content: '「' + a.name + '」将花 ' + a.cost + ' ⚡︎ 且可能破坏现场。确定执行？',
       success: (res) => {
         if (res.confirm) {
           doExecute(a)
@@ -553,7 +558,7 @@ function doExecute(a: CaseAction) {
   rec.ev = a.result
   evByAct.value.push(rec)
   applyHypothesisEffects(a)
-  pushEvent('action', a.id, a.gain, a.cost, '验证：' + a.name + '（-' + a.cost + ' ⚡）', a.danger)
+  pushEvent('action', a.id, a.gain, a.cost, '验证：' + a.name + '（-' + a.cost + ' ⚡︎）', a.danger)
 
   const r = onActionResolved(lowStreak.value, a.gain, otterCd.value)
   lowStreak.value = r.lowStreak
@@ -1193,6 +1198,14 @@ function goReview() {
   display: flex;
   flex-direction: row;
   margin-bottom: 10rpx;
+}
+.freenote {
+  align-items: center;
+}
+.freenote__icon {
+  width: 26rpx;
+  height: 26rpx;
+  margin-right: 10rpx;
 }
 .freenote__text {
   font-size: 23rpx;

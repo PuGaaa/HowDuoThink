@@ -8,7 +8,10 @@
         <view class="ringcard__left">
           <text class="ringcard__label">今日任务</text>
           <text class="ringcard__name">{{ doneDaily }} / {{ totalDaily }}</text>
-          <text class="ringcard__streak">🔥 连续 {{ streakCount }} 天</text>
+          <view class="ringcard__streakrow">
+          <image class="ringcard__flame" src="/static/icons/flame-lemon.png" mode="aspectFit"></image>
+          <text class="ringcard__streak">连续 {{ streakCount }} 天</text>
+        </view>
         </view>
         <view class="ringcard__ring">
           <view class="ringcard__ring-bg"></view>
@@ -20,7 +23,7 @@
       <!-- 每日任务 -->
       <text class="sec">每日任务</text>
       <view v-for="(t, i) in dailyList" :key="t.id" class="task">
-        <text class="task__icon">{{ t.icon }}</text>
+        <image class="task__icon" :src="'/static/icons/' + t.icon + '.png'" mode="aspectFit"></image>
         <view class="task__body">
           <text class="task__title">{{ t.title }}</text>
           <view class="task__track">
@@ -34,7 +37,7 @@
       <!-- 每周任务 -->
       <text class="sec">每周任务</text>
       <view v-for="(t, i) in weeklyList" :key="'w' + i" class="task">
-        <text class="task__icon">{{ t.icon }}</text>
+        <image class="task__icon" :src="'/static/icons/' + t.icon + '.png'" mode="aspectFit"></image>
         <view class="task__body">
           <text class="task__title">{{ t.title }}</text>
           <view class="task__track">
@@ -48,7 +51,7 @@
       <!-- 成长任务 -->
       <text class="sec">成长任务</text>
       <view v-for="(t, i) in growthList" :key="'g' + i" class="task">
-        <text class="task__icon">{{ t.icon }}</text>
+        <image class="task__icon" :src="'/static/icons/' + t.icon + '.png'" mode="aspectFit"></image>
         <view class="task__body">
           <text class="task__title">{{ t.title }}</text>
           <view class="task__track">
@@ -61,7 +64,8 @@
 
       <!-- 分享海报 -->
       <view class="postbtn" @click="goPoster">
-        <text class="postbtn__text">🖼 生成我的侦探档案海报</text>
+        <image class="postbtn__icon" src="/static/icons/clipboard-coral.png" mode="aspectFit"></image>
+        <text class="postbtn__text">生成我的侦探档案海报</text>
       </view>
     </view>
     <tabbar active="task"></tabbar>
@@ -79,6 +83,7 @@ import tabbar from '../../components/tabbar/tabbar.uvue'
 class TaskVM {
   id: string = ''
   icon: string = ''
+  iconImg: string = ''
   title: string = ''
   goal: number = 0
   cur: number = 0
@@ -91,6 +96,7 @@ const doneDaily = ref(0)
 const totalDaily = ref(DAILY_TASKS.length)
 const ringPct = ref(0)
 const dailyList = ref<TaskVM[]>([])
+const dailyIcons = ref<string[]>([])
 const weeklyList = ref<TaskVM[]>([])
 const growthList = ref<TaskVM[]>([])
 
@@ -104,7 +110,7 @@ function buildLists() {
     if (d) done++
     var v = new TaskVM()
     v.id = t.id
-    v.icon = t.icon
+    v.iconImg = '/static/icons/' + t.icon + '.png'
     v.title = t.title
     v.goal = t.goal
     v.cur = cur > t.goal ? t.goal : cur
@@ -122,7 +128,7 @@ function buildLists() {
     const cur = getTaskWeekly(t.metric)
     var w2 = new TaskVM()
     w2.id = t.id
-    w2.icon = t.icon
+    w2.iconImg = '/static/icons/' + t.icon + '.png'
     w2.title = t.title
     w2.goal = t.goal
     var c2 = cur > t.goal ? t.goal : cur
@@ -142,7 +148,7 @@ function buildLists() {
   const rk = rankOf(solved)
   var g1 = new TaskVM()
   g1.id = 'g-rank'
-  g1.icon = '🎖'
+  g1.iconImg = '/static/icons/medal-coral.png'
   g1.title = '晋升「主治工程师」'
   g1.goal = 3
   g1.cur = solved >= 3 ? 3 : solved
@@ -151,7 +157,7 @@ function buildLists() {
   gl.push(g1)
   var g2 = new TaskVM()
   g2.id = 'g-all'
-  g2.icon = '🗺'
+  g2.iconImg = '/static/icons/map-sky.png'
   g2.title = '全部章节通关'
   g2.goal = ALL_CASES.length
   g2.cur = solved
@@ -216,10 +222,20 @@ function goPoster() {
   color: #FFFFFF;
   margin-top: 8rpx;
 }
+.ringcard__streakrow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 10rpx;
+}
+.ringcard__flame {
+  width: 26rpx;
+  height: 26rpx;
+  margin-right: 8rpx;
+}
 .ringcard__streak {
   font-size: 20rpx;
   color: #FFC94D;
-  margin-top: 10rpx;
 }
 .ringcard__ring {
   width: 110rpx;
@@ -308,6 +324,11 @@ function goPoster() {
   border-radius: 46rpx;
   padding: 22rpx;
   margin-top: 20rpx;
+}
+.postbtn__icon {
+  width: 30rpx;
+  height: 30rpx;
+  margin-right: 10rpx;
 }
 .postbtn__text {
   font-size: 27rpx;

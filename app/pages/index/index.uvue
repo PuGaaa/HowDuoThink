@@ -16,7 +16,8 @@
         </view>
       </view>
       <view v-if="packSynced" class="packchip" @click="onPackTap">
-        <text class="packchip__text">☁ 社区关卡已同步 · {{ packCount }} 关可玩</text>
+        <image class="packchip__icon" src="/static/icons/cloud-sky.png" mode="aspectFit"></image>
+        <text class="packchip__text">社区关卡已同步 · {{ packCount }} 关可玩</text>
       </view>
 
       <!-- 继续闯关 -->
@@ -183,7 +184,7 @@ for (let i = 0; i < ALL_CASES.length; i++) {
     const stars = starsOf(p != null && p.bestGrade.length > 0 ? p.bestGrade : '')
     let sl = ''
     for (let k = 0; k < 3; k++) sl += k < stars ? '★' : '☆'
-    const best = p != null && p.bestGrade.length > 0 ? '最佳 ' + p.bestCost + '⚡' : '未挑战'
+    const best = p != null && p.bestGrade.length > 0 ? '最佳 ' + p.bestCost + '⚡︎' : '未挑战'
     continueMeta.value = sl + ' 标准 · ' + best
     break
   }
@@ -280,6 +281,11 @@ function onPackTap() {
   border-color: #BFE0F5;
   padding: 16rpx 22rpx;
   margin-bottom: 22rpx;
+}
+.packchip__icon {
+  width: 28rpx;
+  height: 28rpx;
+  margin-right: 8rpx;
 }
 .packchip__text {
   font-size: 22rpx;
