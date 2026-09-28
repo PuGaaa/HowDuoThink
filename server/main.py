@@ -79,6 +79,13 @@ def oauth_callback(code: str, state: str, oauth_state: Annotated[str | None, Coo
     return resp
 
 
+@app.post("/api/auth/logout")
+def logout():
+    resp = RedirectResponse(gh.WEB_ORIGIN + "/", status_code=302)
+    resp.delete_cookie("session")
+    return resp
+
+
 # 开发绕行：未配置 GitHub 时本地造会话（生产环境设置 GITHUB_CLIENT_ID 后自动失效）
 @app.get("/api/dev/login")
 def dev_login(login: str = Query(default="devuser")):
