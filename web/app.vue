@@ -14,8 +14,14 @@ const loginBusy = ref(false)
 // 个人信息编辑
 const editOpen = ref(false)
 const editName = ref('')
+const editAvatar = ref('')
 const editErr = ref('')
 const editBusy = ref(false)
+const pwOpen = ref(false)
+const pwForm = reactive({ oldPassword: '', newPassword: '', confirm: '' })
+const pwErr = ref('')
+const pwBusy = ref(false)
+const pwOk = ref(false)
 
 onMounted(async () => {
   try { user.value = await api.get('/api/me') } catch { user.value = null }
@@ -63,20 +69,51 @@ async function logout() {
 function openEdit() {
   menuOpen.value = false
   editName.value = user.value?.name || ''
+  editAvatar.value = user.value?.avatar || ''
   editErr.value = ''
   editOpen.value = true
 }
+
+const avatarPreview = computed(() => editAvatar.value || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2264%22 height=%2264%22%3E%3Crect fill=%22%23E9F7F1%22 width=%2264%22 height=%2264%22 rx=%2232%22/%3E%3C/svg%3E')
 
 async function saveProfile() {
   editErr.value = ''
   editBusy.value = true
   try {
-    user.value = await api.patch('/api/me', { name: editName.value })
+    user.value = await api.patch('/api/me', { name: editName.value, avatarUrl: editAvatar.value })
     editOpen.value = false
   } catch (e: any) {
     editErr.value = e?.data?.detail || '保存失败'
   } finally {
     editBusy.value = false
+  }
+}
+
+function openPassword() {
+  menuOpen.value = false
+  pwForm.oldPassword = ''
+  pwForm.newPassword = ''
+  pwForm.confirm = ''
+  pwErr.value = ''
+  pwOk.value = false
+  pwOpen.value = true
+}
+
+async function savePassword() {
+  pwErr.value = ''
+  if (pwForm.newPassword !== pwForm.confirm) {
+    pwErr.value = '两次输入的新密码不一致'
+    return
+  }
+  pwBusy.value = true
+  try {
+    await api.post('/api/me/password', { oldPassword: pwForm.oldPassword, newPassword: pwForm.newPassword })
+    pwOk.value = true
+    setTimeout(() => { pwOpen.value = false }, 1200)
+  } catch (e: any) {
+    pwErr.value = e?.data?.detail || '修改失败'
+  } finally {
+    pwBusy.value = false
   }
 }
 
@@ -148,6 +185,11 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
     <div v-if="editOpen" class="lmodal">
       <div class="lmodal__handle"></div>
       <h2 class="lmodal__title">个人信息</h2>
+      <div class="field avatarfield">
+        <label>头像</label>
+        <img :src="avatarPreview" class="avatarfield__preview" />
+        <input v-model="editAvatar" placeholder="头像图片 URL（留空恢复默认）" />
+      </div>
       <div class="field">
         <label>昵称</label>
         <input v-model="editName" maxlength="40" @keyup.enter="saveProfile" />
@@ -159,6 +201,35 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
       <p v-if="editErr" style="color: var(--red); font-size: 13px; margin: 0 0 10px">{{ editErr }}</p>
       <button class="btn" style="width: 100%" :disabled="editBusy" @click="saveProfile">{{ editBusy ? '保存中…' : '保存' }}</button>
       <button class="lmodal__back" @click="editOpen = false">取消</button>
+      <button class="lmodal__back lmodal__back--accent" @click="openPassword">修改密码 →</button>
+    </div>
+
+    <!-- 密码修改弹窗 -->
+    <div v-if="pwOpen" class="lmask" @click="pwOpen = false"></div>
+    <div v-if="pwOpen" class="lmodal">
+      <div class="lmodal__handle"></div>
+      <h2 class="lmodal__title">修改密码</h2>
+      <template v-if="!pwOk">
+        <div class="field">
+          <label>当前密码</label>
+          <input v-model="pwForm.oldPassword" type="password" autocomplete="current-password" />
+          <div class="hint">GitHub 登录的用户没有初始密码，直接设置即可</div>
+        </div>
+        <div class="field">
+          <label>新密码（≥6 位）</label>
+          <input v-model="pwForm.newPassword" type="password" autocomplete="new-password" />
+        </div>
+        <div class="field">
+          <label>确认新密码</label>
+          <input v-model="pwForm.confirm" type="password" autocomplete="new-password" />
+        </div>
+        <p v-if="pwErr" style="color: var(--red); font-size: 13px; margin: 0 0 10px">{{ pwErr }}</p>
+        <button class="btn" style="width: 100%" :disabled="pwBusy" @click="savePassword">{{ pwBusy ? '保存中…' : '保存新密码' }}</button>
+        <button class="lmodal__back" @click="pwOpen = false; editOpen = true">← 返回个人信息</button>
+      </template>
+      <template v-else>
+        <p style="text-align: center; font-weight: 700; color: var(--mint-deep)">✓ 密码已更新</p>
+      </template>
     </div>
   </div>
 </template>
@@ -185,7 +256,10 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
 .usermenu__item:hover { background: var(--well); }
 .usermenu__item--admin { color: var(--coral); font-weight: 700; }
 .usermenu__item--logout { color: var(--red); }
+.avatarfield { display: flex; flex-direction: column; }
+.avatarfield__preview { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--line); margin-bottom: 10px; object-fit: cover; }
 .lmask { position: fixed; inset: 0; background: rgba(42, 39, 51, 0.45); z-index: 98; }
+.lmodal__back--accent { color: var(--coral); font-weight: 700; }
 .lmodal {
   position: fixed; bottom: 0; left: 0; right: 0; margin: 0 auto; max-width: 440px;
   background: var(--bg); border-radius: 24px 24px 0 0; padding: 18px 28px 40px; z-index: 99;

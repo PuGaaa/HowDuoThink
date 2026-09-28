@@ -136,12 +136,42 @@ def me(uid: SessionCookie):
 @app.patch("/api/me")
 def update_me(body: dict, uid: str = Depends(current_user)):
     name = str(body.get("name", "")).strip()[:40]
+    avatar = body.get("avatarUrl")
+    sets, params = ["name=?"], [name]
+    if avatar is not None:
+        avatar = str(avatar).strip()[:500]
+        # 简单协议校验：允许 http(s) 或空（恢复默认）
+        if avatar and not avatar.startswith(("http://", "https://")):
+            raise HTTPException(400, "头像必须是 http(s) 图片链接")
+        sets.append("avatar=?")
+        params.append(avatar)
     if not name:
         raise HTTPException(400, "昵称不能为空")
-    db.ex("UPDATE users SET name=? WHERE id=?", (name, uid))
+    params.append(uid)
+    db.ex(f"UPDATE users SET {', '.join(sets)} WHERE id=?", tuple(params))
     rows = db.q("SELECT id, login, name, avatar, role FROM users WHERE id=?", (uid,))
     r = rows[0]
     return {"id": r["id"], "login": r["login"], "name": r["name"], "avatar": r["avatar"], "role": r["role"]}
+
+
+@app.post("/api/me/password")
+def change_password(body: dict, uid: str = Depends(current_user)):
+    old = str(body.get("oldPassword", ""))
+    new = str(body.get("newPassword", ""))
+    if len(new) < 6:
+        raise HTTPException(400, "新密码至少 6 位")
+    rows = db.q("SELECT password_hash, login FROM users WHERE id=?", (uid,))
+    if not rows:
+        raise HTTPException(404, "用户不存在")
+    current_hash = rows[0]["password_hash"]
+    # GitHub 用户没有密码：允许直接设置；账密用户必须校验旧密码
+    if current_hash:
+        if not old:
+            raise HTTPException(400, "请输入当前密码")
+        if not gh.verify_password(old, current_hash):
+            raise HTTPException(400, "当前密码错误")
+    db.ex("UPDATE users SET password_hash=? WHERE id=?", (gh.hash_password(new), uid))
+    return {"ok": True}
 
 
 # ---------- 投稿 ----------
