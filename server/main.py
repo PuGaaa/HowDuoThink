@@ -482,20 +482,35 @@ def publish_case(payload: CasePayload, uid: str = Depends(current_user)):
     if errors:
         raise HTTPException(422, {"message": "未过发布门禁", "errors": errors})
     version = db.next_version()
+    # 来源与署名：关联投稿 → 投稿者昵称；官方题 → "官方"
+    sub_id = None
+    author_name = "官方"
+    crow = db.q("SELECT submission_id, author_id FROM cases WHERE id=?", (payload.id,))
+    if crow and crow[0]["submission_id"]:
+        sub_id = crow[0]["submission_id"]
+        srow = db.q(
+            "SELECT u.name, u.login FROM submissions s LEFT JOIN users u ON u.id=s.user_id WHERE s.id=?",
+            (sub_id,),
+        )
+        if srow and (srow[0]["name"] or srow[0]["login"]):
+            author_name = srow[0]["name"] or ("@" + srow[0]["login"])
+    d = payload.model_dump(by_alias=True)
+    d["submissionId"] = sub_id
+    d["authorName"] = author_name
     exists = db.q("SELECT id FROM cases WHERE id=?", (payload.id,))
     if exists:
         db.ex(
             "UPDATE cases SET payload=?, title=?, domain=?, layer=?, difficulty=?, version=?, status='published', published_at=datetime('now') WHERE id=?",
-            (db.jdump(payload.model_dump(by_alias=True)), payload.title, payload.domain, payload.layer, payload.difficulty, version, payload.id),
+            (db.jdump(d), payload.title, payload.domain, payload.layer, payload.difficulty, version, payload.id),
         )
     else:
         db.ex(
             "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload, published_at) "
             "VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now'))",
-            (payload.id, None, uid, payload.title, payload.domain, payload.layer, payload.difficulty, version, "published",
-             db.jdump(payload.model_dump(by_alias=True))),
+            (payload.id, sub_id, uid, payload.title, payload.domain, payload.layer, payload.difficulty, version, "published",
+             db.jdump(d)),
         )
-    article_id = upsert_article_from_case(payload, "社区")
+    article_id = upsert_article_from_case(payload, author_name)
     return {"id": payload.id, "version": version, "articleId": article_id}
 
 

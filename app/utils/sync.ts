@@ -1,6 +1,7 @@
 /** Web 社区同步：拉取 casepack（已发布关卡包），本地校验后落 storage。
  *  v1 范围：拉取 + 落库 + 计数展示；远端关卡的章节合并与游玩放 M3。 */
 import { API_BASE } from '../config'
+import { DiagnosisCase } from '../types/case'
 
 export interface SyncResult {
   version: number
@@ -8,12 +9,31 @@ export interface SyncResult {
   error: string
 }
 
+export const CASEPACK_KEY = 'think_casepack_v1'
 const KEY_VERSION = 'think_pack_version'
-const KEY_PACK = 'think_casepack_v1'
+const KEY_PACK = CASEPACK_KEY
 
 export function getPackVersion(): number {
   const v = uni.getStorageSync(KEY_VERSION)
   return Number(v) || 0
+}
+
+/** 远端已同步的案例（casepack payload 与 DiagnosisCase 同构） */
+export function getRemoteCases(): DiagnosisCase[] {
+  const raw = uni.getStorageSync(CASEPACK_KEY)
+  if (raw == null) {
+    return []
+  }
+  const str = raw as string
+  if (str.length === 0) {
+    return []
+  }
+  try {
+    const arr = JSON.parse(str) as DiagnosisCase[]
+    return Array.isArray(arr) ? arr : []
+  } catch (e) {
+    return []
+  }
 }
 
 export function getPackCount(): number {

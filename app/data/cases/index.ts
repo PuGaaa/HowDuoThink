@@ -24,5 +24,19 @@ export function getCaseById(id: string): DiagnosisCase | null {
       return ALL_CASES[i]
     }
   }
+  // 远端 casepack 兜底（社区同步的关卡）
+  const raw = uni.getStorageSync('think_casepack_v1')
+  if (raw != null && (raw as string).length > 0) {
+    try {
+      const arr = JSON.parse(raw as string) as DiagnosisCase[]
+      for (let i = 0; i < arr.length; i++) {
+        if (arr[i] != null && arr[i].id === id) {
+          return arr[i]
+        }
+      }
+    } catch (e) {
+      return null
+    }
+  }
   return null
 }

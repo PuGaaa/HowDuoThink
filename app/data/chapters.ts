@@ -33,9 +33,30 @@ export const CHAPTERS: ChapterDef[] = [
   { id: 'observability', part: 'master', no: '第 6 章', name: '可观测性迷雾', pact: '你看到的日志和指标，本身也会说谎' },
 ]
 
-/** 章内关卡：按 chapterId 动态聚合 + order 排序；含本地与远端（casepack）案例 */
+/** 章内关卡：按 chapterId 动态聚合 + order 排序；本地与远端（casepack）合并，按 id 去重 */
 export function casesInChapter(chapterId: string): DiagnosisCase[] {
-  return ALL_CASES.filter((c) => c.chapterId === chapterId).sort((a, b) => a.order - b.order)
+  const merged: DiagnosisCase[] = []
+  const seen: string[] = []
+  const push = (c: DiagnosisCase) => {
+    if (seen.indexOf(c.id) < 0) {
+      seen.push(c.id)
+      merged.push(c)
+    }
+  }
+  for (let i = 0; i < ALL_CASES.length; i++) {
+    if (ALL_CASES[i].chapterId === chapterId) push(ALL_CASES[i])
+  }
+  const raw = uni.getStorageSync('think_casepack_v1')
+  if (raw != null && (raw as string).length > 0) {
+    try {
+      const remote = JSON.parse(raw as string) as DiagnosisCase[]
+      for (let i = 0; i < remote.length; i++) {
+        const c = remote[i]
+        if (c != null && c.chapterId === chapterId && seen.indexOf(c.id) < 0) push(c)
+      }
+    } catch (e) {}
+  }
+  return merged.sort((a, b) => a.order - b.order)
 }
 
 /** 全部可用关（本地 + 远端已同步） */

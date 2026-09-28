@@ -16,7 +16,7 @@
         </view>
       </view>
       <view v-if="packSynced" class="packchip" @click="onPackTap">
-        <text class="packchip__text">☁ 社区关卡已同步 · {{ packCount }} 个待上线</text>
+        <text class="packchip__text">☁ 社区关卡已同步 · {{ packCount }} 关可玩</text>
       </view>
 
       <!-- 继续闯关 -->
@@ -197,7 +197,7 @@ function openPlay(id: string) {
 }
 
 function onPackTap() {
-  uni.showToast({ title: '社区关卡将在下个版本开放游玩', icon: 'none' })
+  uni.showToast({ title: '社区关卡已在各章节中可玩', icon: 'none' })
 }
 </script>
 
