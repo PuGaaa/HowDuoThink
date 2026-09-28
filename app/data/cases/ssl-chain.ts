@@ -12,6 +12,10 @@ export const sslChainCase: DiagnosisCase = {
   intro: '晚上十点四十七，客服群炸了。网关日志里全是同一个陌生的报错。',
   domain: 'network',
   layer: 'TLS 握手：两端协商，任何一侧校验策略的差异都会造成"部分失败"',
+  part: 'engineer',
+  chapterId: 'access',
+  order: 2,
+  typeTags: ['cert', 'config', 'dependency'],
   difficulty: 2,
 
   scene: {

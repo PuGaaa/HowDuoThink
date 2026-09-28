@@ -37,7 +37,7 @@
 <script setup lang="uts">
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { CHAPTERS } from '../../data/chapters'
+import { CHAPTERS, casesInChapter } from '../../data/chapters'
 import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress } from '../../utils/storage'
 import { starsOf } from '../../utils/scoring'
@@ -56,47 +56,36 @@ const nodes = ref<NodeVM[]>([])
 const solvedInChapter = ref(0)
 
 onLoad((query : OnLoadOptions) => {
-  const iv = query['i']
+  const cid = query['id']
   let idx = 0
-  if (iv != null) {
-    idx = Number(iv as string)
+  if (cid != null) {
+    for (let i = 0; i < CHAPTERS.length; i++) {
+      if (CHAPTERS[i].id === (cid as string)) { idx = i; break }
+    }
   }
-  if (idx < 0 || idx >= CHAPTERS.length) idx = 0
   ch.value = CHAPTERS[idx]
   const list: NodeVM[] = []
   let solved = 0
-  for (let i = 0; i < ch.value.cases.length; i++) {
-    const c = getCaseById(ch.value.cases[i])
+  const list_cases = casesInChapter(ch.value.id)
+  for (let i = 0; i < list_cases.length; i++) {
+    const c = list_cases[i]
     const vm = new NodeVM()
-    if (c == null) {
-      vm.id = ch.value.cases[i]
-      vm.title = lockedTitle(ch.value.cases[i])
-      vm.meta = '★★ 标准'
-      vm.live = false
-    } else {
-      vm.id = c.id
-      vm.title = c.title
-      vm.live = true
-      const p = getCaseProgress(c.id)
-      const best = p != null && p.bestGrade.length > 0 ? p.bestGrade : ''
-      const stars = best.length > 0 ? starsOf(best) : 0
-      let sl = ''
-      for (let k = 0; k < 3; k++) sl += k < stars ? '★' : '☆'
-      vm.stars = sl
-      vm.meta = '★★ 标准 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡' : '未挑战')
-      if (p != null && p.solved) solved++
-    }
+    vm.id = c.id
+    vm.title = c.title
+    vm.live = true
+    const p = getCaseProgress(c.id)
+    const best = p != null && p.bestGrade.length > 0 ? p.bestGrade : ''
+    const stars = best.length > 0 ? starsOf(best) : 0
+    let sl = ''
+    for (let k = 0; k < 3; k++) sl += k < stars ? '★' : '☆'
+    vm.stars = sl
+    vm.meta = '★★ 标准 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡' : '未挑战')
+    if (p != null && p.solved) solved++
     list.push(vm)
   }
   nodes.value = list
   solvedInChapter.value = solved
 })
-
-function lockedTitle(id: string): string {
-  const map = { 'dns-hijack': 'DNS 代理劫持', 'cors-101': 'CORS 失败', 'nginx-trap': 'Nginx 配置陷阱', 'pool-exhausted': '数据库连接池耗尽', 'cache-drift': '缓存不一致', 'race-condition': '竞态条件', 'white-screen': '前端白屏', 'dep-hell': '依赖版本冲突', 'oom-leak': 'OOM 内存泄漏' }
-  const v = map[id]
-  return v ?? id
-}
 
 function openCase(node: NodeVM) {
   if (!node.live) {

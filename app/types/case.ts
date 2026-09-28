@@ -94,6 +94,11 @@ export interface CaseScene {
   impactHint: string
 }
 
+/** 篇（学习阶段）：apprentice=侦探学徒 engineer=一线工兵 master=资深值班 */
+export type PartId = string
+/** 故障机理标签词表（初版 8 个，可扩展）：config/dependency/race/resource/capacity/cert/timing/data */
+export type TypeTag = string
+
 export interface DiagnosisCase {
   id: string
   title: string
@@ -103,6 +108,14 @@ export interface DiagnosisCase {
   domain: string
   /** 本题主打的"层的契约" */
   layer: string
+  /** 所属篇（学习阶段） */
+  part: PartId
+  /** 所属章 id（章动态聚合的 key） */
+  chapterId: string
+  /** 章内排序（小在前） */
+  order: number
+  /** 故障机理标签 */
+  typeTags: TypeTag[]
   /** 1 教学关 / 2 标准 / 3 地狱 */
   difficulty: number
   scene: CaseScene

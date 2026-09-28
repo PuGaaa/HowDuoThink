@@ -34,29 +34,31 @@
         <text class="continue__meta">新的章节正在路上，敬请期待</text>
       </view>
 
-      <!-- 章节地图 -->
+      <!-- 章节地图：篇-章两级 -->
       <view class="secrow">
         <text class="secrow__title">章节地图</text>
         <text class="secrow__sub">按层闯关，拼出全栈地图</text>
       </view>
-      <view class="grid">
-        <view
-          v-for="(ch, i) in chapters"
-          :key="ch.name"
-          :class="ch.unlocked ? 'chapter chapter--live' : 'chapter'"
-          @click="openChapter(i)"
-        >
-          <view :class="ch.unlocked ? 'chapter__no chapter__no--live' : 'chapter__no'">
-            <text :class="ch.unlocked ? 'chapter__no-text chapter__no-text--live' : 'chapter__no-text'">{{ ch.no }}</text>
+      <view v-for="(part, pi) in parts" :key="part.id" class="part">
+        <view class="part__head" @click="togglePart(part.id)">
+          <view class="part__headrow">
+            <text class="part__name">{{ part.name }}</text>
+            <text class="part__chev">{{ openParts[part.id] ? '⌃' : '⌄' }}</text>
           </view>
-          <image v-if="ch.unlocked" class="chapter__star" src="/static/icons/star-lemon.png" mode="aspectFit"></image>
-          <image v-else class="chapter__lock" src="/static/icons/lock-ink3.png" mode="aspectFit"></image>
-          <text :class="ch.unlocked ? 'chapter__name' : 'chapter__name chapter__name--locked'">{{ ch.name }}</text>
-          <text class="chapter__pact">{{ ch.pactShort }}</text>
-          <view :class="ch.unlocked ? 'chapter__track chapter__track--live' : 'chapter__track'">
-            <view v-if="ch.solved > 0" :style="'width:' + ch.progressPct + 'rpx'" :class="ch.unlocked ? 'chapter__fill chapter__fill--live' : 'chapter__fill'"></view>
+          <text class="part__desc">{{ part.desc }}</text>
+        </view>
+        <view v-if="openParts[part.id]">
+          <view v-for="(ch, ci) in chaptersOfPart(part.id)" :key="ch.id" class="chapter" @click="openChapter(ch.id)">
+            <view class="chapter__no">
+              <text class="chapter__no-text">{{ ch.no }}</text>
+            </view>
+            <text class="chapter__name">{{ ch.name }}</text>
+            <text class="chapter__pact">{{ ch.pact }}</text>
+            <view class="chapter__track">
+              <view class="chapter__fill" :style="'width:' + partProgress(ch.id).pct + 'rpx'"></view>
+            </view>
+            <text class="chapter__count">{{ partProgress(ch.id).solved }}/{{ partProgress(ch.id).total }}</text>
           </view>
-          <text :class="ch.unlocked ? 'chapter__count chapter__count--live' : 'chapter__count'">{{ ch.solved }}/{{ ch.total }}</text>
         </view>
       </view>
       <text class="footer">全部 10 关 · 每关一朵层契约拼图</text>
@@ -67,7 +69,7 @@
 
 <script setup lang="uts">
 import { ref, computed } from 'vue'
-import { CHAPTERS } from '../../data/chapters'
+import { CHAPTERS, PARTS, casesInChapter } from '../../data/chapters'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress, getStreak, CaseProgress } from '../../utils/storage'
@@ -76,29 +78,61 @@ import { rankOf, starsOf } from '../../utils/scoring'
 import { fetchCasepack, getPackCount } from '../../utils/sync'
 
 const rankName = ref('')
-const rankNext = ref('')
-const streakCount = ref(0)
-const chapters = ref<ChapterVM[]>([])
 const continueCaseId = ref('')
 const continueTitle = ref('')
 const continueMeta = ref('')
 const continueChapterLabel = ref('')
 const hasContinue = ref(false)
+const rankNext = ref('')
+const streakCount = ref(0)
+const parts = ref<PartVM[]>(PARTS)
+const openParts = ref<{ [key: string]: boolean }>({ apprentice: true, engineer: false, master: false })
+
+class PartVM {
+  id: string = ''
+  name: string = ''
+  desc: string = ''
+}
+class ChapterVM {
+  id: string = ''
+  no: string = ''
+  name: string = ''
+  pact: string = ''
+}
+function togglePart(id: string) {
+  openParts.value[id] = !openParts.value[id]
+}
+function chaptersOfPart(partId: string): ChapterVM[] {
+  const out: ChapterVM[] = []
+  for (let i = 0; i < CHAPTERS.length; i++) {
+    const ch = CHAPTERS[i]
+    if (ch.part !== partId) continue
+    const vm = new ChapterVM()
+    vm.id = ch.id
+    vm.no = ch.no
+    vm.name = ch.name
+    vm.pact = ch.pact
+    out.push(vm)
+  }
+  return out
+}
+function partProgress(chapterId: string) {
+  const list = casesInChapter(chapterId)
+  let solved = 0
+  for (let i = 0; i < list.length; i++) {
+    const p = getCaseProgress(list[i].id)
+    if (p != null && p.solved) solved++
+  }
+  const pct = list.length > 0 ? Math.floor((260 * solved) / list.length) : 0
+  return { solved: solved, total: list.length, pct: pct }
+}
+function openChapter(chapterId: string) {
+  uni.navigateTo({ url: '/pages/chapter/chapter?id=' + chapterId })
+}
 const packCount = ref(0)
 const packSynced = ref(false)
 
-class ChapterVM {
-  no: string = ''
-  name: string = ''
-  pactShort: string = ''
-  unlocked: boolean = false
-  solved: number = 0
-  total: number = 0
-  progressPct: number = 0
-}
-
 // 竖版内容骨架在 mounted 前就需要空数组占位
-chapters.value = []
 const totals = getTotals(
   ALL_CASES.map((c) => c.id),
   ALL_CASES.map((c) => c.lessons.length)
@@ -124,38 +158,25 @@ function starsLabel(g: string): string {
   return s
 }
 
-// 组装章节数据 + 找继续闯关的关卡
+// 组装继续闯关：找第一个未破案的已上线关（章内动态聚合）
 let continueFound = false
-for (let ci = 0; ci < CHAPTERS.length; ci++) {
-  const ch = CHAPTERS[ci]
-  const vm = new ChapterVM()
-  vm.no = ch.no
-  vm.name = ch.name
-  const cut = ch.pact.indexOf('，')
-  vm.pactShort = cut > 0 ? ch.pact.slice(0, cut) : ch.pact
-  let solved = 0
-  let liveCount = 0
-  for (let ki = 0; ki < ch.cases.length; ki++) {
-    const c = getCaseById(ch.cases[ki])
-    if (c == null) continue
-    liveCount++
-    const p = getCaseProgress(c.id)
-    const isSolved = p != null && p.solved
-    if (isSolved) solved++
-    if (!continueFound && !isSolved) {
-      continueFound = true
-      continueCaseId.value = c.id
-      continueTitle.value = c.title
-      continueChapterLabel.value = ch.no + ' ' + ch.name
-      const best = p != null && p.bestGrade.length > 0 ? '最佳 ' + p.bestCost + '⚡' : '未挑战'
-      continueMeta.value = '★★ 标准 · ' + best
-    }
+for (let i = 0; i < ALL_CASES.length; i++) {
+  const c = ALL_CASES[i]
+  const p = getCaseProgress(c.id)
+  const isSolved = p != null && p.solved
+  if (!isSolved) {
+    continueFound = true
+    continueCaseId.value = c.id
+    continueTitle.value = c.title
+    const ch = CHAPTERS.find((x) => x.id === c.chapterId)
+    continueChapterLabel.value = ch ? ch.no + ' ' + ch.name : ''
+    const stars = starsOf(p != null && p.bestGrade.length > 0 ? p.bestGrade : '')
+    let sl = ''
+    for (let k = 0; k < 3; k++) sl += k < stars ? '★' : '☆'
+    const best = p != null && p.bestGrade.length > 0 ? '最佳 ' + p.bestCost + '⚡' : '未挑战'
+    continueMeta.value = sl + ' 标准 · ' + best
+    break
   }
-  vm.solved = solved
-  vm.total = ch.cases.length
-  vm.unlocked = liveCount > 0
-  vm.progressPct = Math.floor((96 * solved) / vm.total)
-  chapters.value.push(vm)
 }
 hasContinue.value = continueFound
 
@@ -167,15 +188,6 @@ function openPlay(id: string) {
 
 function onPackTap() {
   uni.showToast({ title: '社区关卡将在下个版本开放游玩', icon: 'none' })
-}
-
-function openChapter(i: number) {
-  const vm = chapters.value[i]
-  if (!vm.unlocked) {
-    uni.showToast({ title: '本章即将上线', icon: 'none' })
-    return
-  }
-  uni.navigateTo({ url: '/pages/chapter/chapter?i=' + i })
 }
 </script>
 
