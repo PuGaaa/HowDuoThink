@@ -6,6 +6,10 @@ import { dnsHijackCase } from './dns-hijack'
 import { whiteScreenCase } from './white-screen'
 import { depHellCase } from './dep-hell'
 import { cacheDriftCase } from './cache-drift'
+import { oversellRaceCase } from './oversell-race'
+import { idempotentFailCase } from './idempotent-fail'
+import { logSamplingCase } from './log-sampling'
+import { avgMetricCase } from './avg-metric'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -16,6 +20,10 @@ export const ALL_CASES: DiagnosisCase[] = [
   cacheDriftCase,
   whiteScreenCase,
   depHellCase,
+  oversellRaceCase,
+  idempotentFailCase,
+  logSamplingCase,
+  avgMetricCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {
