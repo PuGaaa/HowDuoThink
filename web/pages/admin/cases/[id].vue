@@ -14,14 +14,15 @@ const PARTS = [
   { id: 'engineer', name: '一线工兵篇' },
   { id: 'master', name: '资深值班篇' },
 ]
-const CHAPTER_LIST = [
-  { id: 'access', name: '接入层之夜' },
-  { id: 'build', name: '构建与依赖' },
-  { id: 'data', name: '数据的脾气' },
-  { id: 'runtime', name: '运行时暗面' },
-  { id: 'concurrency', name: '并发迷宫' },
-  { id: 'observability', name: '可观测性迷雾' },
+const ALL_CHAPTERS = [
+  { id: 'access', part: 'apprentice', name: '接入层之夜' },
+  { id: 'build', part: 'apprentice', name: '构建与依赖' },
+  { id: 'data', part: 'engineer', name: '数据的脾气' },
+  { id: 'runtime', part: 'engineer', name: '运行时暗面' },
+  { id: 'concurrency', part: 'master', name: '并发迷宫' },
+  { id: 'observability', part: 'master', name: '可观测性迷雾' },
 ]
+const chapterOptions = ALL_CHAPTERS
 
 onMounted(async () => {
   const r: any = await api.get('/api/admin/cases/' + cid.value)
@@ -33,9 +34,18 @@ onMounted(async () => {
   meta.typeTags = (r.payload.typeTags || []).join(', ')
 })
 
+const CHAPTER_PART_MAP: { [key: string]: string } = {
+  access: 'apprentice', build: 'apprentice',
+  data: 'engineer', runtime: 'engineer',
+  concurrency: 'master', observability: 'master',
+}
+
 async function saveMeta() {
   msg.value = ''
   errs.value = []
+  // 章变更时自动同步篇
+  const ch = ALL_CHAPTERS.find((c) => c.id === meta.chapterId)
+  if (ch) meta.part = CHAPTER_PART_MAP[meta.chapterId] || meta.part
   try {
     await api.patch('/api/admin/cases/' + cid.value + '/meta', {
       part: meta.part,
@@ -106,12 +116,7 @@ async function publish() {
         <div class="metarow__f">
           <label>章</label>
           <select v-model="meta.chapterId">
-            <option value="access">接入层之夜</option>
-            <option value="build">构建与依赖</option>
-            <option value="data">数据的脾气</option>
-            <option value="runtime">运行时暗面</option>
-            <option value="concurrency">并发迷宫</option>
-            <option value="observability">可观测性迷雾</option>
+            <option v-for="co in chapterOptions" :key="co.id" :value="co.id">{{ co.name }}</option>
           </select>
         </div>
         <div class="metarow__f">
