@@ -68,6 +68,7 @@ async function logout() {
 
 function openEdit() {
   menuOpen.value = false
+  pwOpen.value = false
   editName.value = user.value?.name || ''
   editAvatar.value = user.value?.avatar || ''
   editErr.value = ''
@@ -91,6 +92,7 @@ async function saveProfile() {
 
 function openPassword() {
   menuOpen.value = false
+  editOpen.value = false
   pwForm.oldPassword = ''
   pwForm.newPassword = ''
   pwForm.confirm = ''
@@ -153,7 +155,6 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
     <!-- 登录弹窗 -->
     <div v-if="showLogin" class="lmask" @click="showLogin = false"></div>
     <div v-if="showLogin" class="lmodal">
-      <div class="lmodal__handle"></div>
       <h2 class="lmodal__title">登录</h2>
 
       <template v-if="!pwLogin">
@@ -183,7 +184,6 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
     <!-- 个人信息编辑弹窗 -->
     <div v-if="editOpen" class="lmask" @click="editOpen = false"></div>
     <div v-if="editOpen" class="lmodal">
-      <div class="lmodal__handle"></div>
       <h2 class="lmodal__title">个人信息</h2>
       <div class="field avatarfield">
         <label>头像</label>
@@ -207,7 +207,6 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
     <!-- 密码修改弹窗 -->
     <div v-if="pwOpen" class="lmask" @click="pwOpen = false"></div>
     <div v-if="pwOpen" class="lmodal">
-      <div class="lmodal__handle"></div>
       <h2 class="lmodal__title">修改密码</h2>
       <template v-if="!pwOk">
         <div class="field">
@@ -258,14 +257,13 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
 .usermenu__item--logout { color: var(--red); }
 .avatarfield { display: flex; flex-direction: column; }
 .avatarfield__preview { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--line); margin-bottom: 10px; object-fit: cover; }
-.lmask { position: fixed; inset: 0; background: rgba(42, 39, 51, 0.45); z-index: 98; }
+.lmask { position: fixed; inset: 0; background: rgba(42, 39, 51, 0.45); backdrop-filter: blur(3px); z-index: 98; }
 .lmodal__back--accent { color: var(--coral); font-weight: 700; }
 .lmodal {
   position: fixed; bottom: 0; left: 0; right: 0; margin: 0 auto; max-width: 440px;
   background: var(--bg); border-radius: 24px 24px 0 0; padding: 18px 28px 40px; z-index: 99;
 }
-.lmodal__handle { width: 64px; height: 6px; border-radius: 3px; background: var(--line); margin: 0 auto 18px; }
-.lmodal__title { font-size: 20px; margin: 0 0 18px; text-align: center; }
+.lmodal__title { font-size: 19px; margin: 0 0 20px; text-align: center; font-weight: 800; }
 .ghbtn { display: flex; align-items: center; justify-content: center; width: 100%; background: var(--ink); box-shadow: 0 5px 0 #37323F; }
 .lmodal__divider { text-align: center; color: var(--ink3); font-size: 12px; margin: 18px 0; position: relative; }
 .lmodal__divider::before, .lmodal__divider::after { content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--line); }
