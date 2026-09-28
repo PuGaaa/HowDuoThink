@@ -86,6 +86,23 @@ def logout():
     return resp
 
 
+@app.post("/api/auth/login")
+def auth_login(body: dict):
+    """账号密码登录：uid = 'pw-' + login（与 GitHub 用户同表不同命名空间）。"""
+    login = str(body.get("login", "")).strip()
+    password = str(body.get("password", ""))
+    if not login or not password:
+        raise HTTPException(400, "账号和密码不能为空")
+    rows = db.q("SELECT id, password_hash, role FROM users WHERE id=?", ("pw-" + login,))
+    if not rows or not rows[0]["password_hash"] or not gh.verify_password(password, rows[0]["password_hash"]):
+        raise HTTPException(401, "账号或密码错误")
+    token = gh.sign_session(rows[0]["id"])
+    from fastapi.responses import JSONResponse
+    resp = JSONResponse({"ok": True, "login": login, "role": rows[0]["role"]})
+    resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax")
+    return resp
+
+
 # 开发绕行：未配置 GitHub 时本地造会话（生产环境设置 GITHUB_CLIENT_ID 后自动失效）
 @app.get("/api/dev/login")
 def dev_login(login: str = Query(default="devuser")):
@@ -425,3 +442,14 @@ def casepack(since: int = Query(default=0, ge=0)):
 @app.get("/api/health")
 def health():
     return {"ok": True, "casepackVersion": db.current_version()}
+
+
+@app.on_event("startup")
+def seed_admin():
+    """预置管理员：pw-admin / ADMIN_PASSWORD（默认 think-admin），dev 未配置时也生效。"""
+    import oauth_github as gh
+    db.ex(
+        "INSERT INTO users(id, login, name, avatar, role, password_hash) VALUES('pw-admin', 'pw-admin', '管理员', '', 'admin', ?) "
+        "ON CONFLICT(id) DO UPDATE SET password_hash=excluded.password_hash, role='admin'",
+        (gh.hash_password(gh.ADMIN_PASSWORD),),
+    )

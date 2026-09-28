@@ -1,5 +1,6 @@
 """GitHub OAuth + 自有会话（JWT cookie）。
 开发环境未配置 GITHUB_CLIENT_ID 时，提供 /api/dev/login 绕行（仅本地调试）。"""
+import hashlib
 import os
 import time
 
@@ -11,6 +12,15 @@ CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
 WEB_ORIGIN = os.environ.get("WEB_ORIGIN", "http://localhost:3000")
 GITHUB_ADMIN_LOGINS = set(filter(None, os.environ.get("GITHUB_ADMIN_LOGINS", "").split(",")))
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "think-admin")
+
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(("think:" + password).encode()).hexdigest()
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    return hash_password(password) == hashed
 
 
 def configured() -> bool:

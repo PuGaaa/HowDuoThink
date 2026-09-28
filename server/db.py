@@ -74,6 +74,10 @@ def connect() -> sqlite3.Connection:
 def init() -> None:
     conn = connect()
     conn.executescript(SCHEMA)
+    # 轻迁移：password_hash 列
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(users)")]
+    if "password_hash" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
     conn.commit()
     conn.close()
 
