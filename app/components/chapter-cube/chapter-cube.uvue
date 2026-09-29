@@ -38,7 +38,9 @@ const fillPct = computed((): number => {
 .cubecube {
   display: flex;
   flex-direction: column;
-  width: 344rpx;
+  /* 一行两块：part__body 是 space-between + wrap，用百分比自适应；
+     固定 344rpx 双块加上外层页面留白会超宽，导致被挤成竖排 */
+  width: 46%;
   border-radius: 22rpx;
   padding: 24rpx;
   margin-bottom: 20rpx;
