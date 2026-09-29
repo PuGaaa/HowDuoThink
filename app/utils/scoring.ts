@@ -6,6 +6,20 @@
  *   B = 答对
  *   F = 两次错误指认出局
  */
+import { RootCauseOption } from '../types/case'
+
+/** Fisher-Yates 洗牌（不改原数组）——指认根因选项每次乱序 */
+export function shuffleCauses(list: RootCauseOption[]): RootCauseOption[] {
+  const arr: RootCauseOption[] = []
+  for (let i = 0; i < list.length; i++) arr.push(list[i])
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const tmp = arr[i]
+    arr[i] = arr[j]
+    arr[j] = tmp
+  }
+  return arr
+}
 
 export function computeGrade(solved: boolean, playerCost: number, expertCost: number, wrongIdentifies: number): string {
   if (!solved) {

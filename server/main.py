@@ -1,6 +1,8 @@
 """排错推理训练场 — 社区后端（FastAPI + SQLite）。
 三对象：Submission（投稿）→ Case（关卡，过门禁）→ Article（Web 解决逻辑）。
 App 同步：GET /api/casepack?since=version。"""
+import logging
+import time
 import uuid
 from pathlib import Path
 
@@ -20,6 +22,9 @@ from models import (
 
 db.init()
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger("server")
+
 app = FastAPI(title="排错推理训练场 · 社区后端", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
@@ -30,10 +35,23 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def request_context(request: Request, call_next):
+    """每个请求发 8 位短 id：日志全带 [rid] 前缀，响应头回传，方便对账排查。"""
+    rid = uuid.uuid4().hex[:8]
+    request.state.rid = rid
+    start = time.perf_counter()
+    response = await call_next(request)
+    logger.info("[%s] %s %s -> %s (%.0fms)", rid, request.method, request.url.path, response.status_code, (time.perf_counter() - start) * 1000)
+    response.headers["X-Request-Id"] = rid
+    return response
+
+
 @app.exception_handler(Exception)
 def on_unhandled(request: Request, exc: Exception):
     """全局兜底：内部细节（堆栈/SQL）只进服务端日志，响应只给通用文案。"""
-    print(f"[error] {request.method} {request.url.path} -> {exc!r}")
+    rid = getattr(request.state, "rid", "-")
+    logger.exception("[%s] %s %s 未处理异常", rid, request.method, request.url.path)
     return JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
 
 
@@ -42,7 +60,7 @@ def on_unhandled(request: Request, exc: Exception):
 SessionCookie = Annotated[str | None, Cookie(alias="session")]
 
 
-def current_user(web_token: SessionCookie) -> str:
+def current_user(web_token: SessionCookie = None) -> str:
     if not web_token:
         raise HTTPException(401, "未登录")
     uid = gh.verify_session(web_token)
@@ -76,7 +94,7 @@ def oauth_callback(code: str, state: str, oauth_state: Annotated[str | None, Coo
     try:
         u = gh.exchange_and_fetch(code)
     except Exception:
-        print("[oauth] GitHub 回调失败", exc_info=True)
+        logger.warning("[oauth] GitHub 回调失败", exc_info=True)
         raise HTTPException(502, "GitHub 登录失败，请稍后重试")
     role = gh.role_for(u["login"])
     db.ex(
@@ -130,7 +148,7 @@ def dev_login(login: str = Query(default="devuser")):
 
 
 @app.get("/api/me")
-def me(uid: SessionCookie):
+def me(uid: SessionCookie = None):
     uid_decoded = gh.verify_session(uid) if uid else None
     if not uid_decoded:
         raise HTTPException(401, "未登录")
@@ -533,13 +551,13 @@ def seed_admin():
     - 非 dev：仅当库里没有任何管理员时创建（密码必须来自 ADMIN_PASSWORD 环境变量），绝不覆盖已有密码；
     - ENV=dev：允许用 ADMIN_PASSWORD 重置 pw-admin，方便本地联调。"""
     if gh.JWT_SECRET_EPHEMERAL:
-        print("[startup] 警告：未设置 JWT_SECRET，本次运行为进程内随机密钥（重启后所有会话失效；生产必须设置）")
+        logger.warning("未设置 JWT_SECRET，本次运行为进程内随机密钥（重启后所有会话失效；生产必须设置）")
     has_admin = db.q("SELECT id FROM users WHERE role='admin' LIMIT 1")
     if has_admin and not gh.DEV_MODE:
         return
     if not gh.ADMIN_PASSWORD:
         if not has_admin:
-            print("[startup] 警告：库中无管理员且未设置 ADMIN_PASSWORD，跳过创建（设置环境变量后重启生效）")
+            logger.warning("库中无管理员且未设置 ADMIN_PASSWORD，跳过创建（设置环境变量后重启生效）")
         return
     db.ex(
         "INSERT INTO users(id, login, name, avatar, role, password_hash) VALUES('pw-admin', 'pw-admin', '管理员', '', 'admin', ?) "
