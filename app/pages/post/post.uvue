@@ -2,18 +2,23 @@
   <view class="page">
     <navbar></navbar>
     <view class="content">
-      <text class="pagetitle">侦探档案</text>
+      <!-- 标题区（Figma：品牌行 / 大标题 / 英文小字） -->
+      <text class="head__brand">排错推理训练场</text>
+      <text class="head__title">侦 探 档 案</text>
+      <text class="head__sub">AGENT-ERA DEBUGGER · DIAGNOSIS RECORD</text>
 
-      <!-- 档案卡预览（海报同款视觉） -->
+      <!-- 深色档案主卡（海报同款视觉） -->
       <view class="postcard">
         <view class="deco">
           <view class="deco__b deco__b--a"></view>
           <view class="deco__b deco__b--e"></view>
           <view class="deco__b deco__b--m"></view>
         </view>
-        <image class="postcard__avatar" src="/static/mascots/frog-96.png" mode="aspectFit"></image>
-        <text class="postcard__brand">排错推理训练场 · 侦探档案</text>
+        <view class="postcard__halo">
+          <image class="postcard__avatar" src="/static/mascots/frog-96.png" mode="aspectFit"></image>
+        </view>
         <text class="postcard__rank">{{ rankName }}</text>
+        <view class="postcard__divider"></view>
         <view class="postcard__stats">
           <view class="pstat">
             <text class="pstat__v">{{ solvedCount }}</text>
@@ -31,29 +36,47 @@
         <text class="postcard__slogan">看症状 · 立假设 · 算成本 · 定根因</text>
       </view>
 
+      <!-- 层契约拼图条：每章一块，点亮 = 已破案 -->
+      <view class="puzzle">
+        <view class="puzzle__head">
+          <text class="puzzle__title">层契约拼图</text>
+          <text class="puzzle__count">{{ partSolved }} / {{ CHAPTERS.length }} 章</text>
+        </view>
+        <view class="puzzle__row">
+          <view v-for="(ch, i) in CHAPTERS" :key="ch.id" :class="i < partSolved ? 'pblock pblock--lit' : 'pblock'">
+            <text :class="i < partSolved ? 'pblock__text pblock__text--lit' : 'pblock__text'">章{{ i + 1 }}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 扫码邀请卡 -->
+      <view class="qrcard">
+        <view class="qrcard__box">
+          <view v-for="(cell, i) in qrCells" :key="'q' + i" :class="cell ? 'qcell qcell--on' : 'qcell'"></view>
+        </view>
+        <view class="qrcard__body">
+          <text class="qrcard__title">扫码来挑战</text>
+          <text class="qrcard__sub">把你的排错直觉，练成条件反射</text>
+          <text class="qrcard__meta">{{ today }} · 侦探 No.0002</text>
+        </view>
+      </view>
+
       <view class="btnrow">
         <view class="primarybtn" @click="downloadPoster">
           <text class="primarybtn__text">保存海报 PNG</text>
         </view>
       </view>
       <text class="hint">H5 端下载 PNG 图片；App 端将支持保存到相册</text>
-
-      <!-- 数据明细 -->
-      <view class="card">
-        <text class="card__title">档案数据</text>
-        <view v-for="(row, i) in rows" :key="'r' + i" class="drow">
-          <text class="drow__k">{{ row.k }}</text>
-          <text class="drow__v">{{ row.v }}</text>
-        </view>
-      </view>
+      <text class="foot">—— 本档案由排错推理训练场生成 ——</text>
     </view>
   </view>
 </template>
 
 <script setup lang="uts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { ALL_CASES } from '../../data/cases'
+import { CHAPTERS, casesInChapter } from '../../data/chapters'
 import { getCaseProgress, getStreak, getChecklistUse, getTotals } from '../../utils/storage'
 import { rankOf } from '../../utils/scoring'
 import navbar from '../../components/navbar/navbar.uvue'
@@ -62,7 +85,9 @@ const rankName = ref('')
 const solvedCount = ref(0)
 const streakCount = ref(0)
 const lessonCount = ref(0)
-const rows = ref<{ k: string, v: string }[]>([])
+const partSolved = ref(0)
+const qrCells = ref<boolean[]>([])
+const today = ref('')
 
 function refresh() {
   const totals = getTotals(
@@ -75,13 +100,33 @@ function refresh() {
   const rk = rankOf(totals.solved)
   rankName.value = rk.name
 
-  const list: { k: string, v: string }[] = []
-  list.push({ k: '当前称号', v: rk.name })
-  list.push({ k: '连续天数', v: String(streakCount.value) })
-  list.push({ k: '累计破案', v: String(totals.solved) })
-  list.push({ k: '检查单', v: String(totals.lessons) })
-  list.push({ k: '已相遇吉祥物', v: totals.metMascots + ' / 5' })
-  rows.value = list
+  // 层契约拼图：已破案 ≥1 关的章数
+  let lit = 0
+  for (let i = 0; i < CHAPTERS.length; i++) {
+    const list = casesInChapter(CHAPTERS[i].id)
+    for (let j = 0; j < list.length; j++) {
+      const p = getCaseProgress(list[j].id)
+      if (p != null && p.solved) {
+        lit++
+        break
+      }
+    }
+  }
+  partSolved.value = lit
+
+  // 二维码占位纹理（与 Figma 画板同款伪码图案）
+  const cells: boolean[] = []
+  for (let i = 0; i < 25; i++) {
+    const x = i % 5
+    const y = Math.floor(i / 5)
+    cells.push((x + y * 3 + x * y) % 3 !== 0)
+  }
+  qrCells.value = cells
+
+  const d = new Date()
+  const mm = d.getMonth() + 1 < 10 ? '0' + (d.getMonth() + 1) : String(d.getMonth() + 1)
+  const dd = d.getDate() < 10 ? '0' + d.getDate() : String(d.getDate())
+  today.value = d.getFullYear() + '.' + mm + '.' + dd
 }
 
 // onShow 首次显示也会触发：海报数据随任务积累保持最新
@@ -89,81 +134,152 @@ onShow(() => refresh())
 
 function downloadPoster() {
   // #ifdef WEB
-  // Canvas 手绘同款海报 → toDataURL → 触发下载（无外部依赖；头像为同源静态资源不污染画布）
-  const W = 750
-  const H = 1000
+  // Canvas 按 Figma 画板坐标（390×720）2x 手绘 → PNG 下载
+  const BW = 390
+  const BH = 720
   const c = document.createElement('canvas') as any
-  c.width = W
-  c.height = H
+  c.width = BW * 2
+  c.height = BH * 2
   const ctx = c.getContext('2d') as any
   if (ctx == null) {
     uni.showToast({ title: '当前浏览器不支持导出', icon: 'none' })
     return
   }
-  // 奶油页底 + 深色档案卡
+  ctx.scale(2, 2)
+  // 奶油页底
   ctx.fillStyle = '#FFF9F4'
-  ctx.fillRect(0, 0, W, H)
-  const cardX = 40
-  const cardY = 40
-  const cardW = W - 80
-  const cardH = H - 80
+  ctx.fillRect(0, 0, BW, BH)
+  ctx.textAlign = 'center'
+  // 标题区
+  ctx.fillStyle = '#FF8A5C'
+  ctx.font = 'bold 13px -apple-system, PingFang SC, sans-serif'
+  ctx.fillText('排错推理训练场', BW / 2, 40)
+  ctx.fillStyle = '#4A4458'
+  ctx.font = 'bold 26px -apple-system, PingFang SC, sans-serif'
+  ctx.fillText('侦 探 档 案', BW / 2, 76)
+  ctx.fillStyle = '#AFA8BD'
+  ctx.font = '8px -apple-system, PingFang SC, sans-serif'
+  ctx.fillText('AGENT-ERA DEBUGGER · DIAGNOSIS RECORD', BW / 2, 101)
+  // 深色主卡
+  const KX = 20, KY = 120, KW = 350, KH = 330
   ctx.beginPath()
-  if (ctx.roundRect != null) {
-    ctx.roundRect(cardX, cardY, cardW, cardH, 28)
-  } else {
-    ctx.rect(cardX, cardY, cardW, cardH)
-  }
+  if (ctx.roundRect != null) ctx.roundRect(KX, KY, KW, KH, 24)
+  else ctx.rect(KX, KY, KW, KH)
   ctx.fillStyle = '#4A4458'
   ctx.fill()
-  // 右上三色积木
-  const bw = 22
-  const gap = 8
   const colors = ['#FF8A5C', '#5FC9A5', '#6FB8E8']
   for (let i = 0; i < 3; i++) {
     ctx.fillStyle = colors[i]
-    ctx.fillRect(cardX + cardW - 40 - (3 - i) * (bw + gap), cardY + 18, bw, bw)
+    ctx.fillRect(KX + KW - 26 - (3 - i) * 20, KY + 16, 14, 14)
   }
-  const cx = W / 2
   const img = document.createElement('img') as any
   img.onload = () => {
-    // 圆形头像
-    const ay = 130
-    const r = 80
-    ctx.save()
+    // 吉祥物 + 光圈
     ctx.beginPath()
-    ctx.arc(cx, ay + r, r, 0, Math.PI * 2)
+    ctx.arc(KX + KW / 2, KY + 92, 52, 0, Math.PI * 2)
+    ctx.save()
     ctx.clip()
-    ctx.fillStyle = '#5E5770'
-    ctx.fillRect(cx - r, ay, r * 2, r * 2)
-    ctx.drawImage(img, cx - r, ay, r * 2, r * 2)
+    const g = ctx.createLinearGradient(0, KY + 40, 0, KY + 144) as any
+    g.addColorStop(0, '#5E5770')
+    g.addColorStop(1, '#413B4D')
+    ctx.fillStyle = g
+    ctx.fillRect(KX + KW / 2 - 52, KY + 40, 104, 104)
+    ctx.drawImage(img, KX + KW / 2 - 34, KY + 58, 68, 68)
     ctx.restore()
-    // 文案
-    ctx.textAlign = 'center'
-    ctx.fillStyle = '#C9C2DA'
-    ctx.font = '22px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText('排错推理训练场 · 侦探档案', cx, ay + r * 2 + 56)
+    // 称号 + 分隔虚线
     ctx.fillStyle = '#FFC94D'
-    ctx.font = 'bold 54px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText(rankName.value, cx, ay + r * 2 + 126)
-    // 三列数据
+    ctx.font = 'bold 26px -apple-system, PingFang SC, sans-serif'
+    ctx.fillText(rankName.value, BW / 2, KY + 178)
+    ctx.strokeStyle = '#5E5770'
+    ctx.setLineDash([4, 4])
+    ctx.beginPath()
+    ctx.moveTo(KX + 90, KY + 202)
+    ctx.lineTo(KX + KW - 90, KY + 202)
+    ctx.stroke()
+    ctx.setLineDash([])
+    // 三列数据胶囊
     const stats: any[][] = [
       [String(solvedCount.value), '破案'],
       [String(streakCount.value), '连续天数'],
       [String(lessonCount.value), '检查单'],
     ]
-    const colW = cardW / 3
     for (let i = 0; i < 3; i++) {
-      const x = cardX + colW * i + colW / 2
+      const cw = 98
+      const x = KX + 18 + i * (cw + 9)
+      ctx.beginPath()
+      if (ctx.roundRect != null) ctx.roundRect(x, KY + 220, cw, 64, 16)
+      else ctx.rect(x, KY + 220, cw, 64)
+      ctx.fillStyle = '#413B4D'
+      ctx.fill()
       ctx.fillStyle = '#FFFFFF'
-      ctx.font = 'bold 44px -apple-system, PingFang SC, sans-serif'
-      ctx.fillText(stats[i][0], x, ay + r * 2 + 226)
+      ctx.font = 'bold 22px -apple-system, PingFang SC, sans-serif'
+      ctx.fillText(stats[i][0], x + cw / 2, KY + 251)
       ctx.fillStyle = '#C9C2DA'
-      ctx.font = '20px -apple-system, PingFang SC, sans-serif'
-      ctx.fillText(stats[i][1], x, ay + r * 2 + 260)
+      ctx.font = '10px -apple-system, PingFang SC, sans-serif'
+      ctx.fillText(stats[i][1], x + cw / 2, KY + 272)
     }
     ctx.fillStyle = '#9BD49B'
-    ctx.font = '24px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText('看症状 · 立假设 · 算成本 · 定根因', cx, ay + r * 2 + 340)
+    ctx.font = 'bold 11px -apple-system, PingFang SC, sans-serif'
+    ctx.fillText('看症状 · 立假设 · 算成本 · 定根因', BW / 2, KY + 307)
+    // 层契约拼图条
+    ctx.textAlign = 'left'
+    ctx.fillStyle = '#4A4458'
+    ctx.font = 'bold 12px -apple-system, PingFang SC, sans-serif'
+    ctx.fillText('层契约拼图', 20, 483)
+    ctx.textAlign = 'right'
+    ctx.fillStyle = '#FF8A5C'
+    ctx.fillText(partSolved.value + ' / ' + CHAPTERS.length + ' 章', 370, 483)
+    ctx.textAlign = 'center'
+    const litBg = ['#FFF1E7', '#FFF1E7', '#E9F7F1', '#EAF4FC', '#F5E6DA', '#F5E6DA']
+    const litLine = ['#F3CFA9', '#F3CFA9', '#BEE3D3', '#BFDFF2', '#E8E2D8', '#E8E2D8']
+    for (let i = 0; i < 6; i++) {
+      const x = 20 + i * 59
+      ctx.beginPath()
+      if (ctx.roundRect != null) ctx.roundRect(x, 494, 51, 44, 10)
+      else ctx.rect(x, 494, 51, 44)
+      ctx.fillStyle = i < partSolved.value ? litBg[i] : '#F5E6DA'
+      ctx.fill()
+      ctx.strokeStyle = i < partSolved.value ? litLine[i] : '#E8E2D8'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      ctx.fillStyle = i < partSolved.value ? '#4A4458' : '#AFA8BD'
+      ctx.font = 'bold 10px -apple-system, PingFang SC, sans-serif'
+      ctx.fillText('章' + (i + 1), x + 25.5, 520)
+    }
+    // 扫码邀请卡
+    ctx.beginPath()
+    if (ctx.roundRect != null) ctx.roundRect(20, 566, 350, 96, 20)
+    else ctx.rect(20, 566, 350, 96)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fill()
+    ctx.strokeStyle = '#F5E6DA'
+    ctx.lineWidth = 2
+    ctx.stroke()
+    ctx.beginPath()
+    if (ctx.roundRect != null) ctx.roundRect(34, 580, 68, 68, 10)
+    else ctx.rect(34, 580, 68, 68)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fill()
+    ctx.fillStyle = '#4A4458'
+    for (let i = 0; i < 5; i++) {
+      for (let j = 0; j < 5; j++) {
+        if ((i + j * 3 + i * j) % 3 !== 0) ctx.fillRect(40 + i * 11, 586 + j * 11, 8, 8)
+      }
+    }
+    ctx.textAlign = 'left'
+    ctx.fillStyle = '#4A4458'
+    ctx.font = 'bold 13px -apple-system, PingFang SC, sans-serif'
+    ctx.fillText('扫码来挑战', 116, 596)
+    ctx.fillStyle = '#7A7290'
+    ctx.font = '10px -apple-system, PingFang SC, sans-serif'
+    ctx.fillText('把你的排错直觉，练成条件反射', 116, 618)
+    ctx.fillStyle = '#AFA8BD'
+    ctx.font = '9px -apple-system, PingFang SC, sans-serif'
+    ctx.fillText(today.value + ' · 侦探 No.0002', 116, 638)
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#AFA8BD'
+    ctx.font = '9px -apple-system, PingFang SC, sans-serif'
+    ctx.fillText('—— 本档案由排错推理训练场生成 ——', BW / 2, 696)
     // 触发下载
     const url = c.toDataURL('image/png')
     const a = document.createElement('a') as any
@@ -201,90 +317,233 @@ function downloadPoster() {
   flex-direction: column;
   padding-top: 110rpx;
 }
-.pagetitle {
-  font-size: 44rpx;
+.head__brand {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+  text-align: center;
+}
+.head__title {
+  font-size: 50rpx;
   font-weight: bold;
   color: #4A4458;
-  margin-bottom: 20rpx;
+  text-align: center;
+  margin-top: 12rpx;
+}
+.head__sub {
+  font-size: 17rpx;
+  color: #AFA8BD;
+  text-align: center;
+  margin-top: 10rpx;
+  letter-spacing: 2rpx;
 }
 .postcard {
   display: flex;
   flex-direction: column;
   align-items: center;
   background-color: #4A4458;
-  border-radius: 28rpx;
-  padding: 40rpx 30rpx 34rpx;
-  margin-bottom: 24rpx;
-  position: relative;
-  overflow: hidden;
+  border-radius: 48rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #35303F;
+  padding: 32rpx 30rpx 40rpx;
+  margin-top: 40rpx;
+  box-shadow: 0 8rpx 0 0 #35303F;
 }
 .deco {
   position: absolute;
-  top: 18rpx;
-  right: 22rpx;
+  top: 32rpx;
+  right: 44rpx;
   display: flex;
   flex-direction: row;
 }
 .deco__b {
-  width: 22rpx;
-  height: 22rpx;
-  border-radius: 6rpx;
-  margin-left: 8rpx;
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 8rpx;
+  margin-left: 12rpx;
 }
 .deco__b--a { background-color: #FF8A5C; }
 .deco__b--e { background-color: #5FC9A5; }
 .deco__b--m { background-color: #6FB8E8; }
-.postcard__avatar {
-  width: 128rpx;
-  height: 128rpx;
-  border-radius: 64rpx;
-  background-color: #5E5770;
+.postcard__halo {
+  width: 208rpx;
+  height: 208rpx;
+  border-radius: 104rpx;
+  background-color: #413B4D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 40rpx;
 }
-.postcard__brand {
-  font-size: 20rpx;
-  color: #C9C2DA;
-  margin-top: 18rpx;
+.postcard__avatar {
+  width: 136rpx;
+  height: 136rpx;
+  border-radius: 68rpx;
 }
 .postcard__rank {
-  font-size: 44rpx;
+  font-size: 52rpx;
   font-weight: bold;
   color: #FFC94D;
-  margin-top: 10rpx;
+  margin-top: 24rpx;
+}
+.postcard__divider {
+  width: 336rpx;
+  border-top-width: 2rpx;
+  border-top-style: dashed;
+  border-top-color: #5E5770;
+  margin-top: 20rpx;
 }
 .postcard__stats {
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
   width: 100%;
-  margin-top: 26rpx;
+  margin-top: 36rpx;
 }
 .pstat {
   display: flex;
   flex-direction: column;
   align-items: center;
   flex: 1;
+  background-color: #413B4D;
+  border-radius: 32rpx;
+  padding: 22rpx 0 18rpx;
+  margin: 0 9rpx;
 }
 .pstat__v {
-  font-size: 34rpx;
+  font-size: 42rpx;
   font-weight: bold;
   color: #FFFFFF;
 }
 .pstat__k {
   font-size: 19rpx;
   color: #C9C2DA;
-  margin-top: 6rpx;
+  margin-top: 8rpx;
 }
 .postcard__slogan {
-  font-size: 21rpx;
+  font-size: 23rpx;
+  font-weight: bold;
   color: #9BD49B;
-  margin-top: 26rpx;
+  margin-top: 34rpx;
+}
+.puzzle {
+  display: flex;
+  flex-direction: column;
+  margin-top: 40rpx;
+}
+.puzzle__head {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+.puzzle__title {
+  font-size: 25rpx;
+  font-weight: bold;
+  color: #4A4458;
+}
+.puzzle__count {
+  font-size: 25rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+}
+.puzzle__row {
+  display: flex;
+  flex-direction: row;
+  margin-top: 18rpx;
+}
+.pblock {
+  flex: 1;
+  height: 88rpx;
+  border-radius: 20rpx;
+  background-color: #F5E6DA;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #E8E2D8;
+  margin-right: 14rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pblock--lit {
+  border-color: #F3CFA9;
+}
+.pblock:nth-child(1) { background-color: #FFF1E7; }
+.pblock:nth-child(2) { background-color: #FFF1E7; }
+.pblock:nth-child(3) { background-color: #E9F7F1; }
+.pblock:nth-child(4) { background-color: #EAF4FC; }
+.pblock:nth-child(5) { background-color: #FFF6DE; }
+.pblock:nth-child(6) { background-color: #FFEDF2; }
+.pblock__text {
+  font-size: 21rpx;
+  font-weight: bold;
+  color: #AFA8BD;
+}
+.pblock__text--lit {
+  color: #4A4458;
+}
+.qrcard {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background-color: #FFFFFF;
+  border-radius: 40rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  padding: 28rpx;
+  margin-top: 36rpx;
+  box-shadow: 0 6rpx 0 0 #EFE5D6;
+}
+.qrcard__box {
+  width: 136rpx;
+  height: 136rpx;
+  border-radius: 20rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  padding: 10rpx;
+}
+.qcell {
+  width: 20rpx;
+  height: 20rpx;
+  margin: 2rpx;
+}
+.qcell--on {
+  background-color: #4A4458;
+  border-radius: 4rpx;
+}
+.qrcard__body {
+  display: flex;
+  flex-direction: column;
+  margin-left: 24rpx;
+  flex: 1;
+}
+.qrcard__title {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #4A4458;
+}
+.qrcard__sub {
+  font-size: 21rpx;
+  color: #7A7290;
+  margin-top: 10rpx;
+}
+.qrcard__meta {
+  font-size: 19rpx;
+  color: #AFA8BD;
+  margin-top: 14rpx;
 }
 .btnrow {
   display: flex;
   flex-direction: column;
   /* uni-view 运行时默认 overflow:hidden，给贴底按钮的硬边阴影留缓冲 */
   padding-bottom: 8rpx;
-  margin-bottom: 24rpx;
+  margin-top: 36rpx;
+  margin-bottom: 8rpx;
 }
 .primarybtn {
   display: flex;
@@ -297,44 +556,19 @@ function downloadPoster() {
 }
 .primarybtn__text {
   font-size: 28rpx;
-  font-weight: bold;
   color: #FFFFFF;
+  font-weight: bold;
 }
 .hint {
   font-size: 20rpx;
   color: #AFA8BD;
   text-align: center;
-  margin-bottom: 26rpx;
+  margin-top: 12rpx;
 }
-.card {
-  display: flex;
-  flex-direction: column;
-  background-color: #FFFFFF;
-  border-radius: 20rpx;
-  border-width: 1.5rpx;
-  border-style: solid;
-  border-color: #F5E6DA;
-  padding: 26rpx;
-}
-.card__title {
-  font-size: 28rpx;
-  font-weight: bold;
-  color: #4A4458;
-  margin-bottom: 14rpx;
-}
-.drow {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  padding: 12rpx 0;
-}
-.drow__k {
-  font-size: 24rpx;
-  color: #7A7290;
-}
-.drow__v {
-  font-size: 24rpx;
-  font-weight: bold;
-  color: #4A4458;
+.foot {
+  font-size: 19rpx;
+  color: #AFA8BD;
+  text-align: center;
+  margin-top: 30rpx;
 }
 </style>

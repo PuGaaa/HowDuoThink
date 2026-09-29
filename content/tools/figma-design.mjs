@@ -529,6 +529,70 @@ function buildChapter() {
   return { name: '章节详情 · 接入层之夜', items: s, H: 560 };
 }
 
+/* ---------- 分享海报 · 侦探档案 v2（390 宽，导出 2x = 780 宽 PNG） ---------- */
+function buildSharePoster() {
+  const s = makeScreen();
+  const PW = 390;
+  // 页面奶油底由 frame 提供；顶部标题区
+  s.t('排错推理训练场', 0, 34, 13, { w: 'B', c: C.coral, width: PW, al: 'C' });
+  s.t('侦 探 档 案', 0, 58, 26, { w: 'B', c: C.ink, width: PW, al: 'C' });
+  s.t('AGENT-ERA DEBUGGER · DIAGNOSIS RECORD', 0, 96, 8, { c: C.ink3, width: PW, al: 'C' });
+
+  // 主卡（深紫档案卡）
+  const KX = 20, KY = 120, KW = 350, KH = 330;
+  s.card(KX, KY, KW, KH, C.darkCard, '#35303F', 24, 8);
+  // 三色积木装饰（右上）
+  const bw = 14, gap = 6;
+  const cols = [C.coral, C.mint, C.sky];
+  for (let i = 0; i < 3; i++) s.r(KX + KW - 26 - (3 - i) * (bw + gap), KY + 16, bw, bw, cols[i], { rx: 4 });
+  // 吉祥物 + 光圈
+  s.c(KX + KW / 2, KY + 92, 52, { g: { a: '#5E5770', b: '#413B4D' } });
+  s.t('', 0, 0, 8, {});
+  mascot(s, 'frog', KX + KW / 2 - 34, KY + 58, 68);
+  // 称号 + 银河线
+  s.t('初级侦探', 0, KY + 168, 26, { w: 'B', c: C.lemon, width: PW, al: 'C' });
+  s.l(KX + 90, KY + 202, KX + KW - 90, KY + 202, C.darkTrack, { sw: 2, dash: true });
+  // 三列数据（胶囊）
+  const stat = (i, v, k) => {
+    const cw = 98, x = KX + 18 + i * (cw + 9);
+    s.r(x, KY + 220, cw, 64, '#413B4D', { rx: 16 });
+    s.t(v, x, KY + 230, 22, { w: 'B', c: C.white, width: cw, al: 'C' });
+    s.t(k, x, KY + 258, 10, { c: C.darkSub, width: cw, al: 'C' });
+  };
+  stat(0, '2', '破案');
+  stat(1, '1', '连续天数');
+  stat(2, '8', '检查单');
+  // 底部 slogan
+  s.t('看症状 · 立假设 · 算成本 · 定根因', 0, KY + 300, 11, { w: 'B', c: C.termGreen, width: PW, al: 'C' });
+
+  // 层契约拼图条：六章积木，点亮 = 已通关
+  const PY = 470;
+  s.t('层契约拼图', 20, PY, 12, { w: 'B', c: C.ink });
+  s.t('2 / 6 章', 270, PY, 12, { w: 'B', c: C.coral, width: 100, al: 'R' });
+  const pc = [C.coralSoft, C.coralSoft, C.mintSoft, C.skySoft, C.line, C.line];
+  const pb = ['#F3CFA9', '#F3CFA9', '#BEE3D3', '#BFDFF2', '#E8E2D8', '#E8E2D8'];
+  for (let i = 0; i < 6; i++) {
+    s.r(20 + i * 59, PY + 24, 51, 44, pc[i], { rx: 10, st: pb[i], sw: 2 });
+    s.t('章' + (i + 1), 20 + i * 59, PY + 38, 10, { w: 'B', c: i < 2 ? C.ink : C.ink3, width: 51, al: 'C' });
+  }
+
+  // 二维码 + 邀请
+  const QY = 566;
+  s.card(20, QY, 350, 96, C.card, C.line, 20, 6);
+  s.r(34, QY + 14, 68, 68, C.white, { rx: 10, st: C.line, sw: 2 });
+  // 二维码占位纹理
+  for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+    if ((i + j * 3 + i * j) % 3 !== 0) s.r(40 + i * 11, QY + 20 + j * 11, 8, 8, C.ink, { rx: 2 });
+  }
+  s.t('扫码来挑战', 116, QY + 24, 13, { w: 'B', c: C.ink });
+  s.t('把你的排错直觉，练成条件反射', 116, QY + 46, 10, { c: C.ink2 });
+  s.t('2026.09.29 · 侦探 No.0002', 116, QY + 66, 9, { c: C.ink3 });
+
+  // 页脚
+  s.t('—— 本档案由排错推理训练场生成 ——', 0, 690, 9, { c: C.ink3, width: PW, al: 'C' });
+  return { name: '分享海报 · 侦探档案 v2', items: s, H: 720, wide: false };
+}
+
 /* ---------- ③ 闯关页 ---------- */
 function buildPlay() {
   const s = makeScreen();
@@ -993,6 +1057,6 @@ async function push(screens) {
 }
 
 const mode = process.argv[2] || 'dry';
-const screens = [buildIconSheet(), buildHome(), buildChapter(), buildPlay(), buildReview(), buildHandbook(), buildProfile(), buildMotion()];
+const screens = [buildIconSheet(), buildHome(), buildChapter(), buildPlay(), buildReview(), buildHandbook(), buildProfile(), buildSharePoster(), buildMotion()];
 if (mode === 'dry') dry(screens);
 else await push(screens);

@@ -2,14 +2,16 @@
   <view class="page">
     <navbar></navbar>
     <view class="content">
-      <!-- 章头 -->
+      <!-- 章头（Figma：胶囊章号与章名同行 + 层契约 + 进度行） -->
       <view class="hero">
-        <view class="hero__no">
-          <text class="hero__no-text">{{ ch.no }}</text>
+        <view class="hero__titlerow">
+          <view class="hero__no">
+            <text class="hero__no-text">{{ ch.no }}</text>
+          </view>
+          <text class="hero__name">{{ ch.name }}</text>
         </view>
-        <text class="hero__name">{{ ch.name }}</text>
         <text class="hero__pact">层契约：{{ ch.pact }}</text>
-        <text class="hero__meta">进度 {{ solvedInChapter }}/{{ ch.cases.length }} · 通关解锁层契约拼图</text>
+        <text class="hero__meta">进度 {{ solvedInChapter }}/{{ totalInChapter }} · 收集检查单 {{ lessonCount }} 条</text>
       </view>
 
       <!-- 关卡路径 -->
@@ -57,6 +59,8 @@ class NodeVM {
 const ch = ref(CHAPTERS[0])
 const nodes = ref<NodeVM[]>([])
 const solvedInChapter = ref(0)
+const totalInChapter = ref(0)
+const lessonCount = ref(0)
 
 onLoad((query : OnLoadOptions) => {
   const cid = query['id']
@@ -93,6 +97,13 @@ onLoad((query : OnLoadOptions) => {
   }
   nodes.value = list
   solvedInChapter.value = solved
+  totalInChapter.value = list_cases.length
+  // 章内检查单总数（Figma hero 进度行）
+  let lessons = 0
+  for (let i = 0; i < list_cases.length; i++) {
+    lessons += list_cases[i].lessons.length
+  }
+  lessonCount.value = lessons
 })
 
 function openCase(node: NodeVM) {
@@ -128,19 +139,23 @@ function openCase(node: NodeVM) {
   display: flex;
   flex-direction: column;
   background-color: #FFF1E7;
-  border-radius: 24rpx;
+  border-radius: 20rpx;
   border-width: 2rpx;
   border-style: solid;
-  border-color: #FFD3BC;
-  padding: 28rpx;
+  border-color: #F3CFA9;
+  padding: 24rpx 28rpx;
   margin-bottom: 28rpx;
-  box-shadow: 0 8rpx 0 0 #F3CFA9;;
+  box-shadow: 0 8rpx 0 0 #F3CFA9;
+}
+.hero__titlerow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }
 .hero__no {
   background-color: #FF8A5C;
   border-radius: 22rpx;
   padding: 8rpx 20rpx;
-  align-self: flex-start;
 }
 .hero__no-text {
   font-size: 18rpx;
@@ -148,10 +163,11 @@ function openCase(node: NodeVM) {
   color: #FFFFFF;
 }
 .hero__name {
-  font-size: 36rpx;
+  font-size: 34rpx;
   font-weight: bold;
   color: #4A4458;
-  margin-top: 16rpx;
+  margin-left: 16rpx;
+  flex: 1;
 }
 .hero__pact {
   font-size: 22rpx;
@@ -160,7 +176,7 @@ function openCase(node: NodeVM) {
   line-height: 34rpx;
 }
 .hero__meta {
-  font-size: 20rpx;
+  font-size: 21rpx;
   font-weight: bold;
   color: #FF8A5C;
   margin-top: 14rpx;
