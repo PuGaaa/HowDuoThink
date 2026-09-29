@@ -569,11 +569,19 @@ function buildSharePoster() {
   const PY = 470;
   s.t('层契约拼图', 20, PY, 12, { w: 'B', c: C.ink });
   s.t('2 / 6 章', 270, PY, 12, { w: 'B', c: C.coral, width: 100, al: 'R' });
-  const pc = [C.coralSoft, C.coralSoft, C.mintSoft, C.skySoft, C.line, C.line];
-  const pb = ['#F3CFA9', '#F3CFA9', '#BEE3D3', '#BFDFF2', '#E8E2D8', '#E8E2D8'];
+  // 实体积木语言：点亮 = 章节色实心块 + 硬边投影 + 白字；未点亮 = 虚线空块
+  const acc = [C.coral, C.coral, C.mint, C.sky, C.lemon, C.pink];
+  const deep = ['#E06B38', '#E06B38', '#3FA885', '#4F93C4', '#D9A32E', '#E08AA6'];
   for (let i = 0; i < 6; i++) {
-    s.r(20 + i * 59, PY + 24, 51, 44, pc[i], { rx: 10, st: pb[i], sw: 2 });
-    s.t('章' + (i + 1), 20 + i * 59, PY + 38, 10, { w: 'B', c: i < 2 ? C.ink : C.ink3, width: 51, al: 'C' });
+    const x = 20 + i * 59;
+    if (i < 2) {
+      s.r(x + 1, PY + 28, 51, 48, deep[i], { rx: 12 });
+      s.r(x, PY + 24, 51, 48, acc[i], { rx: 12 });
+      s.t('章' + (i + 1), x, PY + 41, 11, { w: 'B', c: C.white, width: 51, al: 'C' });
+    } else {
+      s.r(x, PY + 24, 51, 48, C.card, { rx: 12, st: '#E3E6EB', sw: 1.5, dash: true });
+      s.t('章' + (i + 1), x, PY + 41, 11, { c: C.ink3, width: 51, al: 'C' });
+    }
   }
 
   // 二维码 + 邀请

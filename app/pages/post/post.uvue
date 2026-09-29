@@ -230,21 +230,38 @@ function downloadPoster() {
     ctx.fillStyle = '#FF8A5C'
     ctx.fillText(partSolved.value + ' / ' + CHAPTERS.length + ' 章', 370, 483)
     ctx.textAlign = 'center'
-    const litBg = ['#FFF1E7', '#FFF1E7', '#E9F7F1', '#EAF4FC', '#F5E6DA', '#F5E6DA']
-    const litLine = ['#F3CFA9', '#F3CFA9', '#BEE3D3', '#BFDFF2', '#E8E2D8', '#E8E2D8']
+    // 实体积木语言：点亮 = 章节色实心块 + 硬边投影 + 白字；未点亮 = 虚线空块
+    const acc = ['#FF8A5C', '#FF8A5C', '#5FC9A5', '#6FB8E8', '#FFC94D', '#FFB5C8']
+    const deep = ['#E06B38', '#E06B38', '#3FA885', '#4F93C4', '#D9A32E', '#E08AA6']
     for (let i = 0; i < 6; i++) {
       const x = 20 + i * 59
-      ctx.beginPath()
-      if (ctx.roundRect != null) ctx.roundRect(x, 494, 51, 44, 10)
-      else ctx.rect(x, 494, 51, 44)
-      ctx.fillStyle = i < partSolved.value ? litBg[i] : '#F5E6DA'
-      ctx.fill()
-      ctx.strokeStyle = i < partSolved.value ? litLine[i] : '#E8E2D8'
-      ctx.lineWidth = 2
-      ctx.stroke()
-      ctx.fillStyle = i < partSolved.value ? '#4A4458' : '#AFA8BD'
-      ctx.font = 'bold 10px -apple-system, PingFang SC, sans-serif'
-      ctx.fillText('章' + (i + 1), x + 25.5, 520)
+      if (i < partSolved.value) {
+        ctx.beginPath()
+        if (ctx.roundRect != null) ctx.roundRect(x + 1, 498, 51, 48, 12)
+        else ctx.rect(x + 1, 498, 51, 48)
+        ctx.fillStyle = deep[i]
+        ctx.fill()
+        ctx.beginPath()
+        if (ctx.roundRect != null) ctx.roundRect(x, 494, 51, 48, 12)
+        else ctx.rect(x, 494, 51, 48)
+        ctx.fillStyle = acc[i]
+        ctx.fill()
+        ctx.fillStyle = '#FFFFFF'
+      } else {
+        ctx.beginPath()
+        if (ctx.roundRect != null) ctx.roundRect(x, 494, 51, 48, 12)
+        else ctx.rect(x, 494, 51, 48)
+        ctx.fillStyle = '#FFFFFF'
+        ctx.fill()
+        ctx.strokeStyle = '#E3E6EB'
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([4, 4])
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.fillStyle = '#AFA8BD'
+      }
+      ctx.font = 'bold 11px -apple-system, PingFang SC, sans-serif'
+      ctx.fillText('章' + (i + 1), x + 25.5, 522)
     }
     // 扫码邀请卡
     ctx.beginPath()
@@ -454,33 +471,34 @@ function downloadPoster() {
 }
 .pblock {
   flex: 1;
-  height: 88rpx;
-  border-radius: 20rpx;
-  background-color: #F5E6DA;
+  height: 96rpx;
+  border-radius: 24rpx;
+  background-color: #FFFFFF;
   border-width: 2rpx;
-  border-style: solid;
-  border-color: #E8E2D8;
+  border-style: dashed;
+  border-color: #E3E6EB;
   margin-right: 14rpx;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .pblock--lit {
-  border-color: #F3CFA9;
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0);
 }
-.pblock:nth-child(1) { background-color: #FFF1E7; }
-.pblock:nth-child(2) { background-color: #FFF1E7; }
-.pblock:nth-child(3) { background-color: #E9F7F1; }
-.pblock:nth-child(4) { background-color: #EAF4FC; }
-.pblock:nth-child(5) { background-color: #FFF6DE; }
-.pblock:nth-child(6) { background-color: #FFEDF2; }
+.pblock--lit:nth-child(1) { box-shadow: 0 8rpx 0 0 #E06B38; background-color: #FF8A5C; }
+.pblock--lit:nth-child(2) { box-shadow: 0 8rpx 0 0 #E06B38; background-color: #FF8A5C; }
+.pblock--lit:nth-child(3) { box-shadow: 0 8rpx 0 0 #3FA885; background-color: #5FC9A5; }
+.pblock--lit:nth-child(4) { box-shadow: 0 8rpx 0 0 #4F93C4; background-color: #6FB8E8; }
+.pblock--lit:nth-child(5) { box-shadow: 0 8rpx 0 0 #D9A32E; background-color: #FFC94D; }
+.pblock--lit:nth-child(6) { box-shadow: 0 8rpx 0 0 #E08AA6; background-color: #FFB5C8; }
 .pblock__text {
   font-size: 21rpx;
   font-weight: bold;
   color: #AFA8BD;
 }
 .pblock__text--lit {
-  color: #4A4458;
+  color: #FFFFFF;
 }
 .qrcard {
   display: flex;
