@@ -1,7 +1,10 @@
 """SQLite（WAL）：小而硬。复杂结构存 JSON 列（schema 迭代期），索引列留给查询。"""
 import json
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
+
+from typing import Iterator
 
 DB_PATH = Path(__file__).parent / "data.db"
 
@@ -89,7 +92,7 @@ def q(sql: str, params: tuple = ()) -> list[sqlite3.Row]:
     return rows
 
 
-def ex(sql: str, params: tuple = ()) -> sqlite3.Cursor:
+def ex(sql: str, params: tuple = ()) -> int:
     conn = connect()
     cur = conn.execute(sql, params)
     conn.commit()
@@ -97,6 +100,22 @@ def ex(sql: str, params: tuple = ()) -> sqlite3.Cursor:
     cur.close()
     conn.close()
     return last  # type: ignore[return-value]
+
+
+@contextmanager
+def tx() -> Iterator[sqlite3.Connection]:
+    """多表写入的事务边界：BEGIN IMMEDIATE 取写锁，块内异常整体回滚。
+    块内请用 conn.execute 而不是 q/ex（它们各自开连接，看不到未提交数据）。"""
+    conn = connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def jload(s: str | None, default):

@@ -1,8 +1,54 @@
 """Pydantic 模型：字段完整性的第一道门（防"填太多"靠 Submission 轻量，防"丢字段"靠 CasePayload 强校验）。"""
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 GAINS = {"high", "mid", "low", "none"}
 DOMAINS = {"network", "deploy", "data", "runtime", "build", "concurrency"}
+
+
+# ---------- 会话与账号 ----------
+
+class LoginBody(BaseModel):
+    login: str = Field(min_length=1, max_length=40)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class ProfileUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    avatar_url: str | None = Field(default=None, max_length=500, alias="avatarUrl")
+
+    @field_validator("avatar_url")
+    @classmethod
+    def _avatar(cls, v: str | None) -> str | None:
+        if v and not v.startswith(("http://", "https://")):
+            raise ValueError("头像必须是 http(s) 图片链接")
+        return v
+
+
+class PasswordChange(BaseModel):
+    old_password: str = Field(default="", max_length=128, alias="oldPassword")
+    new_password: str = Field(min_length=6, max_length=128, alias="newPassword")
+
+
+# ---------- 管理端 ----------
+
+class SubmissionStatusBody(BaseModel):
+    status: Literal["pending", "accepted", "rejected", "archived"]
+    review_note: str = Field(default="", max_length=600, alias="reviewNote")
+
+
+class CaseDraftBody(BaseModel):
+    id: str = Field(pattern=r"^[a-zA-Z0-9_-]{3,40}$")
+    payload: dict = Field(default_factory=dict)
+    submission_id: str | None = Field(default=None, alias="submissionId")
+
+
+class CaseMetaBody(BaseModel):
+    part: Literal["apprentice", "engineer", "master"] | None = None
+    chapter_id: str | None = Field(default=None, max_length=40, alias="chapterId")
+    order: int | None = Field(default=None, ge=0, le=999)
+    type_tags: list[str] | None = Field(default=None, alias="typeTags")
 
 
 class EvidenceIn(BaseModel):

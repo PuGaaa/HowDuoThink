@@ -13,7 +13,10 @@ from fastapi.responses import JSONResponse, RedirectResponse
 import db
 import gate
 import oauth_github as gh
-from models import ArticleOut, CasePayload, SubmissionCreate, StepOut
+from models import (
+    ArticleOut, CaseDraftBody, CaseMetaBody, CasePayload, LoginBody,
+    PasswordChange, ProfileUpdate, SubmissionCreate, SubmissionStatusBody, StepOut,
+)
 
 db.init()
 
@@ -95,20 +98,16 @@ def logout():
 
 
 @app.post("/api/auth/login")
-def auth_login(body: dict):
+def auth_login(body: LoginBody):
     """账号密码登录：uid = 'pw-' + login（与 GitHub 用户同表不同命名空间）。"""
-    login = str(body.get("login", "")).strip()
-    password = str(body.get("password", ""))
-    if not login or not password:
-        raise HTTPException(400, "账号和密码不能为空")
-    rows = db.q("SELECT id, password_hash, role FROM users WHERE id=?", ("pw-" + login,))
-    if not rows or not rows[0]["password_hash"] or not gh.verify_password(password, rows[0]["password_hash"]):
+    rows = db.q("SELECT id, password_hash, role FROM users WHERE id=?", ("pw-" + body.login,))
+    if not rows or not rows[0]["password_hash"] or not gh.verify_password(body.password, rows[0]["password_hash"]):
         raise HTTPException(401, "账号或密码错误")
     # 历史无盐哈希在登录成功时静默升级为 bcrypt
     if gh.is_legacy_hash(rows[0]["password_hash"]):
-        db.ex("UPDATE users SET password_hash=? WHERE id=?", (gh.hash_password(password), rows[0]["id"]))
+        db.ex("UPDATE users SET password_hash=? WHERE id=?", (gh.hash_password(body.password), rows[0]["id"]))
     token = gh.sign_session(rows[0]["id"])
-    resp = JSONResponse({"ok": True, "login": login, "role": rows[0]["role"]})
+    resp = JSONResponse({"ok": True, "login": body.login, "role": rows[0]["role"]})
     resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=gh.COOKIE_SECURE)
     return resp
 
@@ -144,19 +143,11 @@ def me(uid: SessionCookie):
 
 
 @app.patch("/api/me")
-def update_me(body: dict, uid: str = Depends(current_user)):
-    name = str(body.get("name", "")).strip()[:40]
-    avatar = body.get("avatarUrl")
-    sets, params = ["name=?"], [name]
-    if avatar is not None:
-        avatar = str(avatar).strip()[:500]
-        # 简单协议校验：允许 http(s) 或空（恢复默认）
-        if avatar and not avatar.startswith(("http://", "https://")):
-            raise HTTPException(400, "头像必须是 http(s) 图片链接")
+def update_me(body: ProfileUpdate, uid: str = Depends(current_user)):
+    sets, params = ["name=?"], [body.name]
+    if body.avatar_url is not None:
         sets.append("avatar=?")
-        params.append(avatar)
-    if not name:
-        raise HTTPException(400, "昵称不能为空")
+        params.append(body.avatar_url)
     params.append(uid)
     db.ex(f"UPDATE users SET {', '.join(sets)} WHERE id=?", tuple(params))
     rows = db.q("SELECT id, login, name, avatar, role FROM users WHERE id=?", (uid,))
@@ -165,22 +156,18 @@ def update_me(body: dict, uid: str = Depends(current_user)):
 
 
 @app.post("/api/me/password")
-def change_password(body: dict, uid: str = Depends(current_user)):
-    old = str(body.get("oldPassword", ""))
-    new = str(body.get("newPassword", ""))
-    if len(new) < 6:
-        raise HTTPException(400, "新密码至少 6 位")
-    rows = db.q("SELECT password_hash, login FROM users WHERE id=?", (uid,))
+def change_password(body: PasswordChange, uid: str = Depends(current_user)):
+    rows = db.q("SELECT password_hash FROM users WHERE id=?", (uid,))
     if not rows:
         raise HTTPException(404, "用户不存在")
     current_hash = rows[0]["password_hash"]
     # GitHub 用户没有密码：允许直接设置；账密用户必须校验旧密码
     if current_hash:
-        if not old:
+        if not body.old_password:
             raise HTTPException(400, "请输入当前密码")
-        if not gh.verify_password(old, current_hash):
+        if not gh.verify_password(body.old_password, current_hash):
             raise HTTPException(400, "当前密码错误")
-    db.ex("UPDATE users SET password_hash=? WHERE id=?", (gh.hash_password(new), uid))
+    db.ex("UPDATE users SET password_hash=? WHERE id=?", (gh.hash_password(body.new_password), uid))
     return {"ok": True}
 
 
@@ -272,21 +259,18 @@ def admin_submissions(uid: str = Depends(current_user), status: str | None = Non
 
 
 @app.post("/api/admin/submissions/{sid}/status")
-def set_submission_status(sid: str, body: dict, uid: str = Depends(current_user)):
+def set_submission_status(sid: str, body: SubmissionStatusBody, uid: str = Depends(current_user)):
     if not uid:
         raise HTTPException(401, "未登录")
     require_editor(uid)
-    status = body.get("status", "")
-    if status not in {"pending", "accepted", "rejected", "archived"}:
-        raise HTTPException(400, "非法状态")
     rows = db.q("SELECT id FROM submissions WHERE id=?", (sid,))
     if not rows:
         raise HTTPException(404, "投稿不存在")
     db.ex(
         "UPDATE submissions SET status=?, review_note=?, reviewed_at=datetime('now') WHERE id=?",
-        (status, body.get("reviewNote") or "", sid),
+        (body.status, body.review_note, sid),
     )
-    return {"id": sid, "status": status}
+    return {"id": sid, "status": body.status}
 
 
 # ---------- 管理端：Case 草稿 CRUD ----------
@@ -319,15 +303,13 @@ def admin_case_detail(cid: str, uid: str = Depends(current_user)):
 
 
 @app.post("/api/admin/cases")
-def save_case_draft(body: dict, uid: str = Depends(current_user)):
+def save_case_draft(body: CaseDraftBody, uid: str = Depends(current_user)):
     """保存草稿：不跑门禁（draft 允许半成品），只要求 id。发布走 POST /api/cases。"""
     if not uid:
         raise HTTPException(401, "未登录")
     require_editor(uid)
-    cid = str(body.get("id", "")).strip()
-    if not cid:
-        raise HTTPException(400, "缺 id")
-    payload = body.get("payload") or {}
+    cid = body.id
+    payload = body.payload or {}
     payload["id"] = cid
     exists = db.q("SELECT id, status, version FROM cases WHERE id=?", (cid,))
     if exists:
@@ -337,7 +319,7 @@ def save_case_draft(body: dict, uid: str = Depends(current_user)):
     db.ex(
         "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
         "VALUES(?,?,?,?,?,?,?,?,?,?)",
-        (cid, body.get("submissionId"), uid, str(payload.get("title", "")), "", "", 1, 0, "draft", db.jdump(payload)),
+        (cid, body.submission_id, uid, str(payload.get("title", "")), "", "", 1, 0, "draft", db.jdump(payload)),
     )
     return {"id": cid, "status": "draft"}
 
@@ -414,7 +396,7 @@ def draft_from_submission(sid: str) -> dict:
 
 
 @app.patch("/api/admin/cases/{cid}/meta")
-def update_case_meta(cid: str, body: dict, uid: str = Depends(current_user)):
+def update_case_meta(cid: str, body: CaseMetaBody, uid: str = Depends(current_user)):
     """结构化更新三级架构元数据（part/chapterId/order/typeTags），不动正文。"""
     if not uid:
         raise HTTPException(401, "未登录")
@@ -423,17 +405,14 @@ def update_case_meta(cid: str, body: dict, uid: str = Depends(current_user)):
     if not rows:
         raise HTTPException(404, "不存在")
     payload = db.jload(rows[0]["payload"], {})
-    valid_parts = {"apprentice", "engineer", "master"}
-    if body.get("part") and body["part"] not in valid_parts:
-        raise HTTPException(400, "part 非法")
-    if body.get("part"):
-        payload["part"] = body["part"]
-    if "chapterId" in body:
-        payload["chapterId"] = body["chapterId"]
-    if "order" in body:
-        payload["order"] = int(body["order"])
-    if "typeTags" in body:
-        payload["typeTags"] = [str(t).strip() for t in body["typeTags"] if str(t).strip()]
+    if body.part:
+        payload["part"] = body.part
+    if body.chapter_id is not None:
+        payload["chapterId"] = body.chapter_id
+    if body.order is not None:
+        payload["order"] = body.order
+    if body.type_tags is not None:
+        payload["typeTags"] = [t.strip() for t in body.type_tags if t.strip()]
     db.ex("UPDATE cases SET payload=? WHERE id=?", (db.jdump(payload), cid))
     return {"ok": True, "meta": {"part": payload.get("part"), "chapterId": payload.get("chapterId"), "order": payload.get("order"), "typeTags": payload.get("typeTags")}}
 
@@ -443,25 +422,27 @@ def create_draft_from_submission(sid: str, uid: str = Depends(current_user)):
     if not uid:
         raise HTTPException(401, "未登录")
     require_editor(uid)
-    draft = draft_from_submission(sid)
-    payload = draft
-    db.ex(
-        "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?) "
-        "ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
-        (payload["id"], sid, uid, payload["title"], payload["domain"], payload["layer"], payload["difficulty"], 0, "draft", db.jdump(payload)),
-    )
-    db.ex("UPDATE submissions SET status='accepted', reviewed_at=datetime('now') WHERE id=? AND status='pending'", (sid,))
+    payload = draft_from_submission(sid)
+    with db.tx() as conn:
+        conn.execute(
+            "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
+            (payload["id"], sid, uid, payload["title"], payload["domain"], payload["layer"], payload["difficulty"], 0, "draft", db.jdump(payload)),
+        )
+        conn.execute(
+            "UPDATE submissions SET status='accepted', reviewed_at=datetime('now') WHERE id=? AND status='pending'", (sid,)
+        )
     return {"caseId": payload["id"], "submissionId": sid, "status": "draft"}
 
 
 # ---------- Case 转化与发布（editor） ----------
 
-def upsert_article_from_case(payload: CasePayload, author: str) -> str:
+def upsert_article_from_case(conn, payload: CasePayload, author: str) -> str:
+    """在给定事务连接上投影 Case → Article（发布流程的原子部分）。"""
     article_id = "a-" + payload.id
     # 步骤化解决逻辑：从 expertChain 投影（Web 展示"最终解决逻辑"）
     steps = []
-    no = 1
     for st in payload.expert_chain:
         act = st.action_id
         act_name = next((a.name for a in payload.actions if a.id == act), "")
@@ -470,9 +451,8 @@ def upsert_article_from_case(payload: CasePayload, author: str) -> str:
             "act": act_name if act else "（推理收束，停止收集）",
             "found": st.conclusion,
         })
-        no += 1
     lessons = [l.text for l in payload.lessons]
-    db.ex(
+    conn.execute(
         "INSERT INTO articles(id, source_type, source_id, title, layer, domain, steps, lessons, author) "
         "VALUES(?,?,?,?,?,?,?,?,?) "
         "ON CONFLICT(id) DO UPDATE SET title=excluded.title, layer=excluded.layer, steps=excluded.steps, "
@@ -491,7 +471,6 @@ def publish_case(payload: CasePayload, uid: str = Depends(current_user)):
     errors = gate.check_case(payload)
     if errors:
         raise HTTPException(422, {"message": "未过发布门禁", "errors": errors})
-    version = db.next_version()
     # 来源与署名：关联投稿 → 投稿者昵称；官方题 → "官方"
     sub_id = None
     author_name = "官方"
@@ -508,19 +487,27 @@ def publish_case(payload: CasePayload, uid: str = Depends(current_user)):
     d["submissionId"] = sub_id
     d["authorName"] = author_name
     exists = db.q("SELECT id FROM cases WHERE id=?", (payload.id,))
-    if exists:
-        db.ex(
-            "UPDATE cases SET payload=?, title=?, domain=?, layer=?, difficulty=?, version=?, status='published', published_at=datetime('now') WHERE id=?",
-            (db.jdump(d), payload.title, payload.domain, payload.layer, payload.difficulty, version, payload.id),
+    # 版本号 + cases + articles 三写同事务：中途失败整体回滚，版本号不虚增
+    with db.tx() as conn:
+        version_row = conn.execute("SELECT value FROM meta WHERE key='casepack_version'").fetchone()
+        version = (int(version_row["value"]) if version_row else 0) + 1
+        conn.execute(
+            "INSERT INTO meta(key, value) VALUES('casepack_version', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (str(version),),
         )
-    else:
-        db.ex(
-            "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload, published_at) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now'))",
-            (payload.id, sub_id, uid, payload.title, payload.domain, payload.layer, payload.difficulty, version, "published",
-             db.jdump(d)),
-        )
-    article_id = upsert_article_from_case(payload, author_name)
+        if exists:
+            conn.execute(
+                "UPDATE cases SET payload=?, title=?, domain=?, layer=?, difficulty=?, version=?, status='published', published_at=datetime('now') WHERE id=?",
+                (db.jdump(d), payload.title, payload.domain, payload.layer, payload.difficulty, version, payload.id),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload, published_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now'))",
+                (payload.id, sub_id, uid, payload.title, payload.domain, payload.layer, payload.difficulty, version, "published",
+                 db.jdump(d)),
+            )
+        article_id = upsert_article_from_case(conn, payload, author_name)
     return {"id": payload.id, "version": version, "articleId": article_id}
 
 
