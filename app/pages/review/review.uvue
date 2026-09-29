@@ -464,6 +464,8 @@ function replay() {
 .btnrow {
   display: flex;
   flex-direction: row;
+  /* uni-view 运行时默认 overflow:hidden，会裁掉贴底子元素的硬边阴影——留出阴影缓冲 */
+  padding-bottom: 8rpx;
   margin-bottom: 24rpx;
 }
 .nextbtn {
