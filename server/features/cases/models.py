@@ -1,54 +1,10 @@
-"""Pydantic 模型：字段完整性的第一道门（防"填太多"靠 Submission 轻量，防"丢字段"靠 CasePayload 强校验）。"""
+"""cases 域模型：App 关卡完整 schema（与 app/types/case.ts 的 DiagnosisCase 对齐）+ 管理入参。"""
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 GAINS = {"high", "mid", "low", "none"}
 DOMAINS = {"network", "deploy", "data", "runtime", "build", "concurrency"}
-
-
-# ---------- 会话与账号 ----------
-
-class LoginBody(BaseModel):
-    login: str = Field(min_length=1, max_length=40)
-    password: str = Field(min_length=1, max_length=128)
-
-
-class ProfileUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=40)
-    avatar_url: str | None = Field(default=None, max_length=500, alias="avatarUrl")
-
-    @field_validator("avatar_url")
-    @classmethod
-    def _avatar(cls, v: str | None) -> str | None:
-        if v and not v.startswith(("http://", "https://")):
-            raise ValueError("头像必须是 http(s) 图片链接")
-        return v
-
-
-class PasswordChange(BaseModel):
-    old_password: str = Field(default="", max_length=128, alias="oldPassword")
-    new_password: str = Field(min_length=6, max_length=128, alias="newPassword")
-
-
-# ---------- 管理端 ----------
-
-class SubmissionStatusBody(BaseModel):
-    status: Literal["pending", "accepted", "rejected", "archived"]
-    review_note: str = Field(default="", max_length=600, alias="reviewNote")
-
-
-class CaseDraftBody(BaseModel):
-    id: str = Field(pattern=r"^[a-zA-Z0-9_-]{3,40}$")
-    payload: dict = Field(default_factory=dict)
-    submission_id: str | None = Field(default=None, alias="submissionId")
-
-
-class CaseMetaBody(BaseModel):
-    part: Literal["apprentice", "engineer", "master"] | None = None
-    chapter_id: str | None = Field(default=None, max_length=40, alias="chapterId")
-    order: int | None = Field(default=None, ge=0, le=999)
-    type_tags: list[str] | None = Field(default=None, alias="typeTags")
 
 
 class EvidenceIn(BaseModel):
@@ -123,7 +79,7 @@ class SceneIn(BaseModel):
 
 
 class CasePayload(BaseModel):
-    """App 关卡完整 schema（与 app/types/case.ts 的 DiagnosisCase 对齐）——发布门禁的结构校验层。"""
+    """App 关卡完整 schema —— 发布门禁的结构校验层。"""
     id: str = Field(pattern=r"^[a-z0-9-]{3,40}$")
     title: str = Field(min_length=1, max_length=40)
     intro: str = Field(min_length=1, max_length=80)
@@ -177,49 +133,14 @@ class CasePayload(BaseModel):
         return self
 
 
-class SubmissionCreate(BaseModel):
-    """用户投稿：必填 3 项 + 选填——轻是设计，字段与 Case 素材一一对应。"""
-    title: str = Field(min_length=4, max_length=40)
-    symptom: str = Field(min_length=10, max_length=1200)
-    resolution: str = Field(min_length=10, max_length=2400)
-    key_error: str | None = Field(default=None, max_length=600, alias="keyError")
-    timeline: str | None = Field(default=None, max_length=300)
-    lessons: list[str] = Field(default_factory=list, max_length=3)
-    stack_tags: list[str] = Field(default_factory=list, max_length=6)
-    domain_hint: str | None = Field(default=None, max_length=20, alias="domainHint")
-
-    @field_validator("lessons")
-    @classmethod
-    def _lessons(cls, v: list[str]) -> list[str]:
-        for x in v:
-            if len(x) > 80:
-                raise ValueError("单条经验 ≤80 字")
-        return v
+class CaseDraftBody(BaseModel):
+    id: str = Field(pattern=r"^[a-zA-Z0-9_-]{3,40}$")
+    payload: dict = Field(default_factory=dict)
+    submission_id: str | None = Field(default=None, alias="submissionId")
 
 
-class SubmissionOut(BaseModel):
-    id: str
-    title: str
-    status: str
-    created_at: str
-    review_note: str | None = None
-
-    model_config = {"from_attributes": True}
-
-
-class StepOut(BaseModel):
-    no: int
-    observe: str
-    act: str
-    found: str
-
-
-class ArticleOut(BaseModel):
-    id: str
-    title: str
-    layer: str
-    domain: str
-    steps: list[StepOut]
-    lessons: list[str]
-    author: str
-    published_at: str
+class CaseMetaBody(BaseModel):
+    part: Literal["apprentice", "engineer", "master"] | None = None
+    chapter_id: str | None = Field(default=None, max_length=40, alias="chapterId")
+    order: int | None = Field(default=None, ge=0, le=999)
+    type_tags: list[str] | None = Field(default=None, alias="typeTags")

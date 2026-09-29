@@ -46,14 +46,18 @@ docs/案例写作规范.md  →  content/prompts  →  content/seeds（草稿）
 - 修改案例内容 → `app/data/cases/`；新增案例前先读 `docs/案例写作规范.md`
 - 入库自检：`node content/pipeline/validate.mjs app/data/cases/<case>.ts`
 
-**后端（FastAPI）**
+**后端（FastAPI，Feature 架构）**
 
 ```bash
 cd server
 pip install -r requirements.txt
 uvicorn main:app --port 8000
 python3 seed.py   # 官方案例种子入库
+/tmp/pilvenv/bin/python -m pytest tests/ -q   # 单测（隔离临时库）
 ```
+
+目录约定：`core/`（横切：config/db/security/deps）；`features/<域>/`（router + service + models，域内仍分层）。
+依赖规则：feature → core 允许；feature → 其他 feature 仅限 cases.service（供 submissions 转稿、sync 拉取）；SQL 只出现在 feature 的 service 层。
 
 - 凭据全部走环境变量：`GITHUB_CLIENT_ID/SECRET`、`JWT_SECRET`（未设置则进程内随机，重启失效）、`ADMIN_PASSWORD`（无默认值）、`WEB_ORIGIN`、`COOKIE_SECURE=1`（HTTPS 部署时）
 - 开发绕行登录仅 `ENV=dev` 时开放：`/api/dev/login?login=xxx`

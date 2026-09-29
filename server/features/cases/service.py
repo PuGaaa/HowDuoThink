@@ -3,8 +3,8 @@
 from fastapi import HTTPException
 
 import db
-import gate
-from models import CaseDraftBody, CaseMetaBody, CasePayload
+from features.cases import gate
+from features.cases.models import CaseDraftBody, CaseMetaBody, CasePayload
 
 
 def save_case_draft(uid: str, body: CaseDraftBody) -> dict:
@@ -196,11 +196,8 @@ def _upsert_article(conn, payload: CasePayload, author: str) -> str:
     return article_id
 
 
-def article_view(r) -> dict:
-    """articles 行 → Web 展示结构。"""
-    from models import ArticleOut, StepOut
-    steps = [StepOut(no=i + 1, observe=s["observe"], act=s["act"], found=s["found"]) for i, s in enumerate(db.jload(r["steps"], []))]
-    return ArticleOut(
-        id=r["id"], title=r["title"], layer=r["layer"], domain=r["domain"],
-        steps=steps, lessons=db.jload(r["lessons"], []), author=r["author"], published_at=r["published_at"],
-    ).model_dump()
+
+def published_after(since: int) -> tuple[int, list[dict]]:
+    """App 同步：version > since 的已发布案例 + 当前版本号（sync feature 经此取数）。"""
+    rows = db.q("SELECT id, version, payload FROM cases WHERE status='published' AND version>? ORDER BY version", (since,))
+    return db.current_version(), [db.jload(r["payload"], {}) for r in rows]

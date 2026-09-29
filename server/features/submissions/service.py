@@ -1,0 +1,145 @@
+"""submissions 域业务逻辑：投稿创建、我的投稿、审核状态、投稿→Case 草稿转换。
+转稿会编排写入 cases 表（依赖规则允许 submissions → cases 数据归属的编排流）。"""
+from fastapi import HTTPException
+
+import db
+import uuid
+
+
+def create_submission(uid: str, body) -> dict:
+    sid = "s-" + uuid.uuid4().hex[:12]
+    db.ex(
+        "INSERT INTO submissions(id, user_id, title, symptom, resolution, key_error, timeline, lessons, stack_tags, domain_hint) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?)",
+        (
+            sid, uid, body.title, body.symptom, body.resolution,
+            body.key_error, body.timeline, db.jdump(body.lessons), db.jdump(body.stack_tags), body.domain_hint,
+        ),
+    )
+    return {"id": sid, "status": "pending"}
+
+
+def my_submissions(uid: str) -> list[dict]:
+    rows = db.q("SELECT id, title, status, review_note, created_at FROM submissions WHERE user_id=? ORDER BY created_at DESC", (uid,))
+    return [
+        {"id": r["id"], "title": r["title"], "status": r["status"], "reviewNote": r["review_note"], "createdAt": r["created_at"]}
+        for r in rows
+    ]
+
+
+def admin_list(status: str | None = None) -> list[dict]:
+    where, params = "1=1", []
+    if status:
+        where, params = "status=?", [status]
+    rows = db.q(
+        f"SELECT s.*, u.login AS author_login FROM submissions s LEFT JOIN users u ON u.id=s.user_id "
+        f"WHERE {where} ORDER BY s.created_at DESC",
+        tuple(params),
+    )
+    return [
+        {
+            "id": r["id"], "title": r["title"], "symptom": r["symptom"], "resolution": r["resolution"],
+            "keyError": r["key_error"], "timeline": r["timeline"],
+            "lessons": db.jload(r["lessons"], []), "stackTags": db.jload(r["stack_tags"], []),
+            "domainHint": r["domain_hint"], "status": r["status"], "reviewNote": r["review_note"],
+            "author": r["author_login"], "createdAt": r["created_at"],
+        }
+        for r in rows
+    ]
+
+
+def set_status(sid: str, status: str, review_note: str) -> dict:
+    rows = db.q("SELECT id FROM submissions WHERE id=?", (sid,))
+    if not rows:
+        raise HTTPException(404, "投稿不存在")
+    db.ex(
+        "UPDATE submissions SET status=?, review_note=?, reviewed_at=datetime('now') WHERE id=?",
+        (status, review_note, sid),
+    )
+    return {"id": sid, "status": status}
+
+
+def draft_skeleton_from_submission(sid: str) -> dict:
+    """投稿 → Case 草稿骨架：必填字段自动映射，重字段填占位（编辑器里可见待补）。"""
+    rows = db.q("SELECT * FROM submissions WHERE id=?", (sid,))
+    if not rows:
+        raise HTTPException(404, "投稿不存在")
+    s = rows[0]
+    title = s["title"]
+    symptoms = [{"type": "text", "title": "现象描述", "text": s["symptom"]}]
+    if s["key_error"]:
+        symptoms.insert(0, {"type": "error", "title": "关键报错", "text": s["key_error"]})
+    timeline = s["timeline"] or "时间线待补充"
+    # 解决过程按行拆分为专家链骨架：每行 → 观察( thought )，动作占位
+    chain = []
+    lines = [ln.strip() for ln in s["resolution"].replace("；", "\n").replace("。", "\n").split("\n") if ln.strip()]
+    for ln in lines[:8]:
+        chain.append({
+            "thought": ln[:120],
+            "update": "（待补充：这一步假设如何更新）",
+            "actionId": "",
+            "why": "（待补充：为什么这一步值这个成本）",
+            "conclusion": "（待补充：排除了什么/确认了什么）",
+        })
+    if not chain:
+        chain.append({"thought": "（待补充）", "update": "（待补充）", "actionId": "", "why": "（待补充）", "conclusion": "（待补充）"})
+    while len(chain) < 4:
+        chain.append({"thought": "（待补充）", "update": "（待补充）", "actionId": "", "why": "（待补充）", "conclusion": "（待补充）"})
+    lessons = db.jload(s["lessons"], [])
+    lesson_list = [{"text": l, "principle": "（待补充：这一层的契约）"} for l in lessons]
+    lesson_list.append({"text": "（待补充检查单）", "principle": "（待补充原理）"})
+    pid = "c-" + sid.replace("s-", "")
+    part_guess = {"network": "access", "data": "data", "build": "build", "runtime": "runtime", "concurrency": "concurrency", "deploy": "access"}.get(s["domain_hint"] or "", "")
+    return {
+        "id": pid,
+        "title": title,
+        "intro": title,
+        "domain": s["domain_hint"] or "network",
+        "layer": "（待补充层契约）",
+        "part": part_guess or "apprentice",
+        "chapterId": part_guess or "",
+        "order": 99,
+        "typeTags": [],
+        "difficulty": 1,
+        "scene": {
+            "role": "（待补充：玩家角色代入）",
+            "architecture": "（待补充：链路图）",
+            "symptoms": symptoms,
+            "timeline": timeline,
+            "impactHint": "（待补充）",
+        },
+        "hypotheses": [
+            {"id": "h-a", "text": "（待补充假设A）", "excludeActionId": ""},
+            {"id": "h-b", "text": "（待补充假设B）", "excludeActionId": ""},
+            {"id": "h-c", "text": "（待补充假设C）", "excludeActionId": ""},
+        ],
+        "actions": [
+            {"id": "act-1", "name": "（待补充动作）", "desc": "（待补充）", "cost": 1, "gain": "high",
+             "danger": False, "effects": [], "tests": [], "hypotheses": [],
+             "result": {"type": "text", "title": "（待补充）", "text": "（待补充）"}},
+        ],
+        "rootCauses": [
+            {"id": "rc-a", "text": "（待补充根因A）", "correct": False},
+            {"id": "rc-b", "text": "（待补充根因B）", "correct": False},
+            {"id": "rc-c", "text": "（待补充根因C）", "correct": False},
+        ],
+        "expertCost": 5,
+        "restartActionId": "",
+        "expertChain": chain,
+        "lessons": lesson_list,
+    }
+
+
+def create_draft_from_submission(uid: str, sid: str) -> dict:
+    payload = draft_skeleton_from_submission(sid)
+    with db.tx() as conn:
+        conn.execute(
+            "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
+            (payload["id"], sid, uid, payload["title"], payload["domain"], payload["layer"], payload["difficulty"], 0, "draft", db.jdump(payload)),
+        )
+        conn.execute(
+            "UPDATE submissions SET status='accepted', reviewed_at=datetime('now') WHERE id=? AND status='pending'", (sid,)
+        )
+    return {"caseId": payload["id"], "submissionId": sid, "status": "draft"}

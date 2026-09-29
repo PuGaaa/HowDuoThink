@@ -1,6 +1,6 @@
 """发布门禁：写作规范红线的 Python 版。
 结构红线代码强制（过不了就不许发布）；语义红线（证据自洽/双路径/噪声质量）人工勾选清单。"""
-from models import CasePayload
+from features.cases.models import CasePayload
 
 
 def check_case(payload: CasePayload) -> list[str]:

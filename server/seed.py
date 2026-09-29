@@ -9,8 +9,8 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE))
 
 import db  # noqa: E402
-import gate  # noqa: E402
-from models import CasePayload  # noqa: E402
+from features.cases import gate  # noqa: E402
+from features.cases.models import CasePayload  # noqa: E402
 
 
 def seed_case(json_path: Path, author: str = "官方") -> None:
