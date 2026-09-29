@@ -80,9 +80,9 @@
 
 <script setup lang="uts">
 import { ref } from 'vue'
-import { DAILY_TASKS, WEEKLY_TASKS, GROWTH_TASKS, TaskDef } from '../../data/tasks'
+import { onShow } from '@dcloudio/uni-app'
+import { DAILY_TASKS, WEEKLY_TASKS, GROWTH_TASKS } from '../../data/tasks'
 import { getTaskDaily, getTaskWeekly, getCaseProgress, getChecklistUse, getStreak } from '../../utils/storage'
-import { rankOf, starsOf } from '../../utils/scoring'
 import { ALL_CASES } from '../../data/cases'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 
@@ -144,36 +144,33 @@ function buildLists() {
   }
   weeklyList.value = wl
 
+  // 成长任务：由 data/tasks.ts 的 GROWTH_TASKS 驱动；allcases 的目标随案例注册表动态取
   const gl: TaskVM[] = []
   let solved = 0
   for (let i = 0; i < ALL_CASES.length; i++) {
     const p = getCaseProgress(ALL_CASES[i].id)
     if (p != null && p.solved) solved++
   }
-  const rk = rankOf(solved)
-  var g1 = new TaskVM()
-  g1.id = 'g-rank'
-  g1.iconImg = '/static/icons/medal-coral.png'
-  g1.title = '晋升「主治工程师」'
-  g1.goal = 3
-  g1.cur = solved >= 3 ? 3 : solved
-  g1.pct = Math.min(100, Math.round((g1.cur * 100) / 3))
-  g1.done = solved >= 3
-  gl.push(g1)
-  var g2 = new TaskVM()
-  g2.id = 'g-all'
-  g2.iconImg = '/static/icons/map-sky.png'
-  g2.title = '全部章节通关'
-  g2.goal = ALL_CASES.length
-  g2.cur = solved
-  g2.pct = Math.min(100, Math.round((solved * 100) / ALL_CASES.length))
-  g2.done = solved >= ALL_CASES.length
-  gl.push(g2)
+  for (let i = 0; i < GROWTH_TASKS.length; i++) {
+    const t = GROWTH_TASKS[i]
+    const goal = t.metric === 'allcases' ? ALL_CASES.length : t.goal
+    const cur = solved > goal ? goal : solved
+    var g = new TaskVM()
+    g.id = t.id
+    g.iconImg = '/static/icons/' + t.icon + '.png'
+    g.title = t.title
+    g.goal = goal
+    g.cur = cur
+    g.pct = goal > 0 ? Math.min(100, Math.round((cur * 100) / goal)) : 0
+    g.done = solved >= goal
+    gl.push(g)
+  }
   growthList.value = gl
 }
 
 
-buildLists()
+// onShow 首次显示也会触发：破案/核对检查单后回到任务页进度即时更新
+onShow(() => buildLists())
 
 function goPoster() {
   uni.navigateTo({ url: '/pages/post/post' })

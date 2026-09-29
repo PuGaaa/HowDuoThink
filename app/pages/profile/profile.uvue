@@ -62,6 +62,7 @@
 
 <script setup lang="uts">
 import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { ALL_CASES } from '../../data/cases'
 import { getCaseProgress, getStreak, useDay, getTotals } from '../../utils/storage'
 import { rankOf } from '../../utils/scoring'
@@ -80,31 +81,36 @@ const streakCount = ref(0)
 const lessonCount = ref(0)
 const rows = ref<RowVM[]>([])
 
-const totals = getTotals(
-  ALL_CASES.map((c) => c.id),
-  ALL_CASES.map((c) => c.lessons.length)
-)
-solvedCount.value = totals.solved
-lessonCount.value = totals.lessons
-useDayN.value = useDay()
-streakCount.value = getStreak().count
-const rk = rankOf(totals.solved)
-rankName.value = rk.name
-rankNextTip.value = rk.remain > 0 ? '距「' + rk.nextName + '」还差 ' + rk.remain + ' 关' : '已是最高称号'
+function refresh() {
+  const totals = getTotals(
+    ALL_CASES.map((c) => c.id),
+    ALL_CASES.map((c) => c.lessons.length)
+  )
+  solvedCount.value = totals.solved
+  lessonCount.value = totals.lessons
+  useDayN.value = useDay()
+  streakCount.value = getStreak().count
+  const rk = rankOf(totals.solved)
+  rankName.value = rk.name
+  rankNextTip.value = rk.remain > 0 ? '距「' + rk.nextName + '」还差 ' + rk.remain + ' 关' : '已是最高称号'
 
-const r1 = new RowVM()
-r1.label = '学习提醒'
-r1.value = '每天 21:30'
-const r2 = new RowVM()
-r2.label = '每日一题'
-r2.value = '即将上线'
-const r3 = new RowVM()
-r3.label = '检查单云同步'
-r3.value = '即将上线'
-const r4 = new RowVM()
-r4.label = '关于排错推理训练场'
-r4.value = 'v0.1'
-rows.value = [r1, r2, r3, r4]
+  const r1 = new RowVM()
+  r1.label = '学习提醒'
+  r1.value = '每天 21:30'
+  const r2 = new RowVM()
+  r2.label = '每日一题'
+  r2.value = '即将上线'
+  const r3 = new RowVM()
+  r3.label = '检查单云同步'
+  r3.value = '即将上线'
+  const r4 = new RowVM()
+  r4.label = '关于排错推理训练场'
+  r4.value = 'v0.1'
+  rows.value = [r1, r2, r3, r4]
+}
+
+// onShow 首次显示也会触发：从子页返回时数据保持最新
+onShow(() => refresh())
 
 function goHandbook() {
   uni.navigateTo({ url: '/pages/handbook/handbook' })
@@ -263,6 +269,11 @@ function onRow(v: string) {
   border-color: #FFD3BC;
   padding: 24rpx;
   margin-bottom: 14rpx;
+}
+.entryrow__icon {
+  width: 44rpx;
+  height: 44rpx;
+  margin-right: 14rpx;
 }
 .entryrow__label {
   font-size: 25rpx;

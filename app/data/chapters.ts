@@ -4,6 +4,7 @@
 import { ALL_CASES } from './cases'
 import { DiagnosisCase } from '../types/case'
 import { getCaseProgress } from '../utils/storage'
+import { getRemoteCases } from '../utils/sync'
 
 export interface PartDef {
   id: string
@@ -47,15 +48,10 @@ export function casesInChapter(chapterId: string): DiagnosisCase[] {
   for (let i = 0; i < ALL_CASES.length; i++) {
     if (ALL_CASES[i].chapterId === chapterId) push(ALL_CASES[i])
   }
-  const raw = uni.getStorageSync('think_casepack_v1')
-  if (raw != null && (raw as string).length > 0) {
-    try {
-      const remote = JSON.parse(raw as string) as DiagnosisCase[]
-      for (let i = 0; i < remote.length; i++) {
-        const c = remote[i]
-        if (c != null && c.chapterId === chapterId && seen.indexOf(c.id) < 0) push(c)
-      }
-    } catch (e) {}
+  const remote = getRemoteCases()
+  for (let i = 0; i < remote.length; i++) {
+    const c = remote[i]
+    if (c != null && c.chapterId === chapterId && seen.indexOf(c.id) < 0) push(c)
   }
   return merged.sort((a, b) => a.order - b.order)
 }

@@ -35,6 +35,7 @@
 
 <script setup lang="uts">
 import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { ALL_CASES } from '../../data/cases'
 import { getCaseProgress, getChecklistUse } from '../../utils/storage'
 import tabbar from '../../components/tabbar/tabbar.uvue'
@@ -48,22 +49,28 @@ const lessonCount = ref(0)
 const solvedCount = ref(0)
 const lessonCards = ref<LessonCard[]>([])
 const checkUse = ref(0)
-const cards: LessonCard[] = []
-for (let i = 0; i < ALL_CASES.length; i++) {
-  const c = ALL_CASES[i]
-  const p = getCaseProgress(c.id)
-  if (p == null || !p.solved) continue
-  for (let j = 0; j < c.lessons.length; j++) {
-    const lc = new LessonCard()
-    lc.text = c.lessons[j].text
-    lc.src = '《' + c.title + '》 · ' + c.domain
-    cards.push(lc)
+
+function refresh() {
+  const cards: LessonCard[] = []
+  for (let i = 0; i < ALL_CASES.length; i++) {
+    const c = ALL_CASES[i]
+    const p = getCaseProgress(c.id)
+    if (p == null || !p.solved) continue
+    for (let j = 0; j < c.lessons.length; j++) {
+      const lc = new LessonCard()
+      lc.text = c.lessons[j].text
+      lc.src = '《' + c.title + '》 · ' + c.domain
+      cards.push(lc)
+    }
   }
+  lessonCards.value = cards
+  checkUse.value = getChecklistUse()
+  lessonCount.value = cards.length
+  solvedCount.value = cards.length > 0 ? 1 : 0
 }
-lessonCards.value = cards
-checkUse.value = getChecklistUse()
-lessonCount.value = cards.length
-solvedCount.value = cards.length > 0 ? 1 : 0
+
+// onShow 首次显示也会触发：新破案的检查单回到本页即可见
+onShow(() => refresh())
 </script>
 
 <style>

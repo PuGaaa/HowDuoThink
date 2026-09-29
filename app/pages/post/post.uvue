@@ -52,6 +52,7 @@
 
 <script setup lang="uts">
 import { ref, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { ALL_CASES } from '../../data/cases'
 import { getCaseProgress, getStreak, getChecklistUse, getTotals } from '../../utils/storage'
 import { rankOf } from '../../utils/scoring'
@@ -63,17 +64,17 @@ const streakCount = ref(0)
 const lessonCount = ref(0)
 const rows = ref<{ k: string, v: string }[]>([])
 
-const totals = getTotals(
-  ALL_CASES.map((c) => c.id),
-  ALL_CASES.map((c) => c.lessons.length)
-)
-solvedCount.value = totals.solved
-lessonCount.value = totals.lessons
-streakCount.value = getStreak().count
-const rk = rankOf(totals.solved)
-rankName.value = rk.name
+function refresh() {
+  const totals = getTotals(
+    ALL_CASES.map((c) => c.id),
+    ALL_CASES.map((c) => c.lessons.length)
+  )
+  solvedCount.value = totals.solved
+  lessonCount.value = totals.lessons
+  streakCount.value = getStreak().count
+  const rk = rankOf(totals.solved)
+  rankName.value = rk.name
 
-function buildRows() {
   const list: { k: string, v: string }[] = []
   list.push({ k: '当前称号', v: rk.name })
   list.push({ k: '连续天数', v: String(streakCount.value) })
@@ -82,11 +83,14 @@ function buildRows() {
   list.push({ k: '已相遇吉祥物', v: totals.metMascots + ' / 5' })
   rows.value = list
 }
-buildRows()
+
+// onShow 首次显示也会触发：海报数据随任务积累保持最新
+onShow(() => refresh())
 
 function downloadPoster() {
   // H5：把档案卡区域导出为 PNG 的简化实现——打开新窗口仅含海报 DOM，用户右键/长按保存
   // App 端将使用 snapshot 能力保存到相册（后续版本）
+  // #ifdef WEB
   const w = window.open('', '_blank')
   if (w == null) return
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -94,6 +98,10 @@ function downloadPoster() {
     .tip{position:fixed;bottom:20px;color:#AFA8BD;font-size:13px}
   </style></head><body><div class="tip">右键或长按保存下方图片</div></body></html>`)
   w.document.close()
+  // #endif
+  // #ifndef WEB
+  uni.showToast({ title: 'App 端海报保存即将上线', icon: 'none' })
+  // #endif
 }
 </script>
 

@@ -41,7 +41,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { CHAPTERS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId } from '../../data/chapters'
 import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress } from '../../utils/storage'
-import { starsOf } from '../../utils/scoring'
+import { starsLabel } from '../../utils/scoring'
 import navbar from '../../components/navbar/navbar.uvue'
 
 class NodeVM {
@@ -82,10 +82,7 @@ onLoad((query : OnLoadOptions) => {
     vm.challenge = !chapterOpen && c.id === challengeId
     const p = getCaseProgress(c.id)
     const best = p != null && p.bestGrade.length > 0 ? p.bestGrade : ''
-    const stars = best.length > 0 ? starsOf(best) : 0
-    let sl = ''
-    for (let k = 0; k < 3; k++) sl += k < stars ? '★' : '☆'
-    vm.stars = sl
+    vm.stars = starsLabel(best)
     if (vm.challenge) {
       vm.meta = '跳级挑战 · 赢了立即解锁本章 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
     } else {

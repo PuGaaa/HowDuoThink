@@ -22,3 +22,4 @@ __pycache__/
 web/.nuxt/
 web/.output/
 dist/
+data.db

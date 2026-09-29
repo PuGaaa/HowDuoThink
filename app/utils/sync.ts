@@ -61,10 +61,6 @@ export function fetchCasepack(cb: (r: SyncResult) => void) {
           cb({ version: 0, count: 0, error: '数据格式异常' })
           return
         }
-        if (data.cases.length === 0) {
-          cb({ version: data.version, count: 0, error: '' })
-          return
-        }
         // 最小字段校验（App 端防丢字段第二道门）
         for (const c of data.cases) {
           if (!c.id || !c.title || !c.actions || !c.lessons) {
@@ -72,9 +68,18 @@ export function fetchCasepack(cb: (r: SyncResult) => void) {
             return
           }
         }
-        uni.setStorageSync(KEY_PACK, JSON.stringify(data.cases))
+        // 增量合并：since 拉回的是 delta，按 id 并入已存整包后整体落库（直接覆盖会丢掉历史关卡）
+        const mergedMap: Map<string, any> = new Map()
+        for (const c of getRemoteCases()) {
+          if (c != null && c.id) mergedMap.set(c.id, c)
+        }
+        for (const c of data.cases) {
+          mergedMap.set(c.id, c)
+        }
+        const merged = [...mergedMap.values()]
+        uni.setStorageSync(KEY_PACK, JSON.stringify(merged))
         uni.setStorageSync(KEY_VERSION, String(data.version))
-        cb({ version: data.version, count: data.cases.length, error: '' })
+        cb({ version: data.version, count: merged.length, error: '' })
       } catch (e) {
         cb({ version: 0, count: 0, error: '解析失败' })
       }

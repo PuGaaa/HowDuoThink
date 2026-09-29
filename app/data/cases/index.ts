@@ -1,5 +1,6 @@
 import { DiagnosisCase } from '../../types/case'
 import { getCaseProgress } from '../../utils/storage'
+import { getRemoteCases } from '../../utils/sync'
 import { sslChainCase } from './ssl-chain'
 import { poolExhaustedCase } from './pool-exhausted'
 import { corsCase } from './cors-101'
@@ -42,17 +43,10 @@ export function getCaseById(id: string): DiagnosisCase | null {
     }
   }
   // 远端 casepack 兜底（社区同步的关卡）
-  const raw = uni.getStorageSync('think_casepack_v1')
-  if (raw != null && (raw as string).length > 0) {
-    try {
-      const arr = JSON.parse(raw as string) as DiagnosisCase[]
-      for (let i = 0; i < arr.length; i++) {
-        if (arr[i] != null && arr[i].id === id) {
-          return arr[i]
-        }
-      }
-    } catch (e) {
-      return null
+  const arr = getRemoteCases()
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] != null && arr[i].id === id) {
+      return arr[i]
     }
   }
   return null
@@ -68,13 +62,8 @@ export function getCollectedLessons(excludeCaseId: string): CollectedLesson[] {
   const out: CollectedLesson[] = []
   const merged: DiagnosisCase[] = []
   for (let i = 0; i < ALL_CASES.length; i++) merged.push(ALL_CASES[i])
-  const raw = uni.getStorageSync('think_casepack_v1')
-  if (raw != null && (raw as string).length > 0) {
-    try {
-      const remote = JSON.parse(raw as string) as DiagnosisCase[]
-      for (let i = 0; i < remote.length; i++) merged.push(remote[i])
-    } catch (e) {}
-  }
+  const remote = getRemoteCases()
+  for (let i = 0; i < remote.length; i++) merged.push(remote[i])
   for (let i = 0; i < merged.length; i++) {
     const c = merged[i]
     if (c.id === excludeCaseId) continue

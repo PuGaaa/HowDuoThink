@@ -76,13 +76,14 @@
 
 <script setup lang="uts">
 import { ref, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { CHAPTERS, PARTS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId } from '../../data/chapters'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 import chapterCube from '../../components/chapter-cube/chapter-cube.uvue'
 import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress, getStreak, CaseProgress } from '../../utils/storage'
 import { getTotals } from '../../utils/storage'
-import { rankOf, starsOf } from '../../utils/scoring'
+import { rankOf, starsLabel } from '../../utils/scoring'
 import { fetchCasepack, getPackCount } from '../../utils/sync'
 
 const rankName = ref('')
@@ -165,57 +166,48 @@ const packCount = ref(0)
 const packSynced = ref(false)
 const totalLevels = ref(ALL_CASES.length)
 
-// 竖版内容骨架在 mounted 前就需要空数组占位
-const totals = getTotals(
-  ALL_CASES.map((c) => c.id),
-  ALL_CASES.map((c) => c.lessons.length)
-)
-const rk = rankOf(totals.solved)
-rankName.value = rk.name
-rankNext.value = rk.remain > 0 ? '再破案 ' + rk.remain + ' 关晋升「' + rk.nextName + '」' : '已是最高称号'
-streakCount.value = getStreak().count
-packCount.value = getPackCount()
-// 关卡总数：本地注册表与已同步关卡包取大者（包内含社区关）
-totalLevels.value = packCount.value > totalLevels.value ? packCount.value : totalLevels.value
-fetchCasepack((r) => {
-  if (r.error.length === 0 && r.count > 0) {
-    packCount.value = getPackCount()
-    packSynced.value = true
-    // 关卡总数以"本地 + 远端去重"为准（远端含社区关，与本地重 ids 不重复计）
-    totalLevels.value = packCount.value > ALL_CASES.length ? packCount.value : ALL_CASES.length
-  }
-})
+// 数据装配（onShow 触发，首次显示也会执行）：破案/同步后回到首页保持最新
+function refreshHome() {
+  const totals = getTotals(
+    ALL_CASES.map((c) => c.id),
+    ALL_CASES.map((c) => c.lessons.length)
+  )
+  const rk = rankOf(totals.solved)
+  rankName.value = rk.name
+  rankNext.value = rk.remain > 0 ? '再破案 ' + rk.remain + ' 关晋升「' + rk.nextName + '」' : '已是最高称号'
+  streakCount.value = getStreak().count
+  packCount.value = getPackCount()
+  // 关卡总数：本地注册表与已同步关卡包取大者（包内含社区关）
+  totalLevels.value = packCount.value > ALL_CASES.length ? packCount.value : ALL_CASES.length
+  fetchCasepack((r) => {
+    if (r.error.length === 0 && r.count > 0) {
+      packCount.value = getPackCount()
+      packSynced.value = true
+      totalLevels.value = packCount.value > ALL_CASES.length ? packCount.value : ALL_CASES.length
+    }
+  })
 
-function starsLabel(g: string): string {
-  const n = starsOf(g)
-  let s = ''
-  for (let i = 0; i < 3; i++) {
-    s += i < n ? '★' : '☆'
+  // 组装继续闯关：第一个"可玩且未破案"的关（锁定章的非挑战关会被跳过；挑战关未破时天然命中）
+  let continueFound = false
+  for (let i = 0; i < ALL_CASES.length; i++) {
+    const c = ALL_CASES[i]
+    const p = getCaseProgress(c.id)
+    const isSolved = p != null && p.solved
+    if (!isSolved && isCasePlayable(c.id)) {
+      continueFound = true
+      continueCaseId.value = c.id
+      continueTitle.value = c.title
+      const ch = CHAPTERS.find((x) => x.id === c.chapterId)
+      continueChapterLabel.value = ch ? ch.no + ' ' + ch.name : ''
+      const sl = starsLabel(p != null && p.bestGrade.length > 0 ? p.bestGrade : '')
+      const best = p != null && p.bestGrade.length > 0 ? '最佳 ' + p.bestCost + '⚡︎' : '未挑战'
+      continueMeta.value = sl + ' 标准 · ' + best
+      break
+    }
   }
-  return s
+  hasContinue.value = continueFound
 }
-
-// 组装继续闯关：第一个"可玩且未破案"的关（锁定章的非挑战关会被跳过；挑战关未破时天然命中）
-let continueFound = false
-for (let i = 0; i < ALL_CASES.length; i++) {
-  const c = ALL_CASES[i]
-  const p = getCaseProgress(c.id)
-  const isSolved = p != null && p.solved
-  if (!isSolved && isCasePlayable(c.id)) {
-    continueFound = true
-    continueCaseId.value = c.id
-    continueTitle.value = c.title
-    const ch = CHAPTERS.find((x) => x.id === c.chapterId)
-    continueChapterLabel.value = ch ? ch.no + ' ' + ch.name : ''
-    const stars = starsOf(p != null && p.bestGrade.length > 0 ? p.bestGrade : '')
-    let sl = ''
-    for (let k = 0; k < 3; k++) sl += k < stars ? '★' : '☆'
-    const best = p != null && p.bestGrade.length > 0 ? '最佳 ' + p.bestCost + '⚡︎' : '未挑战'
-    continueMeta.value = sl + ' 标准 · ' + best
-    break
-  }
-}
-hasContinue.value = continueFound
+onShow(() => refreshHome())
 
 const continueCase = computed((): boolean => hasContinue.value)
 

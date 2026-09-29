@@ -43,6 +43,16 @@ export function starsOf(grade: string): number {
   return 0
 }
 
+/** 评级 → '★★☆' 展示串（未评级显示 ☆☆☆） */
+export function starsLabel(grade: string): string {
+  const n = starsOf(grade)
+  let s = ''
+  for (let i = 0; i < 3; i++) {
+    s += i < n ? '★' : '☆'
+  }
+  return s
+}
+
 export interface RankInfo {
   index: number
   name: string
