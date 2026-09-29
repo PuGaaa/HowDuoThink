@@ -3,6 +3,7 @@
  *  关 = 案例（带 part/typeTags/order），章内容按 layerKey 动态聚合——加第 101 关只需打标，不改本章。 */
 import { ALL_CASES } from './cases'
 import { DiagnosisCase } from '../types/case'
+import { getCaseProgress } from '../utils/storage'
 
 export interface PartDef {
   id: string
@@ -67,4 +68,72 @@ export function allPlayableCases(): DiagnosisCase[] {
 /** 篇内全部章 */
 export function chaptersInPart(partId: string): ChapterDef[] {
   return CHAPTERS.filter((c) => c.part === partId)
+}
+
+// —— 解锁：轻量序贯 + 跳级挑战 ————————————————
+// 规则：章内关自由顺序；章解锁 = 前一章破 ≥1 关（第 1 章恒开）；
+// 篇解锁 = 前一篇每章破 ≥1 关（第一篇恒开）；
+// 跳级挑战 = 锁定章的 order 最小关恒可玩，通关即解锁本章。
+// 全部从 solved 进度派生，无独立存储。
+
+/** 章内已破案数（本地 + 远端 casepack） */
+export function chapterSolvedCount(chapterId: string): number {
+  const list = casesInChapter(chapterId)
+  let n = 0
+  for (let i = 0; i < list.length; i++) {
+    const p = getCaseProgress(list[i].id)
+    if (p != null && p.solved) n++
+  }
+  return n
+}
+
+/** 章解锁 = 前一章已破 ≥1 关 ∥ 本章已破 ≥1 关（后者覆盖跳级挑战通关后的自动解锁） */
+export function isChapterUnlocked(chapterId: string): boolean {
+  let idx = -1
+  for (let i = 0; i < CHAPTERS.length; i++) {
+    if (CHAPTERS[i].id === chapterId) {
+      idx = i
+      break
+    }
+  }
+  if (idx <= 0) return true
+  if (chapterSolvedCount(chapterId) >= 1) return true
+  return chapterSolvedCount(CHAPTERS[idx - 1].id) >= 1
+}
+
+/** 篇解锁 = 前一篇每章已破 ≥1 关；PARTS 首篇恒开 */
+export function isPartUnlocked(partId: string): boolean {
+  let idx = -1
+  for (let i = 0; i < PARTS.length; i++) {
+    if (PARTS[i].id === partId) {
+      idx = i
+      break
+    }
+  }
+  if (idx <= 0) return true
+  const prev = chaptersInPart(PARTS[idx - 1].id)
+  for (let i = 0; i < prev.length; i++) {
+    if (chapterSolvedCount(prev[i].id) < 1) return false
+  }
+  return true
+}
+
+/** 章的跳级挑战关：order 最小（casesInChapter 已按 order 升序，取首关） */
+export function chapterChallengeCaseId(chapterId: string): string {
+  const list = casesInChapter(chapterId)
+  return list.length > 0 ? list[0].id : ''
+}
+
+/** 关可玩 = 所在章已解锁 ∥ 是本章挑战关；未知关返回 false（play 页另有"案例不存在"兜底） */
+export function isCasePlayable(caseId: string): boolean {
+  for (let i = 0; i < CHAPTERS.length; i++) {
+    const cases = casesInChapter(CHAPTERS[i].id)
+    for (let j = 0; j < cases.length; j++) {
+      if (cases[j].id === caseId) {
+        if (isChapterUnlocked(CHAPTERS[i].id)) return true
+        return chapterChallengeCaseId(CHAPTERS[i].id) === caseId
+      }
+    }
+  }
+  return false
 }

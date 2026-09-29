@@ -1,10 +1,13 @@
 <template>
-  <view :class="'cubecube cubecube--' + accent" @click="$emit('tap')">
-    <view class="cubecube__no">
-      <text class="cubecube__no-text">{{ chapterNo }}</text>
+  <view :class="locked ? 'cubecube cubecube--locked' : 'cubecube cubecube--' + accent" @click="$emit('tap')">
+    <view class="cubecube__head">
+      <view class="cubecube__no">
+        <text class="cubecube__no-text">{{ chapterNo }}</text>
+      </view>
+      <image v-if="locked" class="cubecube__lock" src="/static/icons/lock-ink3.png" mode="aspectFit"></image>
     </view>
     <text class="cubecube__name">{{ name }}</text>
-    <text class="cubecube__pact">{{ pact }}</text>
+    <text class="cubecube__pact">{{ locked ? '通关上一章任意 1 关解锁，或直接挑战本章首关' : pact }}</text>
     <view class="cubecube__track">
       <view class="cubecube__fill" :style="'width:' + fillPct + '%'"></view>
     </view>
@@ -25,6 +28,8 @@ const props = defineProps({
   total: { type: Number, default: 0 },
   /** 篇 id：决定积木色系 apprentice/engineer/master */
   accent: { type: String, default: 'apprentice' },
+  /** 锁定态：置灰 + 锁图标，文案换成解锁提示 */
+  locked: { type: Boolean, default: false },
 })
 
 const fillPct = computed((): number => {
@@ -56,6 +61,20 @@ const fillPct = computed((): number => {
 .cubecube--master {
   background-color: #D4E9FB;
   box-shadow: 0 8rpx 0 0 #85B8E0;
+}
+.cubecube--locked {
+  background-color: #EDE9E4;
+  box-shadow: 0 8rpx 0 0 #CFC8C0;
+}
+.cubecube__head {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+.cubecube__lock {
+  width: 34rpx;
+  height: 34rpx;
 }
 .cubecube__no {
   background-color: #FFFFFF;

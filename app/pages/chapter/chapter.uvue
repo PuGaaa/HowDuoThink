@@ -15,17 +15,18 @@
       <!-- 关卡路径 -->
       <view v-for="(node, i) in nodes" :key="node.id">
         <view v-if="i > 0" class="conn"></view>
-        <view :class="node.live ? 'node node--live' : 'node'" @click="openCase(node)">
-          <view :class="node.live ? 'node__icon node__icon--live' : 'node__icon'">
-            <image v-if="node.live" class="node__bolt" src="/static/icons/bolt-white.png" mode="aspectFit"></image>
+        <view :class="node.playable ? 'node node--live' : 'node'" @click="openCase(node)">
+          <view :class="node.playable ? 'node__icon node__icon--live' : 'node__icon'">
+            <image v-if="node.playable" class="node__bolt" src="/static/icons/bolt-white.png" mode="aspectFit"></image>
+            <image v-else class="node__bolt" src="/static/icons/lock-ink3.png" mode="aspectFit"></image>
           </view>
           <view class="node__body">
-            <text :class="node.live ? 'node__title' : 'node__title node__title--locked'">{{ node.title }}</text>
+            <text :class="node.playable ? 'node__title' : 'node__title node__title--locked'">{{ node.title }}</text>
             <text class="node__meta">{{ node.meta }}</text>
           </view>
-          <text v-if="node.live" class="node__stars">{{ node.stars }}</text>
+          <text v-if="node.playable" class="node__stars">{{ node.stars }}</text>
           <view v-else class="node__offchip">
-            <text class="node__offchip-text">即将上线</text>
+            <text class="node__offchip-text">{{ node.challenge ? '跳级挑战' : '未解锁' }}</text>
           </view>
         </view>
       </view>
@@ -37,7 +38,7 @@
 <script setup lang="uts">
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { CHAPTERS, casesInChapter } from '../../data/chapters'
+import { CHAPTERS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId } from '../../data/chapters'
 import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress } from '../../utils/storage'
 import { starsOf } from '../../utils/scoring'
@@ -49,6 +50,8 @@ class NodeVM {
   meta: string = ''
   stars: string = ''
   live: boolean = false
+  playable: boolean = false
+  challenge: boolean = false
 }
 
 const ch = ref(CHAPTERS[0])
@@ -64,6 +67,8 @@ onLoad((query : OnLoadOptions) => {
     }
   }
   ch.value = CHAPTERS[idx]
+  const chapterOpen = isChapterUnlocked(ch.value.id)
+  const challengeId = chapterChallengeCaseId(ch.value.id)
   const list: NodeVM[] = []
   let solved = 0
   const list_cases = casesInChapter(ch.value.id)
@@ -73,13 +78,19 @@ onLoad((query : OnLoadOptions) => {
     vm.id = c.id
     vm.title = c.title
     vm.live = true
+    vm.playable = chapterOpen || c.id === challengeId
+    vm.challenge = !chapterOpen && c.id === challengeId
     const p = getCaseProgress(c.id)
     const best = p != null && p.bestGrade.length > 0 ? p.bestGrade : ''
     const stars = best.length > 0 ? starsOf(best) : 0
     let sl = ''
     for (let k = 0; k < 3; k++) sl += k < stars ? '★' : '☆'
     vm.stars = sl
-    vm.meta = '★★ 标准 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
+    if (vm.challenge) {
+      vm.meta = '跳级挑战 · 赢了立即解锁本章 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
+    } else {
+      vm.meta = '★★ 标准 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
+    }
     if (p != null && p.solved) solved++
     list.push(vm)
   }
@@ -90,6 +101,10 @@ onLoad((query : OnLoadOptions) => {
 function openCase(node: NodeVM) {
   if (!node.live) {
     uni.showToast({ title: '本题即将上线', icon: 'none' })
+    return
+  }
+  if (!node.playable) {
+    uni.showToast({ title: '通关上一章任意 1 关解锁本章', icon: 'none' })
     return
   }
   uni.navigateTo({ url: '/pages/play/play?id=' + node.id })

@@ -63,6 +63,7 @@
             :solved="partProgress(ch.id).solved"
             :total="partProgress(ch.id).total"
             :accent="part.id"
+            :locked="!isChapterUnlocked(ch.id)"
             @tap="openChapter(ch.id)"
           ></chapter-cube>
         </view>
@@ -75,7 +76,7 @@
 
 <script setup lang="uts">
 import { ref, computed } from 'vue'
-import { CHAPTERS, PARTS, casesInChapter } from '../../data/chapters'
+import { CHAPTERS, PARTS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId } from '../../data/chapters'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 import chapterCube from '../../components/chapter-cube/chapter-cube.uvue'
 import { ALL_CASES, getCaseById } from '../../data/cases'
@@ -138,7 +139,27 @@ function partProgress(chapterId: string) {
   return { solved: solved, total: list.length, pct: pct }
 }
 function openChapter(chapterId: string) {
-  uni.navigateTo({ url: '/pages/chapter/chapter?id=' + chapterId })
+  if (isChapterUnlocked(chapterId)) {
+    uni.navigateTo({ url: '/pages/chapter/chapter?id=' + chapterId })
+    return
+  }
+  // 锁定章：确认后发起跳级挑战（本章首关恒可玩，通关解锁整章）
+  const challengeId = chapterChallengeCaseId(chapterId)
+  if (challengeId.length === 0) {
+    uni.showToast({ title: '本章内容准备中', icon: 'none' })
+    return
+  }
+  const ch = CHAPTERS.find((x) => x.id === chapterId)
+  uni.showModal({
+    title: (ch != null ? ch.name : '本章') + ' · 跳级挑战',
+    content: '通关上一章任意 1 关解锁本章；也可以直接挑战本章首关，赢了立即解锁。',
+    confirmText: '去挑战',
+    success: (res) => {
+      if (res.confirm) {
+        uni.navigateTo({ url: '/pages/play/play?id=' + challengeId })
+      }
+    },
+  })
 }
 const packCount = ref(0)
 const packSynced = ref(false)
@@ -174,13 +195,13 @@ function starsLabel(g: string): string {
   return s
 }
 
-// 组装继续闯关：找第一个未破案的已上线关（章内动态聚合）
+// 组装继续闯关：第一个"可玩且未破案"的关（锁定章的非挑战关会被跳过；挑战关未破时天然命中）
 let continueFound = false
 for (let i = 0; i < ALL_CASES.length; i++) {
   const c = ALL_CASES[i]
   const p = getCaseProgress(c.id)
   const isSolved = p != null && p.solved
-  if (!isSolved) {
+  if (!isSolved && isCasePlayable(c.id)) {
     continueFound = true
     continueCaseId.value = c.id
     continueTitle.value = c.title

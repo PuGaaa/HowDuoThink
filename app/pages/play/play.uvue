@@ -235,6 +235,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import navbar from '../../components/navbar/navbar.uvue'
 import mascot from '../../components/mascot/mascot.uvue'
 import { getCaseById, getCollectedLessons, CollectedLesson } from '../../data/cases'
+import { isCasePlayable } from '../../data/chapters'
 import { CaseAction, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
 import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse, bumpTask } from '../../utils/storage'
 import { computeGrade } from '../../utils/scoring'
@@ -367,6 +368,14 @@ onLoad((query : OnLoadOptions) => {
     setTimeout(() => {
       uni.navigateBack({})
     }, 800)
+    return
+  }
+  // 章节锁最后防线：锁定章的非挑战关不可直达（跳级挑战关放行）
+  if (!isCasePlayable(c.id)) {
+    uni.showToast({ title: '本章未解锁：通关上一章 1 关，或从章节页发起挑战', icon: 'none' })
+    setTimeout(() => {
+      uni.navigateBack({})
+    }, 900)
     return
   }
   caseId.value = c.id
