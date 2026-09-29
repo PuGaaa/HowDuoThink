@@ -22,43 +22,49 @@
 
       <!-- 每日任务 -->
       <text class="sec">每日任务</text>
-      <view v-for="(t, i) in dailyList" :key="t.id" class="task">
+      <view v-for="(t, i) in dailyList" :key="t.id" :class="t.done ? 'task task--done' : 'task'">
         <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
         <view class="task__body">
           <text class="task__title">{{ t.title }}</text>
           <view class="task__track">
-            <view class="task__fill" :style="'width:' + t.pct + '%'"></view>
+            <view :class="t.done ? 'task__fill task__fill--done' : 'task__fill'" :style="'width:' + t.pct + '%'"></view>
           </view>
         </view>
-        <text v-if="t.done" class="task__done">✓</text>
+        <view v-if="t.done" class="task__badge">
+          <image class="task__badge-img" src="/static/icons/check-white.png" mode="aspectFit"></image>
+        </view>
         <text v-else class="task__prog">{{ t.cur }}/{{ t.goal }}</text>
       </view>
 
       <!-- 每周任务 -->
       <text class="sec">每周任务</text>
-      <view v-for="(t, i) in weeklyList" :key="'w' + i" class="task">
+      <view v-for="(t, i) in weeklyList" :key="'w' + i" :class="t.done ? 'task task--done' : 'task'">
         <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
         <view class="task__body">
           <text class="task__title">{{ t.title }}</text>
           <view class="task__track">
-            <view class="task__fill" :style="'width:' + t.pct + '%'"></view>
+            <view :class="t.done ? 'task__fill task__fill--done' : 'task__fill'" :style="'width:' + t.pct + '%'"></view>
           </view>
         </view>
-        <text v-if="t.done" class="task__done">✓</text>
+        <view v-if="t.done" class="task__badge">
+          <image class="task__badge-img" src="/static/icons/check-white.png" mode="aspectFit"></image>
+        </view>
         <text v-else class="task__prog">{{ t.cur }}/{{ t.goal }}</text>
       </view>
 
       <!-- 成长任务 -->
       <text class="sec">成长任务</text>
-      <view v-for="(t, i) in growthList" :key="'g' + i" class="task">
+      <view v-for="(t, i) in growthList" :key="'g' + i" :class="t.done ? 'task task--done' : 'task'">
         <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
         <view class="task__body">
           <text class="task__title">{{ t.title }}</text>
           <view class="task__track">
-            <view class="task__fill" :style="'width:' + t.pct + '%'"></view>
+            <view :class="t.done ? 'task__fill task__fill--done' : 'task__fill'" :style="'width:' + t.pct + '%'"></view>
           </view>
         </view>
-        <text v-if="t.done" class="task__done">✓</text>
+        <view v-if="t.done" class="task__badge">
+          <image class="task__badge-img" src="/static/icons/check-white.png" mode="aspectFit"></image>
+        </view>
         <text v-else class="task__prog">{{ t.cur }}/{{ t.goal }}</text>
       </view>
 
@@ -278,6 +284,10 @@ function goPoster() {
   padding: 22rpx;
   margin-bottom: 16rpx;
 }
+.task--done {
+  background-color: #F0FAF5;
+  border-color: #C8EADC;
+}
 .task__icon {
   width: 72rpx;
   height: 72rpx;
@@ -303,10 +313,22 @@ function goPoster() {
   border-radius: 5rpx;
   background-color: #FF8A5C;
 }
-.task__done {
-  font-size: 30rpx;
-  font-weight: bold;
-  color: #5FC9A5;
+.task__fill--done {
+  background-color: #5FC9A5;
+}
+.task__badge {
+  width: 46rpx;
+  height: 46rpx;
+  border-radius: 23rpx;
+  background-color: #5FC9A5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3rpx 0 0 #3FA885;
+}
+.task__badge-img {
+  width: 26rpx;
+  height: 26rpx;
 }
 .task__prog {
   font-size: 21rpx;
