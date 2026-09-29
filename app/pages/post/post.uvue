@@ -88,16 +88,96 @@ function refresh() {
 onShow(() => refresh())
 
 function downloadPoster() {
-  // H5：把档案卡区域导出为 PNG 的简化实现——打开新窗口仅含海报 DOM，用户右键/长按保存
-  // App 端将使用 snapshot 能力保存到相册（后续版本）
   // #ifdef WEB
-  const w = window.open('', '_blank')
-  if (w == null) return
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-    body{margin:0;background:#FFF9F4;display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,'PingFang SC',sans-serif}
-    .tip{position:fixed;bottom:20px;color:#AFA8BD;font-size:13px}
-  </style></head><body><div class="tip">右键或长按保存下方图片</div></body></html>`)
-  w.document.close()
+  // Canvas 手绘同款海报 → toDataURL → 触发下载（无外部依赖；头像为同源静态资源不污染画布）
+  const W = 750
+  const H = 1000
+  const c = document.createElement('canvas') as any
+  c.width = W
+  c.height = H
+  const ctx = c.getContext('2d') as any
+  if (ctx == null) {
+    uni.showToast({ title: '当前浏览器不支持导出', icon: 'none' })
+    return
+  }
+  // 奶油页底 + 深色档案卡
+  ctx.fillStyle = '#FFF9F4'
+  ctx.fillRect(0, 0, W, H)
+  const cardX = 40
+  const cardY = 40
+  const cardW = W - 80
+  const cardH = H - 80
+  ctx.beginPath()
+  if (ctx.roundRect != null) {
+    ctx.roundRect(cardX, cardY, cardW, cardH, 28)
+  } else {
+    ctx.rect(cardX, cardY, cardW, cardH)
+  }
+  ctx.fillStyle = '#4A4458'
+  ctx.fill()
+  // 右上三色积木
+  const bw = 22
+  const gap = 8
+  const colors = ['#FF8A5C', '#5FC9A5', '#6FB8E8']
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = colors[i]
+    ctx.fillRect(cardX + cardW - 40 - (3 - i) * (bw + gap), cardY + 18, bw, bw)
+  }
+  const cx = W / 2
+  const img = document.createElement('img') as any
+  img.onload = () => {
+    // 圆形头像
+    const ay = 130
+    const r = 80
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(cx, ay + r, r, 0, Math.PI * 2)
+    ctx.clip()
+    ctx.fillStyle = '#5E5770'
+    ctx.fillRect(cx - r, ay, r * 2, r * 2)
+    ctx.drawImage(img, cx - r, ay, r * 2, r * 2)
+    ctx.restore()
+    // 文案
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#C9C2DA'
+    ctx.font = '22px -apple-system, PingFang SC, sans-serif'
+    ctx.fillText('排错推理训练场 · 侦探档案', cx, ay + r * 2 + 56)
+    ctx.fillStyle = '#FFC94D'
+    ctx.font = 'bold 54px -apple-system, PingFang SC, sans-serif'
+    ctx.fillText(rankName.value, cx, ay + r * 2 + 126)
+    // 三列数据
+    const stats: any[][] = [
+      [String(solvedCount.value), '破案'],
+      [String(streakCount.value), '连续天数'],
+      [String(lessonCount.value), '检查单'],
+    ]
+    const colW = cardW / 3
+    for (let i = 0; i < 3; i++) {
+      const x = cardX + colW * i + colW / 2
+      ctx.fillStyle = '#FFFFFF'
+      ctx.font = 'bold 44px -apple-system, PingFang SC, sans-serif'
+      ctx.fillText(stats[i][0], x, ay + r * 2 + 226)
+      ctx.fillStyle = '#C9C2DA'
+      ctx.font = '20px -apple-system, PingFang SC, sans-serif'
+      ctx.fillText(stats[i][1], x, ay + r * 2 + 260)
+    }
+    ctx.fillStyle = '#9BD49B'
+    ctx.font = '24px -apple-system, PingFang SC, sans-serif'
+    ctx.fillText('看症状 · 立假设 · 算成本 · 定根因', cx, ay + r * 2 + 340)
+    // 触发下载
+    const url = c.toDataURL('image/png')
+    const a = document.createElement('a') as any
+    a.href = url
+    a.download = 'detective-card-' + Date.now() + '.png'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    uni.showToast({ title: '海报已开始下载', icon: 'none' })
+  }
+  img.onerror = () => {
+    uni.showToast({ title: '头像加载失败', icon: 'none' })
+  }
+  img.src = '/static/mascots/frog-96.png'
   // #endif
   // #ifndef WEB
   uni.showToast({ title: 'App 端海报保存即将上线', icon: 'none' })
