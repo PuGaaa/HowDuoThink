@@ -23,7 +23,7 @@
       <!-- 每日任务 -->
       <text class="sec">每日任务</text>
       <view v-for="(t, i) in dailyList" :key="t.id" class="task">
-        <image class="task__icon" :src="'/static/icons/' + t.icon + '.png'" mode="aspectFit"></image>
+        <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
         <view class="task__body">
           <text class="task__title">{{ t.title }}</text>
           <view class="task__track">
@@ -37,7 +37,7 @@
       <!-- 每周任务 -->
       <text class="sec">每周任务</text>
       <view v-for="(t, i) in weeklyList" :key="'w' + i" class="task">
-        <image class="task__icon" :src="'/static/icons/' + t.icon + '.png'" mode="aspectFit"></image>
+        <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
         <view class="task__body">
           <text class="task__title">{{ t.title }}</text>
           <view class="task__track">
@@ -51,7 +51,7 @@
       <!-- 成长任务 -->
       <text class="sec">成长任务</text>
       <view v-for="(t, i) in growthList" :key="'g' + i" class="task">
-        <image class="task__icon" :src="'/static/icons/' + t.icon + '.png'" mode="aspectFit"></image>
+        <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
         <view class="task__body">
           <text class="task__title">{{ t.title }}</text>
           <view class="task__track">
@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="uts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { DAILY_TASKS, WEEKLY_TASKS, GROWTH_TASKS, TaskDef } from '../../data/tasks'
 import { getTaskDaily, getTaskWeekly, getCaseProgress, getChecklistUse, getStreak } from '../../utils/storage'
 import { rankOf, starsOf } from '../../utils/scoring'
@@ -96,7 +96,6 @@ const doneDaily = ref(0)
 const totalDaily = ref(DAILY_TASKS.length)
 const ringPct = ref(0)
 const dailyList = ref<TaskVM[]>([])
-const dailyIcons = ref<string[]>([])
 const weeklyList = ref<TaskVM[]>([])
 const growthList = ref<TaskVM[]>([])
 
@@ -280,7 +279,8 @@ function goPoster() {
   margin-bottom: 16rpx;
 }
 .task__icon {
-  font-size: 34rpx;
+  width: 72rpx;
+  height: 72rpx;
   margin-right: 18rpx;
 }
 .task__body {
