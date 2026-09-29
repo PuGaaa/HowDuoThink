@@ -4,7 +4,7 @@ const api = useApi()
 const layer = ref<string>((route.query.layer as string) || '')
 const page = ref(1)
 const { data } = await useFetch<any>('/api/solutions', {
-  baseURL: 'http://localhost:8000',
+  baseURL: api.base,
   query: { layer, page },
 })
 const items = computed(() => data.value?.items ?? [])

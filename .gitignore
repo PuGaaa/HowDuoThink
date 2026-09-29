@@ -17,3 +17,8 @@ node_modules/
 server/data.db*
 server/__pycache__/
 __pycache__/
+
+# Nuxt 构建产物
+web/.nuxt/
+web/.output/
+dist/

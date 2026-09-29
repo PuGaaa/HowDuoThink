@@ -1,26 +1,51 @@
 """GitHub OAuth + 自有会话（JWT cookie）。
-开发环境未配置 GITHUB_CLIENT_ID 时，提供 /api/dev/login 绕行（仅本地调试）。"""
+凭据全部走环境变量：
+- JWT_SECRET 未设置时使用进程内随机密钥（无法伪造，但重启后所有会话失效）；
+- ADMIN_PASSWORD 无默认值：非 dev 环境仅在库里没有管理员时创建，绝不覆盖已有密码。"""
 import hashlib
+import hmac
 import os
+import secrets
 import time
 
+import bcrypt
 import httpx
 import jwt
 
 CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
-JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
+_jwt_secret_env = os.environ.get("JWT_SECRET", "")
+JWT_SECRET = _jwt_secret_env or secrets.token_hex(32)
+JWT_SECRET_EPHEMERAL = not bool(_jwt_secret_env)
 WEB_ORIGIN = os.environ.get("WEB_ORIGIN", "http://localhost:3000")
 GITHUB_ADMIN_LOGINS = set(filter(None, os.environ.get("GITHUB_ADMIN_LOGINS", "").split(",")))
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "think-admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+# 显式开发模式开关：/api/dev/login 与 admin* 提权捷径只在 ENV=dev 下可用
+DEV_MODE = os.environ.get("ENV", "").lower() == "dev"
+# 生产 HTTPS 部署时设 COOKIE_SECURE=1，会话 cookie 仅经 HTTPS 传输
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "") == "1"
 
 
 def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def is_legacy_hash(hashed: str) -> bool:
+    return not hashed.startswith("$2")
+
+
+def _legacy_sha256(password: str) -> str:
     return hashlib.sha256(("think:" + password).encode()).hexdigest()
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    return hash_password(password) == hashed
+    """兼容历史无盐 SHA256 哈希（登录成功后由调用方升级为 bcrypt）。"""
+    if hashed.startswith("$2"):
+        try:
+            return bcrypt.checkpw(password.encode(), hashed.encode())
+        except ValueError:
+            return False
+    return hmac.compare_digest(_legacy_sha256(password), hashed)
 
 
 def configured() -> bool:
@@ -68,6 +93,6 @@ def verify_session(token: str) -> str | None:
 def role_for(login: str) -> str:
     if login in GITHUB_ADMIN_LOGINS:
         return "admin"
-    if not configured() and login.startswith("admin"):
-        return "admin"  # 本地开发绕行：admin* 默认给 editor 权限
+    if DEV_MODE and login.startswith("admin"):
+        return "admin"  # 本地开发绕行：仅 ENV=dev 时 admin* 给 editor 权限
     return "user"

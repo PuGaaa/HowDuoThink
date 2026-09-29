@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const api = useApi()
-const { data } = await useFetch<any>('/api/solutions?page=1&size=6', { baseURL: 'http://localhost:8000' })
+const { data } = await useFetch<any>('/api/solutions?page=1&size=6', { baseURL: api.base })
 const items = computed(() => data.value?.items ?? [])
 </script>
 

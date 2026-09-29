@@ -6,9 +6,9 @@ from pathlib import Path
 
 import jwt
 from typing import Annotated
-from fastapi import Cookie, Depends, FastAPI, HTTPException, Query
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 import db
 import gate
@@ -25,6 +25,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+def on_unhandled(request: Request, exc: Exception):
+    """全局兜底：内部细节（堆栈/SQL）只进服务端日志，响应只给通用文案。"""
+    print(f"[error] {request.method} {request.url.path} -> {exc!r}")
+    return JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
 
 
 # ---------- 会话 ----------
@@ -65,8 +72,9 @@ def oauth_callback(code: str, state: str, oauth_state: Annotated[str | None, Coo
         raise HTTPException(400, "state 不匹配")
     try:
         u = gh.exchange_and_fetch(code)
-    except Exception as e:
-        raise HTTPException(502, str(e))
+    except Exception:
+        print("[oauth] GitHub 回调失败", exc_info=True)
+        raise HTTPException(502, "GitHub 登录失败，请稍后重试")
     role = gh.role_for(u["login"])
     db.ex(
         "INSERT INTO users(id, login, name, avatar, role) VALUES(?,?,?,?,?) "
@@ -75,7 +83,7 @@ def oauth_callback(code: str, state: str, oauth_state: Annotated[str | None, Coo
     )
     token = gh.sign_session(u["github_id"])
     resp = RedirectResponse(gh.WEB_ORIGIN + "/me")
-    resp.set_cookie("session", token, max_age=30 * 86400, httponly=True)
+    resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=gh.COOKIE_SECURE)
     return resp
 
 
@@ -96,18 +104,20 @@ def auth_login(body: dict):
     rows = db.q("SELECT id, password_hash, role FROM users WHERE id=?", ("pw-" + login,))
     if not rows or not rows[0]["password_hash"] or not gh.verify_password(password, rows[0]["password_hash"]):
         raise HTTPException(401, "账号或密码错误")
+    # 历史无盐哈希在登录成功时静默升级为 bcrypt
+    if gh.is_legacy_hash(rows[0]["password_hash"]):
+        db.ex("UPDATE users SET password_hash=? WHERE id=?", (gh.hash_password(password), rows[0]["id"]))
     token = gh.sign_session(rows[0]["id"])
-    from fastapi.responses import JSONResponse
     resp = JSONResponse({"ok": True, "login": login, "role": rows[0]["role"]})
-    resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax")
+    resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=gh.COOKIE_SECURE)
     return resp
 
 
-# 开发绕行：未配置 GitHub 时本地造会话（生产环境设置 GITHUB_CLIENT_ID 后自动失效）
+# 开发绕行：仅显式 ENV=dev 时可用（生产环境无论是否配置 OAuth 都返回 403）
 @app.get("/api/dev/login")
 def dev_login(login: str = Query(default="devuser")):
-    if gh.configured():
-        raise HTTPException(403, "已配置 GitHub OAuth，开发绕行不可用")
+    if not gh.DEV_MODE:
+        raise HTTPException(403, "开发绕行未开启（需 ENV=dev）")
     uid = "dev-" + login
     db.ex(
         "INSERT INTO users(id, login, name, avatar, role) VALUES(?,?,?,?,?) "
@@ -116,7 +126,7 @@ def dev_login(login: str = Query(default="devuser")):
     )
     token = gh.sign_session(uid)
     resp = RedirectResponse(gh.WEB_ORIGIN + "/me")
-    resp.set_cookie("session", token, max_age=30 * 86400, httponly=True)
+    resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=gh.COOKIE_SECURE)
     return resp
 
 
@@ -214,7 +224,7 @@ def article_out(r) -> dict:
 
 
 @app.get("/api/solutions")
-def solutions(layer: str | None = None, page: int = 1, size: int = 20):
+def solutions(layer: str | None = None, page: int = Query(default=1, ge=1), size: int = Query(default=20, ge=1, le=50)):
     where, params = "1=1", []
     if layer:
         where, params = "layer=?", [layer]
@@ -532,8 +542,18 @@ def health():
 
 @app.on_event("startup")
 def seed_admin():
-    """预置管理员：pw-admin / ADMIN_PASSWORD（默认 think-admin），dev 未配置时也生效。"""
-    import oauth_github as gh
+    """管理员引导：
+    - 非 dev：仅当库里没有任何管理员时创建（密码必须来自 ADMIN_PASSWORD 环境变量），绝不覆盖已有密码；
+    - ENV=dev：允许用 ADMIN_PASSWORD 重置 pw-admin，方便本地联调。"""
+    if gh.JWT_SECRET_EPHEMERAL:
+        print("[startup] 警告：未设置 JWT_SECRET，本次运行为进程内随机密钥（重启后所有会话失效；生产必须设置）")
+    has_admin = db.q("SELECT id FROM users WHERE role='admin' LIMIT 1")
+    if has_admin and not gh.DEV_MODE:
+        return
+    if not gh.ADMIN_PASSWORD:
+        if not has_admin:
+            print("[startup] 警告：库中无管理员且未设置 ADMIN_PASSWORD，跳过创建（设置环境变量后重启生效）")
+        return
     db.ex(
         "INSERT INTO users(id, login, name, avatar, role, password_hash) VALUES('pw-admin', 'pw-admin', '管理员', '', 'admin', ?) "
         "ON CONFLICT(id) DO UPDATE SET password_hash=excluded.password_hash, role='admin'",

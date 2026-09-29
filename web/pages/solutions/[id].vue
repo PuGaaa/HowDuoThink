@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const route = useRoute()
-const { data: a } = await useFetch<any>('/api/solutions/' + route.params.id, { baseURL: 'http://localhost:8000' })
+const api = useApi()
+const { data: a } = await useFetch<any>('/api/solutions/' + route.params.id, { baseURL: api.base })
 </script>
 
 <template>

@@ -19,7 +19,7 @@ onMounted(async () => {
     <div v-if="!loaded" class="muted">加载中……</div>
     <div v-else-if="!user" class="card">
       <p style="margin-top: 0">未登录。</p>
-      <a class="btn" href="http://localhost:8000/api/oauth/github/login">GitHub 登录</a>
+      <a class="btn" :href="api.base + '/api/oauth/github/login'">GitHub 登录</a>
     </div>
     <template v-else>
       <div class="card">

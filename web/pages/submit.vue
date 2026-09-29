@@ -42,8 +42,8 @@ async function submit() {
 
     <div v-if="!user" class="card">
       <p style="margin-top: 0">投稿需要 GitHub 登录（用于署名与跟踪状态）。</p>
-      <a class="btn" href="http://localhost:8000/api/oauth/github/login">使用 GitHub 登录</a>
-      <p class="muted" style="margin-top: 10px">本地开发未配置 OAuth？<a :href="'http://localhost:8000/api/dev/login?login=' + (user?.login || 'devuser')">用开发绕行登录</a></p>
+      <a class="btn" :href="api.base + '/api/oauth/github/login'">使用 GitHub 登录</a>
+      <p v-if="api.base.includes('localhost')" class="muted" style="margin-top: 10px">本地开发未配置 OAuth？<a :href="api.base + '/api/dev/login?login=devuser'">用开发绕行登录</a></p>
     </div>
 
     <div v-else-if="submitted" class="card">
