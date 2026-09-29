@@ -202,6 +202,8 @@ function downloadPoster() {
 .btnrow {
   display: flex;
   flex-direction: column;
+  /* uni-view 运行时默认 overflow:hidden，给贴底按钮的硬边阴影留缓冲 */
+  padding-bottom: 8rpx;
   margin-bottom: 24rpx;
 }
 .primarybtn {

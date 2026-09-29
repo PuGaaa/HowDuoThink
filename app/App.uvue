@@ -9,9 +9,10 @@ onHide(() => {})
 </script>
 
 <style>
-/* 全局样式：蒸汽模式仅支持 class 选择器（BEM），页面共用背景色 */
+/* 全局样式：蒸汽模式仅支持 class 选择器（BEM），页面共用背景色。
+   底色与各页 .page 的奶油底一致——短内容页（如海报页）不满屏时 body 不再露灰 */
 uni-page-body,
 .page {
-  background-color: #f4f5f7;
+  background-color: #FFF9F4;
 }
 </style>
