@@ -1,0 +1,100 @@
+<template>
+  <view :class="variant === 'inline' ? 'evcard evcard--inline evbg--' + type : 'evidence evbg--' + type">
+    <view class="evc__head">
+      <image class="evc__icon" :src="iconPath" mode="aspectFit"></image>
+      <text class="evc__title">{{ title }}</text>
+    </view>
+    <text class="evc__text">{{ text }}</text>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { computed } from 'vue'
+
+const props = defineProps({
+  /** 证据类型：error | log | code | text | time */
+  type: { type: String, default: 'text' },
+  title: { type: String, default: '' },
+  text: { type: String, default: '' },
+  /** block = 现场证据卡；inline = 动作内嵌证据 */
+  variant: { type: String, default: 'block' },
+})
+
+const iconPath = computed((): string => {
+  if (props.type === 'error') return '/static/icons/alert-red.png'
+  if (props.type === 'log' || props.type === 'code') return '/static/icons/term-dark.png'
+  if (props.variant === 'inline') return '/static/icons/chat-sky.png'
+  if (props.type === 'chat') return '/static/icons/chat-sky.png'
+  return '/static/icons/clock-ink2.png'
+})
+</script>
+
+<style>
+/* 证据卡：统一排版，背景色区分类型（从 play.uvue 迁入，随组件走） */
+.evidence {
+  display: flex;
+  flex-direction: column;
+  background-color: #FBF3EB;
+  border-radius: 18rpx;
+  padding: 20rpx;
+  margin-top: 18rpx;
+  box-shadow: 0 5rpx 0 0 #EFE5D6;
+}
+.evbg--error {
+  background-color: #FDEDED;
+  box-shadow: 0 5rpx 0 0 #F0CFCF;
+}
+.evbg--log {
+  background-color: #FFF6DE;
+  box-shadow: 0 5rpx 0 0 #EBD48A;
+}
+.evbg--code {
+  background-color: #E9F7F1;
+  box-shadow: 0 5rpx 0 0 #C8E8DA;
+}
+.evbg--text {
+  background-color: #EAF4FC;
+  box-shadow: 0 5rpx 0 0 #CDE1F0;
+}
+.evbg--time {
+  background-color: #F3F0F8;
+  box-shadow: 0 5rpx 0 0 #DDD8E8;
+}
+.evcard {
+  display: flex;
+  flex-direction: column;
+  border-left-width: 4rpx;
+  border-left-style: solid;
+  border-left-color: #FFD3BC;
+  padding: 14rpx 0 14rpx 18rpx;
+  margin-top: 10rpx;
+}
+.evcard--inline {
+  background-color: #FBF3EB;
+  border-radius: 14rpx;
+  padding: 16rpx 18rpx;
+  margin: -6rpx 0 16rpx 10rpx;
+}
+.evc__head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.evc__icon {
+  width: 30rpx;
+  height: 30rpx;
+  margin-right: 11rpx;
+}
+.evc__title {
+  font-size: 23rpx;
+  font-weight: bold;
+  color: #4A4458;
+  flex: 1;
+}
+.evc__text {
+  font-size: 22rpx;
+  color: #52606D;
+  margin-top: 10rpx;
+  line-height: 37rpx;
+}
+</style>

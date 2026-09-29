@@ -1,0 +1,186 @@
+<template>
+  <view class="dbody">
+    <view class="danchor">
+      <text class="danchor__text">{{ timeline }}</text>
+    </view>
+    <scroll-view class="dscroll" scroll-y>
+      <view
+        v-for="(h, i) in hyps"
+        :key="h.id"
+        :class="has(h.id) ? 'hyp hyp--on' : 'hyp'"
+        @click="$emit('toggle', h.id)"
+      >
+        <view v-if="has(h.id)" class="hyp__box hyp__box--on">
+          <image class="hyp__check" src="/static/icons/check-white.png" mode="aspectFit"></image>
+        </view>
+        <view v-else class="hyp__box"></view>
+        <text :class="has(h.id) ? 'hyp__text hyp__text--on' : 'hyp__text'">{{ h.text }}</text>
+      </view>
+      <view v-for="(n, i) in freeNotes" :key="'n' + i" class="freenote">
+        <image class="freenote__icon" src="/static/icons/pen-coral.png" mode="aspectFit"></image>
+        <text class="freenote__text">{{ n }}</text>
+      </view>
+      <view class="noterow">
+        <input class="noterow__input" v-model="noteInput" placeholder="自由备注（可选）：此刻你在怀疑什么" />
+        <text class="noterow__btn" @click="addNote">＋</text>
+      </view>
+    </scroll-view>
+    <view class="primarybtn" @click="$emit('start')">
+      <text class="primarybtn__text">{{ locked ? '更新我的怀疑' : '就这些，开查！' }}</text>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue'
+
+const props = defineProps({
+  /** 假设池（HypothesisOption[]） */
+  hyps: { type: Array as any, default: (): any[] => [] },
+  /** 已勾选的假设 id */
+  selected: { type: Array as any, default: (): any[] => [] },
+  freeNotes: { type: Array as any, default: (): any[] => [] },
+  /** 验证阶段已锁定：按钮变"更新我的怀疑" */
+  locked: { type: Boolean, default: false },
+  timeline: { type: String, default: '' },
+})
+
+const emit = defineEmits(['toggle', 'add-note', 'start'])
+
+const noteInput = ref('')
+
+function has(id: string): boolean {
+  const arr = props.selected as any[]
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] === id) return true
+  }
+  return false
+}
+
+function addNote() {
+  const n = noteInput.value.trim()
+  if (n.length === 0) return
+  emit('add-note', n)
+  noteInput.value = ''
+}
+</script>
+
+<style>
+/* 假设板（从 play.uvue 迁入，随组件走） */
+.dbody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.danchor {
+  display: flex;
+  flex-direction: row;
+  background-color: #FBF3EB;
+  border-radius: 14rpx;
+  padding: 12rpx 18rpx;
+  margin-bottom: 16rpx;
+}
+.danchor__text {
+  font-size: 20rpx;
+  color: #7A7290;
+  flex: 1;
+}
+.dscroll {
+  flex: 1;
+}
+.hyp {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  border-radius: 16rpx;
+  padding: 18rpx;
+  margin-bottom: 12rpx;
+  background-color: #FFFFFF;
+  box-shadow: 0 5rpx 0 0 #EFE5D6;
+}
+.hyp--on {
+  border-color: #FF8A5C;
+  background-color: #FFF1E7;
+}
+.hyp__box {
+  width: 34rpx;
+  height: 34rpx;
+  border-radius: 10rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #E3E6EB;
+  margin-right: 18rpx;
+}
+.hyp__box--on {
+  background-color: #FF8A5C;
+  border-color: #FF8A5C;
+}
+.hyp__check {
+  width: 34rpx;
+  height: 34rpx;
+}
+.hyp__text {
+  font-size: 25rpx;
+  color: #7A7290;
+  line-height: 38rpx;
+  flex: 1;
+}
+.hyp__text--on {
+  color: #4A4458;
+  font-weight: 500;
+}
+.freenote {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 10rpx;
+}
+.freenote__icon {
+  width: 26rpx;
+  height: 26rpx;
+  margin-right: 10rpx;
+}
+.freenote__text {
+  font-size: 23rpx;
+  color: #8A6D1F;
+}
+.noterow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 8rpx;
+}
+.noterow__input {
+  flex: 1;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  border-radius: 16rpx;
+  padding: 14rpx 20rpx;
+  font-size: 23rpx;
+  color: #4A4458;
+}
+.noterow__btn {
+  font-size: 34rpx;
+  color: #FF8A5C;
+  padding: 10rpx 20rpx;
+}
+.primarybtn {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  background-color: #FF8A5C;
+  border-radius: 46rpx;
+  padding: 22rpx;
+  margin-top: 18rpx;
+}
+.primarybtn__text {
+  font-size: 28rpx;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+</style>

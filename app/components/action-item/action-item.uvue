@@ -1,0 +1,116 @@
+<template>
+  <view class="actwrap">
+    <view :class="done ? 'act act--done' : 'act'" @click="$emit('tap')">
+      <view class="act__main">
+        <view class="act__headrow">
+          <text :class="done ? 'act__name act__name--done' : 'act__name'">{{ name }}</text>
+          <view v-if="danger" class="act__danger">
+            <text class="act__danger-text">变更</text>
+          </view>
+        </view>
+        <text class="act__desc">{{ desc }}</text>
+      </view>
+      <view class="act__cost">
+        <image class="act__bolt" src="/static/icons/bolt-coral.png" mode="aspectFit"></image>
+        <text class="act__cost-num">{{ cost }}</text>
+        <text v-if="done" class="act__done">已执行 ✓</text>
+      </view>
+    </view>
+    <evidence-card v-if="done && ev != null" variant="inline" :type="ev!.type" :title="ev!.title" :text="ev!.text"></evidence-card>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = defineProps({
+  name: { type: String, default: '' },
+  desc: { type: String, default: '' },
+  cost: { type: Number, default: 1 },
+  danger: { type: Boolean, default: false },
+  /** 已执行：整行降透明度并内嵌证据 */
+  done: { type: Boolean, default: false },
+  /** 执行后产生的证据（未执行时为 null） */
+  ev: { type: Object as any, default: null },
+})
+
+defineEmits(['tap'])
+</script>
+
+<style>
+/* 动作行（从 play.uvue 迁入，随组件走） */
+.actwrap {
+  display: flex;
+  flex-direction: column;
+}
+.act {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  padding: 22rpx;
+  margin-bottom: 14rpx;
+  box-shadow: 0 5rpx 0 0 #EFE5D6;
+}
+.act--done {
+  opacity: 0.55;
+}
+.act__main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.act__headrow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.act__name {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #4A4458;
+  flex: 1;
+}
+.act__name--done {
+  color: #7A7290;
+}
+.act__danger {
+  background-color: #E86A6A;
+  border-radius: 8rpx;
+  padding: 4rpx 12rpx;
+  margin-left: 14rpx;
+}
+.act__danger-text {
+  font-size: 18rpx;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+.act__desc {
+  font-size: 22rpx;
+  color: #AFA8BD;
+  margin-top: 8rpx;
+}
+.act__cost {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: 16rpx;
+}
+.act__bolt {
+  width: 30rpx;
+  height: 30rpx;
+}
+.act__cost-num {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+}
+.act__done {
+  font-size: 19rpx;
+  color: #5FC9A5;
+  font-weight: bold;
+  margin-top: 6rpx;
+}
+</style>

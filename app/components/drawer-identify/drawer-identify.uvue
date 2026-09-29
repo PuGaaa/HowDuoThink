@@ -1,0 +1,197 @@
+<template>
+  <view class="dbody">
+    <scroll-view class="dscroll" scroll-y>
+      <view class="checklist">
+        <view class="checklist__head" @click="$emit('toggle-check')">
+          <text class="checklist__title">指认前核对：我的检查单（{{ collected.length }}）</text>
+          <text class="checklist__chev">{{ checklistOpen ? '⌃' : '⌄' }}</text>
+        </view>
+        <view v-if="checklistOpen">
+          <view v-for="(cl, i) in collected" :key="'cl' + i" class="checklist__item">
+            <text class="checklist__item-text">✓ {{ cl.text }}</text>
+            <text class="checklist__item-src">{{ cl.src }}</text>
+          </view>
+          <view v-if="collected.length == 0" class="checklist__empty">
+            <text class="checklist__empty-text">还没有收集的检查单——破案后会在这里积累</text>
+          </view>
+        </view>
+      </view>
+      <view v-if="wrongCount > 0" class="reguide">
+        <text class="reguide__text">垂耳兔：你的证据链指向了别处。回假设板重新推演，或者再看一遍证据。</text>
+        <view class="reguide__btn" @click="$emit('go-board')">
+          <text class="reguide__btn-text">回假设板</text>
+        </view>
+      </view>
+      <view v-for="(c, i) in causes" :key="c.id" class="cause" @click="$emit('pick', c.id)">
+        <view :class="picked === c.id ? 'cause__dot cause__dot--on' : 'cause__dot'"></view>
+        <text class="cause__text">{{ c.text }}</text>
+      </view>
+      <text class="dnote">垂耳兔提醒：咬合的证据链比答案本身值钱</text>
+    </scroll-view>
+    <view class="primarybtn" @click="$emit('submit')">
+      <text class="primarybtn__text">就是它！</text>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = defineProps({
+  /** 根因池（已乱序，RootCauseOption[]） */
+  causes: { type: Array as any, default: (): any[] => [] },
+  /** 当前圈选的根因 id */
+  picked: { type: String, default: '' },
+  /** 已收集检查单（CollectedLesson[]） */
+  collected: { type: Array as any, default: (): any[] => [] },
+  checklistOpen: { type: Boolean, default: false },
+  wrongCount: { type: Number, default: 0 },
+})
+
+defineEmits(['pick', 'toggle-check', 'submit', 'go-board'])
+</script>
+
+<style>
+/* 指认根因（从 play.uvue 迁入，随组件走） */
+.dbody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dscroll {
+  flex: 1;
+}
+.dnote {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  margin-top: 14rpx;
+  text-align: center;
+}
+.cause {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  border-radius: 16rpx;
+  padding: 18rpx;
+  margin-bottom: 14rpx;
+  background-color: #FFFFFF;
+  box-shadow: 0 5rpx 0 0 #EFE5D6;
+}
+.cause__dot {
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 15rpx;
+  border-width: 2.5rpx;
+  border-style: solid;
+  border-color: #D5DEE9;
+  margin-right: 16rpx;
+  margin-top: 4rpx;
+}
+.cause__dot--on {
+  border-color: #FF8A5C;
+  background-color: #FF8A5C;
+}
+.cause__text {
+  font-size: 25rpx;
+  color: #4A4458;
+  line-height: 38rpx;
+  flex: 1;
+}
+.checklist {
+  background-color: #FFF6DE;
+  border-radius: 16rpx;
+  border-width: 1rpx;
+  border-style: solid;
+  border-color: #F2D98C;
+  padding: 16rpx 18rpx;
+  margin-bottom: 16rpx;
+}
+.checklist__head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.checklist__title {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #8A6D1F;
+  flex: 1;
+}
+.checklist__chev {
+  font-size: 22rpx;
+  color: #B08F4A;
+}
+.checklist__item {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 12rpx;
+  padding: 12rpx 16rpx;
+  margin-top: 10rpx;
+}
+.checklist__item-text {
+  font-size: 22rpx;
+  color: #4A4458;
+  line-height: 34rpx;
+}
+.checklist__item-src {
+  font-size: 19rpx;
+  color: #B08F4A;
+  margin-top: 4rpx;
+}
+.checklist__empty {
+  padding: 6rpx 0;
+}
+.checklist__empty-text {
+  font-size: 21rpx;
+  color: #B08F4A;
+}
+.reguide {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF6DE;
+  border-radius: 18rpx;
+  border-width: 1rpx;
+  border-style: solid;
+  border-color: #F2D98C;
+  padding: 20rpx;
+  margin-bottom: 20rpx;
+}
+.reguide__text {
+  font-size: 22rpx;
+  color: #8A6D1F;
+  line-height: 34rpx;
+}
+.reguide__btn {
+  align-self: flex-start;
+  background-color: #FFFFFF;
+  border-radius: 26rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #FF8A5C;
+  padding: 10rpx 24rpx;
+  margin-top: 14rpx;
+}
+.reguide__btn-text {
+  font-size: 21rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+}
+.primarybtn {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  background-color: #FF8A5C;
+  border-radius: 46rpx;
+  padding: 22rpx;
+  margin-top: 18rpx;
+}
+.primarybtn__text {
+  font-size: 28rpx;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+</style>
