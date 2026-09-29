@@ -467,6 +467,8 @@ function downloadPoster() {
 .puzzle__row {
   display: flex;
   flex-direction: row;
+  /* 硬边阴影缓冲：pblock 贴行底，uni-view 默认 overflow:hidden 会裁阴影 */
+  padding-bottom: 8rpx;
   margin-top: 18rpx;
 }
 .pblock {
