@@ -1,7 +1,9 @@
 <template>
   <view class="navbar">
-    <view class="navbar__capsule" @click="back">
-      <image class="navbar__chevron" src="/static/icons/chevl-ink.png" mode="aspectFit"></image>
+    <view class="navbar__shadowpad">
+      <view class="navbar__capsule" @click="back">
+        <image class="navbar__chevron" src="/static/icons/chevl-ink.png" mode="aspectFit"></image>
+      </view>
     </view>
   </view>
 </template>
@@ -29,6 +31,10 @@ function back() {
   top: calc(var(--status-bar-height) + 16rpx);
   left: 24rpx;
   z-index: 100;
+}
+/* 硬边阴影缓冲：胶囊阴影画在盒外，uni-view 默认 overflow:hidden 会裁 */
+.navbar__shadowpad {
+  padding-bottom: 6rpx;
 }
 .navbar__capsule {
   width: 80rpx;

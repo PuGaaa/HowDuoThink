@@ -15,7 +15,7 @@
       </view>
 
       <!-- 关卡路径 -->
-      <view v-for="(node, i) in nodes" :key="node.id">
+      <view v-for="(node, i) in nodes" :key="node.id" class="nodewrap">
         <view v-if="i > 0" class="conn"></view>
         <view :class="node.playable ? 'node node--live' : 'node'" @click="openCase(node)">
           <view :class="node.playable ? 'node__icon node__icon--live' : 'node__icon'">
@@ -31,6 +31,7 @@
             <text class="node__offchip-text">{{ node.challenge ? '跳级挑战' : '未解锁' }}</text>
           </view>
         </view>
+        <view v-if="i === nodes.length - 1" class="node__tailpad"></view>
       </view>
       <text class="footer">通关本章，解锁「{{ ch.name }}」层契约拼图</text>
     </view>
@@ -188,6 +189,16 @@ function openCase(node: NodeVM) {
   border-left-width: 3rpx;
   border-left-style: dashed;
   border-left-color: #FFB5C8;
+}
+.node__tailpad {
+  height: 6rpx;
+}
+/* 硬边阴影缓冲：v-for 包裹层默认 overflow:hidden，node 卡贴层底会裁阴影 */
+.nodewrap {
+  padding-bottom: 6rpx;
+}
+.nodewrap .conn {
+  height: 20rpx;
 }
 .node {
   display: flex;

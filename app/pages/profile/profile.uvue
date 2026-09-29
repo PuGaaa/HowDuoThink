@@ -188,6 +188,8 @@ function onRow(v: string) {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
+  /* 硬边阴影缓冲：statcard 贴行底，uni-view 默认 overflow:hidden 会裁阴影 */
+  padding-bottom: 6rpx;
   margin-bottom: 24rpx;
 }
 /* 三卡等宽自适应 */
