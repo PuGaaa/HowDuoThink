@@ -96,8 +96,24 @@
           </view>
           <text class="step__conclusion">结论：{{ st.conclusion }}</text>
         </view>
-        <view v-if="chainShown.length < chainTotal" class="ghostbtn" @click="revealNext">
-          <text class="ghostbtn__text">展开下一步（{{ chainShown.length }}/{{ chainTotal }}）</text>
+        <!-- 推理链进度 + 展开控制 -->
+        <view v-if="chainShown.length < chainTotal" class="reveal">
+          <view class="reveal__progress">
+            <view class="reveal__track">
+              <view class="reveal__fill" :style="'width:' + Math.floor(chainShown.length * 100 / chainTotal) + '%'"></view>
+            </view>
+            <text class="reveal__count">{{ chainShown.length }}/{{ chainTotal }} 步</text>
+          </view>
+          <view class="reveal__btn" @click="revealNext">
+            <text class="reveal__btn-text">展开下一步</text>
+            <image class="reveal__btn-arrow" src="/static/icons/arrowr-white.png" mode="aspectFit"></image>
+          </view>
+        </view>
+        <view v-else class="reveal">
+          <view class="reveal__chip">
+            <image class="reveal__chip-img" src="/static/icons/check-white.png" mode="aspectFit"></image>
+            <text class="reveal__chip-text">推理链已完整 · {{ chainTotal }} 步</text>
+          </view>
         </view>
       </view>
 
@@ -747,6 +763,80 @@ function replay() {
   color: #4A4458;
   margin-top: 12rpx;
   line-height: 36rpx;
+}
+
+
+/* 推理链展开控制：进度轨道 + 实体按钮 */
+.reveal {
+  display: flex;
+  flex-direction: column;
+  /* 硬边阴影缓冲 */
+  padding-bottom: 8rpx;
+  margin-top: 6rpx;
+}
+.reveal__progress {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+.reveal__track {
+  flex: 1;
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: #FBF3EB;
+  overflow: hidden;
+}
+.reveal__fill {
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: #FF8A5C;
+}
+.reveal__count {
+  font-size: 20rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+  margin-left: 14rpx;
+}
+.reveal__btn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  background-color: #FF8A5C;
+  border-radius: 46rpx;
+  padding: 22rpx;
+  box-shadow: 0 8rpx 0 0 #E06B38;
+}
+.reveal__btn-text {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+  margin-right: 10rpx;
+}
+.reveal__btn-arrow {
+  width: 26rpx;
+  height: 26rpx;
+}
+.reveal__chip {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  background-color: #5FC9A5;
+  border-radius: 46rpx;
+  padding: 18rpx;
+  box-shadow: 0 6rpx 0 0 #3FA885;
+}
+.reveal__chip-img {
+  width: 26rpx;
+  height: 26rpx;
+  margin-right: 10rpx;
+}
+.reveal__chip-text {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #FFFFFF;
 }
 
 /* 检查单 */
