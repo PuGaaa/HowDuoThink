@@ -4,6 +4,30 @@ import { API_BASE } from '../config'
 
 const KEY_TOKEN = 'think_token'
 const KEY_USER = 'think_user'
+const KEY_LOCAL_AVATAR = 'think_local_avatar'
+const KEY_LOCAL_NAME = 'think_local_name'
+export const DEFAULT_AVATAR = '/static/images/default-avatar.png'
+/** 预设头像：5 吉祥物 + 默认白猫（v0 无上传，六选一） */
+export const AVATAR_PRESETS: string[] = [
+  '/static/images/default-avatar.png',
+  '/static/images/avatar-1.png',
+  '/static/images/avatar-2.png',
+  '/static/images/avatar-3.png',
+  '/static/images/avatar-4.png',
+  '/static/images/avatar-5.png',
+  '/static/images/avatar-6.png',
+  '/static/images/avatar-7.png',
+  '/static/images/avatar-8.png',
+  '/static/images/avatar-9.png',
+  '/static/images/avatar-10.png',
+  '/static/images/avatar-11.png',
+  '/static/images/avatar-12.png',
+  '/static/mascots/frog.png',
+  '/static/mascots/rabbit.png',
+  '/static/mascots/otter.png',
+  '/static/mascots/snail.png',
+  '/static/mascots/dino.png',
+]
 
 export interface AppUser {
   id: string
@@ -30,6 +54,59 @@ export function getStoredUser(): AppUser | null {
 
 export function isLoggedIn(): boolean {
   return getToken().length > 0
+}
+
+/** 头像优先级：后端 avatar URL -> 本地预设 -> 默认白猫 */
+export function getAvatar(): string {
+  const u = getStoredUser()
+  if (u != null && u.avatar.length > 0) return u.avatar
+  const local = uni.getStorageSync(KEY_LOCAL_AVATAR)
+  if (local != null && (local as string).length > 0) return local as string
+  return DEFAULT_AVATAR
+}
+
+/** 昵称优先级：已登录 user.name；未登录本地名；兜底 */
+export function getDisplayName(): string {
+  const u = getStoredUser()
+  if (u != null && u.name.length > 0) return u.name
+  const local = uni.getStorageSync(KEY_LOCAL_NAME)
+  if (local != null && (local as string).length > 0) return local as string
+  return '游客侦探'
+}
+
+export function setLocalAvatar(path: string) {
+  uni.setStorageSync(KEY_LOCAL_AVATAR, path)
+}
+
+/** 保存昵称：登录态 PATCH 后端（Bearer）+ 更新本地；未登录仅本地 */
+export function updateName(name: string, cb: (r: LoginResult) => void) {
+  const u = getStoredUser()
+  if (isLoggedIn() && u != null) {
+    uni.request({
+      url: API_BASE + '/api/me',
+      method: 'PATCH',
+      header: { Authorization: 'Bearer ' + getToken() } as any,
+      data: { name: name } as any,
+      timeout: 8000,
+      success: (res) => {
+        if (res.statusCode !== 200) {
+          const detail = (res.data as any)?.detail
+          cb({ error: typeof detail === 'string' ? detail : '保存失败' })
+          return
+        }
+        const d = res.data as any
+        u.name = d.name
+        uni.setStorageSync(KEY_USER, JSON.stringify(u))
+        cb({ error: '' })
+      },
+      fail: () => {
+        cb({ error: '无法连接社区服务' })
+      },
+    })
+    return
+  }
+  uni.setStorageSync(KEY_LOCAL_NAME, name)
+  cb({ error: '' })
 }
 
 export interface LoginResult {
@@ -117,7 +194,8 @@ export function smsLogin(phone: string, code: string, cb: (r: LoginResult) => vo
         return
       }
       uni.setStorageSync(KEY_TOKEN, token)
-      uni.setStorageSync(KEY_USER, JSON.stringify({ id: typeof d.userId === 'string' ? d.userId : 'ph', login: d.login, name: d.login, avatar: '', role: d.role } as AppUser))
+      const realName = typeof d.name === 'string' && (d.name as string).length > 0 ? d.name as string : d.login
+      uni.setStorageSync(KEY_USER, JSON.stringify({ id: typeof d.userId === 'string' ? d.userId : 'ph', login: d.login, name: realName, avatar: '', role: d.role } as AppUser))
       cb({ error: '' })
     },
     fail: () => {

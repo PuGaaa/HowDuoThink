@@ -68,6 +68,16 @@ def change_password(uid: str, old_password: str, new_password: str) -> None:
 
 # ---------- 手机号身份 ----------
 
+_NICK_ADJ = ["机警的", "敏锐的", "沉稳的", "好奇的", "冷静的", "执着的", "灵巧的"]
+_NICK_NOUN = ["小海豚", "小柴犬", "小狐狸", "猫头鹰", "小熊猫", "小猎豹", "小海獭"]
+
+
+def random_nickname() -> str:
+    """注册默认昵称：可爱代号（编辑页可随时改）。"""
+    import random
+
+    return random.choice(_NICK_ADJ) + random.choice(_NICK_NOUN)
+
 def send_sms_code(phone: str) -> dict:
     """生成并下发验证码；60s 重发限频。dev 模式响应带 devEcho 供联调。"""
     import db as _db
@@ -103,24 +113,25 @@ def _consume_code(phone: str, code: str) -> None:
 def phone_login(phone: str, code: str) -> dict:
     """验证码登录：验码 → 按手机号找用户/创建（ph- 前缀）→ 返回 {id, login, role, created}。"""
     _consume_code(phone, code)
-    rows = db.q("SELECT id, login, role FROM users WHERE phone=?", (phone,))
+    rows = db.q("SELECT id, login, role, name FROM users WHERE phone=?", (phone,))
     if rows:
-        return {"id": rows[0]["id"], "login": rows[0]["login"], "role": rows[0]["role"], "created": False}
+        return {"id": rows[0]["id"], "login": rows[0]["login"], "role": rows[0]["role"], "name": rows[0]["name"], "created": False}
     uid = "ph-" + phone
     login_name = "u" + phone[-4:] + phone[:3]
+    name = random_nickname()
     try:
         db.ex(
             "INSERT INTO users(id, login, name, role, phone) VALUES(?,?,?,?,?)",
-            (uid, login_name, "手机用户" + phone[-4:], "user", phone),
+            (uid, login_name, name, "user", phone),
         )
     except Exception:
         # login 唯一冲突（极小概率）：追加随机后缀重试
         login_name = login_name + secrets.token_hex(2)
         db.ex(
             "INSERT INTO users(id, login, name, role, phone) VALUES(?,?,?,?,?)",
-            (uid, login_name, "手机用户" + phone[-4:], "user", phone),
+            (uid, login_name, name, "user", phone),
         )
-    return {"id": uid, "login": login_name, "role": "user", "created": True}
+    return {"id": uid, "login": login_name, "role": "user", "name": name, "created": True}
 
 
 def bind_phone(uid: str, phone: str, code: str) -> dict:

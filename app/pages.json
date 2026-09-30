@@ -62,6 +62,13 @@
         "navigationStyle": "custom",
         "navigationBarTitleText": "登录"
       }
+    },
+    {
+      "path": "pages/profile-edit/profile-edit",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "编辑资料"
+      }
     }
   ],
   "globalStyle": {

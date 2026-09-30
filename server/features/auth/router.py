@@ -108,7 +108,7 @@ def phone_login(body: models.PhoneLoginBody):
     """手机验证码登录：新手机号自动建号（与 Web 注册互通的账号体系）。"""
     user = service.phone_login(body.phone, body.code)
     token = security.sign_session(user["id"])
-    resp = JSONResponse({"ok": True, "login": user["login"], "role": user["role"], "userId": user["id"], "token": token})
+    resp = JSONResponse({"ok": True, "login": user["login"], "role": user["role"], "userId": user["id"], "name": user["name"], "token": token})
     resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=config.COOKIE_SECURE)
     return resp
 

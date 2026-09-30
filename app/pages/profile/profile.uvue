@@ -3,14 +3,23 @@
     <view class="content">
       <text class="title">我的</text>
 
-      <!-- 档案卡（横排 + 账号身份行） -->
+      <!-- 档案卡（横排 + 账号身份行）：个人信息为主，称号为次 -->
       <view class="profile">
         <view class="profile__toprow">
           <view class="profile__halo">
-            <image class="profile__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
+            <image class="profile__avatar" :src="getAvatar()" mode="aspectFill"></image>
+            <image class="profile__mascotbadge" src="/static/mascots/frog-24.png" mode="aspectFit"></image>
           </view>
           <view class="profile__right">
-            <text class="profile__rank">{{ rankName }}</text>
+            <view class="profile__namerow">
+              <text class="profile__name">{{ displayName }}</text>
+              <view class="profile__edit" @click="goEdit">
+                <text class="profile__edit-text">编辑</text>
+              </view>
+            </view>
+            <view class="profile__rankbadge">
+              <text class="profile__rankbadge-text">{{ rankName }}</text>
+            </view>
             <text class="profile__meta">本地档案 · 第 {{ useDayN }} 天 · 累计破案 {{ solvedCount }} 关</text>
             <view class="profile__track">
               <view class="profile__fill" :style="'width:' + profilePct + '%'"></view>
@@ -93,6 +102,7 @@ import { getCaseProgress, getStreak, useDay, getTotals } from '../../utils/stora
 import { rankOf } from '../../utils/scoring'
 import { getStoredUser, logout, AppUser } from '../../utils/auth'
 import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
+import { getAvatar, getDisplayName } from '../../utils/auth'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class RowVM {
@@ -109,9 +119,11 @@ const lessonCount = ref(0)
 const rows = ref<RowVM[]>([])
 const user = ref<AppUser | null>(null)
 const profilePct = ref(0)
+const displayName = ref('')
 
 function refresh() {
   user.value = getStoredUser()
+  displayName.value = getDisplayName()
 
   const totals = getTotals(
     ALL_CASES.map((c) => c.id),
@@ -158,6 +170,10 @@ function goPoster() {
 
 function onLogin() {
   uni.navigateTo({ url: '/pages/login/login' })
+}
+
+function goEdit() {
+  uni.navigateTo({ url: '/pages/profile-edit/profile-edit' })
 }
 
 const showLogout = ref(false)
@@ -229,6 +245,19 @@ function onRow(v: string) {
   width: 140rpx;
   height: 140rpx;
   border-radius: 70rpx;
+  background-color: #FBF3EB;
+}
+.profile__mascotbadge {
+  position: absolute;
+  right: -6rpx;
+  bottom: -6rpx;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 28rpx;
+  border-width: 3rpx;
+  border-style: solid;
+  border-color: #4A4458;
+  background-color: #FFF9F4;
 }
 .profile__right {
   display: flex;
@@ -236,15 +265,43 @@ function onRow(v: string) {
   flex: 1;
   margin-left: 28rpx;
 }
-.profile__rank {
-  font-size: 42rpx;
+.profile__namerow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.profile__name {
+  font-size: 38rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+  flex: 1;
+}
+.profile__edit {
+  background-color: #413B4D;
+  border-radius: 26rpx;
+  padding: 8rpx 22rpx;
+}
+.profile__edit-text {
+  font-size: 20rpx;
+  color: #C9C2DA;
+}
+.profile__rankbadge {
+  align-self: flex-start;
+  background-color: rgba(255, 201, 77, 0.16);
+  border-radius: 20rpx;
+  padding: 4rpx 18rpx;
+  margin-top: 12rpx;
+}
+.profile__rankbadge-text {
+  font-size: 20rpx;
   font-weight: bold;
   color: #FFC94D;
 }
 .profile__meta {
   font-size: 20rpx;
   color: #C9C2DA;
-  margin-top: 10rpx;
+  margin-top: 12rpx;
 }
 .profile__track {
   height: 12rpx;

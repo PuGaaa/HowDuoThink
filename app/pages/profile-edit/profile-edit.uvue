@@ -1,0 +1,200 @@
+<template>
+  <view class="page">
+    <navbar></navbar>
+    <view class="content">
+      <text class="pagetitle">编辑资料</text>
+
+      <view class="formcard">
+        <text class="formcard__label">头像</text>
+        <view class="avgrid">
+          <view
+            v-for="(it, i) in presets"
+            :key="'a' + i"
+            :class="selIdx === i ? 'avgrid__item avgrid__item--on' : 'avgrid__item'"
+            @click="selIdx = i"
+          >
+            <image class="avgrid__img" :src="it.path" mode="aspectFill"></image>
+            <view v-if="selIdx === i" class="avgrid__check">
+              <image class="avgrid__check-img" src="/static/icons/check-white.png" mode="aspectFit"></image>
+            </view>
+          </view>
+        </view>
+
+        <text class="formcard__label formcard__label--gap">昵称</text>
+        <input class="field__input" v-model="nickname" maxlength="16" placeholder="16 字以内" />
+        <text class="formcard__tip">{{ nameHint }}</text>
+
+        <view class="btnpad">
+          <view class="primarybtn" @click="save">
+            <text class="primarybtn__text">{{ busy ? '保存中…' : '保存' }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue'
+import navbar from '../../components/navbar/navbar.uvue'
+import { AVATAR_PRESETS, getAvatar, getDisplayName, setLocalAvatar, updateName, isLoggedIn } from '../../utils/auth'
+
+class PresetVM {
+  path: string = ''
+}
+
+const presets = ref<PresetVM[]>([])
+for (let i = 0; i < AVATAR_PRESETS.length; i++) {
+  const vm = new PresetVM()
+  vm.path = AVATAR_PRESETS[i]
+  presets.value.push(vm)
+}
+const cur = getAvatar()
+let initIdx = 0
+for (let i = 0; i < presets.length; i++) {
+  if (presets[i] === cur) { initIdx = i; break }
+}
+const selIdx = ref(initIdx)
+const nickname = ref(getDisplayName())
+const busy = ref(false)
+const nameHint = isLoggedIn() ? '保存后同步到社区账号' : '未登录：仅保存在本机'
+
+function save() {
+  const name = nickname.value.trim()
+  if (name.length === 0) {
+    uni.showToast({ title: '昵称不能为空', icon: 'none' })
+    return
+  }
+  if (busy.value) return
+  busy.value = true
+  setLocalAvatar(presets[selIdx.value])
+  updateName(name, (r) => {
+    busy.value = false
+    if (r.error.length > 0) {
+      uni.showToast({ title: r.error, icon: 'none' })
+      return
+    }
+    uni.showToast({ title: '已保存', icon: 'none' })
+    setTimeout(() => {
+      uni.navigateBack({})
+    }, 600)
+  })
+}
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF9F4;
+  width: 100%;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 24rpx 32rpx 60rpx;
+}
+.content {
+  display: flex;
+  flex-direction: column;
+  padding-top: 110rpx;
+}
+.pagetitle {
+  font-size: 44rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-bottom: 24rpx;
+}
+.formcard {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 30rpx 28rpx 26rpx;
+  box-shadow: 0 6rpx 0 0 #EFE5D6;
+}
+.formcard__label {
+  font-size: 23rpx;
+  font-weight: bold;
+  color: #7A7290;
+  margin-bottom: 16rpx;
+}
+.formcard__label--gap {
+  margin-top: 26rpx;
+}
+.avgrid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.avgrid__item {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 75rpx;
+  margin-right: 24rpx;
+  margin-bottom: 18rpx;
+  border-width: 4rpx;
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0);
+  position: relative;
+}
+.avgrid__item--on {
+  border-color: #FF8A5C;
+}
+.avgrid__img {
+  width: 142rpx;
+  height: 142rpx;
+  border-radius: 71rpx;
+  background-color: #FBF3EB;
+}
+.avgrid__check {
+  position: absolute;
+  right: 4rpx;
+  bottom: 4rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 22rpx;
+  background-color: #5FC9A5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.avgrid__check-img {
+  width: 24rpx;
+  height: 24rpx;
+}
+.field__input {
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  border-radius: 16rpx;
+  padding: 18rpx 22rpx;
+  font-size: 26rpx;
+  color: #4A4458;
+  background-color: #FBF3EB;
+}
+.formcard__tip {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  margin-top: 12rpx;
+}
+/* 硬边阴影缓冲 */
+.btnpad {
+  padding-bottom: 8rpx;
+  margin-top: 26rpx;
+}
+.primarybtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  background-color: #FF8A5C;
+  border-radius: 46rpx;
+  padding: 24rpx;
+  box-shadow: 0 8rpx 0 0 #E06B38;
+}
+.primarybtn__text {
+  font-size: 28rpx;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+</style>
