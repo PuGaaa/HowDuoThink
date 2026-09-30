@@ -8,6 +8,13 @@
       }
     },
     {
+      "path": "pages/about/about",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "关于"
+      }
+    },
+    {
       "path": "pages/chapter/chapter",
       "style": {
         "navigationStyle": "custom",

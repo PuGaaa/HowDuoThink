@@ -57,7 +57,7 @@
 
       <!-- 通用 -->
       <text class="sec">通用</text>
-      <view v-for="(row, i) in rows" :key="'r' + i" class="row" @click="onRow(row.value)">
+      <view v-for="(row, i) in rows" :key="'r' + i" class="row" @click="onRow(row.label, row.value)">
         <text class="row__label">{{ row.label }}</text>
         <text class="row__value">{{ row.value }}</text>
         <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
@@ -167,6 +167,10 @@ function goEdit() {
   uni.navigateTo({ url: '/pages/profile-edit/profile-edit' })
 }
 
+function goAbout() {
+  uni.navigateTo({ url: '/pages/about/about' })
+}
+
 const showLogout = ref(false)
 
 function onLogout() {
@@ -180,8 +184,12 @@ function doLogout() {
   uni.showToast({ title: '已退出', icon: 'none' })
 }
 
-function onRow(v: string) {
-  uni.showToast({ title: v, icon: 'none' })
+function onRow(label: string, value: string) {
+  if (label === '关于排错推理训练场') {
+    goAbout()
+    return
+  }
+  uni.showToast({ title: value + ' · 即将上线', icon: 'none' })
 }
 </script>
 

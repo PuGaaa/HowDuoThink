@@ -1,0 +1,145 @@
+<template>
+  <view class="page">
+    <navbar></navbar>
+    <view class="content">
+      <view class="herocard">
+        <image class="herocard__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
+        <text class="herocard__name">排错推理训练场</text>
+        <text class="herocard__slogan">看症状 · 立假设 · 算成本 · 定根因</text>
+        <text class="herocard__ver">v0.1</text>
+      </view>
+
+      <view class="card">
+        <text class="card__title">这是什么</text>
+        <text class="card__text">给 agent 时代程序员的诊断推理训练器：每关一个真实故障现场，提出假设、花 ⚡︎ 预算验证、指认根因，复盘对照专家推理链。</text>
+      </view>
+
+      <view class="card">
+        <text class="card__title">相关站点</text>
+        <view class="linkrow" @click="openWeb">
+          <text class="linkrow__label">Web 社区站（投稿与解决逻辑）</text>
+          <text class="linkrow__v">localhost:3000</text>
+        </view>
+        <view class="linkrow" @click="goHandbook">
+          <text class="linkrow__label">诊断手册（本机）</text>
+          <text class="linkrow__v">查看</text>
+        </view>
+      </view>
+
+      <view class="card">
+        <text class="card__title">技术栈致谢</text>
+        <text class="card__text">uni-app X（蒸汽模式）· FastAPI · SQLite · Nuxt 3 · Vue · 吉祥物与图标均为项目自有资产</text>
+      </view>
+
+      <text class="foot">—— 本机进度实时保存，闯关愉快 ——</text>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import navbar from '../../components/navbar/navbar.uvue'
+
+function openWeb() {
+  // #ifdef WEB
+  window.open('http://localhost:3000', '_blank')
+  // #endif
+  // #ifndef WEB
+  uni.showToast({ title: '请在浏览器访问社区站', icon: 'none' })
+  // #endif
+}
+
+function goHandbook() {
+  uni.navigateBack({})
+}
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF9F4;
+  width: 100%;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 24rpx 32rpx 60rpx;
+}
+.content {
+  display: flex;
+  flex-direction: column;
+  padding-top: 110rpx;
+}
+.herocard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #4A4458;
+  border-radius: 30rpx;
+  padding: 40rpx 30rpx 34rpx;
+  box-shadow: 0 8rpx 0 0 #35303F;
+}
+.herocard__avatar {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 70rpx;
+  background-color: #FBF3EB;
+}
+.herocard__name {
+  font-size: 38rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+  margin-top: 22rpx;
+}
+.herocard__slogan {
+  font-size: 22rpx;
+  font-weight: bold;
+  color: #9BD49B;
+  margin-top: 14rpx;
+}
+.herocard__ver {
+  font-size: 20rpx;
+  color: #C9C2DA;
+  margin-top: 12rpx;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  margin-top: 24rpx;
+  box-shadow: 0 6rpx 0 0 #EFE5D6;
+}
+.card__title {
+  font-size: 25rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-bottom: 14rpx;
+}
+.card__text {
+  font-size: 23rpx;
+  color: #7A7290;
+  line-height: 38rpx;
+}
+.linkrow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14rpx 0;
+}
+.linkrow__label {
+  font-size: 23rpx;
+  color: #4A4458;
+}
+.linkrow__v {
+  font-size: 21rpx;
+  color: #FF8A5C;
+}
+.foot {
+  font-size: 19rpx;
+  color: #AFA8BD;
+  text-align: center;
+  margin-top: 26rpx;
+}
+</style>
