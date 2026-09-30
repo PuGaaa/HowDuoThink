@@ -93,6 +93,7 @@ import { getStoredUser, logout, AppUser } from '../../utils/auth'
 import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { getAvatar as resolveAvatar, getDisplayName } from '../../utils/auth'
 import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
+import { getReminder, setReminder, reminderLabel, startReminderPolling, requestNotifyPermission } from '../../utils/reminder'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class RowVM {
@@ -141,7 +142,7 @@ function refresh() {
 
   const r1 = new RowVM()
   r1.label = '学习提醒'
-  r1.value = '每天 21:30'
+  r1.value = reminderLabel()
   const r2 = new RowVM()
   r2.label = '每日一题'
   r2.value = dailyIsDone.value ? '✓ 已完成' : dailyTitle.value
@@ -154,8 +155,11 @@ function refresh() {
   rows.value = [r1, r2, r3, r4]
 }
 
-// onShow 首次显示也会触发：从子页返回时数据保持最新
-onShow(() => refresh())
+// onShow 首次显示也会触发：从子页返回时数据保持最新；提醒轮询随页面常驻
+onShow(() => {
+  refresh()
+  startReminderPolling()
+})
 
 function goHandbook() {
   uni.navigateTo({ url: '/pages/handbook/handbook' })
@@ -175,6 +179,32 @@ function goEdit() {
 
 function goAbout() {
   uni.navigateTo({ url: '/pages/about/about' })
+}
+
+function showReminderSheet() {
+  const items = ['每天 20:00', '每天 21:00', '每天 21:30', '每天 22:00', '关闭提醒']
+  uni.showActionSheet({
+    itemList: items,
+    success: (res) => {
+      if (res.tapIndex === 4) {
+        setReminder({ on: false, hh: 21, mm: 30 })
+      } else {
+        // #ifdef WEB
+        const perm = requestNotifyPermission()
+        if (perm === 'default') {
+          const N = (window as any).Notification
+          if (N) N.requestPermission()
+        }
+        // #endif
+        const times: number[][] = [[20, 0], [21, 0], [21, 30], [22, 0]]
+        const t = times[res.tapIndex]
+        setReminder({ on: true, hh: t[0], mm: t[1] })
+        startReminderPolling()
+      }
+      refresh()
+      uni.showToast({ title: '学习提醒已更新', icon: 'none' })
+    },
+  })
 }
 
 const showLogout = ref(false)
@@ -197,6 +227,10 @@ function onRow(label: string, value: string) {
   }
   if (label === '每日一题') {
     uni.navigateTo({ url: '/pages/play/play?id=' + dailyCase().id })
+    return
+  }
+  if (label === '学习提醒') {
+    showReminderSheet()
     return
   }
   uni.showToast({ title: value + ' · 即将上线', icon: 'none' })
