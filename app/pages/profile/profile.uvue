@@ -62,12 +62,12 @@
         <text class="row__value">{{ row.value }}</text>
         <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
       </view>
-      <view v-if="user != null" class="row" @click="onLogout">
-        <text class="row__label row__label--danger">退出登录</text>
+      <!-- 账号操作：白色危险按钮 / 珊瑚主按钮，与设置行区分 -->
+      <view v-if="user != null" class="authbtn authbtn--logout" @click="onLogout">
+        <text class="authbtn__text authbtn__text--danger">退出登录</text>
       </view>
-      <view v-else class="row" @click="onLogin">
-        <text class="row__label">去登录</text>
-        <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
+      <view v-else class="authbtn authbtn--login" @click="onLogin">
+        <text class="authbtn__text authbtn__text--main">去登录</text>
       </view>
     </view>
     <tabbar active="me"></tabbar>
@@ -301,6 +301,37 @@ function onRow(v: string) {
   padding-bottom: 6rpx;
   margin-bottom: 24rpx;
 }
+
+/* 账号操作按钮：白底危险钮 / 珊瑚主钮 */
+.authbtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border-radius: 46rpx;
+  padding: 24rpx;
+  margin-top: 30rpx;
+}
+.authbtn--logout {
+  background-color: #FFFFFF;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F5D5D5;
+}
+.authbtn__text--danger {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #E86A6A;
+}
+.authbtn--login {
+  background-color: #FF8A5C;
+  box-shadow: 0 8rpx 0 0 #E06B38;
+}
+.authbtn__text--main {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+}
 /* 三卡等宽自适应 */
 .statcard {
   display: flex;
@@ -372,9 +403,6 @@ function onRow(v: string) {
   padding: 26rpx;
   margin-bottom: 16rpx;
   box-shadow: 0 5rpx 0 0 #EFE5D6;;
-}
-.row__label--danger {
-  color: #E86A6A;
 }
 .row__label {
   font-size: 25rpx;
