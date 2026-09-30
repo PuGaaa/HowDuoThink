@@ -3,12 +3,37 @@
     <view class="content">
       <text class="title">我的</text>
 
-      <!-- 档案卡 -->
+      <!-- 档案卡（横排 + 账号身份行） -->
       <view class="profile">
-        <image class="profile__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
-        <text class="profile__rank">{{ rankName }}</text>
-        <text class="profile__meta">本地档案 · 第 {{ useDayN }} 天 · 累计破案 {{ solvedCount }} 关</text>
-        <text class="profile__next">{{ rankNextTip }}</text>
+        <view class="profile__toprow">
+          <view class="profile__halo">
+            <image class="profile__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
+          </view>
+          <view class="profile__right">
+            <text class="profile__rank">{{ rankName }}</text>
+            <text class="profile__meta">本地档案 · 第 {{ useDayN }} 天 · 累计破案 {{ solvedCount }} 关</text>
+            <view class="profile__track">
+              <view class="profile__fill" :style="'width:' + profilePct + '%'"></view>
+            </view>
+            <text class="profile__next">{{ rankNextTip }}</text>
+          </view>
+        </view>
+        <!-- 账号身份行 -->
+        <view class="profile__idrow">
+          <template v-if="user != null">
+            <image class="profile__idava" :src="user!.avatar.length > 0 ? user!.avatar : '/static/mascots/rabbit.png'" mode="aspectFill"></image>
+            <text class="profile__idtext">@{{ user!.login }} · {{ user!.role }}</text>
+            <view class="profile__idbtn profile__idbtn--ghost" @click="onLogout">
+              <text class="profile__idbtn-text profile__idbtn-text--ghost">退出</text>
+            </view>
+          </template>
+          <template v-else>
+            <text class="profile__idtext">未登录 · 本机进度已保存</text>
+            <view class="profile__idbtn profile__idbtn--go" @click="onLogin">
+              <text class="profile__idbtn-text">去登录</text>
+            </view>
+          </template>
+        </view>
       </view>
 
       <!-- 统计 -->
@@ -24,27 +49,6 @@
         <view class="statcard">
           <text class="statcard__v">{{ lessonCount }}</text>
           <text class="statcard__k">检查单</text>
-        </view>
-      </view>
-
-      <!-- 账号 -->
-      <view class="account">
-        <text class="account__title">账号</text>
-        <view v-if="user != null" class="account__me">
-          <image class="account__avatar" :src="user!.avatar.length > 0 ? user!.avatar : '/static/mascots/rabbit.png'" mode="aspectFill"></image>
-          <view class="account__who">
-            <text class="account__name">{{ user!.name }}</text>
-            <text class="account__role">@{{ user!.login }} · {{ user!.role }}</text>
-          </view>
-          <view class="account__btn account__btn--ghost" @click="onLogout">
-            <text class="account__btn-text">退出登录</text>
-          </view>
-        </view>
-        <view v-else>
-          <text class="account__desc">v0 进度保存在本机。登录后可参与社区玩法，\n多端同步即将上线。</text>
-          <view class="account__btn" @click="onLogin">
-            <text class="account__btn-text">去登录</text>
-          </view>
         </view>
       </view>
 
@@ -104,6 +108,7 @@ const streakCount = ref(0)
 const lessonCount = ref(0)
 const rows = ref<RowVM[]>([])
 const user = ref<AppUser | null>(null)
+const profilePct = ref(0)
 
 function refresh() {
   user.value = getStoredUser()
@@ -119,6 +124,11 @@ function refresh() {
   const rk = rankOf(totals.solved)
   rankName.value = rk.name
   rankNextTip.value = rk.remain > 0 ? '距「' + rk.nextName + '」还差 ' + rk.remain + ' 关' : '已是最高称号'
+  // 称号进度：按当前段与下一段阈值线性映射
+  const RANKS: number[][] = [[0, 1], [1, 3], [3, 6], [6, 6]]
+  const seg = RANKS[rk.index]
+  const span = seg[1] - seg[0]
+  profilePct.value = span > 0 ? Math.min(100, Math.round(((totals.solved - seg[0]) * 100) / span)) : 100
 
   const r1 = new RowVM()
   r1.label = '学习提醒'
@@ -197,39 +207,116 @@ function onRow(v: string) {
   flex-direction: column;
   background-color: #4A4458;
   border-radius: 30rpx;
-  padding: 36rpx 32rpx;
-  margin-bottom: 24rpx;
+  /* 底部留悬浮带：stats 负 margin 压的是空带而不是身份行内容 */
+  padding: 36rpx 32rpx 92rpx;
+  margin-bottom: 0rpx;
   box-shadow: 0 10rpx 0 0 #37323F;;
 }
+.profile__toprow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.profile__halo {
+  width: 176rpx;
+  height: 176rpx;
+  border-radius: 88rpx;
+  background-color: #413B4D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .profile__avatar {
-  width: 128rpx;
-  height: 128rpx;
-  border-radius: 64rpx;
-  background-color: #5E5770;
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 70rpx;
+}
+.profile__right {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin-left: 28rpx;
 }
 .profile__rank {
-  font-size: 40rpx;
+  font-size: 42rpx;
   font-weight: bold;
-  color: #FFFFFF;
-  margin-top: 20rpx;
+  color: #FFC94D;
 }
 .profile__meta {
-  font-size: 21rpx;
+  font-size: 20rpx;
   color: #C9C2DA;
-  margin-top: 12rpx;
+  margin-top: 10rpx;
+}
+.profile__track {
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: #5E5770;
+  margin-top: 18rpx;
+  overflow: hidden;
+}
+.profile__fill {
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: #FF8A5C;
 }
 .profile__next {
   font-size: 20rpx;
-  color: #FFC94D;
-  margin-top: 10rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+  margin-top: 12rpx;
+}
+.profile__idrow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-top-width: 2rpx;
+  border-top-style: dashed;
+  border-top-color: #5E5770;
+  margin-top: 26rpx;
+  padding-top: 20rpx;
+}
+.profile__idava {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 22rpx;
+  background-color: #5E5770;
+  margin-right: 12rpx;
+}
+.profile__idtext {
+  font-size: 22rpx;
+  color: #C9C2DA;
+  flex: 1;
+}
+.profile__idbtn {
+  border-radius: 26rpx;
+  padding: 10rpx 24rpx;
+}
+.profile__idbtn--ghost {
+  background-color: #413B4D;
+}
+.profile__idbtn--go {
+  background-color: #FF8A5C;
+  box-shadow: 0 5rpx 0 0 #E06B38;
+}
+.profile__idbtn-text {
+  font-size: 21rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.profile__idbtn-text--ghost {
+  color: #C9C2DA;
+  font-weight: 500;
 }
 .stats {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
+  /* 档案风：负 margin 悬浮压深紫卡底边（悬浮带 92rpx） */
+  margin-top: -64rpx;
   /* 硬边阴影缓冲：statcard 贴行底，uni-view 默认 overflow:hidden 会裁阴影 */
   padding-bottom: 6rpx;
   margin-bottom: 24rpx;
+  position: relative;
 }
 /* 三卡等宽自适应 */
 .statcard {
@@ -255,81 +342,8 @@ function onRow(v: string) {
   color: #AFA8BD;
   margin-top: 8rpx;
 }
-.account {
-  display: flex;
-  flex-direction: column;
-  background-color: #FFFFFF;
-  border-radius: 24rpx;
-  border-width: 2rpx;
-  border-style: solid;
-  border-color: #FFD3BC;
-  padding: 28rpx;
-  margin-bottom: 28rpx;
-  box-shadow: 0 8rpx 0 0 #F3CFA9;;
-}
-.account__title {
-  font-size: 26rpx;
-  font-weight: bold;
-  color: #4A4458;
-}
-.account__desc {
-  font-size: 21rpx;
-  color: #AFA8BD;
-  margin-top: 12rpx;
-  line-height: 34rpx;
-}
-.account__me {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  margin-top: 16rpx;
-}
-.account__avatar {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 36rpx;
-  background-color: #FBF3EB;
-  margin-right: 16rpx;
-}
-.account__who {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-.account__name {
-  font-size: 27rpx;
-  font-weight: bold;
-  color: #4A4458;
-}
-.account__role {
-  font-size: 20rpx;
-  color: #AFA8BD;
-  margin-top: 4rpx;
-}
-.account__btn--ghost {
-  background-color: #FFFFFF;
-  border-width: 2rpx;
-  border-style: solid;
-  border-color: #F5E6DA;
-}
-.account__btn--ghost .account__btn-text {
-  color: #7A7290;
-  font-weight: 500;
-}
-.account__btn {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  background-color: #FFF1E7;
-  border-radius: 34rpx;
-  padding: 18rpx;
-  margin-top: 20rpx;
-}
-.account__btn-text {
-  font-size: 23rpx;
-  font-weight: bold;
-  color: #FF8A5C;
-}
+
+
 .sec {
   font-size: 26rpx;
   font-weight: bold;
