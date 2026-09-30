@@ -207,9 +207,8 @@ function onRow(v: string) {
   flex-direction: column;
   background-color: #4A4458;
   border-radius: 30rpx;
-  /* 底部留悬浮带：stats 负 margin 压的是空带而不是身份行内容 */
-  padding: 36rpx 32rpx 92rpx;
-  margin-bottom: 0rpx;
+  padding: 36rpx 32rpx 24rpx;
+  margin-bottom: 24rpx;
   box-shadow: 0 10rpx 0 0 #37323F;;
 }
 .profile__toprow {
@@ -311,12 +310,9 @@ function onRow(v: string) {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  /* 档案风：负 margin 悬浮压深紫卡底边（悬浮带 92rpx） */
-  margin-top: -64rpx;
   /* 硬边阴影缓冲：statcard 贴行底，uni-view 默认 overflow:hidden 会裁阴影 */
   padding-bottom: 6rpx;
   margin-bottom: 24rpx;
-  position: relative;
 }
 /* 三卡等宽自适应 */
 .statcard {
