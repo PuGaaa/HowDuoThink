@@ -11,12 +11,21 @@ NAMES = ['frog', 'otter', 'snail', 'rabbit', 'dino']
 
 def process(name):
     im = Image.open(f'{SRC}/{name}.png').convert('RGBA')
-    # 按 alpha 包围盒裁剪
-    bbox = im.getchannel('A').getbbox()
-    im = im.crop(bbox)
-    side = max(im.size)
-    sq = Image.new('RGBA', (side, side), (255, 255, 255, 0))
-    sq.paste(im, ((side - im.size[0]) // 2, (side - im.size[1]) // 2), im)
+    has_alpha = im.getchannel('A').getextrema()[0] < 255
+    if has_alpha:
+        # 抠图输入：按 alpha 包围盒裁剪
+        bbox = im.getchannel('A').getbbox()
+        im = im.crop(bbox)
+        side = max(im.size)
+        sq = Image.new('RGBA', (side, side), (255, 255, 255, 0))
+        sq.paste(im, ((side - im.size[0]) // 2, (side - im.size[1]) // 2), im)
+    else:
+        # 不透明输入（AI 生图带背景）：中心方裁 + 圆形蒙版
+        side = min(im.size)
+        cx, cy = im.size[0] // 2, im.size[1] // 2
+        half = side // 2
+        im = im.crop((cx - half, cy - half, cx + half, cy + half))
+        sq = im.copy()
     # 白圆徽章：白圆打底 + 主体；4x 超采样抗锯齿圆边
     big = side * 4
     badge = Image.new('RGBA', (big, big), (0, 0, 0, 0))
