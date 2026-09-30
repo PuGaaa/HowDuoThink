@@ -22,11 +22,6 @@ export const AVATAR_PRESETS: string[] = [
   '/static/images/avatar-10.png',
   '/static/images/avatar-11.png',
   '/static/images/avatar-12.png',
-  '/static/mascots/frog.png',
-  '/static/mascots/rabbit.png',
-  '/static/mascots/otter.png',
-  '/static/mascots/snail.png',
-  '/static/mascots/dino.png',
 ]
 
 export interface AppUser {
