@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from core import config, security
 from core.deps import SessionCookie
 from core.deps import current_user
+from core import sms as sms_core
 from features.auth import models, oauth, service
 
 router = APIRouter(tags=["auth"])
@@ -93,3 +94,26 @@ def update_me(body: models.ProfileUpdate, uid: str = Depends(current_user)):
 def change_password(body: models.PasswordChange, uid: str = Depends(current_user)):
     service.change_password(uid, body.old_password, body.new_password)
     return {"ok": True}
+
+
+@router.post("/api/auth/sms/send")
+def sms_send(body: models.SmsSendBody):
+    """下发手机验证码；dev 模式响应带 devEcho 供联调（生产由短信服务下发）。"""
+    out = service.send_sms_code(body.phone)
+    return out
+
+
+@router.post("/api/auth/login/phone")
+def phone_login(body: models.PhoneLoginBody):
+    """手机验证码登录：新手机号自动建号（与 Web 注册互通的账号体系）。"""
+    user = service.phone_login(body.phone, body.code)
+    token = security.sign_session(user["id"])
+    resp = JSONResponse({"ok": True, "login": user["login"], "role": user["role"], "userId": user["id"], "token": token})
+    resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=config.COOKIE_SECURE)
+    return resp
+
+
+@router.post("/api/me/bind-phone")
+def bind_phone(body: models.BindPhoneBody, uid: str = Depends(current_user)):
+    """绑定手机号到当前账号：绑定后可用验证码登录同一账号。"""
+    return service.bind_phone(uid, body.phone, body.code)

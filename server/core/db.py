@@ -59,6 +59,13 @@ CREATE TABLE IF NOT EXISTS articles (
   author TEXT NOT NULL,
   published_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS sms_codes (
+  phone TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -70,6 +77,7 @@ def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
@@ -77,10 +85,13 @@ def connect() -> sqlite3.Connection:
 def init() -> None:
     conn = connect()
     conn.executescript(SCHEMA)
-    # 轻迁移：password_hash 列
+    # 轻迁移：password_hash 列 + phone 列（多身份绑定：密码/GitHub/手机号同行共存）
     cols = [r[1] for r in conn.execute("PRAGMA table_info(users)")]
     if "password_hash" not in cols:
         conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+    if "phone" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN phone TEXT")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone) WHERE phone IS NOT NULL")
     conn.commit()
     conn.close()
 

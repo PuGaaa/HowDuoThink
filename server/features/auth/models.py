@@ -22,3 +22,17 @@ class ProfileUpdate(BaseModel):
 class PasswordChange(BaseModel):
     old_password: str = Field(default="", max_length=128, alias="oldPassword")
     new_password: str = Field(min_length=6, max_length=128, alias="newPassword")
+
+
+class SmsSendBody(BaseModel):
+    phone: str = Field(pattern=r"^1[3-9]\d{9}$")
+
+
+class PhoneLoginBody(BaseModel):
+    phone: str = Field(pattern=r"^1[3-9]\d{9}$")
+    code: str = Field(min_length=6, max_length=6)
+
+
+class BindPhoneBody(BaseModel):
+    phone: str = Field(pattern=r"^1[3-9]\d{9}$")
+    code: str = Field(min_length=6, max_length=6)
