@@ -12,7 +12,7 @@
         </view>
         <text class="verdict__tip">★ 破案 · ★★ 预算 ≤ 1.2× · ★★★ 零错误指认</text>
         <view class="verdict__marks">
-          <image v-for="(m, i) in markNames" :key="'m' + i" class="verdict__mark" :src="'/static/mascots/' + m + '-96.png'" mode="aspectFit"></image>
+          <image v-for="(m, i) in markNames" :key="'m' + i" class="verdict__mark" :src="'/static/mascots/' + m + '.png'" mode="aspectFit"></image>
         </view>
         <view class="cmp">
           <text class="cmp__label">你</text>
@@ -50,7 +50,7 @@
         <text class="replay__title">本局心理回放</text>
         <view v-for="(item, i) in replayItems" :key="'r' + i" :class="item.isMascot ? 'rmascot' : 'revent'">
           <view v-if="item.isMascot" class="rmascot__row">
-            <image class="rmascot__avatar" :src="'/static/mascots/' + item.who + '-96.png'" mode="aspectFit"></image>
+            <image class="rmascot__avatar" :src="'/static/mascots/' + item.who + '.png'" mode="aspectFit"></image>
             <view class="rmascot__body">
               <text class="rmascot__line">{{ item.text }}</text>
               <text class="rmascot__note">{{ item.note }}</text>

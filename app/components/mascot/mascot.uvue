@@ -1,7 +1,7 @@
 <template>
   <view :class="visible ? 'mascot' : 'mascot mascot--hidden'">
     <view class="mascot__badge">
-      <image class="mascot__avatar" :src="'/static/mascots/' + who + '-96.png'" mode="aspectFit"></image>
+      <image class="mascot__avatar" :src="'/static/mascots/' + who + '.png'" mode="aspectFit"></image>
     </view>
     <text class="mascot__line">{{ line }}</text>
   </view>

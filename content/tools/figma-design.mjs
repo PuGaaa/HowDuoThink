@@ -226,7 +226,7 @@ function icon(s, name, X, Y, size, color, o = {}) {
 /* ---------- 吉祥物矢量 mark（几何 kawaii + 渐变 3D，48 网格） ---------- */
 const ASSET_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', 'static', 'mascots');
 function mascotAsset(name) {
-  const p = join(ASSET_DIR, name + '-192.png');
+  const p = join(ASSET_DIR, name + '.png');
   return existsSync(p) ? p : null;
 }
 function mascot(s, name, X, Y, size, o = {}) {
@@ -917,7 +917,7 @@ function shapesSvg(items, forFigma = false) {
     } else if (it.t === 'p') {
       out += `<path d="${it.d}" ${fillOf(it)}${it.st ? ` stroke="${it.st}" stroke-width="${it.sw}" stroke-linecap="round" stroke-linejoin="round"` : ''}/>`;
     } else if (it.t === 'img' && !forFigma) {
-      out += `<image href="assets/${it.name}-192.png" x="${it.x}" y="${it.y}" width="${it.w}" height="${it.w}"/>`;
+      out += `<image href="assets/${it.name}.png" x="${it.x}" y="${it.y}" width="${it.w}" height="${it.w}"/>`;
     }
   }
   return (defs ? `<defs>${defs}</defs>` : '') + out;
@@ -969,7 +969,7 @@ function dry(screens) {
   mkdirSync('/tmp/figma_review/assets', { recursive: true });
   for (const n of ['frog', 'otter', 'snail', 'rabbit', 'dino']) {
     const a = mascotAsset(n);
-    if (a) writeFileSync('/tmp/figma_review/assets/' + n + '-192.png', readFileSync(a));
+    if (a) writeFileSync('/tmp/figma_review/assets/' + n + '.png', readFileSync(a));
   }
   console.log('dry 完成 → /tmp/figma_review/preview.html');
 }
@@ -1015,7 +1015,7 @@ async function push(screens) {
     const imgs = sc.items.sh.filter((it) => it.t === 'img');
     if (imgs.length) {
       const payload = imgs.map((it) => {
-        const b64 = readFileSync(join(ASSET_DIR, it.name + '-96.png')).toString('base64');
+        const b64 = readFileSync(join(ASSET_DIR, it.name + '.png')).toString('base64');
         return { name: it.name, b64, x: it.x, y: it.y, w: it.w };
       });
       await call('execute_figma_code', {

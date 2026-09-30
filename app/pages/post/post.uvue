@@ -15,7 +15,7 @@
           <view class="deco__b deco__b--m"></view>
         </view>
         <view class="postcard__halo">
-          <image class="postcard__avatar" src="/static/mascots/frog-96.png" mode="aspectFit"></image>
+          <image class="postcard__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
         </view>
         <text class="postcard__rank">{{ rankName }}</text>
         <view class="postcard__divider"></view>
@@ -310,7 +310,7 @@ function downloadPoster() {
   img.onerror = () => {
     uni.showToast({ title: '头像加载失败', icon: 'none' })
   }
-  img.src = '/static/mascots/frog-96.png'
+  img.src = '/static/mascots/frog.png'
   // #endif
   // #ifndef WEB
   uni.showToast({ title: 'App 端海报保存即将上线', icon: 'none' })

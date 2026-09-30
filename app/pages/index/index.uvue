@@ -4,7 +4,7 @@
       <!-- 头部：档案 + streak -->
       <view class="header">
         <view class="header__avatar-wrap">
-          <image class="header__avatar" src="/static/mascots/frog-96.png" mode="aspectFit"></image>
+          <image class="header__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
         </view>
         <view class="header__who">
           <text class="header__rank">{{ rankName }}</text>

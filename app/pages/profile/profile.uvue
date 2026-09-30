@@ -5,7 +5,7 @@
 
       <!-- 档案卡 -->
       <view class="profile">
-        <image class="profile__avatar" src="/static/mascots/frog-96.png" mode="aspectFit"></image>
+        <image class="profile__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
         <text class="profile__rank">{{ rankName }}</text>
         <text class="profile__meta">本地档案 · 第 {{ useDayN }} 天 · 累计破案 {{ solvedCount }} 关</text>
         <text class="profile__next">{{ rankNextTip }}</text>
@@ -31,7 +31,7 @@
       <view class="account">
         <text class="account__title">账号</text>
         <view v-if="user != null" class="account__me">
-          <image class="account__avatar" :src="user!.avatar.length > 0 ? user!.avatar : '/static/mascots/rabbit-96.png'" mode="aspectFill"></image>
+          <image class="account__avatar" :src="user!.avatar.length > 0 ? user!.avatar : '/static/mascots/rabbit.png'" mode="aspectFill"></image>
           <view class="account__who">
             <text class="account__name">{{ user!.name }}</text>
             <text class="account__role">@{{ user!.login }} · {{ user!.role }}</text>

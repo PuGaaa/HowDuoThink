@@ -6,7 +6,7 @@
 
       <!-- 收集图鉴卡 -->
       <view class="rankcard">
-        <image class="rankcard__avatar" src="/static/mascots/frog-96.png" mode="aspectFit"></image>
+        <image class="rankcard__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
         <view class="rankcard__body">
           <text class="rankcard__label">诊断手册</text>
           <text class="rankcard__name">{{ lessonCount }} 条检查单</text>
