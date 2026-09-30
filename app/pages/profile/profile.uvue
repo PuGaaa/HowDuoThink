@@ -27,22 +27,6 @@
             <text class="profile__next">{{ rankNextTip }}</text>
           </view>
         </view>
-        <!-- 账号身份行 -->
-        <view class="profile__idrow">
-          <template v-if="user != null">
-            <image class="profile__idava" :src="user!.avatar.length > 0 ? user!.avatar : '/static/images/default-avatar.png'" mode="aspectFill"></image>
-            <text class="profile__idtext">@{{ user!.login }} · {{ user!.role }}</text>
-            <view class="profile__idbtn profile__idbtn--ghost" @click="onLogout">
-              <text class="profile__idbtn-text profile__idbtn-text--ghost">退出</text>
-            </view>
-          </template>
-          <template v-else>
-            <text class="profile__idtext">未登录 · 本机进度已保存</text>
-            <view class="profile__idbtn profile__idbtn--go" @click="onLogin">
-              <text class="profile__idbtn-text">去登录</text>
-            </view>
-          </template>
-        </view>
       </view>
 
       <!-- 统计 -->
@@ -78,6 +62,13 @@
       <view v-for="(row, i) in rows" :key="'r' + i" class="row" @click="onRow(row.value)">
         <text class="row__label">{{ row.label }}</text>
         <text class="row__value">{{ row.value }}</text>
+        <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
+      </view>
+      <view v-if="user != null" class="row" @click="onLogout">
+        <text class="row__label row__label--danger">退出登录</text>
+      </view>
+      <view v-else class="row" @click="onLogin">
+        <text class="row__label">去登录</text>
         <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
       </view>
     </view>
@@ -321,48 +312,7 @@ function onRow(v: string) {
   color: #FF8A5C;
   margin-top: 12rpx;
 }
-.profile__idrow {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  border-top-width: 2rpx;
-  border-top-style: dashed;
-  border-top-color: #5E5770;
-  margin-top: 26rpx;
-  padding-top: 20rpx;
-}
-.profile__idava {
-  width: 44rpx;
-  height: 44rpx;
-  border-radius: 22rpx;
-  background-color: #5E5770;
-  margin-right: 12rpx;
-}
-.profile__idtext {
-  font-size: 22rpx;
-  color: #C9C2DA;
-  flex: 1;
-}
-.profile__idbtn {
-  border-radius: 26rpx;
-  padding: 10rpx 24rpx;
-}
-.profile__idbtn--ghost {
-  background-color: #413B4D;
-}
-.profile__idbtn--go {
-  background-color: #FF8A5C;
-  box-shadow: 0 5rpx 0 0 #E06B38;
-}
-.profile__idbtn-text {
-  font-size: 21rpx;
-  font-weight: bold;
-  color: #FFFFFF;
-}
-.profile__idbtn-text--ghost {
-  color: #C9C2DA;
-  font-weight: 500;
-}
+
 .stats {
   display: flex;
   flex-direction: row;
@@ -442,6 +392,9 @@ function onRow(v: string) {
   padding: 26rpx;
   margin-bottom: 16rpx;
   box-shadow: 0 5rpx 0 0 #EFE5D6;;
+}
+.row__label--danger {
+  color: #E86A6A;
 }
 .row__label {
   font-size: 25rpx;
