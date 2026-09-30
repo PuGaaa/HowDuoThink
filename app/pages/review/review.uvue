@@ -38,7 +38,6 @@
       <view class="btnrow">
         <view class="nextbtn" @click="goNext">
           <text class="nextbtn__text">{{ hasNext ? '下一关' : '返回地图' }}</text>
-          <image class="nextbtn__arrow" src="/static/icons/arrowr-white.png" mode="aspectFit"></image>
         </view>
         <view class="replaybtn" @click="replay">
           <text class="replaybtn__text">再玩一次</text>
@@ -503,10 +502,6 @@ function replay() {
   color: #FFFFFF;
   font-weight: bold;
   margin-right: 10rpx;
-}
-.nextbtn__arrow {
-  width: 32rpx;
-  height: 32rpx;
 }
 .replaybtn {
   flex: 1;
