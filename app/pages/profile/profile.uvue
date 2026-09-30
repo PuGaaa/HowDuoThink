@@ -92,6 +92,7 @@ import { rankOf } from '../../utils/scoring'
 import { getStoredUser, logout, AppUser } from '../../utils/auth'
 import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { getAvatar as resolveAvatar, getDisplayName } from '../../utils/auth'
+import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class RowVM {
@@ -110,11 +111,16 @@ const user = ref<AppUser | null>(null)
 const profilePct = ref(0)
 const displayName = ref('')
 const avatarSrc = ref('/static/images/default-avatar.png')
+const dailyTitle = ref('')
+const dailyIsDone = ref(false)
 
 function refresh() {
   user.value = getStoredUser()
   displayName.value = getDisplayName()
   avatarSrc.value = resolveAvatar()
+  const dc = dailyCase()
+  dailyTitle.value = dc.title
+  dailyIsDone.value = dailyDone()
 
   const totals = getTotals(
     ALL_CASES.map((c) => c.id),
@@ -138,7 +144,7 @@ function refresh() {
   r1.value = '每天 21:30'
   const r2 = new RowVM()
   r2.label = '每日一题'
-  r2.value = '即将上线'
+  r2.value = dailyIsDone.value ? '✓ 已完成' : dailyTitle.value
   const r3 = new RowVM()
   r3.label = '检查单云同步'
   r3.value = '即将上线'
@@ -187,6 +193,10 @@ function doLogout() {
 function onRow(label: string, value: string) {
   if (label === '关于排错推理训练场') {
     goAbout()
+    return
+  }
+  if (label === '每日一题') {
+    uni.navigateTo({ url: '/pages/play/play?id=' + dailyCase().id })
     return
   }
   uni.showToast({ title: value + ' · 即将上线', icon: 'none' })

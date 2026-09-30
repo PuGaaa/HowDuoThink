@@ -20,6 +20,15 @@
         <text class="packchip__text">社区关卡已同步 · {{ packCount }} 关可玩</text>
       </view>
 
+      <!-- 今日一题横幅 -->
+      <view :class="dailyDoneToday ? 'dailycard dailycard--done' : 'dailycard'" @click="openDaily">
+        <view class="dailycard__left">
+          <text class="dailycard__tag">{{ dailyDoneToday ? '今日一题 · 已完成 ✓' : '今日一题 · ' + todayKey() }}</text>
+          <text class="dailycard__title">{{ dailyTitle }}</text>
+        </view>
+        <image class="dailycard__arrow" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
+      </view>
+
       <!-- 继续闯关 -->
       <view v-if="continueCase" class="continue" @click="openPlay(continueCaseId)">
         <text class="continue__tag">继续闯关 · {{ continueChapterLabel }}</text>
@@ -94,6 +103,7 @@ import { getCaseProgress, getStreak, CaseProgress } from '../../utils/storage'
 import { getTotals } from '../../utils/storage'
 import { rankOf, starsLabel } from '../../utils/scoring'
 import { getAvatar } from '../../utils/auth'
+import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
 import { fetchCasepack, getPackCount } from '../../utils/sync'
 
 const rankName = ref('')
@@ -175,6 +185,8 @@ function goChallenge() {
   uni.navigateTo({ url: '/pages/play/play?id=' + challengeCaseId.value })
 }
 const headerAvatar = ref('/static/images/default-avatar.png')
+const dailyTitle = ref('')
+const dailyDoneToday = ref(false)
 const packCount = ref(0)
 const packSynced = ref(false)
 const totalLevels = ref(ALL_CASES.length)
@@ -182,6 +194,9 @@ const totalLevels = ref(ALL_CASES.length)
 // 数据装配（onShow 触发，首次显示也会执行）：破案/同步后回到首页保持最新
 function refreshHome() {
   headerAvatar.value = getAvatar()
+  const dc = dailyCase()
+  dailyTitle.value = dc.title
+  dailyDoneToday.value = dailyDone()
   const totals = getTotals(
     ALL_CASES.map((c) => c.id),
     ALL_CASES.map((c) => c.lessons.length)
@@ -224,6 +239,10 @@ function refreshHome() {
 onShow(() => refreshHome())
 
 const continueCase = computed((): boolean => hasContinue.value)
+
+function openDaily() {
+  uni.navigateTo({ url: '/pages/play/play?id=' + dailyCase().id })
+}
 
 function openPlay(id: string) {
   uni.navigateTo({ url: '/pages/play/play?id=' + id })
@@ -357,6 +376,48 @@ function onPackTap() {
   color: #7A7290;
   margin-top: 10rpx;
 }
+
+/* 今日一题横幅 */
+.dailycard {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background-color: #EAF4FC;
+  border-radius: 24rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #BFE0F5;
+  padding: 24rpx 28rpx;
+  margin-bottom: 22rpx;
+}
+.dailycard--done {
+  background-color: #E9F7F1;
+  border-color: #BEE3D3;
+}
+.dailycard__left {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.dailycard__tag {
+  font-size: 19rpx;
+  font-weight: bold;
+  color: #6FB8E8;
+}
+.dailycard--done .dailycard__tag {
+  color: #5FC9A5;
+}
+.dailycard__title {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-top: 8rpx;
+}
+.dailycard__arrow {
+  width: 26rpx;
+  height: 26rpx;
+}
+
 .continue__circle {
   position: absolute;
   right: 40rpx;

@@ -18,6 +18,7 @@ export const DAILY_TASKS: TaskDef[] = [
   { id: 'd-win', type: 'daily', title: '今日首胜：破案 1 关', goal: 1, metric: 'win', icon: 'trophy-lemon' },
   { id: 'd-check', type: 'daily', title: '复习检查单 1 次', goal: 1, metric: 'checkuse', icon: 'scroll-coral' },
   { id: 'd-hypo', type: 'daily', title: '立假设 ≥2 个', goal: 2, metric: 'hypo', icon: 'bulb-sky' },
+  { id: 'd-daily', type: 'daily', title: '完成今日一题', goal: 1, metric: 'dailycase', icon: 'target-coral' },
 ]
 
 export const WEEKLY_TASKS: TaskDef[] = [

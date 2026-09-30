@@ -168,6 +168,7 @@ import drawerIdentify from '../../components/drawer-identify/drawer-identify.uvu
 import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { getCaseById, getCollectedLessons, CollectedLesson } from '../../data/cases'
 import { isCasePlayable } from '../../data/chapters'
+import { isDailyCase, markDailyDone } from '../../utils/daily'
 import { CaseAction, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
 import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse, bumpTask } from '../../utils/storage'
 import { computeGrade, shuffleCauses } from '../../utils/scoring'
@@ -582,6 +583,11 @@ function finishAndSave() {
     hStates: hStates.value,
   }
   saveSession(rec)
+  // 每日一题：今日题通关 → 标记完成 + 任务计数
+  if (solved.value && isDailyCase(caseId.value)) {
+    markDailyDone()
+    bumpTask('dailycase', 1)
+  }
 }
 
 function goReview() {
