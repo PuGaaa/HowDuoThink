@@ -69,6 +69,15 @@
       </view>
     </view>
     <tabbar active="me"></tabbar>
+    <confirm-dialog
+      :show="showLogout"
+      title="退出登录"
+      message="确定退出当前账号？"
+      confirm-text="退出"
+      :danger="true"
+      @confirm="doLogout"
+      @cancel="showLogout = false"
+    ></confirm-dialog>
   </view>
 </template>
 
@@ -79,6 +88,7 @@ import { ALL_CASES } from '../../data/cases'
 import { getCaseProgress, getStreak, useDay, getTotals } from '../../utils/storage'
 import { rankOf } from '../../utils/scoring'
 import { getStoredUser, logout, AppUser } from '../../utils/auth'
+import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class RowVM {
@@ -140,18 +150,17 @@ function onLogin() {
   uni.navigateTo({ url: '/pages/login/login' })
 }
 
+const showLogout = ref(false)
+
 function onLogout() {
-  uni.showModal({
-    title: '退出登录',
-    content: '确定退出当前账号？',
-    success: (res) => {
-      if (res.confirm) {
-        logout()
-        refresh()
-        uni.showToast({ title: '已退出', icon: 'none' })
-      }
-    },
-  })
+  showLogout.value = true
+}
+
+function doLogout() {
+  showLogout.value = false
+  logout()
+  refresh()
+  uni.showToast({ title: '已退出', icon: 'none' })
 }
 
 function onRow(v: string) {

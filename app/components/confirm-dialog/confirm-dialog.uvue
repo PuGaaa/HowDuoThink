@@ -1,0 +1,120 @@
+<template>
+  <view v-if="show" class="cdlg-mask" @click="$emit('cancel')"></view>
+  <view v-if="show" class="cdlg-wrap">
+    <view class="cdlg">
+      <text class="cdlg__title">{{ title }}</text>
+      <text class="cdlg__msg">{{ message }}</text>
+      <view class="cdlg__row">
+        <view class="cdlg__btn cdlg__btn--ghost" @click="$emit('cancel')">
+          <text class="cdlg__ghost-text">{{ cancelText }}</text>
+        </view>
+        <view :class="danger ? 'cdlg__btn cdlg__btn--danger' : 'cdlg__btn cdlg__btn--main'" @click="$emit('confirm')">
+          <text class="cdlg__main-text">{{ confirmText }}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+const props = defineProps({
+  show: { type: Boolean, default: false },
+  title: { type: String, default: '' },
+  message: { type: String, default: '' },
+  confirmText: { type: String, default: '确定' },
+  cancelText: { type: String, default: '取消' },
+  /** 危险操作：确定键变红 */
+  danger: { type: Boolean, default: false },
+})
+
+defineEmits(['confirm', 'cancel'])
+</script>
+
+<style>
+/* 统一确认弹窗：全站 showModal 的替代品，与奶油底/珊瑚主按钮/硬边阴影同源 */
+.cdlg-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(42, 39, 51, 0.45);
+  z-index: 998;
+}
+.cdlg-wrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.cdlg {
+  width: 560rpx;
+  background-color: #FFF9F4;
+  border-radius: 32rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F3CFA9;
+  padding: 36rpx 32rpx 32rpx;
+  box-shadow: 0 10rpx 0 0 #E8DCCB;
+}
+.cdlg__title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #4A4458;
+  text-align: center;
+}
+.cdlg__msg {
+  font-size: 24rpx;
+  color: #7A7290;
+  line-height: 40rpx;
+  text-align: center;
+  margin-top: 18rpx;
+}
+.cdlg__row {
+  display: flex;
+  flex-direction: row;
+  margin-top: 32rpx;
+  /* 硬边阴影缓冲 */
+  padding-bottom: 8rpx;
+}
+.cdlg__btn {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border-radius: 46rpx;
+  padding: 20rpx;
+}
+.cdlg__btn--main {
+  background-color: #FF8A5C;
+  box-shadow: 0 8rpx 0 0 #E06B38;
+  margin-left: 16rpx;
+}
+.cdlg__btn--danger {
+  background-color: #E86A6A;
+  box-shadow: 0 8rpx 0 0 #C24E4E;
+  margin-left: 16rpx;
+}
+.cdlg__btn--ghost {
+  background-color: #FFFFFF;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+}
+.cdlg__main-text {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.cdlg__ghost-text {
+  font-size: 25rpx;
+  font-weight: bold;
+  color: #7A7290;
+}
+</style>

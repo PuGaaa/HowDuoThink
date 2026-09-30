@@ -71,6 +71,14 @@
       <text class="footer">全部 {{ totalLevels }} 关 · 每关一朵层契约拼图</text>
     </view>
     <tabbar active="adventure"></tabbar>
+    <confirm-dialog
+      :show="challengeShow"
+      :title="challengeTitle"
+      message="通关上一章任意 1 关解锁本章；也可以直接挑战本章首关，赢了立即解锁。"
+      confirm-text="去挑战"
+      @confirm="goChallenge"
+      @cancel="challengeShow = false"
+    ></confirm-dialog>
   </view>
 </template>
 
@@ -80,6 +88,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { CHAPTERS, PARTS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId } from '../../data/chapters'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 import chapterCube from '../../components/chapter-cube/chapter-cube.uvue'
+import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress, getStreak, CaseProgress } from '../../utils/storage'
 import { getTotals } from '../../utils/storage'
@@ -139,6 +148,10 @@ function partProgress(chapterId: string) {
   const pct = list.length > 0 ? Math.floor((260 * solved) / list.length) : 0
   return { solved: solved, total: list.length, pct: pct }
 }
+const challengeShow = ref(false)
+const challengeCaseId = ref('')
+const challengeTitle = ref('')
+
 function openChapter(chapterId: string) {
   if (isChapterUnlocked(chapterId)) {
     uni.navigateTo({ url: '/pages/chapter/chapter?id=' + chapterId })
@@ -151,16 +164,14 @@ function openChapter(chapterId: string) {
     return
   }
   const ch = CHAPTERS.find((x) => x.id === chapterId)
-  uni.showModal({
-    title: (ch != null ? ch.name : '本章') + ' · 跳级挑战',
-    content: '通关上一章任意 1 关解锁本章；也可以直接挑战本章首关，赢了立即解锁。',
-    confirmText: '去挑战',
-    success: (res) => {
-      if (res.confirm) {
-        uni.navigateTo({ url: '/pages/play/play?id=' + challengeId })
-      }
-    },
-  })
+  challengeTitle.value = (ch != null ? ch.name : '本章') + ' · 跳级挑战'
+  challengeCaseId.value = challengeId
+  challengeShow.value = true
+}
+
+function goChallenge() {
+  challengeShow.value = false
+  uni.navigateTo({ url: '/pages/play/play?id=' + challengeCaseId.value })
 }
 const packCount = ref(0)
 const packSynced = ref(false)

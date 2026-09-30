@@ -144,6 +144,15 @@
         @go-board="drawerTab = 'board'"
       ></drawer-identify>
     </view>
+    <confirm-dialog
+      :show="confirmShow"
+      title="状态变更动作"
+      :message="pendingAction != null ? '「' + pendingAction.name + '」将花 ' + pendingAction.cost + ' ⚡︎ 且可能破坏现场。确定执行？' : ''"
+      confirm-text="执行"
+      :danger="true"
+      @confirm="confirmDanger"
+      @cancel="cancelDanger"
+    ></confirm-dialog>
   </view>
 </template>
 
@@ -156,6 +165,7 @@ import evidenceCard from '../../components/evidence-card/evidence-card.uvue'
 import actionItem from '../../components/action-item/action-item.uvue'
 import drawerBoard from '../../components/drawer-board/drawer-board.uvue'
 import drawerIdentify from '../../components/drawer-identify/drawer-identify.uvue'
+import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { getCaseById, getCollectedLessons, CollectedLesson } from '../../data/cases'
 import { isCasePlayable } from '../../data/chapters'
 import { CaseAction, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
@@ -430,21 +440,31 @@ function evOf(id: string): Evidence {
   return fallback
 }
 
+const pendingAction = ref<CaseAction | null>(null)
+const confirmShow = ref(false)
+
 function executeAction(a: CaseAction) {
   if (isTaken(a.id)) return
   if (a.danger) {
-    uni.showModal({
-      title: '状态变更动作',
-      content: '「' + a.name + '」将花 ' + a.cost + ' ⚡︎ 且可能破坏现场。确定执行？',
-      success: (res) => {
-        if (res.confirm) {
-          doExecute(a)
-        }
-      },
-    })
-  } else {
+    pendingAction.value = a
+    confirmShow.value = true
+    return
+  }
+  doExecute(a)
+}
+
+function confirmDanger() {
+  confirmShow.value = false
+  const a = pendingAction.value
+  pendingAction.value = null
+  if (a != null) {
     doExecute(a)
   }
+}
+
+function cancelDanger() {
+  confirmShow.value = false
+  pendingAction.value = null
 }
 
 // 假设效应静默记账：excluded/confirmed 为终态，不被升降权覆盖
