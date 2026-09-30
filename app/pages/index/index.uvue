@@ -301,9 +301,9 @@ function onPackTap() {
   margin-bottom: 22rpx;
 }
 .packchip__icon {
-  width: 28rpx;
-  height: 28rpx;
-  margin-right: 8rpx;
+  width: 34rpx;
+  height: 34rpx;
+  margin-right: 10rpx;
 }
 .packchip__text {
   font-size: 22rpx;
