@@ -94,6 +94,7 @@ import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { getAvatar as resolveAvatar, getDisplayName } from '../../utils/auth'
 import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
 import { getReminder, setReminder, reminderLabel, startReminderPolling, requestNotifyPermission } from '../../utils/reminder'
+import { manualSync, lastSyncLabel, pullMergeProgress } from '../../utils/sync-progress'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class RowVM {
@@ -148,7 +149,7 @@ function refresh() {
   r2.value = dailyIsDone.value ? '✓ 已完成' : dailyTitle.value
   const r3 = new RowVM()
   r3.label = '检查单云同步'
-  r3.value = '即将上线'
+  r3.value = user.value != null ? (lastSyncLabel().length > 0 ? lastSyncLabel() : '点击同步') : '登录后可用'
   const r4 = new RowVM()
   r4.label = '关于排错推理训练场'
   r4.value = 'v0.1'
@@ -159,6 +160,9 @@ function refresh() {
 onShow(() => {
   refresh()
   startReminderPolling()
+  pullMergeProgress((r) => {
+    if (r.merged > 0) refresh()
+  })
 })
 
 function goHandbook() {
@@ -231,6 +235,13 @@ function onRow(label: string, value: string) {
   }
   if (label === '学习提醒') {
     showReminderSheet()
+    return
+  }
+  if (label === '检查单云同步') {
+    manualSync((r) => {
+      if (r.error.length > 0) uni.showToast({ title: r.error, icon: 'none' })
+      refresh()
+    })
     return
   }
   uni.showToast({ title: value + ' · 即将上线', icon: 'none' })

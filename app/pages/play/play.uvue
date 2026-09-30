@@ -169,6 +169,7 @@ import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { getCaseById, getCollectedLessons, CollectedLesson } from '../../data/cases'
 import { isCasePlayable } from '../../data/chapters'
 import { isDailyCase, markDailyDone } from '../../utils/daily'
+import { scheduleProgressUpload } from '../../utils/sync-progress'
 import { CaseAction, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
 import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse, bumpTask } from '../../utils/storage'
 import { computeGrade, shuffleCauses } from '../../utils/scoring'
@@ -588,6 +589,8 @@ function finishAndSave() {
     markDailyDone()
     bumpTask('dailycase', 1)
   }
+  // 云同步：防抖上传最新进度
+  scheduleProgressUpload()
 }
 
 function goReview() {

@@ -140,6 +140,7 @@ export function login(loginName: string, password: string, cb: (r: LoginResult) 
 export function logout() {
   uni.removeStorageSync(KEY_TOKEN)
   uni.removeStorageSync(KEY_USER)
+  uni.removeStorageSync('think_last_sync')
 }
 
 export interface SmsResult {

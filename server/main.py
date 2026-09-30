@@ -16,6 +16,7 @@ from features.auth.router import router as auth_router
 from features.cases.router import router as cases_router
 from features.submissions.router import router as submissions_router
 from features.solutions.router import router as solutions_router
+from features.progress.router import router as progress_router
 from features.sync.router import router as sync_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(solutions_router)
     app.include_router(cases_router)
     app.include_router(sync_router)
+    app.include_router(progress_router)
 
     @app.get("/api/health")
     def health():
