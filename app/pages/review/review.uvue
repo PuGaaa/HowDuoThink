@@ -107,11 +107,10 @@
           </view>
           <view class="stepnav">
             <view :class="chainIdx > 0 ? 'stepnav__btn stepnav__btn--ghost' : 'stepnav__btn stepnav__btn--dis'" @click="prevStep">
-              <text class="stepnav__ghost-text">← 上一步</text>
+              <text class="stepnav__ghost-text">上一步</text>
             </view>
             <view v-if="chainIdx < chainTotal - 1" class="stepnav__btn stepnav__btn--main" @click="nextStep">
               <text class="stepnav__main-text">下一步</text>
-              <image class="stepnav__arrow" src="/static/icons/arrowr-white.png" mode="aspectFit"></image>
             </view>
             <view v-else class="stepnav__btn stepnav__btn--done">
               <image class="stepnav__done-img" src="/static/icons/check-white.png" mode="aspectFit"></image>
@@ -810,11 +809,6 @@ function replay() {
   font-size: 27rpx;
   font-weight: bold;
   color: #FFFFFF;
-  margin-left: 8rpx;
-}
-.stepnav__arrow {
-  width: 24rpx;
-  height: 24rpx;
 }
 .stepnav__ghost-text {
   font-size: 25rpx;
