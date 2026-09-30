@@ -21,7 +21,7 @@
         <!-- 账号身份行 -->
         <view class="profile__idrow">
           <template v-if="user != null">
-            <image class="profile__idava" :src="user!.avatar.length > 0 ? user!.avatar : '/static/mascots/rabbit.png'" mode="aspectFill"></image>
+            <image class="profile__idava" :src="user!.avatar.length > 0 ? user!.avatar : '/static/images/default-avatar.png'" mode="aspectFill"></image>
             <text class="profile__idtext">@{{ user!.login }} · {{ user!.role }}</text>
             <view class="profile__idbtn profile__idbtn--ghost" @click="onLogout">
               <text class="profile__idbtn-text profile__idbtn-text--ghost">退出</text>
