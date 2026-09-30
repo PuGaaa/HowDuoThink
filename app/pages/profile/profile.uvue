@@ -6,7 +6,7 @@
       <view class="profile">
         <view class="profile__toprow">
           <view class="profile__halo">
-            <image class="profile__avatar" :src="getAvatar()" mode="aspectFill"></image>
+            <image class="profile__avatar" :src="avatarSrc" mode="aspectFill"></image>
           </view>
           <view class="profile__right">
             <view class="profile__namerow">
@@ -91,7 +91,7 @@ import { getCaseProgress, getStreak, useDay, getTotals } from '../../utils/stora
 import { rankOf } from '../../utils/scoring'
 import { getStoredUser, logout, AppUser } from '../../utils/auth'
 import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
-import { getAvatar, getDisplayName } from '../../utils/auth'
+import { getAvatar as resolveAvatar, getDisplayName } from '../../utils/auth'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class RowVM {
@@ -109,10 +109,12 @@ const rows = ref<RowVM[]>([])
 const user = ref<AppUser | null>(null)
 const profilePct = ref(0)
 const displayName = ref('')
+const avatarSrc = ref('/static/images/default-avatar.png')
 
 function refresh() {
   user.value = getStoredUser()
   displayName.value = getDisplayName()
+  avatarSrc.value = resolveAvatar()
 
   const totals = getTotals(
     ALL_CASES.map((c) => c.id),

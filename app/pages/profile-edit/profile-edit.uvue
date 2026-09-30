@@ -67,7 +67,7 @@ function save() {
   }
   if (busy.value) return
   busy.value = true
-  setLocalAvatar(presets[selIdx.value])
+  setLocalAvatar(presets.value[selIdx.value].path)
   updateName(name, (r) => {
     busy.value = false
     if (r.error.length > 0) {
