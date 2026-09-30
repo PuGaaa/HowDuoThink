@@ -52,7 +52,8 @@ def auth_login(body: models.LoginBody):
     """账号密码登录：uid = 'pw-' + login（与 GitHub 用户同表不同命名空间）。"""
     user = service.verify_login(body.login, body.password)
     token = security.sign_session(user["id"])
-    resp = JSONResponse({"ok": True, "login": body.login, "role": user["role"]})
+    # token 同时放响应体：App 端存 storage 走 Bearer 头；Web 端走 cookie（忽略即可）
+    resp = JSONResponse({"ok": True, "login": body.login, "role": user["role"], "token": token})
     resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=config.COOKIE_SECURE)
     return resp
 

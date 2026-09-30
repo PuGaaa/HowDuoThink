@@ -30,9 +30,21 @@
       <!-- 账号 -->
       <view class="account">
         <text class="account__title">账号</text>
-        <text class="account__desc">v0 进度保存在本机。登录后可多端同步、\n参与排行榜与每日挑战。</text>
-        <view class="account__btn" @click="onLogin">
-          <text class="account__btn-text">登录 / 注册 · 即将开放</text>
+        <view v-if="user != null" class="account__me">
+          <image class="account__avatar" :src="user!.avatar.length > 0 ? user!.avatar : '/static/mascots/rabbit-96.png'" mode="aspectFill"></image>
+          <view class="account__who">
+            <text class="account__name">{{ user!.name }}</text>
+            <text class="account__role">@{{ user!.login }} · {{ user!.role }}</text>
+          </view>
+          <view class="account__btn account__btn--ghost" @click="onLogout">
+            <text class="account__btn-text">退出登录</text>
+          </view>
+        </view>
+        <view v-else>
+          <text class="account__desc">v0 进度保存在本机。登录后可参与社区玩法，\n多端同步即将上线。</text>
+          <view class="account__btn" @click="onLogin">
+            <text class="account__btn-text">去登录</text>
+          </view>
         </view>
       </view>
 
@@ -66,6 +78,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { ALL_CASES } from '../../data/cases'
 import { getCaseProgress, getStreak, useDay, getTotals } from '../../utils/storage'
 import { rankOf } from '../../utils/scoring'
+import { getStoredUser, logout, AppUser } from '../../utils/auth'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class RowVM {
@@ -80,8 +93,11 @@ const solvedCount = ref(0)
 const streakCount = ref(0)
 const lessonCount = ref(0)
 const rows = ref<RowVM[]>([])
+const user = ref<AppUser | null>(null)
 
 function refresh() {
+  user.value = getStoredUser()
+
   const totals = getTotals(
     ALL_CASES.map((c) => c.id),
     ALL_CASES.map((c) => c.lessons.length)
@@ -121,7 +137,21 @@ function goPoster() {
 }
 
 function onLogin() {
-  uni.showToast({ title: '登录功能即将开放', icon: 'none' })
+  uni.navigateTo({ url: '/pages/login/login' })
+}
+
+function onLogout() {
+  uni.showModal({
+    title: '退出登录',
+    content: '确定退出当前账号？',
+    success: (res) => {
+      if (res.confirm) {
+        logout()
+        refresh()
+        uni.showToast({ title: '已退出', icon: 'none' })
+      }
+    },
+  })
 }
 
 function onRow(v: string) {
@@ -238,6 +268,44 @@ function onRow(v: string) {
   color: #AFA8BD;
   margin-top: 12rpx;
   line-height: 34rpx;
+}
+.account__me {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 16rpx;
+}
+.account__avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 36rpx;
+  background-color: #FBF3EB;
+  margin-right: 16rpx;
+}
+.account__who {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.account__name {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #4A4458;
+}
+.account__role {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  margin-top: 4rpx;
+}
+.account__btn--ghost {
+  background-color: #FFFFFF;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+}
+.account__btn--ghost .account__btn-text {
+  color: #7A7290;
+  font-weight: 500;
 }
 .account__btn {
   display: flex;

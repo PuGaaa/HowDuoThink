@@ -55,6 +55,13 @@
         "navigationStyle": "custom",
         "navigationBarTitleText": "侦探档案"
       }
+    },
+    {
+      "path": "pages/login/login",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "登录"
+      }
     }
   ],
   "globalStyle": {

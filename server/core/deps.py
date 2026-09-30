@@ -1,19 +1,24 @@
-"""路由层共享依赖：会话鉴权与编辑权限。"""
+"""路由层共享依赖：会话鉴权与编辑权限。
+身份通道两种：Web 走 session cookie；App 走 Authorization: Bearer <jwt>。"""
 from typing import Annotated
 
-from fastapi import Cookie, HTTPException
+from fastapi import Cookie, Header, HTTPException
 
 from core import security
 
 SessionCookie = Annotated[str | None, Cookie(alias="session")]
 
 
-def current_user(web_token: SessionCookie = None) -> str:
-    if not web_token:
-        raise HTTPException(401, "未登录")
-    uid = security.verify_session(web_token)
+def _uid_from_token(token: str | None) -> str | None:
+    return security.verify_session(token) if token else None
+
+
+def current_user(web_token: SessionCookie = None, authorization: Annotated[str | None, Header()] = None) -> str:
+    uid = _uid_from_token(web_token)
+    if not uid and authorization and authorization.lower().startswith("bearer "):
+        uid = _uid_from_token(authorization[7:].strip())
     if not uid:
-        raise HTTPException(401, "会话已过期")
+        raise HTTPException(401, "未登录")
     return uid
 
 
