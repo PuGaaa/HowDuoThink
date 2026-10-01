@@ -13,6 +13,12 @@ import { oomLeakCase } from './oom-leak'
 import { msgOrderCase } from './msg-order'
 import { nginxTrapCase } from './nginx-trap'
 import { cacheReviewCase } from './cache-review'
+import { eventLoopBlockedCase } from './event-loop-blocked'
+import { timewaitCase } from './timewait-exhausted'
+import { closureLeakCase } from './closure-leak'
+import { ciCacheCase } from './ci-cache-pollution'
+import { alertStormCase } from './alert-storm'
+import { histogramCase } from './histogram-bucket'
 import { oversellRaceCase } from './oversell-race'
 import { idempotentFailCase } from './idempotent-fail'
 import { logSamplingCase } from './log-sampling'
@@ -30,6 +36,12 @@ export const ALL_CASES: DiagnosisCase[] = [
   msgOrderCase,
   nginxTrapCase,
   cacheReviewCase,
+  eventLoopBlockedCase,
+  timewaitCase,
+  closureLeakCase,
+  ciCacheCase,
+  alertStormCase,
+  histogramCase,
   whiteScreenCase,
   depHellCase,
   oversellRaceCase,

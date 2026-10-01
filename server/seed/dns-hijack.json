@@ -4,7 +4,7 @@
   "intro": "客服收到集中反馈：某省用户 App 全部提示网络异常，其他省份一切正常。",
   "domain": "network",
   "layer": "DNS 解析链路：域名到 IP 之间隔着缓存、运营商和权威服务器",
-  "part": "engineer",
+  "part": "apprentice",
   "chapterId": "access",
   "order": 1,
   "typeTags": [

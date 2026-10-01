@@ -1,0 +1,256 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * B1-4 · build L2
+ * 主训思维：验证思维（验证的有效性取决于环境一致性——绿色不代表可信）
+ * 次训思维：全栈视野（本地/CI/生产三方环境差异）
+ * 真实原型：CI 缓存 node_modules 未随 lockfile 失效，测试跑旧依赖，新 bug 漏测
+ * 情绪兽设计：惊讶獭（惊讶）——"CI 全绿，生产全红"
+ * 检查单：思维型 3 + 知识型 1
+ */
+export const ciCacheCase: DiagnosisCase = {
+  id: 'ci-cache-pollution',
+  title: 'CI 上明明是绿的——构建缓存污染',
+  intro: '新版本测试全绿、正常发布，两小时后线上炸了。本地复现？可以。CI 上复现？失败。同一个 bug，在两个世界表现不同。',
+  domain: 'build',
+  layer: '绿色不等于可信：验证的有效性，取决于验证环境与运行环境的一致性',
+  part: 'apprentice',
+  chapterId: 'build',
+  order: 3,
+  typeTags: ['build', 'ci'],
+  difficulty: 2,
+
+  scene: {
+    role: '你是「鲜到家」结算服务的负责人，刚发布的一个"无害重构"两小时后把生产打挂了——而 CI 上它的测试全是绿的。',
+    architecture: 'Git → CI(测试+构建) → 制品库 → 生产(本地/CI 环境的三方差异)',
+    tag: '故障现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '线上报错',
+        text: 'TypeError: pricing.calcDiscount is not a function\n→ 出现在结算链路；触发条件：用户使用新上线的"阶梯折扣"功能。\n本地按步骤复现：成功。CI 跑同一用例：通过。生产：必炸。',
+      },
+      {
+        type: 'text',
+        title: '三方对照',
+        text: '本地 node_modules：pricing@2.3.0（含 calcDiscount）\n生产制品：pricing@2.3.0（含 calcDiscount）\nCI node_modules：pricing@2.3.0？——待核实。',
+      },
+    ],
+    timeline: '重构 PR 昨天合入，CI 全绿 ｜ 今天上午发布，两小时后故障 ｜ pricing 包上周由 2.2 升级到 2.3（新增 calcDiscount 方法）',
+    impactHint: '同一个 bug 在两个世界表现不同——三个环境里，哪一个在撒谎？',
+  },
+
+  hypotheses: [
+    { id: 'h-cache', text: 'CI 缓存污染：node_modules 来自旧缓存，测试跑的是旧依赖（pricing@2.2 无 calcDiscount），用例被跳过或断言失效', excludeActionId: 'a-depdiff' },
+    { id: 'h-env', text: '环境配置差异：测试与生产的配置/环境变量不同，bug 只在特定配置下触发', excludeActionId: 'a-envdiff' },
+    { id: 'h-flaky', text: 'Flaky 测试：用例不稳定，这次恰好没测出来', excludeActionId: 'a-flaky' },
+    { id: 'h-order', text: '时序问题：测试跑的时候 bug 代码还没合入，测了个寂寞', excludeActionId: 'a-timeline' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '构建三方对照表',
+      desc: '本地/CI/生产的环境差异三角',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [{ id: 'h-order', status: 'down' }],
+      result: {
+        type: 'text',
+        title: '三方对照',
+        text: '本地：复现 ✓　CI：复现 ✗　生产：必炸\n→ 生产与本地同为 pricing@2.3.0，唯独 CI 的运行时环境待查。\n→ CI 是唯一"测不到 bug"的世界。',
+      },
+    },
+    {
+      id: 'a-depdiff',
+      name: '对比 CI 与生产的依赖树',
+      desc: 'npm ls 产物对照：版本差异一目了然',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-cache'],
+      hypotheses: [{ id: 'h-cache', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: '依赖树 diff',
+        text: '生产制品：pricing@2.3.0  ✓\nCI runner： pricing@2.2.6  ← 旧版（无 calcDiscount）\n→ CI 的 node_modules 来自 3 天前的缓存：pricing 升级发生在缓存生成之后，\nlockfile 已更新但缓存从未失效——测试一直在用旧依赖跑新代码。',
+      },
+    },
+    {
+      id: 'a-cacheconf',
+      name: '查 CI 缓存配置',
+      desc: '缓存 key 里有没有 lockfile 的指纹',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-cache'],
+      hypotheses: [{ id: 'h-cache', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: 'ci.yml 缓存段',
+        text: 'cache:\n  key: node-modules-v1        ← 固定 key，永不过期\n  paths: [node_modules/]\n→ 缓存 key 是写死的版本号：依赖变更不产生新 key，旧 node_modules 永生。',
+      },
+    },
+    {
+      id: 'a-timeline',
+      name: '核对合入与测试的时序',
+      desc: '排除"测了个寂寞"的时序问题',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-order'],
+      hypotheses: [{ id: 'h-order', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '时间线',
+        text: 'pricing@2.3.0 升级：上周三 ｜ 重构 PR 合入：昨天 ｜ CI 测试：昨天（合入后）\n→ 时序正常：测试确实跑在两份变更都合入之后。',
+      },
+    },
+    {
+      id: 'a-flaky',
+      name: '查测试重试与历史通过率',
+      desc: '排除 flaky 测试掩盖',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-flaky'],
+      hypotheses: [{ id: 'h-flaky', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '测试历史',
+        text: '该用例近 30 天通过率 100%，无重试记录。\n→ 不是 flaky：它跑在旧依赖上，从来没机会失败。',
+      },
+    },
+    {
+      id: 'a-envdiff',
+      name: 'Diff 测试与生产的配置',
+      desc: '排除环境变量差异',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-env'],
+      hypotheses: [{ id: 'h-env', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '配置 diff',
+        text: '环境变量、特性开关、配置文件全部一致。\n→ 唯一差异就是 CI 的 node_modules。',
+      },
+    },
+    {
+      id: 'a-fixkey',
+      name: '缓存 key 指纹化并清缓存',
+      desc: '【状态变更】缓存 key 加入 lockfile hash，清理旧缓存',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '修复结果',
+        text: 'cache.key: node-modules-{{ checksum "package-lock.json" }}\n旧缓存全量清除。\n→ 依赖任何变更都会产生新 key，旧 node_modules 不再永生。',
+      },
+    },
+    {
+      id: 'a-hotfix',
+      name: '修复依赖版本并重新发布',
+      desc: '【状态变更】锁定 pricing@2.3.0 重新走流水线发布',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '止损结果',
+        text: '缓存修复后 CI 重新跑测试：红灯——calcDiscount 用例如预期失败（bug 复现）。\n修复 bug → 全绿（这次是真的绿）→ 重新发布，线上恢复。',
+      },
+    },
+    {
+      id: 'a-rollback',
+      name: '回滚本次发布止血',
+      desc: '【状态变更】回滚到上一稳定版本',
+      cost: 3,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '止血结果',
+        text: '回滚后结算链路恢复。\n→ 止血完成；真绿灯的重新发布在缓存修复与 bug 修复之后。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-cache', text: 'CI 缓存 key 写死（node-modules-v1），pricing 升级后 node_modules 缓存从未失效——测试跑在旧依赖 pricing@2.2 上（无 calcDiscount），新 bug 漏测；生产用新依赖必炸', correct: true },
+    { id: 'rc-env', text: '测试与生产的环境配置差异导致 bug 仅在生产触发', correct: false },
+    { id: 'rc-flaky', text: 'Flaky 测试不稳定，恰好漏测', correct: false },
+    { id: 'rc-order', text: '测试与合入的时序错位，测了个寂寞', correct: false },
+  ],
+
+  expertCost: 7,
+  restartActionId: 'a-rollback',
+
+  expertChain: [
+    {
+      thought: '三方对照表是起点：本地复现、CI 通过、生产必炸——唯一"测不到 bug"的世界就是 CI，它一定在撒谎。',
+      update: '生产与本地依赖同为 2.3.0，唯独 CI 的 node_modules 待查——三个世界，CI 最可疑。',
+      actionId: 'a-impact',
+      why: '1⚡ 先构建"环境差异三角"：本地/CI/生产三方对照，撒谎的环境会自己站出来。',
+      conclusion: 'CI 世界嫌疑最大 → 对比三方依赖树。',
+    },
+    {
+      thought: '对比 CI 与生产的依赖树：npm ls 一跑，版本差异当场现形。',
+      update: 'CI 跑的是 pricing@2.2.6（无 calcDiscount）——测试在旧依赖上跑新代码，bug 从未被测试。',
+      actionId: 'a-depdiff',
+      why: '2⚡ 依赖树 diff 直击根因："测试绿"只证明测试通过，不证明测试环境与生产一致。',
+      conclusion: 'CI 缓存了 3 天前的旧依赖 → 查缓存为什么没失效。',
+    },
+    {
+      thought: '看缓存配置：缓存 key 写死 node-modules-v1，lockfile 变更不产生新 key——旧 node_modules 永生。',
+      update: '机制闭环：缓存永生 → 旧依赖永生 → 测试永远测不到新依赖里的 bug。',
+      actionId: 'a-cacheconf',
+      why: '2⚡ 缓存 key 的设计决定缓存的新鲜度：key 不含内容指纹，缓存就成了"事实上的永久依赖"。',
+      conclusion: '缓存配置缺陷实锤 → 修复 key 指纹化 + 清旧缓存。',
+    },
+    {
+      thought: '时序/flaky/配置全部排除，修复后 CI 重跑如预期变红（bug 复现）再变绿——证据完全闭合。',
+      update: '停止收集。缓存 key 指纹化 + bug 修复 + 真绿灯重新发布。',
+      actionId: '',
+      why: '【停止规则】最终验证闭环：修复缓存后测试"如预期失败"——这正是环境一致性恢复的最好证明。三方对照再无差异。',
+      conclusion: '缓存 key 加入 lockfile hash + 清旧缓存 + bug 修复 + 真绿灯发布。检查单：缓存 key 必须含内容指纹。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '绿色不等于可信：测试的有效性取决于"验证环境 = 运行环境"，两者不一致，绿灯就是谎言。',
+      principle: '验证思维：测试的价值 = 用例质量 × 环境一致性。CI 绿灯只能证明"测试在 CI 的环境里通过了"，不能证明"生产会正常"。',
+    },
+    {
+      text: '缓存 key 必须包含内容的指纹：lockfile 的 hash 变了，依赖缓存就必须失效。',
+      principle: '缓存通用法则：key = 内容指纹（lockfile hash/源码 hash）。写死的版本号 key，缓存就成了事实上的永久依赖。',
+    },
+    {
+      text: '本地/CI/生产三方依赖树 diff，应该成为发布前的例行检查。',
+      principle: '程序设计纪律：npm ls / 依赖树哈希在流水线中输出并比对——环境漂移在发布前暴露，而不是在生产事故里暴露。',
+    },
+    {
+      text: '修复缓存后测试"如预期变红"，是环境一致性恢复的最好证明。',
+      principle: '验证思维：修完基础设施先制造一次已知失败来验证修复——测试基础设施本身也需要被测试。',
+    },
+  ],
+}
