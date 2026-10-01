@@ -3,4 +3,4 @@
 cd "$(dirname "$0")"
 export JWT_SECRET="${JWT_SECRET:-dev-secret-please-change}"
 export ENV=dev
-exec /tmp/pilvenv/bin/uvicorn main:app --port 8000
+exec "$(dirname "$0")/.venv/bin/uvicorn" main:app --port 8000

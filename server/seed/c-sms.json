@@ -1,1 +1,289 @@
-{"id": "c-3c2cab6d3f05", "title": "凌晨短信验证码全部失败", "intro": "凌晨短信验证码全部失败", "domain": "network", "layer": "第三方依赖：短信通道的备份路由契约", "part": "engineer", "chapterId": "data", "order": 3, "typeTags": ["dependency", "config"], "difficulty": 1, "scene": {"role": "你是登录系统的值班后端，凌晨被告警叫醒", "architecture": "App → 登录服务 → 短信网关 → 运营商通道A/B", "symptoms": [{"type": "error", "title": "关键报错", "text": "运营商回执: MNF_0042 通道不可用"}, {"type": "text", "title": "现象描述", "text": "凌晨两点起用户收不到短信验证码，登录成功率暴跌。持续 40 分钟后自愈。全部用户受影响。"}], "timeline": "02:10 开始 ｜ 02:50 自愈 ｜ 前一日接入新运营商通道", "impactHint": "先看是全部失败还是部分失败"}, "hypotheses": [{"id": "h-ops", "text": "短信服务商故障", "excludeActionId": "act-ops"}, {"id": "h-channel", "text": "运营商通道切换/维护", "excludeActionId": "act-channel"}, {"id": "h-app", "text": "登录服务自身代码故障", "excludeActionId": "act-self"}], "actions": [{"id": "act-impact", "name": "看失败率时间线", "desc": "全部用户还是部分用户，从几点开始", "cost": 1, "gain": "high", "danger": false, "effects": [], "tests": [], "hypotheses": [{"id": "h-app", "status": "down"}], "result": {"type": "text", "title": "失败率时间线", "text": "02:10 起陡增，02:50 归零；登录服务无发版"}}, {"id": "act-ops", "name": "查短信服务商发送记录", "desc": "服务商后台发送量与回执", "cost": 2, "gain": "mid", "danger": false, "effects": [], "tests": ["h-ops"], "hypotheses": [{"id": "h-ops", "status": "down"}], "result": {"type": "text", "title": "服务商后台", "text": "发送请求正常送达服务商，回执大面积失败"}}, {"id": "act-channel", "name": "查通道回执与变更记录", "desc": "运营商通道回执码与切换记录", "cost": 2, "gain": "high", "danger": false, "effects": [], "tests": ["h-channel"], "hypotheses": [{"id": "h-channel", "status": "confirmed"}], "result": {"type": "log", "title": "通道回执", "text": "MNF_0042 通道不可用，02:05 该通道进入维护窗口（未通知）"}}, {"id": "act-self", "name": "查登录服务日志", "desc": "排除自身代码故障", "cost": 1, "gain": "low", "danger": false, "effects": [], "tests": ["h-app"], "hypotheses": [{"id": "h-app", "status": "excluded"}], "result": {"type": "text", "title": "服务日志", "text": "无异常堆栈，出栈请求正常"}}, {"id": "act-switch", "name": "切换备用通道", "desc": "【状态变更】切到运营商B通道", "cost": 6, "gain": "none", "danger": true, "effects": [], "tests": ["h-channel"], "hypotheses": [], "result": {"type": "text", "title": "切换结果", "text": "回执恢复正常，验证码到达率回升"}}, {"id": "act-applog2", "name": "查登录服务错误率", "desc": "对比验证码发送接口的错误率与基线", "cost": 1, "gain": "low", "danger": false, "effects": [], "tests": ["h-app"], "hypotheses": [{"id": "h-app", "status": "excluded"}], "result": {"type": "text", "title": "错误率曲线", "text": "接口错误率与平日持平，业务层无异常"}}, {"id": "act-recent", "name": "查近期变更记录", "desc": "核对登录服务与短信网关的发布记录", "cost": 1, "gain": "mid", "danger": false, "effects": [], "tests": ["h-app", "h-channel"], "hypotheses": [{"id": "h-app", "status": "down"}], "result": {"type": "text", "title": "变更记录", "text": "登录服务 7 天未发版；网关配置无变更；前一日新接入运营商通道 A"}}, {"id": "act-ops-status", "name": "查服务商状态页", "desc": "服务商官方 status page", "cost": 1, "gain": "low", "danger": false, "effects": [], "tests": ["h-ops"], "hypotheses": [{"id": "h-ops", "status": "excluded"}], "result": {"type": "text", "title": "状态页", "text": "全绿，无故障公告"}}], "rootCauses": [{"id": "rc-channel", "text": "运营商通道维护未通知，通道不可用", "correct": true}, {"id": "rc-ops", "text": "短信服务商整体故障", "correct": false}, {"id": "rc-app", "text": "登录服务代码故障", "correct": false}], "expertCost": 6, "restartActionId": "act-switch", "expertChain": [{"thought": "凌晨告警，先看失败率形状：全部还是部分，从几点开始。", "update": "建立时间基线，自身代码故障降权", "actionId": "act-impact", "why": "1⚡ 买形状：全部失败与部分失败的假设集完全不同", "conclusion": "02:10 陡增 02:50 自愈，登录服务无发版 → 自身代码故障降权"}, {"thought": "不是自己的问题就往外看：服务商整体还是单通道。", "update": "外部二分：服务商整体 vs 单通道", "actionId": "act-ops", "why": "先确认服务商整体健康度，排除最大面的故障", "conclusion": "服务商正常送达但回执失败 → 收缩到通道层"}, {"thought": "通道层看回执码与切换记录，是最便宜的实锤路径。", "update": "通道维护假设升权至第一", "actionId": "act-channel", "why": "回执码直接指明通道状态，2⚡ 买到确定性", "conclusion": "MNF_0042 通道不可用 + 维护窗口时间吻合 → 实锤"}, {"thought": "证据已闭合：回执码 + 时间线 + 切换记录三点齐。", "update": "停止收集，转入行动", "actionId": "", "why": "继续收集不会改变行动（切通道），再查是给焦虑交税", "conclusion": "切换备用通道恢复；事后要求运营商维护提前通知"}], "lessons": [{"text": "接入第三方通道必须有备用路由", "principle": "第三方依赖的可用性契约：单通道等于单点，关键路径必须能降级"}, {"text": "回执码要提前建监控", "principle": "第三方回执是比业务指标更前置的信号，回执码异常常先于用户感知"}]}
+{
+  "id": "c-3c2cab6d3f05",
+  "title": "凌晨短信验证码全部失败",
+  "intro": "凌晨短信验证码全部失败",
+  "domain": "network",
+  "layer": "第三方依赖：短信通道的备份路由契约",
+  "part": "engineer",
+  "chapterId": "build",
+  "order": 3,
+  "typeTags": [
+    "dependency",
+    "config"
+  ],
+  "difficulty": 1,
+  "scene": {
+    "role": "你是登录系统的值班后端，凌晨被告警叫醒",
+    "architecture": "App → 登录服务 → 短信网关 → 运营商通道A/B",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "关键报错",
+        "text": "运营商回执: MNF_0042 通道不可用"
+      },
+      {
+        "type": "text",
+        "title": "现象描述",
+        "text": "凌晨两点起用户收不到短信验证码，登录成功率暴跌。持续 40 分钟后自愈。全部用户受影响。"
+      }
+    ],
+    "timeline": "02:10 开始 ｜ 02:50 自愈 ｜ 前一日接入新运营商通道",
+    "impactHint": "先看是全部失败还是部分失败"
+  },
+  "hypotheses": [
+    {
+      "id": "h-ops",
+      "text": "短信服务商故障",
+      "excludeActionId": "act-ops"
+    },
+    {
+      "id": "h-channel",
+      "text": "运营商通道切换/维护",
+      "excludeActionId": "act-channel"
+    },
+    {
+      "id": "h-app",
+      "text": "登录服务自身代码故障",
+      "excludeActionId": "act-self"
+    }
+  ],
+  "actions": [
+    {
+      "id": "act-impact",
+      "name": "看失败率时间线",
+      "desc": "全部用户还是部分用户，从几点开始",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [
+        {
+          "id": "h-app",
+          "status": "down"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "失败率时间线",
+        "text": "02:10 起陡增，02:50 归零；登录服务无发版"
+      }
+    },
+    {
+      "id": "act-ops",
+      "name": "查短信服务商发送记录",
+      "desc": "服务商后台发送量与回执",
+      "cost": 2,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-ops"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-ops",
+          "status": "down"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "服务商后台",
+        "text": "发送请求正常送达服务商，回执大面积失败"
+      }
+    },
+    {
+      "id": "act-channel",
+      "name": "查通道回执与变更记录",
+      "desc": "运营商通道回执码与切换记录",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-channel"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-channel",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "log",
+        "title": "通道回执",
+        "text": "MNF_0042 通道不可用，02:05 该通道进入维护窗口（未通知）"
+      }
+    },
+    {
+      "id": "act-self",
+      "name": "查登录服务日志",
+      "desc": "排除自身代码故障",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-app"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-app",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "服务日志",
+        "text": "无异常堆栈，出栈请求正常"
+      }
+    },
+    {
+      "id": "act-switch",
+      "name": "切换备用通道",
+      "desc": "【状态变更】切到运营商B通道",
+      "cost": 6,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [
+        "h-channel"
+      ],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "切换结果",
+        "text": "回执恢复正常，验证码到达率回升"
+      }
+    },
+    {
+      "id": "act-applog2",
+      "name": "查登录服务错误率",
+      "desc": "对比验证码发送接口的错误率与基线",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-app"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-app",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "错误率曲线",
+        "text": "接口错误率与平日持平，业务层无异常"
+      }
+    },
+    {
+      "id": "act-recent",
+      "name": "查近期变更记录",
+      "desc": "核对登录服务与短信网关的发布记录",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-app",
+        "h-channel"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-app",
+          "status": "down"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "变更记录",
+        "text": "登录服务 7 天未发版；网关配置无变更；前一日新接入运营商通道 A"
+      }
+    },
+    {
+      "id": "act-ops-status",
+      "name": "查服务商状态页",
+      "desc": "服务商官方 status page",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-ops"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-ops",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "状态页",
+        "text": "全绿，无故障公告"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-channel",
+      "text": "运营商通道维护未通知，通道不可用",
+      "correct": true
+    },
+    {
+      "id": "rc-ops",
+      "text": "短信服务商整体故障",
+      "correct": false
+    },
+    {
+      "id": "rc-app",
+      "text": "登录服务代码故障",
+      "correct": false
+    }
+  ],
+  "expertCost": 6,
+  "restartActionId": "act-switch",
+  "expertChain": [
+    {
+      "thought": "凌晨告警，先看失败率形状：全部还是部分，从几点开始。",
+      "update": "建立时间基线，自身代码故障降权",
+      "actionId": "act-impact",
+      "why": "1⚡ 买形状：全部失败与部分失败的假设集完全不同",
+      "conclusion": "02:10 陡增 02:50 自愈，登录服务无发版 → 自身代码故障降权"
+    },
+    {
+      "thought": "不是自己的问题就往外看：服务商整体还是单通道。",
+      "update": "外部二分：服务商整体 vs 单通道",
+      "actionId": "act-ops",
+      "why": "先确认服务商整体健康度，排除最大面的故障",
+      "conclusion": "服务商正常送达但回执失败 → 收缩到通道层"
+    },
+    {
+      "thought": "通道层看回执码与切换记录，是最便宜的实锤路径。",
+      "update": "通道维护假设升权至第一",
+      "actionId": "act-channel",
+      "why": "回执码直接指明通道状态，2⚡ 买到确定性",
+      "conclusion": "MNF_0042 通道不可用 + 维护窗口时间吻合 → 实锤"
+    },
+    {
+      "thought": "证据已闭合：回执码 + 时间线 + 切换记录三点齐。",
+      "update": "停止收集，转入行动",
+      "actionId": "",
+      "why": "继续收集不会改变行动（切通道），再查是给焦虑交税",
+      "conclusion": "切换备用通道恢复；事后要求运营商维护提前通知"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "接入第三方通道必须有备用路由",
+      "principle": "第三方依赖的可用性契约：单通道等于单点，关键路径必须能降级"
+    },
+    {
+      "text": "回执码要提前建监控",
+      "principle": "第三方回执是比业务指标更前置的信号，回执码异常常先于用户感知"
+    }
+  ]
+}
