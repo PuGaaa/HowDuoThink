@@ -1,0 +1,240 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * B4-3 · security L3（决策现场皮肤）
+ * 主训思维：安全思维（安全修复不能让位于商业节点——但"临时缓解 + 排期修复"优于"二选一"）
+ * 次训思维：产品思维（大促延迟的商誉/竞争损失是真实成本，不是"借口"）
+ * 真实原型：大促 D-3 渗透测试发现支付页 XSS（中危），修复需 2 天开发 + 回归，大促后修复则风险窗口 2 周
+ * 情绪兽设计：恐怖蛙（恐慌）——"支付页面 + XSS + 大促 D-3"，每个词都在加压
+ * 检查单：思维型 3 + 知识型 1
+ */
+export const xssDecisionCase: DiagnosisCase = {
+  id: 'xss-decision',
+  title: '大促 D-3：XSS 修还是延',
+  intro: '季度渗透测试发现：支付页面存在存储型 XSS（中危），可窃取会话 token。修复需 2 天开发 + 1 天回归——但大促 D-3，全员在做最后冲刺。',
+  domain: 'data',
+  layer: '安全修复不需要二选一：临时缓解（WAF/ CSP）+ 排期修复 = 纵深防御的实战运用',
+  part: 'master',
+  chapterId: 'security',
+  order: 7,
+  typeTags: ['security', 'decision'],
+  difficulty: 3,
+
+  scene: {
+    role: '你是「鲜到家」的安全工程师。渗透测试发现支付页存储型 XSS——你在群里发完报告，产品经理秒回："D-3 了，大促后修。"你的决策窗口：今天确认处置方案。',
+    architecture: 'App → 支付页面(存储型 XSS: 商品备注字段) → 会话 token(可被窃取)',
+    tag: '决策现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '渗透测试报告',
+        text: '漏洞：支付页面商品备注字段未过滤 HTML——恶意买家在备注中注入 <script>\n触发条件：卖家查看含恶意备注的订单时执行（卖家侧）\n可窃取：卖家会话 token → 可查看全部买家订单（含 PII）。\n评级：中危（需卖家触发，非买家侧直接利用）。',
+      },
+      {
+        type: 'text',
+        title: '修复评估',
+        text: '修复方案：备注字段 HTML encode + CSP header（防御性）\n开发：2 天 + 回归 1 天 = 3 天\n大促 D-3：全团队在做最后冲刺，插入 3 天 = 大促准备推迟。\n临时缓解：WAF 加规则拦截备注中的 <script> 标签（10 分钟配置，非根治）。',
+      },
+    ],
+    timeline: '渗透测试：今天 ｜ 大促：D-3 ｜ 修复开发：2 天 + 回归 1 天 ｜ 临时缓解 WAF：10 分钟 ｜ XSS 漏洞存在时长：自上线以来（约 1 年）',
+    impactHint: '"修还是延"是假二选一——中间还有第三条路：WAF 临时缓解（10 分钟）+ 大促后排期修复。先评估缓解方案够不够。',
+  },
+
+  hypotheses: [
+    { id: 'h-waf', text: 'WAF 规则拦截 <script> 标签 = 有效临时缓解：大促窗口内风险可控', excludeActionId: 'a-waftest' },
+    { id: 'h-csp', text: 'CSP header 是比 WAF 更可靠的临时缓解（浏览器层防执行）', excludeActionId: 'a-csptest' },
+    { id: 'h-waf-bypass', text: 'WAF 规则可被绕过（编码绕过/大小写/标签变体），临时缓解不充分', excludeActionId: 'a-wafbypass' },
+    { id: 'h-exploit', text: '漏洞存在已 1 年，未被实际利用——风险可接受，大促后再修', excludeActionId: 'a-exploithist' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '评估漏洞的实际可利用性',
+      desc: '评级"中危"的依据：触发条件是什么、攻击者能拿到什么',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '可利用性评估',
+        text: '触发条件：需要恶意买家在备注中注入 → 攻击者可控。\n攻击效果：卖家查看订单时 token 被窃 → 可访问全部买家订单（PII）。\n攻击前提：需要主动注入的恶意买家——非被动暴露。\n→ "中危"定级合理：不是任何人访问就中招的低危，也不是无交互即可利用的高危。',
+      },
+    },
+    {
+      id: 'a-waftest',
+      name: '部署 WAF 临时规则并验证',
+      desc: '拦截 <script> 标签，10 分钟生效',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-waf'],
+      hypotheses: [{ id: 'h-waf', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: 'WAF 部署与验证',
+        text: 'WAF 规则：备注字段含 <script> / <img onerror> / <svg onload> 的请求 → 拦截 + 记录。\n测试：POC payload 被成功拦截。\n→ 临时缓解生效：大促窗口内 XSS 攻击被 WAF 拦在门外。',
+      },
+    },
+    {
+      id: 'a-wafbypass',
+      name: '测试 WAF 规则的绕过面',
+      desc: '编码绕过/大小写/标签变体——临时缓解够不够硬',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-waf-bypass'],
+      hypotheses: [{ id: 'h-waf-bypass', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: '绕过测试',
+        text: '测试 5 种绕过：\n大小写变形（<ScRiPt>）：拦截 ✓\n编码绕过（&#60;script&#62;）：拦截 ✓\n标签变体（<svg onload>）：拦截 ✓\n拆分注入（<scr<script>ipt>）：部分绕过 ⚠️（需补规则）\n不含标签的 DOM 型 payload：不经过 WAF ⚠️（需 CSP 兜底）\n→ WAF 是有效但非完美的缓解层：需 CSP 兜底 + 修复排期不能取消。',
+      },
+    },
+    {
+      id: 'a-csptest',
+      name: '部署 CSP header 作为兜底层',
+      desc: '即使 WAF 被绕过，CSP 阻止脚本执行',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-csp'],
+      hypotheses: [{ id: 'h-csp', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: 'CSP 部署',
+        text: 'Content-Security-Policy: script-src "self"（禁止内联脚本执行）\n→ 即使恶意 <script> 通过 WAF 注入 HTML，浏览器 CSP 会阻止执行。\n→ 双层缓解：WAF（网络层拦截）+ CSP（浏览器层禁止执行）= 纵深防御。',
+      },
+    },
+    {
+      id: 'a-csptest2',
+      name: '验证 CSP 不影响正常功能',
+      desc: 'CSP 过严会破坏支付页面的正常脚本',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '兼容性验证',
+        text: 'CSP script-src "self" 白名单：结算主逻辑（同域脚本）正常执行 ✓\n第三方统计脚本：被拦截 ⚠️（需加白名单域名）\n支付渠道 SDK：正常（iframe 沙箱模式）✓\n→ 调整 CSP：script-src "self" analytics.example.com——不影响支付功能。',
+      },
+    },
+    {
+      id: 'a-exploithist',
+      name: '审计历史日志中是否已被利用',
+      desc: '漏洞存在 1 年了——有没有被实际利用过',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-exploit'],
+      hypotheses: [{ id: 'h-exploit', status: 'down' }],
+      result: {
+        type: 'text',
+        title: '历史审计',
+        text: '支付页面日志 + 备注字段回溯 1 年：未发现 <script> 标签注入记录。\n→ 未被实际利用（可能因为攻击者不知道有这个接口，或回报不如其他目标）。\n→ 但"未被利用"不改变修复的必要性——它改变的是紧急程度（D-3 修 vs 大促后排），不影响"修不修"。',
+      },
+    },
+    {
+      id: 'a-schedule',
+      name: '制定分层处置计划',
+      desc: '【状态变更】大促前临时缓解 + 大促 D+7 排期根治 + pre-commit 防复发',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '分层处置计划',
+        text: 'D-3（今天）：WAF 规则 + CSP header 上线（临时缓解，10 分钟 + 1 小时）\nD+7：备注字段 HTML encode + 接口层输出过滤（根治，排入 sprint）\nD+7：pre-commit 钩子：备注字段含 HTML 标签 → 前端提示"不支持格式"\n→ 三层递进：临时缓解（今天）→ 根治（下周）→ 防复发（长期）。',
+      },
+    },
+    {
+      id: 'a-approve',
+      name: '大促前强行修复',
+      desc: '【状态变更】暂停大促准备，全员修 XSS',
+      cost: 3,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '强行修复的代价',
+        text: '大促准备暂停 3 天：\n营销物料未最终确认、库存对账推迟、客服培训取消一天。\n→ 大促照常进行，但准备质量下降——大促后的复盘会问：为什么中危漏洞需要在 D-3 全员暂停？\n此选项作为反面教学：安全修复不需要二选一——分层处置比"全有或全无"更专业。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-layered', text: '分层处置：WAF + CSP 临时缓解（今天）→ 大促后排期根治 → pre-commit 防复发——安全修复不需要二选一，纵深防御的实战运用', correct: true },
+    { id: 'rc-delayfix', text: '大促后修复：风险窗口 2 周（含大促高峰），中危漏洞在大流量下可能升级', correct: false },
+    { id: 'rc-forcefix', text: '大促前强行修复：安全正确但商业代价过高（准备质量下降），且 WAF + CSP 已提供足够缓解', correct: false },
+    { id: 'rc-ignore', text: '漏洞存在 1 年未被利用，风险可接受，不修', correct: false },
+  ],
+
+  expertCost: 7,
+  restartActionId: 'a-approve',
+
+  expertChain: [
+    {
+      thought: '先评估可利用性：触发条件、攻击效果、攻击前提——"中危"定级的依据是什么。',
+      update: '中危定级合理：需卖家触发（非买家侧被动）、攻击者可控但需主动注入、效果 = PII 泄露。',
+      actionId: 'a-impact',
+      why: '1⚡ 可利用性评估决定响应级别：不需要"最高危就全员暂停"——中危的响应是"缓解 + 排期"，不是"全有或全无"。',
+      conclusion: '中危定级确认 → 评估临时缓解方案。',
+    },
+    {
+      thought: 'WAF 临时缓解 10 分钟可部署——部署后做绕过测试，缓解方案必须验证而不是假设有效。',
+      update: 'WAF 拦截大部分 payload，但拆分注入可部分绕过 + DOM 型不经过 WAF——需要 CSP 兜底。',
+      actionId: 'a-wafbypass',
+      why: '2⚡ 绕过测试是缓解方案的质量门：部署缓解后假设"已安全"而不测试绕过面，等于用没校准的天平称重。',
+      conclusion: 'WAF 有效但不完美 → 加 CSP 兜底层。',
+    },
+    {
+      thought: 'CSP 兜底层部署后验证兼容性：不影响支付功能 + 统计脚本加白名单——缓解方案不能破坏大促页面。',
+      update: '双层缓解（WAF + CSP）部署完成且不影响功能 → 安全与商业不再是二选一。',
+      actionId: 'a-csptest',
+      why: '1⚡ 兼容性验证是缓解方案的最后一步：缓解方案的"缓解"二字，前提是不引入新问题。',
+      conclusion: '双层缓解生效 → 制定分层处置计划。',
+    },
+    {
+      thought: '历史审计确认未被利用 + 分层处置计划完备（今天缓解/下周根治/长期防复发）——停止收集。',
+      update: '停止决策循环。分层处置不是"二选一的妥协"，是纵深防御的实战运用。',
+      actionId: '',
+      why: '【停止规则】缓解验证 ✓ 兼容性 ✓ 历史审计 ✓ 分层计划 ✓——四项闭合。安全修复的答案是"分层处置"，不是"全有或全无"。',
+      conclusion: '今天 WAF+CSP 缓解、大促安心冲刺、D+7 根治 + 防复发——安全与商业兼得。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '安全修复不需要二选一：临时缓解（WAF/CSP）+ 排期根治 = 纵深防御的实战运用。',
+      principle: '安全思维："修还是延"是假二选一——中间方案是"临时缓解 + 排期根治"。缓解不是"不修"的借口，排期也不是"不管"的理由——两层递进才叫处置。',
+    },
+    {
+      text: '缓解方案必须做绕过测试：部署 WAF 规则后假设"已安全"，等于用没校准的天平称重。',
+      principle: '安全思维：每个缓解层都可能有绕过面（编码/变体/DOM 型）。缓解方案的质量门 = 绕过测试——测试结果决定"还需要加几层"。',
+    },
+    {
+      text: '历史审计决定紧急程度，不决定是否修复："未被利用"降低紧急度（D-3 缓解够了），但不降低修复的必要性（D+7 根治）。',
+      principle: '安全思维：漏洞存在 1 年未被利用 ≠ 安全——攻击者的利用意愿受目标价值与攻击成本影响，会变化。审计结论是排期依据，不是免修金牌。',
+    },
+    {
+      text: '大促前强行修复的代价不只是 3 天人力——是大促准备质量的全面下降。',
+      principle: '产品思维：安全修复的决策是分层处置（缓解/根治/防复发三层递进），不是"全有或全无"——专业的安全工程是在商业约束下找到最优的风险降低路径。',
+    },
+  ],
+}

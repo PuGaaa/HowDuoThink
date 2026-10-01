@@ -29,6 +29,10 @@ import { gatewayReviewCase } from './gateway-review'
 import { pipelineReviewCase } from './pipeline-review'
 import { containerReviewCase } from './container-review'
 import { metricsReviewCase } from './metrics-review'
+import { midnightRollbackCase } from './midnight-rollback'
+import { canaryDecisionCase } from './canary-decision'
+import { xssDecisionCase } from './xss-decision'
+import { errorBudgetCase } from './error-budget'
 import { oversellRaceCase } from './oversell-race'
 import { idempotentFailCase } from './idempotent-fail'
 import { logSamplingCase } from './log-sampling'
@@ -62,6 +66,10 @@ export const ALL_CASES: DiagnosisCase[] = [
   pipelineReviewCase,
   containerReviewCase,
   metricsReviewCase,
+  midnightRollbackCase,
+  canaryDecisionCase,
+  xssDecisionCase,
+  errorBudgetCase,
   whiteScreenCase,
   depHellCase,
   oversellRaceCase,
