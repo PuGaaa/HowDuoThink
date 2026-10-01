@@ -25,6 +25,10 @@ import { logPiiCase } from './log-pii'
 import { ssrfCase } from './ssrf-internal'
 import { withdrawRaceCase } from './withdraw-race'
 import { supplyPoisonCase } from './supply-poison'
+import { gatewayReviewCase } from './gateway-review'
+import { pipelineReviewCase } from './pipeline-review'
+import { containerReviewCase } from './container-review'
+import { metricsReviewCase } from './metrics-review'
 import { oversellRaceCase } from './oversell-race'
 import { idempotentFailCase } from './idempotent-fail'
 import { logSamplingCase } from './log-sampling'
@@ -54,6 +58,10 @@ export const ALL_CASES: DiagnosisCase[] = [
   ssrfCase,
   withdrawRaceCase,
   supplyPoisonCase,
+  gatewayReviewCase,
+  pipelineReviewCase,
+  containerReviewCase,
+  metricsReviewCase,
   whiteScreenCase,
   depHellCase,
   oversellRaceCase,

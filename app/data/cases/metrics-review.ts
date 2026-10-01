@@ -1,0 +1,240 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * B3-4 · observability L3（可观测章结业评审）
+ * 主训思维：产品思维（告警分级是产品分层——P1 以上才通知，等于把 P0 前兆降级为日报）
+ * 次训思维：沉淀思维（关闭自定义指标 = 关闭历史事故换来的检测线）
+ * 真实原型：统一告警模板强制全服务套用 + 下线"非标"自定义指标（含 event loop lag）
+ * 情绪兽设计：恐怖蛙（恐慌）——"上季度 event-loop 事故的检测线，被这次统一关掉了"
+ * 检查单：思维型 3 + 知识型 1
+ */
+export const metricsReviewCase: DiagnosisCase = {
+  id: 'metrics-review',
+  title: '可观测 1.0 评审——统一模板关掉了检测线',
+  intro: '可观测团队提交"指标体系 1.0"终审方案：全服务统一告警模板（HTTP 5xx / CPU / 内存三件套）+ 下线所有"非标"自定义指标 + P1 以上才通知。听起来规范——但 event loop lag 监控就在"非标"名单里。',
+  domain: 'runtime',
+  layer: '统一告警模板是伪规范化：上季度事故换来的检测线（event loop lag），不能被"标准化"下线',
+  part: 'master',
+  chapterId: 'observability',
+  order: 5,
+  typeTags: ['observability', 'architecture'],
+  difficulty: 3,
+
+  scene: {
+    role: '你是「鲜到家」的架构评审委员。可观测团队 1.0 方案要统一全公司告警——"标准化"的方向没问题，但统一模板只有 HTTP 5xx / CPU / 内存三件套。三个月前 event-loop 事故的检测线，就在下线名单里。',
+    architecture: '17 个服务 → 统一告警模板(5xx/CPU/内存) → 告警平台(P1 以上通知) | 自定义指标(全部下线)',
+    tag: '评审现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '方案文档 · 关键句',
+        text: '① 统一告警模板：HTTP 5xx / CPU / 内存三件套（"全服务一套标准"）\n② 自定义指标下线：event loop lag、业务指标等"非标指标"统一回收\n③ 分级：P1 以上才通知（减少告警疲劳）',
+      },
+      {
+        type: 'text',
+        title: '评审输入 · 历史事故对照',
+        text: '上季度 event-loop 事故（lag 1.2s，全接口超时）：\n当时的检测线 = event loop lag 自定义指标——非标名单第一名。\n该事故期间 CPU 均值仅 25%、HTTP 5xx 无异常——统一模板三件套全部失明。',
+      },
+    ],
+    timeline: 'event-loop 事故：3 个月前（检测线事后上线）｜ 指标体系 1.0：本月评审 ｜ 若下线自定义指标，同类事故将不可检测',
+    impactHint: '统一模板能覆盖全部历史事故吗？——把历史事故清单对着模板过一遍，答案就在纸上。',
+  },
+
+  hypotheses: [
+    { id: 'h-template', text: '统一模板三件套（5xx/CPU/内存）对事件循环类服务失明——历史事故已证明', excludeActionId: 'a-template' },
+    { id: 'h-p1', text: 'P1 以上才通知：P0 前兆类告警（慢查询前兆）被降级为日报，漏掉黄金响应窗口', excludeActionId: 'a-p1' },
+    { id: 'h-retire', text: '自定义指标本就冗余：统一模板能推导出等价信息', excludeActionId: 'a-retire' },
+    { id: 'h-oncall', text: '值班交接窗口的静默策略会漏掉跨班次告警', excludeActionId: 'a-handover' },
+  ],
+
+  actions: [
+    {
+      id: 'a-template',
+      name: '用历史事故对照统一模板',
+      desc: '上季度 event-loop 事故，统一模板能检测到吗',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-template'],
+      hypotheses: [{ id: 'h-template', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: '历史事故回放',
+        text: 'event-loop 事故复盘数据回放进统一模板：\nHTTP 5xx：无异常（卡顿是排队，不是失败）✗\nCPU：均值 25%（单核 100% 被均值掩盖）✗\n内存：平稳 ✗\n→ 三件套全部失明：同类事故复发时，统一模板一个告警都不会发。',
+      },
+    },
+    {
+      id: 'a-p1',
+      name: '推演 P1 分级下的告警丢失',
+      desc: 'P0 前兆类告警在"仅 P1 通知"下会怎样',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-p1'],
+      hypotheses: [{ id: 'h-p1', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: '分级推演',
+        text: '"主库慢查询数 > 50/min"（上季度 P0 前兆）按新分级属于 P2（无直接用户影响）→ 降级为日报。\n→ 前兆→事故的黄金响应窗口（2h51min）将全部落在日报里。\nP1 分级的初衷是减噪，但一刀切把前兆也减掉了。',
+      },
+    },
+    {
+      id: 'a-retire',
+      name: '核对自定义指标是否可推导',
+      desc: '统一模板三件套能否推导出 event loop lag',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-retire'],
+      hypotheses: [{ id: 'h-retire', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '推导核对',
+        text: 'event loop lag 无法从 5xx/CPU/内存推导：\nlag 是调度层指标，三件套是资源/输出层指标——信息不相交。\n→ 自定义指标不是冗余，是独立检测线。',
+      },
+    },
+    {
+      id: 'a-handover',
+      name: '评估值班交接的静默窗口',
+      desc: '静默策略跨班次会漏什么',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-oncall'],
+      hypotheses: [{ id: 'h-oncall', status: 'down' }],
+      result: {
+        type: 'text',
+        title: '静默窗口评估',
+        text: '静默窗口 5 分钟（交接对齐），有交接确认机制兜底。\n→ 窗口可控，非阻断项（记录待办：交接确认制度化）。',
+      },
+    },
+    {
+      id: 'a-fixsub',
+      name: '拟统一框架 + 自定义指标的共存方案',
+      desc: '【状态变更】统一模板 + 白名单自定义指标共存，P0 前兆独立通道',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '共存方案',
+        text: '统一模板保留（基线覆盖）+ 白名单自定义指标共存（历史事故检测线保留）；\n"P0 前兆类"独立通知通道（不等 P1 分级）；自定义指标纳入评审白名单制度（新增需评审，不可随意下线）。',
+      },
+    },
+    {
+      id: 'a-history',
+      name: '清点全部自定义指标的来源',
+      desc: '每条"非标"指标背后是不是都有一场事故',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '自定义指标考古',
+        text: '现存 6 条自定义指标全部有出处：event loop lag（3 个月前事故）、慢查询前兆（上季度 P0 前兆）、\nMQ 堆积、连接池水位、缓存命中率、第三方降级信号。\n→ "非标"不等于"冗余"：每一条都是历史事故换来的检测线。',
+      },
+    },
+    {
+      id: 'a-slo',
+      name: '核对 SLO 与告警分级的映射',
+      desc: 'P0 前兆应属于哪个分级',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '分级映射修正',
+        text: '分级标准应是"距 P0 的距离"，不是"是否已有用户影响"：\n前兆类（慢查询爬升/队列堆积）→ P0 前兆通道（非 P2 日报）。\n→ 分级标准修正后，P1-only 的问题自然消解。',
+      },
+    },
+    {
+      id: 'a-golive',
+      name: '按原方案下线自定义指标',
+      desc: '【状态变更】不等共存方案，1.0 全量启用',
+      cost: 3,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '启用结果',
+        text: '1.0 全量启用，自定义指标下线。\n下一次 event-loop 类事故：统一模板静默，无任何告警——事故将靠用户投诉发现，\n且因检测线已下线，"事后补救"需要重建整套指标（两周）。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-template', text: '核心阻断缺陷：统一模板三件套（5xx/CPU/内存）对事件循环类故障失明（历史事故回放已证明）——下线自定义指标等于拆除唯一检测线', correct: true },
+    { id: 'rc-p1', text: '真实风险：P1 以上才通知的分级把 P0 前兆类告警降级为日报，黄金响应窗口（2h51min）被丢弃', correct: false },
+    { id: 'rc-retire', text: '自定义指标可从统一模板推导', correct: false },
+    { id: 'rc-oncall', text: '值班交接静默窗口漏掉跨班次告警', correct: false },
+  ],
+
+  expertCost: 6,
+  restartActionId: 'a-golive',
+
+  expertChain: [
+    {
+      thought: '统一模板是不是真的"统一了检测能力"？——拿历史事故当测试用例：回放上季度 event-loop 事故进模板。',
+      update: '三件套全部失明：同类事故复发时零告警——统一模板不是升级，是检测能力降级。',
+      actionId: 'a-template',
+      why: '2⚡ 历史事故回放是可观测性方案的天然测试用例：每场事故都对应一条检测线，回放一遍就知道哪些线被剪断了。',
+      conclusion: '统一模板检测降级实锤 → 追问 P1 分级的告警丢失。',
+    },
+    {
+      thought: 'P1 以上才通知——前兆类告警在分级里算什么级别？推演"主库慢查询"前兆的完整旅程。',
+      update: 'P0 前兆被降级为日报：黄金响应窗口 2h51min 全部落在日报里——减噪的初衷变成了减掉前兆。',
+      actionId: 'a-p1',
+      why: '2⚡ 分级推演暴露一刀切的代价："减少告警疲劳"和"留住前兆"并不矛盾——矛盾的是把前兆也塞进了普通分级。',
+      conclusion: '分级缺陷实锤 → 核对自定义指标的不可推导性。',
+    },
+    {
+      thought: '确认"非标自定义指标"不是冗余：检查统一模板能否推导出 event loop lag。',
+      update: '信息层不相交（调度层 vs 资源层）——自定义指标是独立检测线，不是冗余。',
+      actionId: 'a-retire',
+      why: '1⚡ 排除"冗余"可能才能结论"不可下线"：如果模板能推导，下线就是清理；推导不了，下线就是拆除。',
+      conclusion: '自定义指标 = 独立检测线，下线 = 拆除 → 拟共存方案。',
+    },
+    {
+      thought: '共存方案闭环：统一模板管基线、白名单自定义指标管专项、P0 前兆独立通道、白名单纳入评审制度——四件套齐了，停止评审。',
+      update: '停止评审。有条件通过：共存方案 + 白名单制度，标准化与检测线兼得。',
+      actionId: '',
+      why: '【评审停止规则】历史事故回放 ✓ 分级推演 ✓ 冗余排除 ✓ 共存方案 ✓——评审四步闭合，产出是"带白名单制度的通过"。',
+      conclusion: '有条件通过：统一模板 + 白名单自定义指标共存 + P0 前兆独立通道 + 白名单评审制度。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '统一告警模板是伪标准化：每条历史事故换来的检测线（自定义指标），都不能被"标准化"下线。',
+      principle: '产品思维：可观测性方案的评审用历史事故当测试用例——统一模板回放全部历史事故，一条检测不出来，方案就不该通过。',
+    },
+    {
+      text: '告警分级的标准是"距 P0 的距离"，不是"是否已有用户影响"——前兆类告警是黄金响应窗口本身。',
+      principle: '产品思维：P0 前兆（慢查询爬升/队列堆积）没有用户影响，但它决定你有没有 2h51min 的响应窗口。把前兆降级为日报，等于把灭火器降级为说明书。',
+    },
+    {
+      text: '"非标"不等于"冗余"：自定义指标的信息层（调度层）与统一模板（资源/输出层）不相交——下线是拆除检测线。',
+      principle: '架构设计：指标体系的分层（调度层/资源层/输出层/业务层）决定信息是否可推导——跨层的指标不可互相替代。',
+    },
+    {
+      text: '告警疲劳的正确解法是分级+聚合，不是"减少告警"：减噪的刀不能砍在前兆告警上。',
+      principle: '沉淀思维：P1-only 的初衷是减噪（真实痛点：日均 380 条），正确解法是聚合收敛+前兆独立通道——告警量 380→4 的同时 P0 前兆 100% 触达，两者兼得。',
+    },
+  ],
+}
