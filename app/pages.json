@@ -4,7 +4,7 @@
       "path": "pages/index/index",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "排错推理训练场"
+        "navigationBarTitleText": "Debugo"
       }
     },
     {
@@ -80,7 +80,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "排错推理训练场",
+    "navigationBarTitleText": "Debugo",
     "navigationBarBackgroundColor": "#FFF9F4",
     "backgroundColor": "#FFF9F4"
   }

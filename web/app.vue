@@ -125,7 +125,7 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
 <template>
   <div class="shell">
     <header class="topbar">
-      <NuxtLink to="/" class="topbar__brand">排错推理训练场 · 社区</NuxtLink>
+      <NuxtLink to="/" class="topbar__brand">Debugo · 社区</NuxtLink>
       <nav class="topbar__nav">
         <NuxtLink to="/solutions" class="topbar__link">解决逻辑</NuxtLink>
         <NuxtLink to="/submit" class="topbar__link">投稿</NuxtLink>
@@ -150,7 +150,7 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
       </nav>
     </header>
     <main class="main"><NuxtPage /></main>
-    <footer class="footer">给 agent 时代程序员的排错推理训练场 · Web 社区（投稿与解决逻辑展示，闯关在 App）</footer>
+    <footer class="footer">Debugo — 诊断思维训练场 · Web 社区（投稿与解决逻辑展示，闯关在 App）</footer>
 
     <!-- 登录弹窗 -->
     <div v-if="showLogin" class="lmask" @click="showLogin = false"></div>
