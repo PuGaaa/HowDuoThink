@@ -75,6 +75,7 @@ class SceneIn(BaseModel):
     architecture: str = Field(min_length=1, max_length=300)
     timeline: str = Field(min_length=1, max_length=300)
     impact_hint: str = Field(min_length=1, max_length=120, alias="impactHint")
+    tag: str = Field(default="故障现场", max_length=20)
     symptoms: list[EvidenceIn] = Field(min_length=1)
 
 

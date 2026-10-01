@@ -92,6 +92,8 @@ export interface CaseScene {
   timeline: string
   /** 引导第一步查影响面的提示语 */
   impactHint: string
+  /** 现场标签（默认"故障现场"）：皮肤可演进，如"评审现场" */
+  tag?: string
 }
 
 /** 篇（学习阶段）：apprentice=侦探学徒 engineer=一线工兵 master=资深值班 */

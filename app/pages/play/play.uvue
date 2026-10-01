@@ -16,7 +16,7 @@
       <!-- 故障现场 -->
       <view class="scene">
         <view class="scene__tag">
-          <text class="scene__tag-text">故障现场</text>
+          <text class="scene__tag-text">{{ sceneTag }}</text>
         </view>
         <text class="scene__title">{{ title }}</text>
         <text class="scene__role">{{ role }}</text>
@@ -183,6 +183,7 @@ import {
 } from '../../utils/mascot'
 
 const loaded = ref(false)
+const sceneTag = ref('故障现场')
 const title = ref('')
 const role = ref('')
 const arch = ref('')
@@ -318,6 +319,7 @@ onLoad((query : OnLoadOptions) => {
   timeline.value = c.scene.timeline
   hint.value = c.scene.impactHint
   symptoms.value = c.scene.symptoms
+  sceneTag.value = (c.scene as any).tag || '故障现场' 
   hyps.value = c.hypotheses
   acts.value = c.actions
   causes.value = shuffleCauses(c.rootCauses)

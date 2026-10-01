@@ -1,0 +1,274 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * 设计评审关试点（皮肤演进：故障排查 → 事前评审）。
+ * 训练理念设计层：架构设计思维（故障的种子是设计取舍）+ 程序设计思维（防御式设计）。
+ * 结构与排查关完全同构：假设 = 设计缺陷假设，验证动作 = 评审会上的追问。
+ */
+export const cacheReviewCase: DiagnosisCase = {
+  id: 'cache-review',
+  title: '上线前的缓存方案评审',
+  intro: '明天商品详情页改造方案过终审。方案逻辑自洽、收益诱人——但你的工作，是找出它会在什么时候出事。',
+  domain: 'data',
+  layer: '缓存设计的取舍：先问业务时效，再定技术参数',
+  part: 'engineer',
+  chapterId: 'data',
+  order: 5,
+  typeTags: ['data', 'architecture'],
+  difficulty: 3,
+
+  scene: {
+    role: '你是「鲜到家」的后端负责人，评审会上被指派"挑刺"——找出这个方案未来会出事的地方。',
+    architecture: 'App → 详情页服务 → Redis(方案新增) → MySQL(商品表 500 万行)',
+    tag: '评审现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '方案文档 · 关键句',
+        text: '详情页 QPS 峰值 8000，读:写 = 100:1。\n引入 Redis 缓存，TTL 30 分钟。\nDB 读压力预计下降 95%，接口 P99 预计 < 50ms。',
+      },
+      {
+        type: 'text',
+        title: '现网事实',
+        text: '商品价格由运营在促销期批量改价——去年双 11 预热 10 分钟内改了 1200 个 SKU，业务要求改价分钟级生效。\n历史：一次促销改价后，"下单价格与页面不一致"的客服投诉 5 分钟内翻倍。',
+      },
+    ],
+    timeline: '方案评审明天举行 ｜ 双 11 预热 11 天后开始 ｜ 去年大促出现过价格投诉与一次临时救火',
+    impactHint: '这不是故障排查——是在故障发生之前，把种子找出来。最值钱的问句是："什么情况下这个设计会出事？"',
+  },
+
+  hypotheses: [
+    { id: 'h-price', text: '价格时效与缓存冲突：改价后 30 分钟内用户看到旧价并可下单——资损窗口' },
+    { id: 'h-avalanche', text: '无预热 + 统一 TTL：大促零点缓存集中过期，瞬时流量全量回源压垮 DB' },
+    { id: 'h-stampede', text: '热点 key 失效瞬间无回源保护：大量请求同时重建缓存——击穿无防护' },
+    { id: 'h-cap', text: '容量按日常 QPS 估算：大促 3 倍峰值 + 无降级预案——峰值下不可用' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '问清价格的业务时效要求',
+      desc: '评审第一问：什么数据错不起、多久不能错',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [{ id: 'h-price', status: 'up' }],
+      result: {
+        type: 'text',
+        title: '业务约束',
+        text: '运营明确：促销改价必须分钟级生效——价格是资损红线数据。\n→ TTL 30 分钟与分钟级时效直接冲突，头号嫌疑成立。',
+      },
+    },
+    {
+      id: 'a-orderpath',
+      name: '查下单链路的价格读取来源',
+      desc: '旧价会不会真的流到用户手里',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-price'],
+      hypotheses: [{ id: 'h-price', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: '下单链路代码',
+        text: 'createOrder() {\n  price = cache.get("sku:" + id).price   ← 下单也读缓存\n  charge(price)\n}\n→ 下单与展示读同一份缓存：改价后 30 分钟内，用户可按旧价成交。\n资损路径闭环，实锤。',
+      },
+    },
+    {
+      id: 'a-ttl',
+      name: '追问 TTL 30 分钟的依据',
+      desc: '这个数字是怎么定出来的',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '方案作者的回答',
+        text: '"读多写少的场景一般就设 30 分钟。"\n→ 拍脑袋：没有业务输入，没有评估改价时效——参数缺的不是值，是对齐过程。',
+      },
+    },
+    {
+      id: 'a-avalanche',
+      name: '追问预热与过期策略',
+      desc: '大促零点，这批缓存会发生什么',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-avalanche'],
+      hypotheses: [{ id: 'h-avalanche', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: '评审追问记录',
+        text: '预热？——"还没做，上线后再说。"\n差异化 TTL？——"统一 30 分钟。"\n→ 双 11 零点：新建缓存冷启动 + 存量集中过期，瞬时全量回源 DB（500 万行热点表）。\n雪崩路径确认。',
+      },
+    },
+    {
+      id: 'a-stampede',
+      name: '追问热点 key 的回源保护',
+      desc: '同一个 key 失效瞬间，一千个请求谁来读库',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-stampede'],
+      hypotheses: [{ id: 'h-stampede', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: '评审追问记录',
+        text: '互斥锁 / 逻辑过期 / 单飞？——"没有，失效了就都去查库吧。"\n→ 爆款商品 key 失效瞬间：并发回源无保护。击穿无防护，确认。',
+      },
+    },
+    {
+      id: 'a-capacity',
+      name: '追问大促峰值容量与降级',
+      desc: '3 倍峰值时这套设计还站得住吗',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-cap'],
+      hypotheses: [{ id: 'h-cap', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: '评审追问记录',
+        text: '容量按多少估的？——"按当前峰值 8000 QPS。"\n大促 3 倍呢？——"……没算。"\n降级预案？——"没有。"\n→ 容量按日常估算、无降级：大促峰值下不可用，确认。',
+      },
+    },
+    {
+      id: 'a-history',
+      name: '查同类问题的历史记录',
+      desc: '去年那次价格投诉是怎么收场的',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-price'],
+      hypotheses: [{ id: 'h-price', status: 'up' }],
+      result: {
+        type: 'text',
+        title: '事故工单归档',
+        text: '去年大促 D-1：批量改价后 2 小时内 300+ 价格投诉 → 临时用"逐个删缓存"脚本救火，2 小时清完。\n→ 同类问题发生过、靠人肉救过火——新方案把它做成了常态，而不是修掉了它。',
+      },
+    },
+    {
+      id: 'a-benefit',
+      name: '评估方案本身的收益',
+      desc: '方向对不对，别把 baby 和洗澡水一起倒掉',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '收益评估',
+        text: '读加速收益真实：95% 命中预估合理，DB 压力下降可观。\n→ 评审结论不是推翻方案——是保留收益、补上边界设计。',
+      },
+    },
+    {
+      id: 'a-minfix',
+      name: '开出最小修正清单',
+      desc: '让方案达到可上线状态的必改项',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-price', 'h-avalanche', 'h-stampede', 'h-cap'],
+      hypotheses: [
+        { id: 'h-price', status: 'confirmed' },
+        { id: 'h-avalanche', status: 'confirmed' },
+        { id: 'h-stampede', status: 'confirmed' },
+        { id: 'h-cap', status: 'confirmed' },
+      ],
+      result: {
+        type: 'text',
+        title: '评审结论 · 修正清单',
+        text: '① 改价事件主动失效缓存（不等 TTL）\n② TTL 差异化 + 大促预热\n③ 热点 key 互斥回源\n④ 按 3 倍峰值重估容量 + 降级预案\n→ 四项补齐后有条件通过；价格时效为上线阻断项。',
+      },
+    },
+    {
+      id: 'a-approve',
+      name: '按原方案批准上线',
+      desc: '【状态变更】不做修改直接过审',
+      cost: 4,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '批准结果',
+        text: '方案原样过审上线。\n双 11 零点：改价投诉爆发 + 缓存集中过期 DB 过载——你批准的不是方案，是排期表上的故障。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-price', text: '核心阻断缺陷：价格时效（分钟级）与缓存 TTL 30 分钟冲突、且无主动失效——旧价下单资损窗口，必须修复后才能上线', correct: true },
+    { id: 'rc-avalanche', text: '真实风险但非阻断：无预热 + 统一 TTL 的集中过期，大促前补预热与差异化 TTL 即可', correct: false },
+    { id: 'rc-stampede', text: '真实风险但非阻断：热点 key 无回源互斥保护，击穿防护列入大促前清单', correct: false },
+    { id: 'rc-cap', text: '真实风险但非阻断：容量按日常估算且无降级预案，大促前重估', correct: false },
+  ],
+
+  expertCost: 8,
+  restartActionId: 'a-approve',
+
+  expertChain: [
+    {
+      thought: '评审不是走过场——第一问先要业务约束：这个页面什么数据错不起、多久不能错。',
+      update: '价格是资损红线、要求分钟级生效 → "TTL 30 分钟"与它直接冲突，头号嫌疑成立。',
+      actionId: 'a-impact',
+      why: '1⚡ 买到的是设计边界：资损红线决定所有技术参数的优先级——没有业务输入，TTL 就是拍脑袋。',
+      conclusion: '分钟级时效确立 → 任何缓存策略必须先回答这个问题。',
+    },
+    {
+      thought: '时效要求明确了，验证旧价能不能真的流到用户手里——别停在"看起来有问题"。',
+      update: '下单与展示读同一份缓存 → 旧价可成交，资损路径闭环。',
+      actionId: 'a-orderpath',
+      why: '2⚡ 把嫌疑变成实锤：下单是资损的最后一道闸，链路查一次就知道闸门开没开。',
+      conclusion: '旧价下单窗口真实存在 → 核心阻断缺陷确认。',
+    },
+    {
+      thought: '单点缺陷之外看系统性风险：大促零点这批缓存会发生什么——正确性之外还要问存活。',
+      update: '无预热 + 统一 TTL + 无互斥 + 容量按日常估算 → 雪崩/击穿/容量三项风险全部确认。',
+      actionId: 'a-avalanche',
+      why: '2⚡ 买到的是容量视角：评审要同时覆盖"会不会出错"与"扛不扛得住"——方案只答了前者。',
+      conclusion: '雪崩/击穿/容量三项列入大促前必补清单。',
+    },
+    {
+      thought: '资损路径 + 系统风险 + 历史前科（去年人肉救过火）——三点齐了，评审结论可以下了。',
+      update: '停止追问。方案方向正确（读加速收益真实），缺的是边界与防护——结论是有条件通过。',
+      actionId: '',
+      why: '【评审停止规则】修正清单已经能开出：改价主动失效 + 差异化 TTL + 预热 + 互斥回源 + 3 倍容量。继续追问不会再发现新缺陷——评审的产出是清单，不是完美。',
+      conclusion: '有条件通过：价格时效为上线阻断项，其余列入大促前清单。检查单：缓存参数必须先有业务时效输入。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '缓存参数不是技术题：TTL 多少分钟，答案在业务时效里——先问"什么数据错不起、多久不能错"，再写技术方案。',
+      principle: '技术参数没有业务输入就是拍脑袋。读多写少只决定"要不要缓存"，数据时效与资损容忍度才决定"怎么缓存"。',
+    },
+    {
+      text: '加缓存 = 给系统引入一个新状态机：过期、预热、击穿、容量四张卷子必答，少答一张就是未来某次故障的种子。',
+      principle: '缓存设计清单：主动失效策略（谁负责失效）、预热（冷启动谁扛）、击穿保护（热点 key 互斥）、容量（峰值倍数）。四问过全，方案才算完整。',
+    },
+    {
+      text: '评审会上最值钱的问句是"什么情况下这个设计会出事"，而不是"这个设计有什么好处"。',
+      principle: '方案的作者只会论证收益；评审者的职责是用反例拷问边界。收益由作者证明，风险由评审证明——各司其职才叫评审。',
+    },
+    {
+      text: '历史救火记录是免费的评审意见：上次靠人肉救火的地方，这次一定还会着。',
+      principle: '临时脚本救过的火，说明系统缺一个正式机制。评审前翻历史工单，等于提前拿到答案。',
+    },
+  ],
+}

@@ -12,6 +12,7 @@ import { slowQueryCase } from './slow-query'
 import { oomLeakCase } from './oom-leak'
 import { msgOrderCase } from './msg-order'
 import { nginxTrapCase } from './nginx-trap'
+import { cacheReviewCase } from './cache-review'
 import { oversellRaceCase } from './oversell-race'
 import { idempotentFailCase } from './idempotent-fail'
 import { logSamplingCase } from './log-sampling'
@@ -28,6 +29,7 @@ export const ALL_CASES: DiagnosisCase[] = [
   oomLeakCase,
   msgOrderCase,
   nginxTrapCase,
+  cacheReviewCase,
   whiteScreenCase,
   depHellCase,
   oversellRaceCase,
