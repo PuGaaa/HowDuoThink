@@ -19,6 +19,12 @@ import { closureLeakCase } from './closure-leak'
 import { ciCacheCase } from './ci-cache-pollution'
 import { alertStormCase } from './alert-storm'
 import { histogramCase } from './histogram-bucket'
+import { leakedKeysCase } from './leaked-keys'
+import { idorOrdersCase } from './idor-orders'
+import { logPiiCase } from './log-pii'
+import { ssrfCase } from './ssrf-internal'
+import { withdrawRaceCase } from './withdraw-race'
+import { supplyPoisonCase } from './supply-poison'
 import { oversellRaceCase } from './oversell-race'
 import { idempotentFailCase } from './idempotent-fail'
 import { logSamplingCase } from './log-sampling'
@@ -42,6 +48,12 @@ export const ALL_CASES: DiagnosisCase[] = [
   ciCacheCase,
   alertStormCase,
   histogramCase,
+  leakedKeysCase,
+  idorOrdersCase,
+  logPiiCase,
+  ssrfCase,
+  withdrawRaceCase,
+  supplyPoisonCase,
   whiteScreenCase,
   depHellCase,
   oversellRaceCase,

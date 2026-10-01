@@ -1,0 +1,291 @@
+{
+  "id": "withdraw-race",
+  "title": "提现接口的并发漏洞——账户提了双倍",
+  "intro": "风控通报：6 个账户出现提现金额超过余额——同一账户并发发起两笔提现，都通过了余额检查。资金已损失 4.7 万元。",
+  "domain": "concurrency",
+  "layer": "安全思维：检查与扣减必须原子——并发窗口里的两次\"通过\"，就是一次资金损失",
+  "part": "master",
+  "chapterId": "security",
+  "order": 5,
+  "typeTags": [
+    "security",
+    "concurrency"
+  ],
+  "difficulty": 3,
+  "scene": {
+    "role": "你是「鲜到家」钱包服务的后端负责人。风控通报：6 个账户提现超余额，最大一单提了双倍——这 6 个账户的注册时间都不到 48 小时。",
+    "architecture": "App → 钱包服务(提现接口) → 账户表(余额字段) → 出金通道",
+    "tag": "风控现场",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "风控流水分析",
+        "text": "账户 A（余额 1000 元）：\n22:41:03.201 提现 800 元 —— 余额检查通过（余额 1000 ≥ 800）\n22:41:03.204 提现 800 元 —— 余额检查通过（余额 1000 ≥ 800）\n→ 两笔都成功出金，实付 1600 元。6 个账户同模式，注册均不到 48 小时。"
+      },
+      {
+        "type": "text",
+        "title": "攻击特征",
+        "text": "两笔请求间隔仅 3ms——来自同一设备指纹。\n出金通道：两笔均已到账第三方支付，不可逆。"
+      }
+    ],
+    "timeline": "新钱包功能上线 45 天 ｜ 攻击发生在昨晚 22:41 ｜ 今晨风控冻结可疑账户并通报",
+    "impactHint": "两次检查都显示\"余额够\"——要么是余额错，要么是检查的世界过时了。"
+  },
+  "hypotheses": [
+    {
+      "id": "h-race",
+      "text": "余额检查与扣减非原子：并发窗口内两笔都读到\"检查时\"的余额——双花",
+      "excludeActionId": "a-code"
+    },
+    {
+      "id": "h-replay",
+      "text": "请求重放：同一笔提现被重发执行两次",
+      "excludeActionId": "a-replaycheck"
+    },
+    {
+      "id": "h-precision",
+      "text": "金额精度 bug：浮点运算导致余额计算错乱",
+      "excludeActionId": "a-precision"
+    },
+    {
+      "id": "h-upstream",
+      "text": "上游重复调用：重试机制把一笔请求发了两次",
+      "excludeActionId": "a-upstream"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-impact",
+      "name": "分析风控流水的攻击指纹",
+      "desc": "两笔请求的时间间隔与来源",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [
+        {
+          "id": "h-race",
+          "status": "up"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "攻击指纹",
+        "text": "间隔 3ms + 同设备指纹 + 同金额 → 并发脚本同时发射。\n两笔都通过了余额检查 → \"检查\"读到的都是扣减前的余额。\n→ 竞态窗口实锤方向：检查与扣减之间存在时间缝。"
+      }
+    },
+    {
+      "id": "a-code",
+      "name": "读提现接口的实现",
+      "desc": "检查与扣减是怎么写的",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-race"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-race",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "withdraw.js 关键行",
+        "text": "const balance = await Account.getBalance(uid)      ← 第 1 步：读\nif (balance < amount) throw \"余额不足\"              ← 第 2 步：查\nawait Account.deduct(uid, amount)                   ← 第 3 步：扣\nawait Channel.payout(uid, amount)                   ← 第 4 步：出金\n// 读、查、扣三步之间，任何并发请求都能插进来\n→ 经典 SELECT-then-UPDATE：检查的是\"过去\"的余额，扣的是\"现在\"的钱。"
+      }
+    },
+    {
+      "id": "a-replaycheck",
+      "name": "核对请求 ID 与重放记录",
+      "desc": "排除重放攻击",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-replay"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-replay",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "重放分析",
+        "text": "两笔请求 requestId 不同、时间戳不同——是真正的并发请求，不是重放。\n→ 排除重放；但这暴露另一个缺失：接口没有幂等键——重放防御顺手补上。"
+      }
+    },
+    {
+      "id": "a-precision",
+      "name": "核对金额精度处理",
+      "desc": "排除浮点精度 bug",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-precision"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-precision",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "精度核对",
+        "text": "金额全链路为整数分（int），无浮点运算。\n→ 排除精度问题：流水数字清晰，就是\"检查通过了两倍\"。"
+      }
+    },
+    {
+      "id": "a-upstream",
+      "name": "核对上游重试机制",
+      "desc": "排除上游重试导致的重复调用",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-upstream"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-upstream",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "上游核对",
+        "text": "App 端无自动重试；网关无重试策略。\n两笔请求是攻击者主动并发发出的。\n→ 排除上游；攻击者知道自己在干什么。"
+      }
+    },
+    {
+      "id": "a-scope",
+      "name": "排查同类接口的暴露面",
+      "desc": "转账/充值/扣券有没有同样的竞态",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "同类暴露面",
+        "text": "审计全部资金操作接口：提现/转账/消费扣款/红包领取——\n4 个接口全部存在\"检查与扣减分离\"模式。\n→ 不是一个接口的 bug，是一类接口的架构缺陷——修复要全面铺开。"
+      }
+    },
+    {
+      "id": "a-fixatomic",
+      "name": "资金操作全面原子化改造",
+      "desc": "【状态变更】条件 UPDATE 原子扣减 + 幂等键 + 流水对账",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "修复结果",
+        "text": "① 原子扣减：UPDATE account SET balance = balance - ? WHERE uid=? AND balance >= ?（影响行数=0 即拒绝）\n② 提现接口加幂等键（客户端生成，服务端去重）\n③ 灰度验证：并发 1000 双发脚本 → 第二笔全部拒绝，余额精准。"
+      }
+    },
+    {
+      "id": "a-freeze",
+      "name": "冻结可疑账户并止付",
+      "desc": "【状态变更】冻结 6 个攻击账户，追回出金",
+      "cost": 1,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "止付结果",
+        "text": "6 账户冻结，4.7 万元中 3.1 万元在第三方通道内被止付成功，1.6 万元已出金进入追偿。\n→ 资金操作的损失追偿成本极高——防住比追回便宜得多。"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-race",
+      "text": "提现接口余额检查与扣减非原子（SELECT-then-UPDATE 三步分离）——并发窗口内两笔请求都读到检查时的余额，双双通过并出金（double-spend）",
+      "correct": true
+    },
+    {
+      "id": "rc-replay",
+      "text": "请求重放：同一笔提现被重复执行",
+      "correct": false
+    },
+    {
+      "id": "rc-precision",
+      "text": "金额浮点精度计算错误",
+      "correct": false
+    },
+    {
+      "id": "rc-upstream",
+      "text": "上游重试机制重复调用",
+      "correct": false
+    }
+  ],
+  "expertCost": 7,
+  "restartActionId": "a-freeze",
+  "expertChain": [
+    {
+      "thought": "攻击指纹先读：间隔 3ms、同设备、双笔都通过检查——\"检查时余额够\"是两笔共同的证词。",
+      "update": "两笔都通过检查 → 要么余额本身错了，要么检查读到的世界过时了。后者嫌疑大：流水显示余额计算清晰。",
+      "actionId": "a-impact",
+      "why": "1⚡ 攻击指纹分类：间隔 3ms 的并发双发指向竞态窗口；时间上完全重合的同一 ID 才指向重放。指纹不同，病不同。",
+      "conclusion": "竞态方向确认 → 读代码验证检查与扣减的关系。"
+    },
+    {
+      "thought": "读代码：读余额 → 查 → 扣三步分离——第 3 步执行时，第 1 步读到的余额已经过期。",
+      "update": "SELECT-then-UPDATE 实锤：并发窗口 = 第 1 步到第 3 步之间的全部时间。两笔都在窗口内检查通过。",
+      "actionId": "a-code",
+      "why": "2⚡ 直捣机制：并发 bug 的本质是\"检查基于旧世界，动作发生在新世界\"——把三步压成一个原子操作，窗口就消失了。",
+      "conclusion": "竞态实锤 + 同类接口全部存在同模式 → 修复要全面铺开。"
+    },
+    {
+      "thought": "重放/精度/上游三个\"长得像\"的假设逐一排除：请求 ID 不同、金额全整数、无上游重试。",
+      "update": "三假设排除后，竞态是唯一解释。审计发现 4 个同类接口同模式——修复范围扩大。",
+      "actionId": "a-replaycheck",
+      "why": "1⚡ 逐个排除\"长得像\"的假设是并发排查的纪律：重放/精度/上游重试都能造成双扣，只有排除它们，竞态结论才成立。",
+      "conclusion": "竞态实锤加固 + 修复范围定为全部资金操作接口。"
+    },
+    {
+      "thought": "修复方案原子化：条件 UPDATE（WHERE balance >= amount）一行解决读查扣三步——影响行数为 0 即拒绝。幂等键防重放顺手补上。",
+      "update": "停止收集。冻结止付 + 原子化改造 + 幂等键 + 同类接口全面铺开。",
+      "actionId": "",
+      "why": "【停止规则】攻击指纹、代码机制、排除项、同类暴露面四项闭合。修复方案\"原子扣减 + 幂等键\"是资金操作的标准答案。",
+      "conclusion": "止付追偿 3.1 万；原子化改造上线后并发双发全部拒绝。检查单：资金操作 = 原子扣减 + 幂等键 + 流水对账。"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "检查与扣减必须原子：SELECT-then-UPDATE 的三步分离，就是并发攻击的跑道。",
+      "principle": "程序设计纪律：条件 UPDATE（UPDATE ... WHERE balance >= amount）用影响行数判断成败——把\"读/查/扣\"三步压成数据库的一步原子操作，窗口即消失。"
+    },
+    {
+      "text": "并发 bug 就是安全漏洞：竞态超卖丢的是库存，竞态提现丢的是钱——攻击者专挑检查与扣减之间的窗口。",
+      "principle": "安全思维：所有\"检查 → 执行\"模式的接口都是潜在攻击面。渗透测试者与故障的区别只在动机——修复标准相同：原子化。"
+    },
+    {
+      "text": "资金操作三件套：原子扣减 + 幂等键 + 流水对账——缺任何一件，损失只是时间问题。",
+      "principle": "沉淀思维：原子扣减防并发双花，幂等键防重放，流水对账兜底发现。三件套在钱包功能上线前就该齐备——这次 4.7 万学费买回的清单。"
+    },
+    {
+      "text": "风控流水是攻击者的自白书：间隔 3ms、同设备、双笔同金额——攻击指纹里藏着全部作案手法。",
+      "principle": "验证思维：资金异常排查从流水分析开始——间隔/来源/金额/设备指纹四个维度就能区分\"重放/竞态/精度\"三类病因。"
+    }
+  ]
+}

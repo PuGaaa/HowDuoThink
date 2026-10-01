@@ -1,0 +1,240 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * B2-1 · security L1（安全攻防·第 7 章开篇教学关）
+ * 主训思维：安全思维（密钥泄露后，删代码 ≠ 撤销密钥——轮换才是第一步）
+ * 次训思维：全栈视野（git 历史/云平台账单/公开仓库的暴露面）
+ * 真实原型：密钥硬编码进公开仓库，八个月后安全扫描发现
+ * 情绪兽设计：恐怖蛙（恐慌）——"密钥在公网躺了八个月"
+ * 检查单：思维型 3 + 知识型 1
+ */
+export const leakedKeysCase: DiagnosisCase = {
+  id: 'leaked-keys',
+  title: '密钥在公网躺了八个月',
+  intro: '安全扫描报告：短信服务商 API Key 硬编码在仓库里，八个月前提交，仓库是公开的。上周你刚把代码改成环境变量——以为就安全了。',
+  domain: 'deploy',
+  layer: '密钥泄露后，删代码 ≠ 撤销密钥：轮换是第一步，历史清洗是第二步',
+  part: 'master',
+  chapterId: 'security',
+  order: 1,
+  typeTags: ['security', 'deploy'],
+  difficulty: 1,
+
+  scene: {
+    role: '你是「鲜到家」的工程师。八个月前你为了"本地跑通"，把短信 API Key 写进了配置文件并提交——上周你把它改成了环境变量，以为已经解决了。今天安全扫描的报告到了。',
+    architecture: 'Git 仓库(公开) → CI → 生产（短信服务商 API）',
+    tag: '安全事件现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '安全扫描报告',
+        text: '级别：高危\n发现：SMS_PROVIDER_API_KEY 硬编码（commit 8 个月前）\n仓库可见性：public\n当前状态：代码已移除（上周），密钥本身：未轮换。',
+      },
+      {
+        type: 'text',
+        title: '关键事实',
+        text: '该 API Key 可调用短信发送接口（按条计费）。\n公开仓库 + 公网爬虫常年扫描密钥——暴露面不是"可能被看到"，是"大概率已被看到"。',
+      },
+    ],
+    timeline: '密钥提交：8 个月前 ｜ 代码移除：上周 ｜ 你的认知：已经解决 ｜ 安全扫描：今天',
+    impactHint: '"代码里已经没有了"和"密钥已经安全了"，是同一件事吗？',
+  },
+
+  hypotheses: [
+    { id: 'h-rotate', text: '立即轮换密钥并审计账单：泄露密钥仍有效，删代码不等于撤销', excludeActionId: 'a-rotate' },
+    { id: 'h-clean', text: '清洗 git 历史：用 filter-repo 从所有提交中抹除密钥', excludeActionId: 'a-clean' },
+    { id: 'h-blame', text: '这是安全团队/平台组的事，我只负责改代码', excludeActionId: 'a-blame' },
+    { id: 'h-scan', text: '等扫描工具自动修复或自动失效', excludeActionId: 'a-scanonly' },
+  ],
+
+  actions: [
+    {
+      id: 'a-report',
+      name: '读扫描报告并评估暴露面',
+      desc: '泄露了什么、多久、谁能看到',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [{ id: 'h-rotate', status: 'up' }],
+      result: {
+        type: 'text',
+        title: '暴露面评估',
+        text: '泄露物：SMS API Key（可发短信，按条计费）\n暴露时长：8 个月\n暴露范围：公开仓库——爬虫扫描密钥是常态，按"已被获取"处理。\n→ 严重性：高危。处置第一步：轮换。',
+      },
+    },
+    {
+      id: 'a-rotate',
+      name: '云平台吊销旧密钥并签发新密钥',
+      desc: '【状态变更】轮换是安全事件响应的第一步',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-rotate'],
+      hypotheses: [{ id: 'h-rotate', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: '轮换完成',
+        text: '旧 API Key 立即吊销（调用返回 401）→ 新密钥签发并存入密钥管理服务。\n→ 泄露的旧密钥从此变成一串废字符：这才是"解决了"的真正含义。',
+      },
+    },
+    {
+      id: 'a-bill',
+      name: '审计云平台账单与调用日志',
+      desc: '泄露期间有没有被恶意调用',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-rotate'],
+      hypotheses: [{ id: 'h-rotate', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: '审计结果',
+        text: '8 个月账单：无异常调用高峰、无异地 IP 调用记录。\n→ 运气好：未被恶意利用。但"还没被用"不等于"不用轮换"——爬虫什么时候用，不由你决定。',
+      },
+    },
+    {
+      id: 'a-gitlog',
+      name: '用 git log 确认泄露范围',
+      desc: '哪些提交、哪些文件、暴露多久',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '泄露范围',
+        text: '涉及提交：3 个（含 1 个 README 示例）\n暴露时长：8 个月（公开期 37 天）\n→ 需要清洗的范围明确。',
+      },
+    },
+    {
+      id: 'a-clean',
+      name: 'git filter-repo 清洗历史',
+      desc: '从所有提交中抹除密钥（需协调 force push）',
+      cost: 2,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-clean'],
+      hypotheses: [{ id: 'h-clean', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: '历史清洗',
+        text: 'filter-repo 抹除 3 个提交中的密钥 → force push（全员需重新 clone）。\n→ 注意：已 clone 的本地副本与第三方 fork 无法追溯清洗——所以历史清洗是第二步，轮换才是第一步。',
+      },
+    },
+    {
+      id: 'a-blame',
+      name: '只通知安全团队，自己不改',
+      desc: '"这是平台组的责任"',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-blame'],
+      hypotheses: [{ id: 'h-blame', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '这个想法的问题',
+        text: '提交者是你，泄露窗口是因你的提交而打开——安全是全员责任，第一响应人就是发现人和提交人。\n→ 排除：等别人处理只会拉长暴露窗口。',
+      },
+    },
+    {
+      id: 'a-scanonly',
+      name: '只等扫描工具自动修复',
+      desc: '"扫描工具会发现并自动处理的吧"',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-scan'],
+      hypotheses: [{ id: 'h-scan', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '这个想法的问题',
+        text: '扫描工具的职责是"发现"，不是"修复"——它甚至不会替你吊销密钥。\n→ 排除：等待不产生任何安全增益。',
+      },
+    },
+    {
+      id: 'a-prevent',
+      name: '加预提交钩子防再犯',
+      desc: '【状态变更】secret 扫描进入 pre-commit 与 CI',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '防复发',
+        text: 'pre-commit 钩子 + CI 密钥扫描上线：含密钥样式的提交直接被拒。\n→ 下一次"手滑"，会在提交前被拦下——安全从"事后响应"前移到"事前拦截"。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-rotate', text: '正确处置第一步：立即吊销/轮换泄露密钥并审计账单——删代码不等于撤销密钥，泄露的凭证在被轮换前永远有效', correct: true },
+    { id: 'rc-clean', text: 'git 历史清洗：必要但次级——已 clone 副本与 fork 无法追溯，历史清洗需协调 force push', correct: false },
+    { id: 'rc-blame', text: '责任转移：交给安全团队/平台组后自己不再跟进', correct: false },
+    { id: 'rc-scan', text: '被动等待扫描工具自动修复', correct: false },
+  ],
+
+  expertCost: 6,
+  restartActionId: 'a-prevent',
+
+  expertChain: [
+    {
+      thought: '评估暴露面：泄露了什么、多久、谁能看到——决定严重性级别。',
+      update: '可计费 SMS Key + 公开仓库 + 8 个月暴露 → 按"已被获取"处理，高危。',
+      actionId: 'a-report',
+      why: '1⚡ 暴露面评估决定响应级别：公开仓库里的密钥按"已被爬虫获取"处理是安全行业的标准假设——不存在"可能没被发现"的侥幸。',
+      conclusion: '高危确认 → 处置第一步：轮换。',
+    },
+    {
+      thought: '"上周已经改成环境变量了"——但你解决的是"代码里没有了"，不是"密钥失效了"。轮换 + 审计，双管齐下。',
+      update: '旧密钥吊销立即生效；账单审计显示 8 个月无恶意调用——运气好，但轮换依旧必须做。',
+      actionId: 'a-rotate',
+      why: '2⚡ 轮换是密钥泄露响应的第一定律：泄露的凭证在被吊销前永远有效——删代码改变的是代码，吊销改变的才是风险。',
+      conclusion: '轮换完成 → 泄露密钥变成废字符，风险清零。',
+    },
+    {
+      thought: '风险清零后复盘暴露范围：git log 确认 3 个提交 8 个月 → 历史清洗排第二位。',
+      update: 'filter-repo 清洗 + force push 完成——但已 clone 副本与 fork 无法追溯。',
+      actionId: 'a-clean',
+      why: '1⚡ 历史清洗排第二的原因：它降低"未来再被翻出"的概率，但不消除"已被翻出"的风险——所以排在轮换之后，顺序不能反。',
+      conclusion: '历史清洗完成 → 防复发拦截。',
+    },
+    {
+      thought: '响应闭环的最后一块：加 pre-commit 密钥扫描，让下一次手滑在提交前被拦。',
+      update: '停止收集。轮换 ✓ 审计 ✓ 清洗 ✓ 拦截 ✓——事件响应完整闭环。',
+      actionId: '',
+      why: '【停止规则】响应四步（轮换/审计/清洗/拦截）全部完成，风险清零。继续追加动作不产生安全增益。',
+      conclusion: '事件闭环。检查单：密钥泄露响应四步 = 轮换 → 审计 → 清洗 → 拦截。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '密钥泄露后，删代码 ≠ 撤销密钥：泄露的凭证在被吊销前永远有效。',
+      principle: '安全响应第一定律：处置顺序 = 轮换 → 审计 → 清洗 → 拦截。跳过轮换直接清洗历史，等于把被偷的钥匙留在锁上、只擦掉钥匙的照片。',
+    },
+    {
+      text: '公开仓库里的密钥，按"已被爬虫获取"处理——不存在"可能没被发现"的侥幸。',
+      principle: '全栈视野：公网爬虫 7×24 扫描密钥样式（AWS AKIA 前缀、私钥头、API Key 格式），暴露时长直接等于风险敞口。',
+    },
+    {
+      text: '安全是全员责任：发现人和提交人就是第一响应人，"等安全团队"只会拉长暴露窗口。',
+      principle: '安全响应的责任模型：发现者即响应者（轮换立刻能做），安全团队提供支持（审计/溯源）——责任转移不是响应。',
+    },
+    {
+      text: '密钥管理服务 + 预提交扫描：让"手滑"在提交前被拦，让"轮换"变成一次点击。',
+      principle: '沉淀思维：事后响应四步完成后，必须加两道防线——密钥管理服务（代码里永远没有密钥）+ pre-commit 扫描（含密钥样式的提交直接被拒）。',
+    },
+  ],
+}

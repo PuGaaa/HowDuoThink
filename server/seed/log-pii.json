@@ -1,0 +1,316 @@
+{
+  "id": "log-pii",
+  "title": "日志里的手机号与 token",
+  "intro": "合规审计通报：订单服务日志打印了用户手机号、收货地址和完整登录 token——日志平台全员可搜，保留 180 天。",
+  "domain": "runtime",
+  "layer": "日志是数据泄露的暗渠：每一次\"打个日志方便排查\"，都可能是一次无意识的数据外泄",
+  "part": "master",
+  "chapterId": "security",
+  "order": 3,
+  "typeTags": [
+    "security",
+    "logging"
+  ],
+  "difficulty": 2,
+  "scene": {
+    "role": "你是「鲜到家」订单服务的负责人。合规审计发出通报：你的服务日志存在个人信息违规存储——这触碰的是法规红线，不是代码风格问题。",
+    "architecture": "订单服务 → 日志采集 → 日志平台(全员可搜, 保留 180 天)",
+    "tag": "合规审计现场",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "合规审计通报",
+        "text": "抽样：订单服务日志命中个人信息 40 万+ 条（手机号/收货地址明文）。\n另发现：完整登录 token 直接打印（有效期内可重放）。\n法规对照：违反个人信息最小必要原则。"
+      },
+      {
+        "type": "text",
+        "title": "日志平台现状",
+        "text": "全员只读可搜全量（包括实习同学）。\n保留期 180 天，无访问审计。"
+      }
+    ],
+    "timeline": "日志格式从未系统性审查过 ｜ 上季度日志平台从\"运维可见\"开放为\"全员可搜\" ｜ 合规审计本周进场",
+    "impactHint": "\"打个日志方便排查\"——这个习惯动作里，藏着多少用户的数据？"
+  },
+  "hypotheses": [
+    {
+      "id": "h-log",
+      "text": "服务代码打印了整个业务对象：手机号/地址/token 随对象序列化进日志",
+      "excludeActionId": "a-code"
+    },
+    {
+      "id": "h-access",
+      "text": "日志平台权限过宽：全员可搜全量，放大了暴露面",
+      "excludeActionId": "a-access"
+    },
+    {
+      "id": "h-encrypt",
+      "text": "日志传输或存储未加密，需要加密改造",
+      "excludeActionId": "a-transport"
+    },
+    {
+      "id": "h-retain",
+      "text": "保留期 180 天过长，超出了必要范围",
+      "excludeActionId": "a-retain"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-grep",
+      "name": "在日志平台实测命中量",
+      "desc": "用手机号正则搜一遍，量化暴露",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-log"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-log",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "实测命中",
+        "text": "手机号正则搜索：命中 41.7 万条日志，含明文手机号/收货地址。\ntoken 搜索：命中 2.3 万条完整登录 token。\n→ 通报属实，且比通报更严重：token 可重放。"
+      }
+    },
+    {
+      "id": "a-code",
+      "name": "追查打印源头：代码里谁在打",
+      "desc": "是故意打的还是顺手打的",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-log"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-log",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "打印源头",
+        "text": "logger.info(\"createOrder\", JSON.stringify(order))   ← 整个对象入日志\nlogger.info(\"login ok\", { token })                  ← token 全量打印\n// 三处源头：建单/登录/异常兜底——都是\"为了排查方便\""
+      }
+    },
+    {
+      "id": "a-codefix",
+      "name": "源头改造：脱敏工具 + 打印规范",
+      "desc": "【状态变更】统一脱敏（中间打码）+ token 截断，三处源头修复",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "修复结果",
+        "text": "日志工具层加 mask 中间件：手机号 138****5678、地址只留省市、token 只留前 8 位。\n三处源头改为白名单字段输出。\n灰度一周：排查能力未受影响（关键信息保留可辨识度），敏感数据归零。"
+      }
+    },
+    {
+      "id": "a-access",
+      "name": "审计日志平台的访问权限",
+      "desc": "谁能搜到这 40 万条",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-access"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-access",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "权限审计",
+        "text": "全员只读可搜全量日志（含实习同学）——40 万条 PII 对 300 人可见。\n→ 暴露面放大器：修复打印只是第一步，权限必须收到\"相关业务线\"。"
+      }
+    },
+    {
+      "id": "a-accessfix",
+      "name": "日志平台权限收紧",
+      "desc": "【状态变更】全员可搜 → 按业务线最小化授权",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-access"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-access",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "权限收紧",
+        "text": "权限模型改为：业务线隔离 + 角色申请制（默认无权限）。\n→ 可见人数 300 → 23，且带访问审计。"
+      }
+    },
+    {
+      "id": "a-transport",
+      "name": "核查传输与存储加密",
+      "desc": "排除\"加密层没做\"的假设",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-encrypt"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-encrypt",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "加密核对",
+        "text": "日志传输 TLS 加密、平台存储 AES 加密——基础设施层合规。\n→ 问题不在\"没加密\"：加密保护的是外部攻击，防不了\"内部明文打印\"——源头治理才是正解。"
+      }
+    },
+    {
+      "id": "a-retain",
+      "name": "核查保留期策略",
+      "desc": "180 天是不是太长",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-retain"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-retain",
+          "status": "down"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "保留期评估",
+        "text": "180 天在\"运维排障\"用途下属合理范围（行业惯例 90~180 天）。\n→ 保留期合规：真正的违规是\"内容含 PII\"——内容合规后，保留期不再是主要矛盾。"
+      }
+    },
+    {
+      "id": "a-purge",
+      "name": "清空全部历史日志应急",
+      "desc": "【状态变更】立即删除 180 天全量日志消掉 PII",
+      "cost": 2,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "应急结果",
+        "text": "PII 确实清零了——但过去半年的排查依据也一起消失，线上正在发生的另一个问题失去线索。\n→ 清历史是\"销毁证据式合规\"：正确做法是修源头 + 权限收紧，历史日志按保留期自然过期。"
+      }
+    },
+    {
+      "id": "a-recheck",
+      "name": "修复后复测命中量",
+      "desc": "【状态变更】整改完成后请合规复检",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "复检结果",
+        "text": "脱敏中间件灰度 7 天后：PII 命中 41.7 万 → 0 条。\ntoken 命中归零。合规通报关闭，整改记录归档。\n→ 从\"违规\"到\"合规\"：一个中间件 + 一次权限收紧。"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-log",
+      "text": "服务代码把整个业务对象序列化进日志（含手机号/地址）+ token 全量打印——三处\"为了排查方便\"的源头，造成 41.7 万条 PII 入日志",
+      "correct": true
+    },
+    {
+      "id": "rc-access",
+      "text": "日志平台全员可搜全量的权限过宽，放大了暴露面",
+      "correct": false
+    },
+    {
+      "id": "rc-encrypt",
+      "text": "日志传输/存储缺少加密层",
+      "correct": false
+    },
+    {
+      "id": "rc-retain",
+      "text": "日志保留期 180 天超出必要范围",
+      "correct": false
+    }
+  ],
+  "expertCost": 6,
+  "restartActionId": "a-recheck",
+  "expertChain": [
+    {
+      "thought": "通报先量化：审计说 40 万条，自己实测一遍——数量、类型、分布决定整改的优先级。",
+      "update": "实测 41.7 万条 PII + 2.3 万条 token（可重放）——比通报更严重。",
+      "actionId": "a-grep",
+      "why": "1⚡ 自己实测而不是照单全收：通报是别人的抽样，实测是自己的全貌——token 可重放这个更严重的发现就是这么来的。",
+      "conclusion": "严重性确认 → 追打印源头。"
+    },
+    {
+      "thought": "追源头：是有人故意打，还是\"顺手 JSON.stringify 整个对象\"？——两种源头两种修法。",
+      "update": "三处源头全是\"为了排查方便\"的顺手打印，无恶意——修法是工具层统一脱敏，不是逐条删日志。",
+      "actionId": "a-code",
+      "why": "2⚡ 找到源头才能选对修法：故意泄露要追责，习惯性打印要给工具——日志工具层加脱敏中间件，一次性治所有源头。",
+      "conclusion": "源头 = 习惯性整对象打印 → 统一脱敏中间件。"
+    },
+    {
+      "thought": "源头之外看放大器：40 万条 PII 在平台上谁能搜到？权限宽度决定暴露面。",
+      "update": "全员 300 人可搜全量——暴露面被权限放大了两个数量级，权限收紧是第二战场。",
+      "actionId": "a-access",
+      "why": "1⚡ 日志平台权限是暴露面的乘数：内容少 × 权限宽，和内容多 × 权限窄，风险可能相当——两个都要治。",
+      "conclusion": "权限收紧方案确立 → 排除其余假设。"
+    },
+    {
+      "thought": "加密已合规、保留期合理、权限已收紧——假设全部闭环，复检测验证。",
+      "update": "停止收集。复检通过 = 整改闭环。",
+      "actionId": "",
+      "why": "【停止规则】源头（脱敏中间件）、放大器（权限收紧）都治理完毕，复检 0 命中——继续追加动作不产生合规增益。",
+      "conclusion": "合规通报关闭。检查单：打印业务对象前必过\"PII 检查\"；日志权限默认最小化。"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "日志是数据泄露的暗渠：\"打个日志方便排查\"的习惯动作，可能正在批量外泄用户数据。",
+      "principle": "安全思维：JSON.stringify 整个业务对象进日志，等于把数据库的一行拷贝到全员可搜的平台。打印任何对象前，先问\"这里面有没有手机号/地址/凭据\"。"
+    },
+    {
+      "text": "脱敏要在工具层统一做，而不是靠每个开发者自觉：一个 mask 中间件，治所有源头。",
+      "principle": "程序设计纪律：日志工具层内置脱敏中间件（手机号/地址/凭据自动打码），让\"合规打印\"成为默认行为——依赖自觉的规范，终会被赶工期打破。"
+    },
+    {
+      "text": "token 打进日志 = 凭据泄露：有效期内可重放，等于把登录态送人。",
+      "principle": "安全思维：凭据（token/密钥/密码）的日志安全线是\"只留前 8 位可辨识\"。可重放的凭据泄露，按凭据泄露处置而非日志问题。"
+    },
+    {
+      "text": "日志平台的权限是暴露面的乘数：内容治理（源头脱敏）与权限治理（最小化）必须同时做。",
+      "principle": "沉淀思维：源头脱敏管\"写进去什么\"，权限最小化管\"谁能读出来\"——两个战场一起治，日志平台才能从\"合规风险\"变回\"排查工具\"。"
+    }
+  ]
+}
