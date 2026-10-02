@@ -1,0 +1,300 @@
+{
+  "id": "data-script-accident",
+  "title": "修数据的脚本，修出了五万个新错误",
+  "intro": "运营反馈某商品库存显示为 -50。你写了个修复脚本——结果 5 万个商品的库存全部变成了 -50。",
+  "domain": "data",
+  "layer": "数据操作脚本的三道防线：测试环境验证 + 备份 + 双人复核——缺一道就是全表灾难",
+  "part": "master",
+  "chapterId": "data",
+  "order": 8,
+  "typeTags": [
+    "data",
+    "database"
+  ],
+  "difficulty": 3,
+  "scene": {
+    "role": "你是「鲜到家」的运营平台后端。运营报了库存显示 -50 的 bug，你 5 分钟写了个修复脚本——执行后 5 万个商品库存全部变成 -50。",
+    "architecture": "运营后台 → 库存服务 → MySQL(inventory 表 5 万行)",
+    "tag": "故障现场",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "执行结果",
+        "text": "UPDATE inventory SET stock = -50 WHERE sku_id = 12345\n→ 执行返回：affected rows: 50,000（不是 1）\n→ WHERE 条件没有生效——更新了全表而非单条。"
+      },
+      {
+        "type": "text",
+        "title": "业务影响",
+        "text": "5 万个商品库存全部变为 -50 → 前端显示\"库存不足\" → 全站无法下单。\n涉及品牌方 300+，影响大促预热。"
+      }
+    ],
+    "timeline": "脚本编写：5 分钟 ｜ 脚本执行：直接在生产执行（无测试环境验证、无备份）｜ 发现全表更新：执行后 30 秒（affected rows 异常）",
+    "impactHint": "UPDATE 的 affected rows = 50000 而不是 1——WHERE 到底写没写、写对了没？"
+  },
+  "hypotheses": [
+    {
+      "id": "h-wheremissing",
+      "text": "UPDATE 没写 WHERE 条件——全表更新",
+      "excludeActionId": "a-sqlcheck"
+    },
+    {
+      "id": "h-wherewrong",
+      "text": "WHERE 条件写错了（类型不匹配导致不匹配任何行→ MySQL 严格模式报错→但 affected rows=50000 说明不是这种情况）",
+      "excludeActionId": "a-sqlcheck"
+    },
+    {
+      "id": "h-trigger",
+      "text": "触发了库存表的触发器，级联更新了其他行",
+      "excludeActionId": "a-triggercheck"
+    },
+    {
+      "id": "h-orm",
+      "text": "ORM 层的批量操作副作用",
+      "excludeActionId": "a-ormcheck"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-sqlcheck",
+      "name": "读执行的实际 SQL",
+      "desc": "从 MySQL general log 看实际执行的 SQL",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-wheremissing",
+        "h-wherewrong"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-wheremissing",
+          "status": "confirmed"
+        },
+        {
+          "id": "h-wherewrong",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "general log",
+        "text": "实际执行的 SQL：\nUPDATE inventory SET stock = -50 WHERE sku_id = 12345\n→ SQL 看起来正确！有 WHERE！但 affected rows = 50000？？\n→ SQL 本身没问题——问题在\"执行环境\"。再查。"
+      }
+    },
+    {
+      "id": "a-environment",
+      "name": "确认执行的数据库环境",
+      "desc": "你确定这个 SQL 跑在生产库而不是测试库？反过来说",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "环境确认",
+        "text": "你执行的连接串指向：mysql://prod-cluster/inventory_db\n库里的 inventory 表确实有 50000 行。\n但 sku_id = 12345 在这张表里不存在（该 SKU 已下架被软删除）。\n→ \"WHERE sku_id = 12345\" 没匹配到任何行。\n那 affected rows = 50000 是怎么来的？"
+      }
+    },
+    {
+      "id": "a-reason",
+      "name": "分析 affected rows = 50000 的原因",
+      "desc": "50 条还是 5 万条——数字是关键线索",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "数字分析",
+        "text": "inventory 表总行数 = 50,000。\n脚本输出 \"affected rows: 50000\" —— 但 sku_id = 12345 已下架不在表中。\n→ 也就是说实际执行的 UPDATE 没有WHERE 条件！\n检查你的终端历史——你是不是复制了模板忘了改 WHERE？"
+      }
+    },
+    {
+      "id": "a-triggercheck",
+      "name": "检查表上的触发器",
+      "desc": "排除触发器级联",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-trigger"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-trigger",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "触发器检查",
+        "text": "inventory 表无 AFTER UPDATE 触发器。\n→ 排除触发器级联。"
+      }
+    },
+    {
+      "id": "a-ormcheck",
+      "name": "检查是否有 ORM 层副作用",
+      "desc": "排除 ORM 层批量操作",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-orm"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-orm",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "ORM 检查",
+        "text": "直接用 mysql CLI 执行，无 ORM 层参与。\n→ 排除 ORM 副作用。"
+      }
+    },
+    {
+      "id": "a-restore",
+      "name": "从备份恢复库存表",
+      "desc": "【状态变更】从备份快照恢复 5 万行库存数据",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "恢复结果",
+        "text": "从 RDS 备份恢复 inventory 表（回到 -50 bug 前的状态）。\n5 万行库存数据恢复，前端恢复下单。\n→ 恢复用了 20 分钟；但你没有最初的 -50 bug 要修了——因为运营那边数据已自行刷新。"
+      }
+    },
+    {
+      "id": "a-rca",
+      "name": "写根因分析报告（RCA）",
+      "desc": "复盘文档：事故时间线 + 根因 + 三道防线 + 教训",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "RCA 报告",
+        "text": "① 时间线：15:43 写脚本 → 15:48 执行 → 15:49 发现全表更新 → 16:10 备份恢复\n② 根因：复制脚本模板丢失 WHERE + 直接生产执行无验证\n③ 教训：三道防线写入团队规范\n④ 行动项：所有历史数据操作脚本入库审计"
+      }
+    },
+    {
+      "id": "a-notifybrand",
+      "name": "通知受影响品牌方",
+      "desc": "【状态变更】通知 300+ 品牌方库存异常与恢复时间",
+      "cost": 1,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "品牌方通知",
+        "text": "运营团队逐个通知 300+ 品牌方：库存系统异常已恢复，请在 1 小时内核对各自库存。\n→ 危机公关：透明通知优于静默恢复（品牌方自行发现库存异常会更不信任平台）。"
+      }
+    },
+    {
+      "id": "a-safetyscript",
+      "name": "制定数据操作安全规范",
+      "desc": "【状态变更】测试环境验证 + 备份 + 双人复核 三道防线",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "数据操作安全规范",
+        "text": "① 测试环境先跑一遍（验证 SQL 正确性）\n② 生产执行前 mysqldump 备份目标表\n③ 双人复核（第二人确认 SQL 的 WHERE 条件）\n④ 生产执行必须用 CLI 工具（防复制丢失 WHERE）\n→ 三道防线写入团队 wiki，所有数据操作脚本必须遵守。"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-wheremissing",
+      "text": "复制脚本模板时丢失了 WHERE 条件——实际执行的是无 WHERE 的全表 UPDATE，5 万行库存全部变为 -50。根因是\"复制粘贴丢失 WHERE + 直接生产执行无验证、无备份、无复核\"",
+      "correct": true
+    },
+    {
+      "id": "rc-wherewrong",
+      "text": "WHERE 条件写错导致不匹配任何行",
+      "correct": false
+    },
+    {
+      "id": "rc-trigger",
+      "text": "表上触发器级联更新其他行",
+      "correct": false
+    },
+    {
+      "id": "rc-orm",
+      "text": "ORM 层批量操作副作用",
+      "correct": false
+    }
+  ],
+  "expertCost": 5,
+  "restartActionId": "a-safetyscript",
+  "expertChain": [
+    {
+      "thought": "先读实际执行的 SQL：general log 是最诚实的证据——它记录了到底执行了什么。",
+      "update": "general log 显示的 SQL 有 WHERE 条件且正确——但 affected rows = 50000？？矛盾。",
+      "actionId": "a-sqlcheck",
+      "why": "1⚡ general log 是最诚实的证据：它记录的是\"实际执行的 SQL\"，不是\"你以为执行的 SQL\"。",
+      "conclusion": "SQL 有 WHERE 但影响 5 万行 → 确认执行环境。"
+    },
+    {
+      "thought": "确认执行环境：连接串指向生产库、inventory 表 5 万行、sku_id = 12345 不在表中（已下架）。",
+      "update": "SQL 正确但 sku_id = 12345 不在表中 → 应该影响 0 行，实际影响 50000 行。\n→ 矛盾：不是 SQL 写错了，是执行了不同的 SQL。检查终端历史。",
+      "actionId": "a-environment",
+      "why": "1⚡ \"SQL 正确但影响行数错误\"是最危险的线索——说明实际执行的 SQL 和你以为的不一样。",
+      "conclusion": "确认执行了不同的 SQL → 分析 affected rows = 50000 的原因。"
+    },
+    {
+      "thought": "affected rows = 50000 = 表的总行数。这说明执行的 UPDATE 没有WHERE 条件。翻终端历史。",
+      "update": "终端历史：你复制了一个模板脚本，模板里没有 WHERE 条件——你忘了加。\n→ 根因实锤：复制粘贴丢失 WHERE 条件 + 直接生产执行。",
+      "actionId": "a-reason",
+      "why": "2⚡ affected rows = 表总行数是\"全表 UPDATE\"的铁证——不用猜，数字本身就是答案。",
+      "conclusion": "根因实锤 → 恢复数据 + 制定安全规范。"
+    },
+    {
+      "thought": "触发器/ORM 排除，备份恢复完成，三道防线写入 wiki——排查闭环。",
+      "update": "停止排查。数据恢复 ✓ 安全规范 ✓——事件闭环。",
+      "actionId": "",
+      "why": "【停止规则】数据恢复 ✓ 根因实锤（复制丢 WHERE）✓ 安全规范落地 ✓——三步闭环。",
+      "conclusion": "检查单：数据操作脚本三道防线 = 测试环境验证 + 备份 + 双人复核。缺一道 = 全表灾难。"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "复制脚本模板时，WHERE 条件是最容易丢失的部分——尤其是行尾的 WHERE，丢了不影响语法只影响影响范围。",
+      "principle": "程序设计纪律：数据操作脚本必须以\"先写 WHERE 再写 UPDATE\"的顺序编写（IDE 会提示未匹配的列名）。复制模板后第一步：检查 WHERE。"
+    },
+    {
+      "text": "affected rows 是最诚实的证据：期望影响 1 行实际影响 50000 行，数字本身就告诉你\"执行了错误的 SQL\"。",
+      "principle": "验证思维：数据操作后第一时间看 affected rows——期望 1 行实际 50000 行，立刻回滚。不要等\"看起来好像没问题\"再做确认。"
+    },
+    {
+      "text": "数据操作脚本三道防线：测试环境验证 + 备份 + 双人复核——缺任何一道都可能变成全表灾难。",
+      "principle": "沉淀思维：数据操作的安全规范应该写入团队 wiki 并强制执行——\"这次 5 分钟写的脚本\"和\"上次写了 2 小时的功能代码\"在安全标准上应该一致。"
+    },
+    {
+      "text": "direct 生产执行是最危险的路径：CLI 直连生产库 + 复制粘贴 = 灾难的完美配方。",
+      "principle": "程序设计纪律：生产数据操作必须通过受控工具（带确认/审计/回滚能力的平台），不允许 CLI 直连生产库执行裸 SQL。"
+    }
+  ]
+}

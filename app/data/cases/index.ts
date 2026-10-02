@@ -33,6 +33,10 @@ import { midnightRollbackCase } from './midnight-rollback'
 import { canaryDecisionCase } from './canary-decision'
 import { xssDecisionCase } from './xss-decision'
 import { errorBudgetCase } from './error-budget'
+import { doubleStrikeCase } from './double-strike'
+import { falseLeadCase } from './false-lead'
+import { cascadeCase } from './cascade-timeout'
+import { dataScriptCase } from './data-script-accident'
 import { oversellRaceCase } from './oversell-race'
 import { idempotentFailCase } from './idempotent-fail'
 import { logSamplingCase } from './log-sampling'
@@ -70,6 +74,10 @@ export const ALL_CASES: DiagnosisCase[] = [
   canaryDecisionCase,
   xssDecisionCase,
   errorBudgetCase,
+  doubleStrikeCase,
+  falseLeadCase,
+  cascadeCase,
+  dataScriptCase,
   whiteScreenCase,
   depHellCase,
   oversellRaceCase,
