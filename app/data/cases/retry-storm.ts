@@ -1,0 +1,240 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * B6-3 · evolution L2
+ * 主训思维：架构设计（重试无退避 = 放大故障：3x 重试 × 1000 客户端 = 3000 QPS 额外压力）
+ * 次训思维：程序设计（指数退避 + 熔断器 = 重试的标准配置）
+ * 真实原型：网络抖动导致 3% 请求失败 → 每个客户端自动重试 3 次 → 总请求量 ×4 → 全站过载
+ * 情绪兽设计：恐怖蛙（恐慌）——重试风暴越滚越大
+ * 检查单：思维型 3 + 知识型 1
+ */
+export const retryStormCase: DiagnosisCase = {
+  id: 'retry-storm',
+  title: '每个客户端都在重试——重试风暴',
+  intro: '网络抖动 30 秒后恢复。但系统没有恢复——请求量从正常的 5000 QPS 飙升到 20000 QPS，持续 10 分钟。多出来的 15000 QPS 全是重试。',
+  domain: 'runtime',
+  layer: '重试无退避 = 放大故障：3x 重试 × 1000 客户端 = 3000 QPS 额外压力——重试风暴把"30 秒的抖动"变成"10 分钟的雪崩"',
+  part: 'master',
+  chapterId: 'evolution',
+  order: 3,
+  typeTags: ['architecture', 'resilience'],
+  difficulty: 2,
+
+  scene: {
+    role: '你是「鲜到家」API 网关的负责人。网络抖动 30 秒后网络已恢复，但系统请求量从 5000 QPS 飙到 20000 QPS，持续不降。',
+    architecture: 'APP 客户端 ×10000（每个自动重试 3 次） → API 网关 → 后端服务',
+    tag: '故障现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '网关 QPS 监控',
+        text: '正常 QPS：5000\n网络抖动期：5000（其中 3% 失败 = 150 失败请求）\n抖动后：20000 QPS（×4！）——持续 10 分钟未回落。\n→ 多出来的 15000 QPS = 重试流量。',
+      },
+      {
+        type: 'text',
+        title: '客户端行为',
+        text: 'APP 内置 HTTP 客户端自动重试：失败后立即重试，最多 3 次，无退避间隔。\n→ 150 个失败请求 × 3 次重试 × 10000 客户端 = 重试风暴。',
+      },
+    ],
+    timeline: '网络抖动：30 秒（已恢复）｜ 重试风暴：抖动后持续 10 分钟未回落 ｜ 后端服务：CPU 从 40% 飙到 95%',
+    impactHint: '网络抖动只持续了 30 秒——为什么系统持续了 10 分钟？多出来的流量从哪来？',
+  },
+
+  hypotheses: [
+    { id: 'h-retry', text: '客户端自动重试（3 次无退避）：失败请求 × 3 次重试 = 流量放大 4 倍', excludeActionId: 'a-retrycheck' },
+    { id: 'h-traffic', text: '正常流量激增：营销活动或热点事件', excludeActionId: 'a-trafficcheck' },
+    { id: 'h-ddos', text: 'DDoS 攻击：恶意流量', excludeActionId: 'a-ddos' },
+    { id: 'h-queue', text: '队列积压释放：之前积压的请求集中处理', excludeActionId: 'a-queue' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '分析 QPS 飙升的时间线',
+      desc: '飙升与抖动的时间关系',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '时间线对齐',
+        text: '网络抖动：22:00:00 ~ 22:00:30（30 秒）\nQPS 飙升：22:00:30 起，从 5000 飙到 20000\n→ 飙升精确发生在抖动恢复后——不是巧合，是因果。',
+      },
+    },
+    {
+      id: 'a-retrycheck',
+      name: '检查 APP 的重试策略',
+      desc: '重试几次、有没有退避',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-retry'],
+      hypotheses: [{ id: 'h-retry', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: '重试策略审计',
+        text: 'APP HTTP 客户端配置：\nmaxRetries: 3, retryOnFailure: true, backoff: none\n→ 3 次重试 + 无退避间隔 = 失败后立即重试 ×3。\n→ 网络抖动 30 秒内积压的失败请求，恢复后全部立即重试。',
+      },
+    },
+    {
+      id: 'a-trafficcheck',
+      name: '排查正常流量激增',
+      desc: '排除营销/热点事件',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-traffic'],
+      hypotheses: [{ id: 'h-traffic', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '流量来源',
+        text: '无营销活动、无热点事件、无推送发送。\n流量来源分布正常（APP 推送带来的增量 < 5%）。\n→ 排除正常流量激增。',
+      },
+    },
+    {
+      id: 'a-ddos',
+      name: '排查 DDoS 攻击',
+      desc: '排除恶意流量',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-ddos'],
+      hypotheses: [{ id: 'h-ddos', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: 'DDoS 排查',
+        text: '流量来源 IP 分布与正常时段一致；请求有合法登录态；请求模式正常。\n→ 排除 DDoS：这些是真实用户的真实重试。',
+      },
+    },
+    {
+      id: 'a-queue',
+      name: '排查队列积压释放',
+      desc: '排除积压集中处理',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-queue'],
+      hypotheses: [{ id: 'h-queue', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '队列排查',
+        text: '消息队列消费延迟正常，无积压释放。\n→ 排除队列积压。',
+      },
+    },
+    {
+      id: 'a-retrycount',
+      name: '统计重试请求的来源分布',
+      desc: '重试流量来自多少个客户端、重试了几次',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '重试来源统计',
+        text: '重试请求来自 8900 个不同客户端（占总客户端 89%）。\n平均每个客户端重试 1.7 次（上限 3 次，部分因连续失败放弃）。\n→ 重试风暴不是少数客户端的攻击，是"所有客户端的共同行为"。',
+      },
+    },
+    {
+      id: 'a-fixbackoff',
+      name: '添加指数退避 + 熔断器',
+      desc: '【状态变更】重试加指数退避（1s/2s/4s）+ 客户端熔断器',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '修复结果',
+        text: '重试策略：maxRetries 3 → backoff 1s/2s/4s（指数退避）。\n客户端熔断器：错误率 > 50% 时暂停所有请求 5s。\n→ 下次抖动：重试分散在 1~7 秒内，不会形成集中风暴。',
+      },
+    },
+    {
+      id: 'a-rollbackgw',
+      name: '紧急扩容网关 absorbing 重试流量',
+      desc: '【状态变更】网关扩容 2 倍吸收重试流量',
+      cost: 2,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '扩容结果',
+        text: '网关扩容后可以吸收重试流量，但根本问题未解决。\n→ 治标：客户端的重试策略不变，下次抖动还会重演。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-retry', text: 'APP 客户端自动重试（3 次无退避）：网络抖动 30 秒产生的 150 个失败请求在恢复后全部立即重试——重试流量放大 4 倍导致网关和后端过载 10 分钟', correct: true },
+    { id: 'rc-traffic', text: '正常流量激增（营销/热点事件）', correct: false },
+    { id: 'rc-ddos', text: 'DDoS 攻击产生的恶意流量', correct: false },
+    { id: 'rc-queue', text: '消息队列积压集中释放', correct: false },
+  ],
+
+  expertCost: 5,
+  restartActionId: 'a-rollbackgw',
+
+  expertChain: [
+    {
+      thought: 'QPS 飙升的时间线与网络抖动精确对齐（抖动恢复后立即飙升）——这不是巧合，是因果。',
+      update: '抖动 30 秒 → 恢复后 QPS ×4——多出来的流量与抖动直接相关。',
+      actionId: 'a-impact',
+      why: '1⚡ 时间线对齐是因果推断的第一步：飙升精确发生在"抖动恢复后"——说明不是独立事件，而是抖动的下游效应。',
+      conclusion: '抖动→飙升因果关系确认 → 找到"放大机制"。',
+    },
+    {
+      thought: 'APP 内置自动重试：3 次无退避——失败请求在恢复后全部立即重试。QPS ×4 的放大因子 = 1 原始 + 3 重试。',
+      update: '重试风暴实锤：无退避的重试在恢复后集中爆发，QPS ×4 持续 10 分钟。',
+      actionId: 'a-retrycheck',
+      why: '2⚡ 直捣机制：无退避的重试 = 所有客户端在同一时刻恢复后同时重试——"同步重试"是分布式系统最经典的放大效应。',
+      conclusion: '重试风暴实锤 → 排除其他可能原因。',
+    },
+    {
+      thought: '流量激增/DDoS/队列积压三个替代解释逐一排除：无营销活动、IP 分布正常、队列正常。',
+      update: '三个替代解释全部排除——重试风暴是唯一解释。',
+      actionId: 'a-trafficcheck',
+      why: '1⚡ 排除法收尾：三个替代解释都能独立导致 QPS 飙升——逐个排除后，重试风暴成为唯一合理解释。',
+      conclusion: '重试风暴唯一解释确认 → 修复重试策略。',
+    },
+    {
+      thought: '指数退避 + 熔断器上线——重试分散在 1~7 秒内，不会形成集中风暴。',
+      update: '停止排查。重试修复完成。',
+      actionId: '',
+      why: '【停止规则】指数退避分散重试时间 + 熔断器限制最大重试——两层防线覆盖"这次抖动"和"下次抖动"。',
+      conclusion: '检查单：重试策略必须配指数退避 + 熔断器——重试是容错，无退避的重试是放大器。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '重试无退避 = 放大故障：30 秒的网络抖动，因为无退避重试变成了 10 分钟的雪崩。',
+      principle: '架构设计：指数退避（1s/2s/4s）是重试的标准配置——它让重试请求在时间上分散，避免恢复瞬间的集中风暴。无退避的重试 = 所有客户端在同一时刻同时重试。',
+    },
+    {
+      text: '重试是容错手段，无退避的重试是故障放大器：你的"容错"代码可能正在把短暂抖动变成持续雪崩。',
+      principle: '程序设计纪律：每次写 retry 逻辑时，问自己"如果 1000 个客户端同时重试会怎样"。答案是：你需要指数退避 + 熔断器 + 最大重试次数。',
+    },
+    {
+      text: '熔断器是重试风暴的兜底：错误率 > 50% 时暂停所有请求 5 秒——让"抖动期间积压的重试"不再集中爆发。',
+      principle: '架构设计：熔断器（三状态）与指数退避配合使用——退避分散时间，熔断限制最大并发。二者缺一，重试风暴的风险就只被部分覆盖。',
+    },
+    {
+      text: '网络抖动只持续 30 秒，重试风暴持续 10 分钟——"瞬时的因"通过重试被放大为"持续的果"。',
+      principle: '架构设计：评估系统的"故障放大因子"——一个 30 秒的抖动能被放大多长时间？重试 ×4 的放大因子 = 你的系统在用 4 倍的代价处理一个已经消失的问题。',
+    },
+  ],
+}

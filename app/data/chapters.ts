@@ -34,6 +34,7 @@ export const CHAPTERS: ChapterDef[] = [
   { id: 'concurrency', part: 'master', no: '第 5 章', name: '并发迷宫', pact: '时间与顺序是隐藏的维度：竞态只在重放时现形' },
   { id: 'observability', part: 'master', no: '第 6 章', name: '可观测性迷雾', pact: '你看到的日志和指标，本身也会说谎' },
   { id: 'security', part: 'master', no: '第 7 章', name: '安全攻防', pact: '每一个便利的捷径，都可能是别人进来的门' },
+  { id: 'evolution', part: 'master', no: '第 8 章', name: '架构演进', pact: '故障的种子在设计时种下——容量、限流、降级是偿还' },
 ]
 
 /** 章内关卡：按 chapterId 动态聚合 + order 排序；本地与远端（casepack）合并，按 id 去重 */

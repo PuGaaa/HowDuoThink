@@ -37,6 +37,10 @@ import { doubleStrikeCase } from './double-strike'
 import { falseLeadCase } from './false-lead'
 import { cascadeCase } from './cascade-timeout'
 import { dataScriptCase } from './data-script-accident'
+import { rateLimitPassCase } from './rate-limit-passthrough'
+import { fallbackDrillCase } from './fallback-drill-fail'
+import { retryStormCase } from './retry-storm'
+import { hpaLagCase } from './hpa-lag'
 import { oversellRaceCase } from './oversell-race'
 import { idempotentFailCase } from './idempotent-fail'
 import { logSamplingCase } from './log-sampling'
@@ -78,6 +82,10 @@ export const ALL_CASES: DiagnosisCase[] = [
   falseLeadCase,
   cascadeCase,
   dataScriptCase,
+  rateLimitPassCase,
+  fallbackDrillCase,
+  retryStormCase,
+  hpaLagCase,
   whiteScreenCase,
   depHellCase,
   oversellRaceCase,
