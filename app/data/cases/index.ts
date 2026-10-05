@@ -45,6 +45,10 @@ import { oversellRaceCase } from './oversell-race'
 import { idempotentFailCase } from './idempotent-fail'
 import { logSamplingCase } from './log-sampling'
 import { avgMetricCase } from './avg-metric'
+import { mqLostCase } from './mq-lost'
+import { mqDuplicateCase } from './mq-duplicate'
+import { mqDlqCase } from './mq-dlq'
+import { mqDelayCase } from './mq-delay'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -92,6 +96,10 @@ export const ALL_CASES: DiagnosisCase[] = [
   idempotentFailCase,
   logSamplingCase,
   avgMetricCase,
+  mqLostCase,
+  mqDuplicateCase,
+  mqDlqCase,
+  mqDelayCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {

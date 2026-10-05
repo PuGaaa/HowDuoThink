@@ -153,7 +153,7 @@ export const midnightRollbackCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-newcode'],
-      hypotheses: [{ id: 'h-newcode', status: 'up' }],
+      hypotheses: [{ id: 'h-newcode', status: 'confirmed' }],
       result: {
         type: 'text',
         title: '定位进展',

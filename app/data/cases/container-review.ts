@@ -11,7 +11,7 @@ import { DiagnosisCase } from '../../types/case'
 export const containerReviewCase: DiagnosisCase = {
   id: 'container-review',
   title: '容器治理评审——一刀切的限额与失明的扩容',
-  intro: '运维团队提交"容器资源统一治理"方案：全部服务统一 2C4G 限额 + HPA 按 CPU 70% 扩缩容。听起来规范——但你们的 17 个服务，资源画像各不相同。',
+  intro: '运维团队提交"容器资源统一治理"方案：全部服务统一 2C4G 限额 + HPA 按 CPU 70% 扩缩容。但你们的 17 个服务，资源画像各不相同。',
   domain: 'runtime',
   layer: '资源限额是服务画像的一部分：统一数字是管理的简化，却是运行的灾难',
   part: 'engineer',

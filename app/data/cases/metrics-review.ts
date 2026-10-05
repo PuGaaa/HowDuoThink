@@ -11,7 +11,7 @@ import { DiagnosisCase } from '../../types/case'
 export const metricsReviewCase: DiagnosisCase = {
   id: 'metrics-review',
   title: '可观测 1.0 评审——统一模板关掉了检测线',
-  intro: '可观测团队提交"指标体系 1.0"终审方案：全服务统一告警模板（HTTP 5xx / CPU / 内存三件套）+ 下线所有"非标"自定义指标 + P1 以上才通知。听起来规范——但 event loop lag 监控就在"非标"名单里。',
+  intro: '可观测团队提交"指标体系 1.0"终审方案：统一告警模板 + 下线"非标"自定义指标。听起来规范——但 event loop lag 监控就在"非标"名单里。',
   domain: 'runtime',
   layer: '统一告警模板是伪规范化：上季度事故换来的检测线（event loop lag），不能被"标准化"下线',
   part: 'master',

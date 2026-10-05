@@ -35,6 +35,10 @@ export const CHAPTERS: ChapterDef[] = [
   { id: 'observability', part: 'master', no: '第 6 章', name: '可观测性迷雾', pact: '你看到的日志和指标，本身也会说谎' },
   { id: 'security', part: 'master', no: '第 7 章', name: '安全攻防', pact: '每一个便利的捷径，都可能是别人进来的门' },
   { id: 'evolution', part: 'master', no: '第 8 章', name: '架构演进', pact: '故障的种子在设计时种下——容量、限流、降级是偿还' },
+  { id: 'messaging', part: 'master', no: '第 9 章', name: '消息与异步', pact: '消息不是数据，是承诺——发出去就要到，到了就要对，对了就只能一次' },
+  { id: 'deployment', part: 'master', no: '第 10 章', name: '部署与发布', pact: '上线不是终点，是另一次排错的起点' },
+  { id: 'network', part: 'master', no: '第 11 章', name: '网络深处', pact: '你以为是代码的问题，其实是网络在偷偷改你的数据' },
+  { id: 'testing', part: 'master', no: '第 12 章', name: '测试与质量', pact: '测试是代码的镜子——照不出问题的时候，问题最大' },
 ]
 
 /** 章内关卡：按 chapterId 动态聚合 + order 排序；本地与远端（casepack）合并，按 id 去重 */

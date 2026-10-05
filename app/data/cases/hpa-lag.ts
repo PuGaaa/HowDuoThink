@@ -11,7 +11,7 @@ import { DiagnosisCase } from '../../types/case'
 export const hpaLagCase: DiagnosisCase = {
   id: 'hpa-lag',
   title: '弹性伸缩永远慢半拍——扩容了，但用户已经走了',
-  intro: '营销活动开始 5 分钟后流量 ×3，HPA 立即触发扩容——新 Pod 就绪用了 4 分钟。这 4 分钟里，3000 QPS 的超时请求打到了只有 3 个旧 Pod 上。',
+  intro: '营销活动开始 5 分钟后流量 ×3，HPA 立即扩容——新 Pod 就绪用了 4 分钟。这 4 分钟里，3000 QPS 的超时请求全打到 3 个旧 Pod。',
   domain: 'runtime',
   layer: '反应式伸缩永远慢半拍：HPA 触发 → 调度 → 拉镜像 → 启动 → 就绪，每一步都有延迟——4 分钟的窗口够用户流失 3 次',
   part: 'master',
@@ -89,7 +89,7 @@ export const hpaLagCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-replica'],
-      hypotheses: [{ id: 'h-replica', status: 'up' }],
+      hypotheses: [{ id: 'h-replica', status: 'confirmed' }],
       result: {
         type: 'text',
         title: '副本数评估',

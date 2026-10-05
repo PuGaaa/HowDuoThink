@@ -11,7 +11,7 @@ import { DiagnosisCase } from '../../types/case'
 export const supplyPoisonCase: DiagnosisCase = {
   id: 'supply-poison',
   title: '一个依赖包的投毒',
-  intro: '安全情报通报：公司大量使用的 npm 包 request-utils 的 2.1.1 版本被投毒——维护者账号被盗，新版本窃取环境变量。CI 与生产已运行 2.1.1 四天。',
+  intro: '安全情报通报：npm 包 request-utils 的 2.1.1 被投毒——维护者账号被盗，新版本窃取环境变量。CI 与生产已运行 2.1.1 四天。',
   domain: 'build',
   layer: '依赖即攻击面：package.json 的每一行，都是一次对陌生人的信任',
   part: 'master',

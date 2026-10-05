@@ -145,6 +145,22 @@ export const rateLimitPassCase: DiagnosisCase = {
       },
     },
     {
+      id: 'a-confighist',
+      name: '查限流配置的变更历史',
+      desc: '阈值从上线至今调整过几次',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-limitlow'],
+      hypotheses: [{ id: 'h-limitlow', status: 'confirmed' }],
+      result: {
+        type: 'text',
+        title: '配置变更历史',
+        text: '配置中心记录：限流阈值自服务上线 8 个月以来零变更；\n同期积分商城 DAU 增长 6 倍、已有两次活动流量接近阈值。\n→ 阈值从未跟随业务更新——"容量契约"形同虚设，且早有前兆。',
+      },
+    },
+    {
       id: 'a-rollback',
       name: '关闭营销活动页止血',
       desc: '【状态变更】暂时关闭积分商城入口，等限流调整',
@@ -186,6 +202,13 @@ export const rateLimitPassCase: DiagnosisCase = {
       actionId: 'a-capa',
       why: '2⚡ 压测确认服务容量：排除"服务真的扛不住"的可能性——上调限流才安全，否则只是把限流问题变成服务崩溃。',
       conclusion: '服务容量确认 → 调整限流阈值。',
+    },
+    {
+      thought: '查配置变更历史：阈值有没有随业务增长更新过——之前是否已有前兆。',
+      update: '8 个月零变更 + DAU 涨 6 倍 + 两次活动接近阈值——前兆早就在，只是没人看契约。',
+      actionId: 'a-confighist',
+      why: '1⚡ 配置历史把"偶发失误"升级为"流程缺失"：问题不是这次忘了调，是没有任何机制提醒调。',
+      conclusion: '修复要双层：当下上调阈值 + 流程上把容量评估纳入活动准备。',
     },
     {
       thought: '阈值来源是默认模板——"先设个安全的值"在上线时是安全的，但业务增长后就成了瓶颈。DB 也不是瓶颈。',
