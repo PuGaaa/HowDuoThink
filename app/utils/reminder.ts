@@ -56,7 +56,7 @@ function fireNotification() {
   const day = today.getFullYear() + '-' + today.getMonth() + '-' + today.getDate()
   if (uni.getStorageSync(sentKey) === day) return
   uni.setStorageSync(sentKey, day)
-  new N('Debugo', { body: '今天的学习时间到了，来破一案吧 🔍' })
+  new N('好多星', { body: '今天的学习时间到了，来破一案吧 🔍' })
   // #endif
 }
 

@@ -596,7 +596,7 @@ function finishAndSave() {
 }
 
 function goReview() {
-  uni.navigateTo({ url: '/pages/review/review' })
+  uni.redirectTo({ url: '/pages/victory/victory' })
 }
 </script>
 

@@ -4,7 +4,7 @@
       "path": "pages/index/index",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "Debugo"
+        "navigationBarTitleText": "好多星"
       }
     },
     {
@@ -12,6 +12,14 @@
       "style": {
         "navigationStyle": "custom",
         "navigationBarTitleText": "关于"
+      }
+    },
+    {
+      "path": "pages/victory/victory",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "破案成功",
+        "disableScroll": true
       }
     },
     {
@@ -80,7 +88,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "Debugo",
+    "navigationBarTitleText": "好多星",
     "navigationBarBackgroundColor": "#FFF9F4",
     "backgroundColor": "#FFF9F4"
   }

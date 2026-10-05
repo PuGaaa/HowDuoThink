@@ -3,7 +3,7 @@
     <navbar></navbar>
     <view class="content">
       <!-- 标题区（Figma：品牌行 / 大标题 / 英文小字） -->
-      <text class="head__brand">Debugo</text>
+      <text class="head__brand">好多星</text>
       <text class="head__title">侦 探 档 案</text>
       <text class="head__sub">AGENT-ERA DEBUGGER · DIAGNOSIS RECORD</text>
 
@@ -67,7 +67,7 @@
         </view>
       </view>
       <text class="hint">H5 端下载 PNG 图片；App 端将支持保存到相册</text>
-      <text class="foot">—— 本档案由 Debugo 生成 ——</text>
+      <text class="foot">—— 本档案由 好多星 生成 ——</text>
     </view>
   </view>
 </template>
@@ -153,7 +153,7 @@ function downloadPoster() {
   // 标题区
   ctx.fillStyle = '#FF8A5C'
   ctx.font = 'bold 13px -apple-system, PingFang SC, sans-serif'
-  ctx.fillText('Debugo', BW / 2, 40)
+  ctx.fillText('好多星', BW / 2, 40)
   ctx.fillStyle = '#4A4458'
   ctx.font = 'bold 26px -apple-system, PingFang SC, sans-serif'
   ctx.fillText('侦 探 档 案', BW / 2, 76)
@@ -296,7 +296,7 @@ function downloadPoster() {
     ctx.textAlign = 'center'
     ctx.fillStyle = '#AFA8BD'
     ctx.font = '9px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText('—— 本档案由 Debugo 生成 ——', BW / 2, 696)
+    ctx.fillText('—— 本档案由 好多星 生成 ——', BW / 2, 696)
     // 触发下载
     const url = c.toDataURL('image/png')
     const a = document.createElement('a') as any

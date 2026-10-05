@@ -1,4 +1,4 @@
-# Debugo — 诊断思维训练场
+# 好多星 HowDuoThink — 程序员思维训练场
 
 给 agent 时代程序员的**诊断推理训练器**。训练的不是知识点，而是高手的核心习惯：
 
@@ -14,18 +14,18 @@
 
 ## 仓库地图
 
-| 目录 | 职责 |
-|---|---|
-| `app/` | uni-app X **蒸汽模式**主应用（H5 先行验证玩法 → 后编译 iOS）。页面：首页章节地图 / 章节详情 / 闯关 / 复盘 / 任务 / 海报 / 手册 / 我的 |
-| `app/static/mascots/` | 3D 吉祥物图片资产（生图 + 圆形徽章化，96/48/24/192 四档） |
-| `app/static/icons/` | 自有图标库 PNG（36 个，resvg 从设计库 SVG 渲染） |
-| `content/prompts/` | AI 生成案例的 prompt 模板（从《案例写作规范》派生） |
-| `content/pipeline/` | Node 脚本：schema 校验（validate.mjs）、跨行字符串 lint |
-| `content/tools/` | 设计与内容工具：Figma 桥（figma-rpc/figma-design）、吉祥物图处理、图标库生成、案例导出 |
-| `content/seeds/` | AI 生成的**待审核**案例草稿 |
-| `docs/` | 产品文档：《案例写作规范》《角色设定集》、ROADMAP、决策记录 |
-| `server/` | FastAPI + SQLite 社区后端：GitHub OAuth + 账密登录（bcrypt）、投稿 → 审核 → AI 辅助转稿 → 门禁（gate.py）→ 发布 → casepack 版本同步 |
-| `web/` | Nuxt 3 社区站：解决逻辑展示 / 投稿 / 我的 / 管理端（编辑器 + 元数据） |
+| 目录                  | 职责                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `app/`                | uni-app X**蒸汽模式**主应用（H5 先行验证玩法 → 后编译 iOS）。页面：首页章节地图 / 章节详情 / 闯关 / 复盘 / 任务 / 海报 / 手册 / 我的 |
+| `app/static/mascots/` | 3D 吉祥物图片资产（生图 + 圆形徽章化，96/48/24/192 四档）                                                                            |
+| `app/static/icons/`   | 自有图标库 PNG（36 个，resvg 从设计库 SVG 渲染）                                                                                     |
+| `content/prompts/`    | AI 生成案例的 prompt 模板（从《案例写作规范》派生）                                                                                  |
+| `content/pipeline/`   | Node 脚本：schema 校验（validate.mjs）、跨行字符串 lint                                                                              |
+| `content/tools/`      | 设计与内容工具：Figma 桥（figma-rpc/figma-design）、吉祥物图处理、图标库生成、案例导出                                               |
+| `content/seeds/`      | AI 生成的**待审核**案例草稿                                                                                                          |
+| `docs/`               | 产品文档：《案例写作规范》《角色设定集》、ROADMAP、决策记录                                                                          |
+| `server/`             | FastAPI + SQLite 社区后端：GitHub OAuth + 账密登录（bcrypt）、投稿 → 审核 → AI 辅助转稿 → 门禁（gate.py）→ 发布 → casepack 版本同步  |
+| `web/`                | Nuxt 3 社区站：解决逻辑展示 / 投稿 / 我的 / 管理端（编辑器 + 元数据）                                                                |
 
 ## 内容流向（生死管线）
 
@@ -72,8 +72,8 @@ npm run dev   # localhost:3000；后端地址经 NUXT_PUBLIC_API_BASE 覆盖
 
 ## 运行状态速查
 
-| 服务 | 端口 | 说明 |
-|---|---|---|
-| App H5 dev | 5173 | HBuilderX vite |
-| 社区后端 | 8000 | uvicorn main:app |
-| Web 社区站 | 3000 | Nuxt dev |
+| 服务       | 端口 | 说明             |
+| ---------- | ---- | ---------------- |
+| App H5 dev | 5173 | HBuilderX vite   |
+| 社区后端   | 8000 | uvicorn main:app |
+| Web 社区站 | 3000 | Nuxt dev         |

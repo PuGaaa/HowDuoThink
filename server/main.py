@@ -1,4 +1,4 @@
-"""Debugo — 社区后端（FastAPI + SQLite）。
+"""好多星 — 社区后端（FastAPI + SQLite）。
 Feature 架构：core/（横切）+ features/<域>/（router/service/models）。
 本文件只做 app 工厂：中间件、日志、异常兜底、路由挂载、启动种子。
 三对象：Submission（投稿）→ Case（关卡，过门禁）→ Article（Web 解决逻辑）。
@@ -29,7 +29,7 @@ def create_app() -> FastAPI:
 
     db.init()
 
-    app = FastAPI(title="Debugo · 社区后端", version="0.2.0")
+    app = FastAPI(title="好多星 HowDuoThink · 社区后端", version="0.2.0")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[config.WEB_ORIGIN, "http://localhost:3000", "http://localhost:5173"],

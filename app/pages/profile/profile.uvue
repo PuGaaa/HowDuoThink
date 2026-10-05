@@ -151,7 +151,7 @@ function refresh() {
   r3.label = '检查单云同步'
   r3.value = user.value != null ? (lastSyncLabel().length > 0 ? lastSyncLabel() : '点击同步') : '登录后可用'
   const r4 = new RowVM()
-  r4.label = '关于 Debugo'
+  r4.label = '关于 好多星'
   r4.value = 'v0.1'
   rows.value = [r1, r2, r3, r4]
 }
@@ -225,7 +225,7 @@ function doLogout() {
 }
 
 function onRow(label: string, value: string) {
-  if (label === '关于 Debugo') {
+  if (label === '关于 好多星') {
     goAbout()
     return
   }

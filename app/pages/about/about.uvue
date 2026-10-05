@@ -4,7 +4,8 @@
     <view class="content">
       <view class="herocard">
         <image class="herocard__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
-        <text class="herocard__name">Debugo</text>
+        <text class="herocard__name">好多星</text>
+        <text class="herocard__en">HowDuoThink</text>
         <text class="herocard__sub">诊断思维训练场</text>
         <text class="herocard__slogan">看症状 · 立假设 · 算成本 · 定根因</text>
         <text class="herocard__ver">v0.1</text>
@@ -12,7 +13,7 @@
 
       <view class="card">
         <text class="card__title">这是什么</text>
-        <text class="card__text">Debugo 训练的是诊断思维：每关一个真实故障现场，提出假设、花 ⚡︎ 预算验证、指认根因，复盘对照专家推理链——练的是高手排错时的思考方式。</text>
+        <text class="card__text">好多星 训练的是诊断思维：每关一个真实故障现场，提出假设、花 ⚡︎ 预算验证、指认根因，复盘对照专家推理链——练的是高手排错时的思考方式。</text>
       </view>
 
       <view class="card">
@@ -90,6 +91,11 @@ function goHandbook() {
   font-weight: bold;
   color: #FFFFFF;
   margin-top: 22rpx;
+}
+.herocard__en {
+  font-size: 20rpx;
+  color: #C9C2DA;
+  margin-top: 6rpx;
 }
 .herocard__sub {
   font-size: 21rpx;

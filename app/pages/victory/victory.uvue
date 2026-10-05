@@ -1,0 +1,290 @@
+<template>
+  <view class="page">
+    <!-- 装饰粒子 -->
+    <view class="confetti">
+      <view v-for="(d, i) in dots" :key="'d' + i" class="dot" :class="'dot-' + (i % 6)" :style="d"></view>
+    </view>
+
+    <!-- 五兽庆祝行 -->
+    <view class="mascots">
+      <view v-for="(m, i) in mascots" :key="'m' + i" class="mwrap" :class="'mwrap-' + i">
+        <view class="mwrap__circle" :style="{ backgroundColor: m.bg }">
+          <image class="mwrap__img" :src="m.src" mode="aspectFit"></image>
+        </view>
+        <text class="mwrap__name">{{ m.name }}</text>
+      </view>
+    </view>
+
+    <!-- 主标题 -->
+    <text class="victory-title">破案成功！</text>
+    <text class="victory-sub">思维兽们为你欢呼</text>
+
+    <!-- 评级 + 数据 -->
+    <view class="stats">
+      <view class="stat">
+        <text class="stat__v stat__v--gold">{{ grade }}</text>
+        <text class="stat__k">评级</text>
+      </view>
+      <view class="stat">
+        <text class="stat__v">{{ cost }}⚡</text>
+        <text class="stat__k">你的成本</text>
+      </view>
+      <view class="stat">
+        <text class="stat__v stat__v--mint">{{ expert }}⚡</text>
+        <text class="stat__k">专家</text>
+      </view>
+      <view class="stat">
+        <text class="stat__v stat__v--mint">+{{ lessons }}</text>
+        <text class="stat__k">检查单</text>
+      </view>
+    </view>
+
+    <!-- 进入复盘 -->
+    <view class="btnpad">
+      <view class="primarybtn" @click="goReview">
+        <text class="primarybtn__text">进入复盘</text>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref, onMounted } from 'vue'
+
+const grade = ref('S')
+const cost = ref(0)
+const expert = ref(1)
+const lessons = ref(0)
+
+interface MascotItem {
+  src: string
+  name: string
+  bg: string
+}
+
+const mascots = ref<MascotItem[]>([])
+const dots = ref<string[]>([])
+
+// 五兽数据
+const mascotData: MascotItem[] = [
+  { src: '/static/mascots/frog.png', name: '恐怖蛙', bg: '#FDEDED' },
+  { src: '/static/mascots/otter.png', name: '惊讶獭', bg: '#FFF6DE' },
+  { src: '/static/mascots/snail.png', name: '不行蜗', bg: '#EAF4FC' },
+  { src: '/static/mascots/rabbit.png', name: '垂耳兔', bg: '#E9F7F1' },
+  { src: '/static/mascots/dino.png', name: '三角龙', bg: '#F3F0F8' },
+]
+
+// 装饰粒子（随机位置/颜色/大小）
+function genDots() {
+  const arr: string[] = []
+  const colors = ['#FF8A5C', '#FFC94D', '#5FC9A5', '#6FB8E8', '#FFB5C8']
+  for (let i = 0; i < 14; i++) {
+    const x = Math.floor(Math.random() * 90)
+    const y = Math.floor(Math.random() * 80)
+    const sz = Math.floor(Math.random() * 10) + 6
+    const c = colors[i % colors.length]
+    const delay = (Math.random() * 1.5).toFixed(1)
+    arr.push(`left:${x}%;top:${y}%;width:${sz}px;height:${sz}px;background-color:${c};animation-delay:${delay}s`)
+  }
+  dots.value = arr
+}
+
+onMounted(() => {
+  // 读取通关数据（从 storage 的 session）
+  try {
+    const raw = uni.getStorageSync('think_session_v1')
+    if (raw != null && (raw as string).length > 0) {
+      const session = JSON.parse(raw as string)
+      grade.value = session.grade || 'S'
+      cost.value = session.playerCost || 0
+      expert.value = session.expertCost || 1
+    }
+  } catch (e) { }
+
+  // 检查单数量
+  try {
+    const lessonsRaw = uni.getStorageSync('think_lesson_gain')
+    if (lessonsRaw != null) lessons.value = Number(lessonsRaw) || 0
+  } catch (e) { }
+
+  mascots.value = mascotData
+  genDots()
+})
+
+function goReview() {
+  uni.redirectTo({ url: '/pages/review/review' })
+}
+</script>
+
+<style>
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #FFF9F4;
+  width: 100%;
+  min-height: 100vh;
+  padding: 60rpx 32rpx 60rpx;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 装饰粒子 */
+.confetti {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+.dot {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  animation: dotIn 0.5s ease-out forwards, float 3s ease-in-out 0.5s infinite;
+}
+@keyframes dotIn {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 0.6; transform: scale(1); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* 五兽庆祝 */
+.mascots {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  margin-top: 180rpx;
+}
+.mwrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 12rpx;
+  opacity: 0;
+  animation: mascotIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.mwrap-0 { animation-delay: 0.3s; }
+.mwrap-1 { animation-delay: 0.45s; }
+.mwrap-2 { animation-delay: 0.6s; }
+.mwrap-3 { animation-delay: 0.75s; }
+.mwrap-4 { animation-delay: 0.9s; }
+@keyframes mascotIn {
+  from { opacity: 0; transform: translateY(60rpx) scale(0.3); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.mwrap__circle {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6rpx 0 0 rgba(0, 0, 0, 0.08);
+}
+.mwrap__img {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 48rpx;
+}
+.mwrap__name {
+  font-size: 18rpx;
+  color: #AFA8BD;
+  margin-top: 8rpx;
+}
+
+/* 主标题 */
+.victory-title {
+  font-size: 64rpx;
+  font-weight: bold;
+  color: #FFC94D;
+  margin-top: 40rpx;
+  text-align: center;
+  opacity: 0;
+  animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 1.2s forwards;
+  text-shadow: 0 4rpx 0 rgba(0, 0, 0, 0.06);
+}
+.victory-sub {
+  font-size: 24rpx;
+  color: #AFA8BD;
+  margin-top: 12rpx;
+  opacity: 0;
+  animation: fadeUp 0.4s ease-out 1.5s forwards;
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0) rotate(-5deg); }
+  to { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 数据行 */
+.stats {
+  display: flex;
+  flex-direction: row;
+  margin-top: 48rpx;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 26rpx 36rpx;
+  margin: 0 12rpx;
+  box-shadow: 0 6rpx 0 0 #EFE5D6;
+  opacity: 0;
+  animation: fadeUp 0.4s ease-out forwards;
+}
+.stat:nth-child(1) { animation-delay: 1.7s; }
+.stat:nth-child(2) { animation-delay: 1.85s; }
+.stat:nth-child(3) { animation-delay: 2s; }
+.stat:nth-child(4) { animation-delay: 2.15s; }
+.stat__v {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #4A4458;
+}
+.stat__v--gold {
+  color: #FFC94D;
+  font-size: 42rpx;
+}
+.stat__v--mint {
+  color: #5FC9A5;
+}
+.stat__k {
+  font-size: 19rpx;
+  color: #AFA8BD;
+  margin-top: 6rpx;
+}
+
+/* 按钮 */
+.btnpad {
+  padding-bottom: 8rpx;
+  margin-top: 48rpx;
+  width: 100%;
+  opacity: 0;
+  animation: fadeUp 0.4s ease-out 2.5s forwards;
+}
+.primarybtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  background-color: #FF8A5C;
+  border-radius: 46rpx;
+  padding: 26rpx;
+  box-shadow: 0 8rpx 0 0 #E06B38;
+}
+.primarybtn__text {
+  font-size: 28rpx;
+  color: #FFFFFF;
+  font-weight: bold;
+}
+</style>
