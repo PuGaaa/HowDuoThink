@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 10 章 · 可观测性迷雾 第二批（指标基数爆炸 L2）
+ * 第 2 章 · 可观测性迷雾 第二批（指标基数爆炸 L2）
  * 教学点：架构设计——每个 label 组合都是一条独立时间序列：高基数信息进指标 = 监控自杀；
  * 度量设计权衡：指标答"多少"，日志/trace 答"谁"。
  * 专家路径：impact(1) + seriescount(2) + queryload(1) = 4⚡︎

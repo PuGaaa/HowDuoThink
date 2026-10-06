@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 13 章 · 消息与异步（重复消费 L2）
+ * 第 5 章 · 消息与异步（重复消费 L2）
  * 教学点：MQ 的 at-least-once 语义意味着重复是常态；幂等不是 MQ 的责任，是消费者的责任。
  * 专家路径：impact(1) + logcheck(1) + redeliver(2) = 4⚡︎
  */

@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 15 章 · 网络深处（TCP 重传 L2）
+ * 第 7 章 · 网络深处（TCP 重传 L2）
  * 教学点：全栈视野——"能 ping 通"不等于"网络没问题"；分层验证（变包大小、看响应头）；
  * MTU 不一致 + PMTUD 黑洞是容器网络经典暗坑。
  * 专家路径：impact(1) + pingsize(1) + gclog(1) + conntrack(1) = 4⚡︎

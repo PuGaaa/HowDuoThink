@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 5 章 · 接口与契约 结业评审（评审现场 L3）
+ * 第 1 章 · 接口与契约 结业评审（评审现场 L3）
  * 教学点：架构设计——契约规范的每一条都要能追溯到事故学费：兼容可执行化、废弃五步、
  * 限流分级、错误码样例验证；产品思维——规范是学费的结晶。
  * 专家路径：compatcheck(2) + sunsetcheck(1) + ratecheck(1) + errorcheck(1) + benefit(1) + minfix(2) = 8⚡︎

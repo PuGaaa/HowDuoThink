@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 12 章 · 架构演进 结业评审（评审现场 L3）
+ * 第 4 章 · 架构演进 结业评审（评审现场 L3）
  * 教学点：架构设计——容量保障的四张必答卷：按形状算容量（不是按均值外推）、DB 是最终瓶颈、
  * 预案必须演练过、压测覆盖真实场景；产品思维——侥幸渡劫不是容量。
  * 专家路径：dbload(2) + pulsecheck(1) + drillcheck(1) + scenecover(1) + benefit(1) + minfix(2) = 8⚡︎

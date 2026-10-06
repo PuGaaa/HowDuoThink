@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 9 章 · 并发迷宫 第三批（线程池拒绝策略静默丢任务 L2）
+ * 第 1 章 · 并发迷宫 第三批（线程池拒绝策略静默丢任务 L2）
  * 教学点：程序设计——队列是缓冲不是容量；拒绝异常被吞 = AbortPolicy 变相 DiscardPolicy；
  * 提交/执行/结果三账对齐是异步链路的对账底线。
  * 专家路径：impact(1) + rejectaudit(2) + policycheck(1) = 4⚡︎

@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 16 章 · 测试与质量 结业评审（评审现场 L3）
+ * 第 8 章 · 测试与质量 结业评审（评审现场 L3）
  * 教学点：验证思维——测试策略要经得起本仓库事故史的拷问：重跑文化、覆盖率假象、
  * 隔离缺陷都交过学费；产品思维——质量度量是激励系统，度量什么就得到什么。
  * 专家路径：retrypolicy(2) + quarantinestate(1) + coveragemetric(1) + flakyroot(1) + benefit(1) + minfix(2) = 8⚡︎

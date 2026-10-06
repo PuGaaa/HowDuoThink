@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 16 章 · 测试与质量（mock 泄露 L2）
+ * 第 8 章 · 测试与质量（mock 泄露 L2）
  * 教学点：程序设计——测试的隔离性是设计出来的：mock 必须有确定性恢复（fixture 作用域/上下文管理器）；
  * 测试之间共享全局状态 = 定时炸弹。
  * 专家路径：impact(1) + isolation(2) + runnorder(1) = 4⚡︎

@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 13 章 · 消息与异步 第二批（慢消费队头阻塞 L2）
+ * 第 5 章 · 消息与异步 第二批（慢消费队头阻塞 L2）
  * 教学点：程序设计——分区内 FIFO 保序的代价是队头阻塞：一条慢消息卡住整个分区；
  * 外部调用必须有超时与隔离舱（bulkhead）；保序与吞吐是一对需要显式设计的权衡。
  * 专家路径：impact(1) + skewstat(1) + conccfg(1) + brokerio(1) = 4⚡︎

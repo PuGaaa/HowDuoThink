@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 16 章 · 测试与质量（flaky test L3）
+ * 第 8 章 · 测试与质量（flaky test L3）
  * 教学点：验证思维——"重跑就绿"不是测试通过了，是测试在抽签；flaky 是信号不是噪声；
  * 随机数据暴露真 bug 时，"偶发失败"其实是确定性的、只是输入在变。
  * 专家路径：impact(1) + seedcheck(2) + repro(1) = 4⚡︎

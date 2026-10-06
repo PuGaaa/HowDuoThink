@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 14 章 · 部署与发布（CDN 缓存不一致 L3）
+ * 第 6 章 · 部署与发布（CDN 缓存不一致 L3）
  * 教学点：验证思维——"发布完成"必须定义在用户视角（边缘抽样验证），不是 build 绿+源站对；
  * 多层缓存从里向外剥，每层用响应头说话；流程变更也是变更。
  * 专家路径：impact(1) + edgeprobe(1) + headers(1) + originlog(1) = 4⚡︎

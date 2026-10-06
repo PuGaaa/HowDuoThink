@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 9 章 · 并发迷宫 第三批（ThreadLocal 残留串数据 L2）
+ * 第 1 章 · 并发迷宫 第三批（ThreadLocal 残留串数据 L2）
  * 教学点：假设思维——"偶发串数据"的经典结构：线程池复用 + 上下文未清理 + 绕过写入路径的读取；
  * ThreadLocal 必须有确定性清理（finally remove）与 fail-fast 读取。
  * 专家路径：impact(1) + tlexamine(2) + threadreplay(1) = 4⚡︎

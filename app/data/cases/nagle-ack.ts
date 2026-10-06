@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 15 章 · 网络深处 第三批（Nagle × 延迟确认互等 L2）
+ * 第 7 章 · 网络深处 第三批（Nagle × 延迟确认互等 L2）
  * 教学点：全栈视野——两个"各自正确"的 TCP 优化相遇会互等出 40ms；
  * 延迟指纹（精确 40ms 整数倍）直指定时器；低延迟 RPC 必须 TCP_NODELAY。
  * 专家路径：impact(1) + packetpair(2) + repro(1) = 4⚡︎

@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 15 章 · 网络深处 第五批（链路饱和无 QoS L2）
+ * 第 7 章 · 网络深处 第五批（链路饱和无 QoS L2）
  * 教学点：全栈视野——链路是共享资源：大流量任务无 QoS 划分时，API 的小包在队列里陪葬；
  * 带宽准入表让跨机房大流量任务先登记后执行。
  * 专家路径：impact(1) + linkutil(2) + connshare(1) = 4⚡︎

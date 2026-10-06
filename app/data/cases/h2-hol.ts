@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 15 章 · 网络深处（HTTP/2 队头阻塞 L2）
+ * 第 7 章 · 网络深处（HTTP/2 队头阻塞 L2）
  * 教学点：架构设计——多路复用是双刃剑：TCP 层一个丢包阻塞整条连接的所有流；
  * 隔离（连接分片）是架构层解法；per-stream 监控让共享资源的问题显形。
  * 专家路径：impact(1) + streamtrace(2) + upstream(1) = 4⚡︎

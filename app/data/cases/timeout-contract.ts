@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 5 章 · 接口与契约 第三批（超时预算链 L2）
+ * 第 1 章 · 接口与契约 第三批（超时预算链 L2）
  * 教学点：架构设计——超时是三方契约：client/gateway/server/下游 需要递减预算链；
  * 上游先放弃时下游要收到取消；重试是放大器要配退避。
  * 专家路径：impact(1) + timeouttable(2) + gatewaytimeout(1) = 4⚡︎

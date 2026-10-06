@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 14 章 · 部署与发布 第二批（回滚不完整 L2）
+ * 第 6 章 · 部署与发布 第二批（回滚不完整 L2）
  * 教学点：验证思维——回滚的边界必须画全：应用可回退，schema 走过的路退不回去；
  * migration 必须向后兼容（N-1），回滚预案必须包含数据层评估。
  * 专家路径：impact(1) + colcheck(2) + instver(1) = 4⚡︎

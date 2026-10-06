@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 5 章 · 接口与契约 第五批（错误响应契约缺失 L2）
+ * 第 1 章 · 接口与契约 第五批（错误响应契约缺失 L2）
  * 教学点：架构设计——错误响应也是契约：message 是给人看的文案，code 才是给程序读的协议；
  * 文案与逻辑解耦（i18n），错误码表与 schema 同源生成。
  * 专家路径：impact(1) + erroranatomy(2) + encoding(1) = 4⚡︎

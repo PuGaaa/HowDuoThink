@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 6 章 · 数据的脾气（慢查询 L2）
+ * 第 2 章 · 数据的脾气（慢查询 L2）
  * 教学点：EXPLAIN 是 SQL 排查的显影液；"全表扫描"与"索引失效"要靠表结构区分；
  * 数据增长不是根因，是放大器。
  * 专家路径：impact(1) + slowlog(1) + explain(2) + tablestruct(1) = 5⚡︎
