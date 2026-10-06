@@ -61,6 +61,12 @@ import { coverageIllusionCase } from './coverage-illusion'
 import { mockLeakCase } from './mock-leak'
 import { flakyTestCase } from './flaky-test'
 import { envDriftCase } from './env-drift'
+import { mqSlowPartCase } from './mq-slowpart'
+import { deployMigrationCase } from './deploy-migration'
+import { poolDeadlockCase } from './pool-deadlock'
+import { lockExpiryCase } from './lock-expiry'
+import { idleResetCase } from './idle-reset'
+import { mqBusReviewCase } from './mq-bus-review'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -124,6 +130,12 @@ export const ALL_CASES: DiagnosisCase[] = [
   mockLeakCase,
   flakyTestCase,
   envDriftCase,
+  mqSlowPartCase,
+  deployMigrationCase,
+  poolDeadlockCase,
+  lockExpiryCase,
+  idleResetCase,
+  mqBusReviewCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {
