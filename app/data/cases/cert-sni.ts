@@ -12,7 +12,7 @@ export const certSniCase: DiagnosisCase = {
   intro: '新域名上线后老设备全部证书校验失败：同一 IP、不同客户端、拿到不同证书——SNI 缺失的回退坑。',
   domain: 'network',
   layer: '同 IP 多域名的 TLS 靠 SNI 区分——不带 SNI 的客户端拿到的是默认站点',
-  part: 'master',
+  part: 'apprentice',
   chapterId: 'access',
   order: 8,
   typeTags: ['config', 'dependency', 'security'],

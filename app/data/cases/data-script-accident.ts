@@ -14,7 +14,7 @@ export const dataScriptCase: DiagnosisCase = {
   intro: '运营反馈某商品库存显示为 -50。你写了个修复脚本——结果 5 万个商品的库存全部变成了 -50。',
   domain: 'data',
   layer: '数据操作脚本的三道防线：测试环境验证 + 备份 + 双人复核——缺一道就是全表灾难',
-  part: 'master',
+  part: 'engineer',
   chapterId: 'data',
   order: 8,
   typeTags: ['data', 'database'],

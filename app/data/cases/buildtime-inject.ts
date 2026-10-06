@@ -12,7 +12,7 @@ export const buildtimeInjectCase: DiagnosisCase = {
   intro: 'API 地址迁移改了配置中心，发布后前端仍请求旧地址——那个变量在构建时就被烤进了产物。',
   domain: 'build',
   layer: '构建期变量是"烤进产物的指纹"——运行时配置对它无效',
-  part: 'engineer',
+  part: 'apprentice',
   chapterId: 'build',
   order: 6,
   typeTags: ['build', 'config', 'verification'],

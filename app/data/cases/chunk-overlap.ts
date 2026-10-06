@@ -12,7 +12,7 @@ export const chunkOverlapCase: DiagnosisCase = {
   intro: '发版那几分钟，线上用户页面随机崩：旧页面引用的 JS chunk 已被删——用户的请求和发布脚本在赛跑。',
   domain: 'build',
   layer: '发布窗口是一场比赛——旧资源的保留期要覆盖所有还活着的老页面',
-  part: 'engineer',
+  part: 'apprentice',
   chapterId: 'build',
   order: 7,
   typeTags: ['build', 'deploy', 'race'],

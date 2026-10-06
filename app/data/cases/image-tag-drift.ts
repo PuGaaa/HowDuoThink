@@ -12,7 +12,7 @@ export const imageTagDriftCase: DiagnosisCase = {
   intro: '测试环境验证通过的修复，部署到生产后问题依旧——查了半天，两边跑的根本不是同一个镜像。',
   domain: 'build',
   layer: '同一个标签不等于同一个镜像——标签是指针，digest 才是实体',
-  part: 'engineer',
+  part: 'apprentice',
   chapterId: 'build',
   order: 5,
   typeTags: ['build', 'deploy', 'verification'],

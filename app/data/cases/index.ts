@@ -108,6 +108,10 @@ import { requiredFieldCase } from './required-field'
 import { docDriftCase } from './doc-drift'
 import { configTypoCase } from './config-typo'
 import { bootOrderCase } from './boot-order'
+import { logCorrelationCase } from './log-correlation'
+import { waterfallReadCase } from './waterfall-read'
+import { timeoutContractCase } from './timeout-contract'
+import { hotReloadGapCase } from './hot-reload-gap'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -218,6 +222,10 @@ export const ALL_CASES: DiagnosisCase[] = [
   docDriftCase,
   configTypoCase,
   bootOrderCase,
+  logCorrelationCase,
+  waterfallReadCase,
+  timeoutContractCase,
+  hotReloadGapCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {

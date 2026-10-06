@@ -1,0 +1,298 @@
+{
+  "id": "waterfall-read",
+  "title": "\"接口要 3 秒\"——这句话里藏了四段故事",
+  "intro": "测试反馈\"接口要 3 秒\"：瀑布图把 3 秒拆成四段——DNS 0.1、连接 2.6、等待 0.2、下载 0.1。慢在哪一段？",
+  "domain": "network",
+  "layer": "总耗时是四段故事的总和——分段定责，别让后端背连接的锅",
+  "part": "apprentice",
+  "chapterId": "integration",
+  "order": 3,
+  "typeTags": [
+    "network",
+    "verification"
+  ],
+  "difficulty": 2,
+  "scene": {
+    "role": "你是「鲜到家」的新人前端，测试的 bug 单写着\"接口慢 3 秒\"，指派给了后端，后端说\"我接口很快\"。",
+    "architecture": "浏览器 → 跨机房网关(新证书上线一周) → 商品服务 ｜ 测试环境：首次访问为主",
+    "tag": "故障现场",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "测试的单据",
+        "text": "商品详情接口耗时 3.0s（Network 面板总量）。\n后端的单据：服务端日志处理耗时 200ms——\"我很快，是你的问题\"。"
+      },
+      {
+        "type": "text",
+        "title": "僵局",
+        "text": "前端：\"Network 面板显示 3 秒。\"\n后端：\"我日志 200ms。\"\n同一个接口，两个数字差 15 倍——两个数字都是真的，它们量的是不同的东西。"
+      }
+    ],
+    "timeline": "网关一周前上线新证书（此前无此问题）｜ 测试环境首次访问为主（无浏览器缓存）｜ 无其他变更",
+    "impactHint": "\"3 秒\"是一个总数——把它拆开：DNS、连接、等待、下载，每段的故事不同，责任方也不同。"
+  },
+  "hypotheses": [
+    {
+      "id": "h-connect",
+      "text": "连接建立占 2.6s：TLS 完整握手 + OCSP 在线校验阻塞（新证书上线时间吻合）",
+      "excludeActionId": "a-waterfall"
+    },
+    {
+      "id": "h-ttfb",
+      "text": "服务端等待（TTFB）占大头：后端处理慢",
+      "excludeActionId": "a-ttfbcheck"
+    },
+    {
+      "id": "h-download",
+      "text": "内容下载占大头：响应体过大",
+      "excludeActionId": "a-sizecheck"
+    },
+    {
+      "id": "h-dns",
+      "text": "DNS 解析慢拖住起点",
+      "excludeActionId": "a-dnscheck"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-impact",
+      "name": "打开瀑布图：把 3 秒拆成四段",
+      "desc": "影响面：DNS / 连接 / 等待 / 下载 各占多少",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "code",
+        "title": "瀑布图四段拆解",
+        "text": "DNS 解析：    0.1s\n连接建立：    2.6s  ← TCP + TLS\n等待(TTFB)：  0.2s  ← 服务端处理\n内容下载：    0.1s\n总 3.0s：慢的 87% 在\"连接建立\"——两个数字的谜底：\n后端的 200ms 量的是 TTFB，测试的 3 秒量的是全程——它们没打架，量段不同。"
+      }
+    },
+    {
+      "id": "a-waterfall",
+      "name": "细拆连接段：2.6 秒里发生了什么",
+      "desc": "TCP 握手 × RTT + TLS 握手 + 证书验证，逐项对账",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-connect"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-connect",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "连接段解剖（跨机房 RTT 80ms）",
+        "text": "TCP 三次握手：3 × 80ms ≈ 0.24s\nTLS 握手：完整握手 2 × RTT ≈ 0.16s —— 合计 0.4s，还差 2.2s！\n抓包补刀：TLS Certificate 消息后，客户端卡 2.2s——\nOCSP 在线校验：客户端逐级查询证书状态（新证书未配 OCSP stapling），\n每级 OCSP 查询跨公网 0.7~1.1s。\n实锤：OCSP 在线校验 × 无 stapling = 每次全握手交 2.2s 的\"验证税\"。"
+      }
+    },
+    {
+      "id": "a-repro",
+      "name": "对照实验：首次 vs 会话复用",
+      "desc": "第二个请求的连接耗时——变量隔离",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "code",
+        "title": "首连 vs 复用对照",
+        "text": "首次连接：connect 2.6s（OCSP + 完整握手）\n会话复用连接：connect 0.05s（TLS session 恢复，无证书重验）\n对照结论：慢的只是\"每次全新握手\"——与\"新证书上线\"时间吻合（换证书=新信任链=全量重验）。"
+      }
+    },
+    {
+      "id": "a-ttfbcheck",
+      "name": "核对服务端处理耗时",
+      "desc": "排除后端慢",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-ttfb"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-ttfb",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "TTFB 核对",
+        "text": "等待段 0.2s 与后端日志 200ms 一致——后端无辜，它的数字是真的，只是不是全部。"
+      }
+    },
+    {
+      "id": "a-sizecheck",
+      "name": "核对响应体大小",
+      "desc": "排除下载慢",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-download"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-download",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "下载核对",
+        "text": "响应 12KB / 0.1s——正常。\n→ 排除下载段。"
+      }
+    },
+    {
+      "id": "a-dnscheck",
+      "name": "核对 DNS 段",
+      "desc": "排除解析慢",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-dns"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-dns",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "DNS 核对",
+        "text": "DNS 0.1s 正常（本地递归命中）。\n→ 排除 DNS。"
+      }
+    },
+    {
+      "id": "a-danger",
+      "name": "紧急在客户端禁用 OCSP 校验",
+      "desc": "【状态变更】测试端 curl --no-ocsp / 浏览器策略关 OCSP",
+      "cost": 1,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "禁用结果",
+        "text": "连接 0.4s——快了，但证书吊销状态不再被验证：\n被吊销的证书也能通过——安全校验降级换速度。\n→ 复盘点评：OCSP 该用\"服务端随握手递送\"（stapling）解决，而不是让客户端闭眼。"
+      }
+    },
+    {
+      "id": "a-fixstaple",
+      "name": "修复：网关 OCSP stapling + TLS 会话复用",
+      "desc": "【状态变更】网关开启 stapling（随握手附验证结果）+ session ticket 复用",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "修复结果",
+        "text": "① OCSP stapling：服务端定时取签名好的验证结果随握手递送——客户端免在线查询\n② TLS session 复用：复用连接 0.05s（已有），全握手也降至 0.4s\n回归：首次连接 2.6s → 0.4s，接口总耗时 3.0s → 0.8s；吊销校验保留。"
+      }
+    },
+    {
+      "id": "a-fixmonitor",
+      "name": "沉淀：连接分段埋点",
+      "desc": "【状态变更】前端监控按分段上报（DNS/connect/TTFB/download）；connect > 1s 告警",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "分段监控",
+        "text": "沿用连接分段埋点（happy-eyeballs 批次的基建）：每段独立 P95 + \"connect > 1s\" 告警。\n下次\"接口慢 3 秒\"的单子，第一眼就知道该派给谁——分段定责结束甩锅文化。"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-connect",
+      "text": "连接建立占 3 秒中的 2.6s：新证书未配 OCSP stapling，客户端逐级在线查询吊销状态（2.2s）+ 完整 TLS 握手——\"接口慢 3 秒\"的 87% 由连接段贡献，后端无辜",
+      "correct": true
+    },
+    {
+      "id": "rc-ttfb",
+      "text": "服务端处理慢拖高 TTFB",
+      "correct": false
+    },
+    {
+      "id": "rc-download",
+      "text": "响应体过大拖慢下载段",
+      "correct": false
+    },
+    {
+      "id": "rc-dns",
+      "text": "DNS 解析慢拖住起点",
+      "correct": false
+    }
+  ],
+  "expertCost": 4,
+  "restartActionId": "a-danger",
+  "expertChain": [
+    {
+      "thought": "\"3 秒\"是一个总数——第一动作就是拆：DNS/连接/等待/下载四段，每段有自己的责任方。",
+      "update": "87% 在连接建立段——后端的 200ms 与测试的 3 秒没打架，量段不同。",
+      "actionId": "a-impact",
+      "why": "1⚡︎ 教学核心：总耗时是四段故事的总和——分段是性能争议的终审程序。\"谁的问题\"这种争论，在瀑布图面前自动终止。",
+      "conclusion": "主嫌疑锁定：连接段（h-connect 升权）。"
+    },
+    {
+      "thought": "细拆连接段：TCP/握手/证书验证逐项对账——2.6s 里还藏着一段\"看不见的等待\"。",
+      "update": "实锤：OCSP 在线校验 2.2s（新证书无 stapling）+ 握手 0.4s——验证税实锤。",
+      "actionId": "a-waterfall",
+      "why": "2⚡︎ 分段之后还要再分段：连接段内部（TCP/TLS/OCSP）各有账本——\"拆到能行动为止\"是性能分析的分寸：OCSP 一项就对应一个明确的修复（stapling）。",
+      "conclusion": "根因实锤：OCSP 验证税。"
+    },
+    {
+      "thought": "首连 vs 会话复用的对照实验——把\"证书换新\"这个变量钉死。",
+      "update": "复用 0.05s vs 首连 2.6s——慢只发生在全新握手；与换证书时间线吻合。",
+      "actionId": "a-repro",
+      "why": "1⚡︎ 对照实验同时解释\"为什么现在才出现\"：换证书重置了信任链缓存——变量与时间线的咬合，让修复不再怀疑\"是不是还要查别处\"。",
+      "conclusion": "变量钉死 → 排除其余三段。"
+    },
+    {
+      "thought": "TTFB/下载/DNS 各 1⚡︎ 排除留证——四段都有\"无责证明\"，甩锅文化终结。停止收集。",
+      "update": "停止。",
+      "actionId": "",
+      "why": "【停止规则】分段（87% 在连接）✓ 细拆（OCSP 2.2s）✓ 对照（复用 0.05s）✓——四段无责 + 一段实锤，证据链完整。",
+      "conclusion": "沉淀：总耗时是四段故事的总和——分段定责后，\"慢\"从一句废话变成一张派工单。"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "总耗时是四段故事的总和：DNS/连接/等待/下载——每段对应不同的责任方，分段是性能争议的终审程序。",
+      "principle": "验证思维：任何\"接口慢 X 秒\"的单子，第一动作是打开瀑布图分段——后端的日志只量 TTFB，客户端的总耗时包含连接与传输。分段定责终结\"前后端互相甩锅\"：每段的无责证明与实锤一样重要。"
+    },
+    {
+      "text": "分段之后还要拆到\"能行动为止\"：连接段内部再拆 TCP/TLS/证书验证——OCSP 在线校验一项就对应一个明确修复。",
+      "principle": "程序设计：性能分析的分寸 = 拆到\"一个症状对应一个动作\"。OCSP stapling（服务端随握手递送验证结果）是慢握手的特效药——新手证书上线清单里必须有它，否则每次全握手都交 2 秒验证税。"
+    },
+    {
+      "text": "两个数字都是真的：后端 200ms 与客户端 3s 量的是不同的段——先问\"你量的是哪一段\"，再谈谁的问题。",
+      "principle": "沟通纪律：性能争议的第一句话应该是\"定义量段\"而不是\"我很快\"。分段埋点（DNS/connect/TTFB/download 独立上报）让每一段有公开的数字——甩锅文化终结于共同的仪表盘。"
+    }
+  ]
+}

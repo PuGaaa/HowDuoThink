@@ -14,7 +14,7 @@ export const doubleStrikeCase: DiagnosisCase = {
   intro: '大促前压力测试：DB 连接池耗尽、接口全线超时。但你逐条排查——缓存命中率 97% "正常"、慢查询 0 条"正常"、连接数"正常"。每条线都看不出问题。',
   domain: 'data',
   layer: '多因叠加的排错：每条线单独看都"还行"，是因为它们互相掩盖——必须拉全链路同时看',
-  part: 'master',
+  part: 'engineer',
   chapterId: 'data',
   order: 7,
   typeTags: ['data', 'cache'],

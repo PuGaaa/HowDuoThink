@@ -14,7 +14,7 @@ export const cascadeCase: DiagnosisCase = {
   intro: '评论服务因为慢查询变慢（500ms→5s），订单服务和商品服务跟着超时，最终全站不可用。评论服务只占请求链路的 5%——为什么能拖垮全站？',
   domain: 'runtime',
   layer: '级联雪崩：一个依赖的超时传递为全链路故障——没有熔断、没有背压、超时值形同虚设',
-  part: 'master',
+  part: 'engineer',
   chapterId: 'runtime',
   order: 6,
   typeTags: ['runtime', 'architecture'],
