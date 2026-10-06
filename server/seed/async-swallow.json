@@ -1,0 +1,315 @@
+{
+  "id": "async-swallow",
+  "title": "报表\"生成中\"了三天：异常连堆栈都没来得及写",
+  "intro": "异步报表任务 5% 凭空消失：无回调、无日志、无终态——异步线程里抛的异常，连堆栈都没来得及写。",
+  "domain": "runtime",
+  "layer": "异步异常要有人接——没接住的异常是三无任务：无日志无回调无终态",
+  "part": "apprentice",
+  "chapterId": "error-reading",
+  "order": 4,
+  "typeTags": [
+    "resource",
+    "data",
+    "observability"
+  ],
+  "difficulty": 2,
+  "scene": {
+    "role": "你是「鲜到家」报表平台的新人，用户的三张\"永久生成中\"报表是你的第三课。",
+    "architecture": "导出请求 → 异步任务池(生成报表 → 上传 OSS → 回调置状态) ｜ 状态机：生成中 → 完成/失败",
+    "tag": "故障现场",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "三无任务",
+        "text": "5% 的任务：无完成回调、无失败回调、无任何日志——状态永远停在\"生成中\"。\n用户三天后追问：\"我的报表呢？\"——运营只能手动重发。"
+      },
+      {
+        "type": "text",
+        "title": "反常之处",
+        "text": "接口层正常返回\"生成中\"✓、线程池指标健康 ✓、ELK 搜\"导出失败\"零命中 ✓。\n三处都\"没出错\"，任务却消失了——与联调的\"三无现场\"神似，但这次在服务端。"
+      }
+    ],
+    "timeline": "导出改异步架构两周 ｜ 三无任务自上线出现 ｜ 同期成功任务 95% 全链路日志完整",
+    "impactHint": "成功的任务有完整日志，失败的任务连日志都没有——失败的路径上，少装了什么仪器？"
+  },
+  "hypotheses": [
+    {
+      "id": "h-swallow",
+      "text": "异步任务异常未被捕获：submit 的 Future 被丢弃、无 UncaughtHandler——异常被线程池静默吞掉，状态不更新",
+      "excludeActionId": "a-taskaudit"
+    },
+    {
+      "id": "h-oss",
+      "text": "OSS 上传失败但回调也失败（成功上传、失败通知双丢）",
+      "excludeActionId": "a-osslog"
+    },
+    {
+      "id": "h-oom",
+      "text": "任务 OOM 被内核杀死，线程死亡",
+      "excludeActionId": "a-threadstate"
+    },
+    {
+      "id": "h-queue",
+      "text": "任务在队列堆积未执行（还没轮到）",
+      "excludeActionId": "a-queuestate"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-impact",
+      "name": "给\"消失\"画坐标",
+      "desc": "影响面：消失发生在生命周期的哪一段",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "code",
+        "title": "消失坐标",
+        "text": "三无任务：提交后立即消失（无执行记录）\n线程池：活跃度正常（其余任务在跑）\n成功任务：全链路日志完整 ✓\n→ 不是\"执行失败\"（那会有失败日志），是\"执行前/执行中无声蒸发\"——失败路径上少装了仪器。"
+      }
+    },
+    {
+      "id": "a-taskaudit",
+      "name": "解剖任务提交与异常路径",
+      "desc": "submit 的返回值去哪了、异常抛给谁",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-swallow"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-swallow",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "代码解剖",
+        "text": "executor.submit(() => { render(); uploadOss(); markDone(); })\n三处缺陷叠加：\n① 返回的 Future 被丢弃——get() 没人调，异常没人读\n② 任务体内无 try-catch——render() 抛 NPE 直接传出\n③ 线程池无 UncaughtExceptionHandler——异常进线程池的黑洞\n④ 状态机只有\"生成中→完成\"路径——失败分支根本不存在\n实验：提交一个必抛异常的任务 → 三无复现 100%。\n实锤：异常进黑洞，状态机没有\"死\"的选项。"
+      }
+    },
+    {
+      "id": "a-osslog",
+      "name": "核对 OSS 上传记录",
+      "desc": "排除\"上传了但回调丢\"",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-oss"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-oss",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "OSS 核对",
+        "text": "三无任务在 OSS 侧连上传尝试的记录都没有——任务死在生成阶段，没走到上传。\n→ 排除 OSS 回调双丢。"
+      }
+    },
+    {
+      "id": "a-threadstate",
+      "name": "核对线程池线程状态",
+      "desc": "排除 OOM 杀线程",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-oom"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-oom",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "线程核对",
+        "text": "工作线程全部健康（RUNNABLE/WAITING），无死亡无重建风暴；dmesg 无 OOM kill。\n→ 排除 OOM。"
+      }
+    },
+    {
+      "id": "a-queuestate",
+      "name": "核对队列水位与任务执行记录",
+      "desc": "排除\"还没轮到\"",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-queue"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-queue",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "队列核对",
+        "text": "队列水位 12%——不存在堆积；三无任务连\"开始执行\"的日志都没有（区别于执行中断）。\n→ 排除排队：它们被执行过一瞬间，然后无声死亡。"
+      }
+    },
+    {
+      "id": "a-danger",
+      "name": "紧急清空任务池并重启",
+      "desc": "【状态变更】排空队列 + 重启任务池，赌一次干净初始化",
+      "cost": 1,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "清空结果",
+        "text": "队列中 6 个疑似三无任务被丢弃（用户侧重新提交），线程池重启。\n新提交任务依旧三无（根因未修）——止血动作只清了\"疑似的现场\"，\n且丢弃任务让 6 个用户白等——止血代价记账，修复必须跟上。"
+      }
+    },
+    {
+      "id": "a-fixhandler",
+      "name": "修复：失败路径补全 + 异常兜底",
+      "desc": "【状态变更】任务体 try-catch → 失败回调 + 状态机\"失败\"分支；线程池挂 UncaughtExceptionHandler 兜底",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "修复结果",
+        "text": "① 任务体统一 try-catch：任何异常 → markFailed(reason) + 失败回调\n② 线程池 UncaughtExceptionHandler：漏网异常兜底记录 + 告警\n③ 状态机补\"失败\"分支：生成中 → 完成 ∨ 失败（不可能再有三无）\n回归：必抛异常任务 → 状态\"失败\" + 失败回调 + ERROR 日志——三无绝迹。"
+      }
+    },
+    {
+      "id": "a-fixsweep",
+      "name": "沉淀：状态机巡检哨兵",
+      "desc": "【状态变更】\"生成中\"超 10 分钟自动标 STUCK + 告警——三无任务的最后哨兵",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "哨兵上线",
+        "text": "巡检任务：超时未终态的任务标记 STUCK 并告警。\n它不是修复（任务仍需人工或重跑），是\"发现\"的兜底——任何未来的三无，10 分钟内现形。"
+      }
+    },
+    {
+      "id": "a-fixlint",
+      "name": "沉淀：异步提交规范",
+      "desc": "【状态变更】lint：submit 返回值禁止丢弃；异步任务必须有失败路径；线程池必须配 UncaughtHandler",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "规范进工具",
+        "text": "静态检查三条：Future 丢弃拦截 / 异步任务失败路径必填 / 线程池构建器强制 handler。\n全仓扫描另揪出 2 处同款黑洞（通知服务/归档服务）——一次学费，三处偿还。"
+      }
+    },
+    {
+      "id": "a-fixmon",
+      "name": "沉淀：线程池异常计数指标",
+      "desc": "【状态变更】每分钟\"被池吞掉的异常数\"指标上线——吞异常不再无声",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "计数指标",
+        "text": "UncaughtExceptionHandler 同时打点：swallowed_exceptions_total。\n指标 > 0 即告警——黑洞从\"绝对静默\"变成\"有仪表的陷阱\"。"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-swallow",
+      "text": "异步任务异常无人接：submit 的 Future 被丢弃、任务体无 try-catch、线程池无 UncaughtExceptionHandler——异常进黑洞，状态机无失败分支，5% 任务三无消失",
+      "correct": true
+    },
+    {
+      "id": "rc-oss",
+      "text": "OSS 上传成功但回调双丢",
+      "correct": false
+    },
+    {
+      "id": "rc-oom",
+      "text": "任务 OOM 被内核杀死",
+      "correct": false
+    },
+    {
+      "id": "rc-queue",
+      "text": "任务队列堆积未执行",
+      "correct": false
+    }
+  ],
+  "expertCost": 4,
+  "restartActionId": "a-fixhandler",
+  "expertChain": [
+    {
+      "thought": "成功的任务有完整日志、失败的任务零日志——先画\"消失\"的坐标：死在生命周期的哪一段。",
+      "update": "提交后立即消失、无执行记录、线程池健康——不是执行失败，是\"失败路径上没装仪器\"。",
+      "actionId": "a-impact",
+      "why": "1⚡︎ \"成功有日志、失败无日志\"的不对称本身就是证据：失败路径的观测缺失——它解释了为什么 ELK 零命中。",
+      "conclusion": "嫌疑锁定：异常无人接（h-swallow 升权）。"
+    },
+    {
+      "thought": "解剖提交与异常路径——submit 的返回值、任务体的 catch、线程池的 handler，三个环节逐一查。",
+      "update": "实锤：Future 丢弃 + 无 catch + 无 handler + 状态机无失败分支——四重缺陷叠加的黑洞。",
+      "actionId": "a-taskaudit",
+      "why": "2⚡︎ 教学核心：异步异常的\"蒸发机制\"是四重缺陷的乘积——任何一环在岗都会留下痕迹。必抛异常任务的复现实验是终极证明：黑洞可以被抓个现行。",
+      "conclusion": "根因实锤：异常进黑洞。"
+    },
+    {
+      "thought": "OSS/线程/队列三个\"任务去了哪\"的假设各 1⚡︎ 排除——三种\"死亡方式\"逐个清场。",
+      "update": "OSS 无尝试、线程健康、队列无堆积——三无任务死于\"执行的第一瞬间\"。",
+      "actionId": "a-osslog",
+      "why": "1⚡︎ \"任务去了哪\"的三种假说（没执行/执行死/执行完没回话）排除顺序由证据成本决定——OSS 记录与线程状态都是现成数据。",
+      "conclusion": "嫌疑收敛单点。"
+    },
+    {
+      "thought": "修复（失败路径+兜底）、哨兵（STUCK 巡检）、门禁（lint 三条）、指标（吞异常计数）。停止收集。",
+      "update": "停止。",
+      "actionId": "",
+      "why": "【停止规则】机制（四重黑洞）✓ 哨兵（STUCK 巡检）✓ 门禁（lint+指标）✓——修复、发现、防复发三层闭合。",
+      "conclusion": "沉淀：异步异常要有人接——Future 不丢、异常有 handler、状态机有失败分支；吞异常的线程池是有仪表的陷阱。"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "异步线程抛出的异常没人接就会蒸发：Future 丢弃 + 任务体无 catch + 线程池无 handler = 无日志无回调无终态的三无任务。",
+      "principle": "程序设计：异步任务的异常契约三件套——任务体 try-catch（失败回调+状态更新）、线程池 UncaughtExceptionHandler（兜底）、Future 处理（或明确丢弃的理由）。状态机必须有\"失败\"分支：只有成功路径的状态机，注定生产三无任务。"
+    },
+    {
+      "text": "\"成功有日志、失败无日志\"的不对称 = 失败路径的观测缺失：它解释了 ELK 零命中，也指出仪器该装在哪。",
+      "principle": "可观测性设计：失败路径的日志/回调/状态更新是观测体系的另一半——只给成功路径装仪器，等于只监控\"没坏的东西\"。吞异常计数指标让黑洞有仪表，STUCK 巡检让三无任务 10 分钟现形。"
+    },
+    {
+      "text": "三无现场与三无任务的对照：前端\"无错无数据\"、服务端\"无日志无终态\"——凡是\"没有痕迹\"的故障，先怀疑\"失败路径没装仪器\"。",
+      "principle": "假设思维：\"零日志\"不是\"没发生\"，是\"发生的证据也被吞了\"。排查思路从\"搜索失败\"转向\"审计失败路径的仪器配置\"——catch 块、回调注册、状态机分支，逐个点验。"
+    }
+  ]
+}
