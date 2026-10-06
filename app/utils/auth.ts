@@ -73,6 +73,33 @@ export function setLocalAvatar(path: string) {
   uni.setStorageSync(KEY_LOCAL_AVATAR, path)
 }
 
+/** 保存头像：登录态 PATCH 后端（Bearer）+ 更新本地；未登录仅本地 */
+export function updateAvatar(url: string, cb: (r: LoginResult) => void) {
+  const u = getStoredUser()
+  setLocalAvatar(url)
+  if (isLoggedIn() && u != null) {
+    uni.request({
+      url: API_BASE + '/api/me',
+      method: 'PATCH',
+      header: { Authorization: 'Bearer ' + getToken(), 'Content-Type': 'application/json' } as any,
+      data: { name: u.name, avatarUrl: url } as any,
+      timeout: 8000,
+      success: (res) => {
+        if (res.statusCode === 200) {
+          const nu: AppUser = { id: u.id, login: u.login, name: (res.data as any).name ?? u.name, avatar: (res.data as any).avatar ?? url, role: u.role }
+          uni.setStorageSync(KEY_USER, JSON.stringify(nu))
+          cb({ error: '', user: nu })
+          return
+        }
+        cb({ error: '头像保存失败' })
+      },
+      fail: () => cb({ error: '无法连接社区服务' }),
+    })
+    return
+  }
+  cb({ error: '', user: u })
+}
+
 /** 保存昵称：登录态 PATCH 后端（Bearer）+ 更新本地；未登录仅本地 */
 export function updateName(name: string, cb: (r: LoginResult) => void) {
   const u = getStoredUser()

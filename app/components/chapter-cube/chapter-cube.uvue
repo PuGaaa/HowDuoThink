@@ -7,7 +7,7 @@
       <image v-if="locked" class="cubecube__lock" src="/static/icons/lock-ink3.png" mode="aspectFit"></image>
     </view>
     <text class="cubecube__name">{{ name }}</text>
-    <text class="cubecube__pact">{{ locked ? '通关上一章任意 1 关解锁，或直接挑战本章首关' : pact }}</text>
+    <text class="cubecube__pact">{{ locked ? '通关上一章全部关卡解锁，或直接挑战本章首关' : pact }}</text>
     <view class="cubecube__track">
       <view class="cubecube__fill" :style="'width:' + fillPct + '%'"></view>
     </view>

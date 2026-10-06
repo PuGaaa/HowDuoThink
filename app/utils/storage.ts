@@ -65,6 +65,63 @@ function emptyMascotStats(): MascotStats {
   return m
 }
 
+// —— 登录态写穿透：任何玩法数据写入 → 通知同步层推后端（监听由 sync-progress 注册）——
+let progressListener: (() => void) | null = null
+
+export function setProgressListener(cb: (() => void) | null) {
+  progressListener = cb
+}
+
+export function notifyProgressDirty() {
+  if (progressListener != null) progressListener()
+}
+
+/** 全量进度包（与后端 /api/me/progress 的 bundle 结构一一对应） */
+export interface ProgressBundle {
+  cases: { [id: string]: any }
+  streak: any
+  mascots: any
+  tasks: any
+  dailyDone: string
+  checkuse: number
+}
+
+/** 导出本地全量进度（登录态上传用） */
+export function exportProgressBundle(): ProgressBundle {
+  const cases: { [id: string]: any } = {}
+  const info = uni.getStorageInfoSync()
+  for (let i = 0; i < info.keys.length; i++) {
+    const k = info.keys[i]
+    if (k.indexOf('think_case_') !== 0) continue
+    const raw = uni.getStorageSync(k)
+    if (raw == null || (raw as string).length === 0) continue
+    try {
+      cases[k.replace('think_case_', '')] = JSON.parse(raw as string)
+    } catch (e) {}
+  }
+  const b: ProgressBundle = {
+    cases: cases,
+    streak: getStreak(),
+    mascots: getMascotStats(),
+    tasks: loadTasks(),
+    dailyDone: uni.getStorageSync('think_daily_done_v1') as string ?? '',
+    checkuse: getChecklistUse(),
+  }
+  return b
+}
+
+/** 导入后端全量进度（登录态拉取用，覆盖本地——后端为唯一事实源） */
+export function importProgressBundle(b: ProgressBundle) {
+  for (const id in b.cases) {
+    uni.setStorageSync('think_case_' + id, JSON.stringify(b.cases[id]))
+  }
+  if (b.streak != null) uni.setStorageSync('think_streak_v1', JSON.stringify(b.streak))
+  if (b.mascots != null) uni.setStorageSync('think_mascots_v1', JSON.stringify(b.mascots))
+  if (b.tasks != null) uni.setStorageSync('think_tasks_v1', JSON.stringify(b.tasks))
+  uni.setStorageSync('think_daily_done_v1', b.dailyDone ?? '')
+  uni.setStorageSync('think_checkuse_v1', String(b.checkuse ?? 0))
+}
+
 export function getCaseProgress(caseId: string): CaseProgress | null {
   const raw = uni.getStorageSync(KEY_CASE + caseId)
   if (raw == null) {
@@ -127,6 +184,7 @@ export function saveSession(record: SessionRecord): void {
     }
   }
   uni.setStorageSync(KEY_MASCOTS, JSON.stringify(stats))
+  notifyProgressDirty()
 }
 
 function gradeRank(grade: string): number {
@@ -174,6 +232,7 @@ const KEY_CHECKUSE = 'think_checkuse_v1'
 export function bumpChecklistUse(): number {
   const n = getChecklistUse() + 1
   uni.setStorageSync(KEY_CHECKUSE, String(n))
+  notifyProgressDirty()
   return n
 }
 
@@ -331,6 +390,7 @@ export function bumpTask(metric: string, n: number): void {
   if (t.weekly[metric] == null) t.weekly[metric] = 0
   t.weekly[metric] = t.weekly[metric] + n
   uni.setStorageSync(KEY_TASKS, JSON.stringify(t))
+  notifyProgressDirty()
 }
 
 export function getTaskDaily(metric: string): number {
@@ -340,3 +400,5 @@ export function getTaskDaily(metric: string): number {
 export function getTaskWeekly(metric: string): number {
   return loadTasks().weekly[metric] || 0
 }
+
+// sync v2: cache-bust

@@ -94,7 +94,7 @@ import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { getAvatar as resolveAvatar, getDisplayName } from '../../utils/auth'
 import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
 import { getReminder, setReminder, reminderLabel, startReminderPolling, requestNotifyPermission } from '../../utils/reminder'
-import { manualSync, lastSyncLabel, pullMergeProgress } from '../../utils/sync-progress'
+import { manualSync, lastSyncLabel, pullServerProgress } from '../../utils/sync-progress'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class RowVM {
@@ -160,8 +160,9 @@ function refresh() {
 onShow(() => {
   refresh()
   startReminderPolling()
-  pullMergeProgress((r) => {
-    if (r.merged > 0) refresh()
+  // 登录态：后端为唯一事实源，回到档案页即拉取覆盖本地，再刷新显示
+  pullServerProgress((r) => {
+    if (r.error.length === 0) refresh()
   })
 })
 

@@ -1,5 +1,7 @@
-"""progress 域模型：检查单/进度云同步的载荷。
-v0 同步范围：案例进度（solved/bestGrade/bestCost/plays）。任务计数不同步。"""
+"""progress 域模型：进度云同步的载荷。
+v1 同步范围：案例进度 + streak + 动物统计 + 任务计数 + 每日一题 + 检查单使用数。"""
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -14,3 +16,10 @@ class ProgressCase(BaseModel):
 
 class ProgressBlob(BaseModel):
     cases: dict[str, ProgressCase] = Field(default_factory=dict)
+    streak: dict[str, Any] = Field(default_factory=dict)
+    mascots: dict[str, Any] = Field(default_factory=dict)
+    tasks: dict[str, Any] = Field(default_factory=dict)
+    daily_done: str = Field(default="", alias="dailyDone")
+    checkuse: int = Field(default=0, ge=0)
+
+    model_config = {"populate_by_name": True}

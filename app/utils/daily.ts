@@ -2,6 +2,8 @@
 import { ALL_CASES } from '../data/cases'
 import { DiagnosisCase } from '../types/case'
 
+import { notifyProgressDirty } from './storage'
+
 const KEY_DONE = 'think_daily_done_v1'
 
 export function todayKey(): string {
@@ -38,4 +40,7 @@ export function dailyDone(): boolean {
 
 export function markDailyDone() {
   uni.setStorageSync(KEY_DONE, todayKey())
+  notifyProgressDirty()
 }
+
+// sync v2: cache-bust

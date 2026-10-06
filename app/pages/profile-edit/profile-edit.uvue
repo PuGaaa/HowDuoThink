@@ -37,7 +37,7 @@
 <script setup lang="uts">
 import { ref } from 'vue'
 import navbar from '../../components/navbar/navbar.uvue'
-import { AVATAR_PRESETS, getAvatar, getDisplayName, setLocalAvatar, updateName, isLoggedIn } from '../../utils/auth'
+import { AVATAR_PRESETS, getAvatar, getDisplayName, setLocalAvatar, updateName, updateAvatar, isLoggedIn } from '../../utils/auth'
 
 class PresetVM {
   path: string = ''
@@ -67,7 +67,20 @@ function save() {
   }
   if (busy.value) return
   busy.value = true
-  setLocalAvatar(presets.value[selIdx.value].path)
+  const presetPath = presets.value[selIdx.value].path
+  if (isLoggedIn()) {
+    busy.value = true
+    updateAvatar(presetPath, (r) => {
+      busy.value = false
+      if (r.error.length > 0) {
+        uni.showToast({ title: r.error, icon: 'none' })
+        return
+      }
+      uni.navigateBack({})
+    })
+    return
+  }
+  setLocalAvatar(presetPath)
   updateName(name, (r) => {
     busy.value = false
     if (r.error.length > 0) {

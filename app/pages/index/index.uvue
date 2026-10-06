@@ -100,6 +100,7 @@ import chapterCube from '../../components/chapter-cube/chapter-cube.uvue'
 import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress, getStreak, CaseProgress } from '../../utils/storage'
+import { pullServerProgress } from '../../utils/sync-progress'
 import { getTotals } from '../../utils/storage'
 import { rankOf, starsLabel } from '../../utils/scoring'
 import { getAvatar } from '../../utils/auth'
@@ -238,7 +239,11 @@ function refreshHome() {
   }
   hasContinue.value = continueFound
 }
-onShow(() => refreshHome())
+onShow(() => {
+  refreshHome()
+  // 登录态：后端为唯一事实源，回首页即拉取覆盖本地，再刷新显示
+  pullServerProgress(() => refreshHome())
+})
 
 const continueCase = computed((): boolean => hasContinue.value)
 
