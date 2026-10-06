@@ -79,6 +79,12 @@ import { sqliSortCase } from './sqli-sort'
 import { rebalanceStormCase } from './rebalance-storm'
 import { gracefulShutdownCase } from './graceful-shutdown'
 import { nagleAckCase } from './nagle-ack'
+import { buildtimeInjectCase } from './buildtime-inject'
+import { poolRejectionCase } from './pool-rejection'
+import { traceBreakCase } from './trace-break'
+import { apiSunsetCase } from './api-sunset'
+import { implicitCastCase } from './implicit-cast'
+import { capacityReviewCase } from './capacity-review'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -160,6 +166,12 @@ export const ALL_CASES: DiagnosisCase[] = [
   rebalanceStormCase,
   gracefulShutdownCase,
   nagleAckCase,
+  buildtimeInjectCase,
+  poolRejectionCase,
+  traceBreakCase,
+  apiSunsetCase,
+  implicitCastCase,
+  capacityReviewCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {
