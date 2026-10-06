@@ -1,0 +1,273 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * 第 3 章 · 数据的脾气 第二批（主从延迟写后立读 L2）
+ * 教学点：架构设计——读写分离的代价是读"过去"：写后立读必须有一致性保障（读己之写）；
+ * 延迟不是异常是物理事实，架构要为它设计兜底。
+ * 专家路径：impact(1) + lagprobe(2) + ordertime(1) = 4⚡︎
+ */
+export const replicaLagCase: DiagnosisCase = {
+  id: 'replica-lag',
+  title: '下单成功了，订单列表却是空的',
+  intro: '用户下单成功，跳到订单列表却看不到订单——刷新几次才出来。写后立读撞上了主从延迟。',
+  domain: 'data',
+  layer: '读写分离读的是"过去"——写后立读必须有一致性保障',
+  part: 'engineer',
+  chapterId: 'data',
+  order: 8,
+  typeTags: ['data', 'timing', 'architecture'],
+  difficulty: 2,
+
+  scene: {
+    role: '你是「鲜到家」订单平台的存储负责人，大促第一波高峰的客诉全是同一句话。',
+    architecture: '下单(写主库) → binlog 复制 → 从库×4(轮询读) ｜ 订单列表页：读从库 ｜ 订单详情页：读主库',
+    tag: '故障现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '复制延迟监控',
+        text: 'Seconds_Behind_Master：大促高峰 2~8s（平时 < 100ms）。\n客诉模式：下单成功提示后跳转订单列表，列表为空；几十秒后"自己好了"。',
+      },
+      {
+        type: 'text',
+        title: '分裂对照',
+        text: '同一订单：详情页（读主库）立刻可见；列表页（读从库）暂时不可见。\n两处读的是"同一份数据的两个时点"。',
+      },
+    ],
+    timeline: '大促第一波高峰进行中 ｜ 上月为读扩展新增 2 个从库、列表页切到从库 ｜ 客诉量随写入量增长',
+    impactHint: '详情页看得见、列表页看不见——同一份数据的"两个时点"。写完就读，读到的是几秒前的世界？',
+  },
+
+  hypotheses: [
+    { id: 'h-replag', text: '主从延迟：写后立读从从库读，复制尚未追上——读到了"过去"的快照', excludeActionId: 'a-lagprobe' },
+    { id: 'h-trans', text: '下单接口提前返回：事务未提交/异步落库，数据本来就没写进去', excludeActionId: 'a-ordertime' },
+    { id: 'h-cache', text: '订单列表缓存了空结果（负缓存），刷新也命中空缓存', excludeActionId: 'a-cacheprobe' },
+    { id: 'h-shard', text: '分片路由错误：订单被写到非预期分片，列表查错库', excludeActionId: 'a-shardcheck' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '对照详情页与列表页的可见性',
+      desc: '影响面：同一订单在两条读路径上的表现差异',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '双读路径对照',
+        text: '订单详情（读主库）：下单后立刻可见，100% ✓\n订单列表（读从库）：延迟 2~8s 才出现，高峰期 31% 首查为空\n客诉恢复时间：与复制延迟曲线逐分钟吻合\n→ 数据写进去了（主库可见），是"从库还没追上"——可见性分裂指向复制链路。',
+      },
+    },
+    {
+      id: 'a-lagprobe',
+      name: '实测一条订单的从库到达时间',
+      desc: '下单 t0，它什么时候出现在从库',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-replag'],
+      hypotheses: [{ id: 'h-replag', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: '复制到达实测',
+        text: 't0      主库提交（binlog 位点 L10001）\nt0+2.1s 从库 3 应用到 L10001\n高峰抽样 20 单：从库到达 1.8~7.9s，全部 > 客诉"首查为空"窗口\n→ 写后立读的窗口正好落在延迟里：用户 0.5s 内跳列表，读到的是 2 秒前的世界。',
+      },
+    },
+    {
+      id: 'a-lagstat',
+      name: '细分延迟的根因',
+      desc: '为什么高峰延迟到 8s——谁拖住了复制',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '延迟归因',
+        text: '从库回放线程：被"批量积分发放"大事务阻塞（单事务 12 万行，回放 6s+）\n该定时任务大促期间每小时全量跑一次，与高峰叠加 → 延迟毛刺 2~8s\n→ 两层问题：写后立读无保护（架构）× 大事务拖慢复制（运维）。先救用户，再修任务。',
+      },
+    },
+    {
+      id: 'a-ordertime',
+      name: '核对下单事务的提交时点',
+      desc: '排除"没写进去"',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-trans'],
+      hypotheses: [{ id: 'h-trans', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '提交核对',
+        text: '下单接口返回前事务已提交（binlog 位点早于响应）。\n→ 排除写入侧：主库 100% 可见已经证明这点。',
+      },
+    },
+    {
+      id: 'a-cacheprobe',
+      name: '核对列表页缓存',
+      desc: '排除负缓存',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-cache'],
+      hypotheses: [{ id: 'h-cache', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '缓存核对',
+        text: '列表页无负缓存；绕过缓存直查从库，延迟窗口内同样查不到。\n→ 排除缓存：查的就是"过去"的数据本身。',
+      },
+    },
+    {
+      id: 'a-shardcheck',
+      name: '核对分片路由',
+      desc: '排除路由错库',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-shard'],
+      hypotheses: [{ id: 'h-shard', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '路由核对',
+        text: '订单落在预期分片，主从拓扑正确，列表查询路由无偏差。\n→ 排除分片问题。',
+      },
+    },
+    {
+      id: 'a-danger',
+      name: '紧急把列表页切回主库',
+      desc: '【状态变更】大促期间列表读切主库',
+      cost: 1,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '切换结果',
+        text: '客诉立刻清零（读己之写天然成立）。\n代价：主库读压力 +40%，CPU 告警——用主库的余量换了用户体验，高峰下是拆东墙补西墙。',
+      },
+    },
+    {
+      id: 'a-fixsession',
+      name: '修复：写后立读会话粘滞（读己之写）',
+      desc: '【状态变更】用户"写后 N 秒内"的订单读固定路由主库',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '修复结果',
+        text: '会话级读写一致性：下单成功后 10s 内，该用户的订单相关读固定走主库（粘滞窗口随实时延迟自适应）。\n列表页其余流量继续走从库——主库压力仅 +3%。\n回归：高峰期"下单后首查为空"率 31% → 0%。',
+      },
+    },
+    {
+      id: 'a-fixbigtx',
+      name: '沉淀：大事务拆分',
+      desc: '【状态变更】批量任务分批提交（每批 < 1000 行），复制延迟毛刺 8s → 0.5s',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '任务改造',
+        text: '批量积分发放拆为分批提交 + 批间让出（错峰到低峰执行）。\n从库回放不再被单事务长阻塞，高峰延迟稳定 < 500ms。',
+      },
+    },
+    {
+      id: 'a-fixmonitor',
+      name: '沉淀：延迟分级告警联动路由',
+      desc: '【状态变更】复制延迟 > 1s 预警；> 3s 自动扩大读己之写粘滞窗口',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '联动机制',
+        text: '延迟监控与路由层联动：延迟越大，粘滞窗口自动越长——一致性保障从静态配置变成自适应。\n> 5s 触发人工介入（检查是否有新的大事务）。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-replag', text: '读写分离无"读己之写"保障：下单（写主库）后立读列表（读从库），高峰复制延迟 2~8s（被 12 万行大事务回放拖慢）——用户在延迟窗口内读到"过去"的从库快照', correct: true },
+    { id: 'rc-trans', text: '下单接口提前返回，事务未提交数据未落库', correct: false },
+    { id: 'rc-cache', text: '订单列表负缓存了空结果', correct: false },
+    { id: 'rc-shard', text: '分片路由错误，订单写入非预期分片', correct: false },
+  ],
+
+  expertCost: 4,
+  restartActionId: 'a-danger',
+
+  expertChain: [
+    {
+      thought: '"详情看得见、列表看不见"——同一份数据两条读路径，先对齐这个分裂：写进去了吗。',
+      update: '详情页（主库）100% 可见——数据已写入；分裂只发生在"从库那条读路径"上。',
+      actionId: 'a-impact',
+      why: '1⚡︎ 双路径对照一步排除半个问题空间：写入侧清白，剩下的嫌疑全部落在"读从库的时点"上。',
+      conclusion: '嫌疑锁定：复制延迟（h-replag 升权）。',
+    },
+    {
+      thought: '实测一条订单的"从库到达时间"——把延迟从监控数字变成一次真实的到达实验。',
+      update: '实锤：t0 提交、t0+2~8s 到达从库；用户 0.5s 内首查——窗口精确咬合。',
+      actionId: 'a-lagprobe',
+      why: '2⚡︎ 到达实验把"Seconds_Behind_Master 是 2~8"翻译成"用户在 t0+0.5s 读到 t0-2s 的世界"——监控数字只有落进用户行为的时间线，才能解释现象。',
+      conclusion: '根因实锤：写后立读 × 复制延迟。',
+    },
+    {
+      thought: '延迟为什么会到 8 秒——监控告警之外要找到拖住复制的那只手。',
+      update: '12 万行大事务回放阻塞 + 高峰叠加——延迟有明确的"制造者"，也要一起修。',
+      actionId: 'a-lagstat',
+      why: '1⚡︎ 根因分两层：架构缺陷（立读无保护）不因延迟消失而消失，但延迟根因（大事务）不修则保护窗口越撑越大——两层一起治才闭环。',
+      conclusion: '修复双线：会话粘滞 + 大事务拆分。',
+    },
+    {
+      thought: '事务/缓存/分片三个常规嫌疑各 1⚡︎ 排除——主库可见已经先验了一半，排除只是留证。',
+      update: '提交时点、缓存、路由全部清白——嫌疑收敛单点。',
+      actionId: 'a-ordertime',
+      why: '1⚡︎ 快排留证是复盘的底气：下次再有人提"是不是没提交"，直接翻证据。',
+      conclusion: '嫌疑收敛 → 修复与止血分层。',
+    },
+    {
+      thought: '止血（切主库，代价大）、修复（读己之写粘滞）、治理（大事务）、联动（自适应窗口）。停止收集。',
+      update: '停止。',
+      actionId: '',
+      why: '【停止规则】机制（立读撞延迟）✓ 延迟根因（大事务）✓ 保障设计（粘滞自适应）✓——现象、制造者、防线三层闭合。',
+      conclusion: '沉淀：读写分离读的是"过去"。一致性不是全有或全无——"读己之写"是用户能感知的那部分一致性，必须单独设计。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '读写分离读的是"过去"：复制延迟是物理事实不是异常——写后立读（下单后看订单）必须有一致性保障。',
+      principle: '架构设计：读己之写（session 粘滞主库）是读写分离的标配组件，不是可选项。粘滞窗口可按实时延迟自适应；无法粘滞的场景（跨设备）要明示用户"稍后可见"。延迟不会消失，架构要为它兜底。',
+    },
+    {
+      text: '复制延迟的"制造者"要单独清算：一个 12 万行的大事务能让所有从库回放停摆 6 秒——延迟毛刺往往是少数任务拖的。',
+      principle: '数据运维：批量任务分批提交（每批千行级）+ 错峰执行；大事务是复制延迟的头号制造者，也是主库 undo/锁的头号制造者——一次改造三处收益。',
+    },
+    {
+      text: '监控数字要落进用户时间线才有解释力："延迟 2~8s"只有对上"用户 0.5s 后首查"，才从统计变成因果。',
+      principle: '验证思维：到达实验（一条数据的端到端时点追踪）把监控指标翻译成用户经历。排查时问一句"这个数字对得上现象的时间尺度吗"——对不上，因果链就还缺一段。',
+    },
+  ],
+}

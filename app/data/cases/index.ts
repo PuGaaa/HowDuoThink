@@ -73,6 +73,12 @@ import { regexCatastropheCase } from './regex-catastrophe'
 import { cardinalityBlastCase } from './cardinality-blast'
 import { distributedMonolithCase } from './distributed-monolith'
 import { loadtestIllusionCase } from './loadtest-illusion'
+import { wsUpgradeCase } from './ws-upgrade'
+import { replicaLagCase } from './replica-lag'
+import { sqliSortCase } from './sqli-sort'
+import { rebalanceStormCase } from './rebalance-storm'
+import { gracefulShutdownCase } from './graceful-shutdown'
+import { nagleAckCase } from './nagle-ack'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -148,6 +154,12 @@ export const ALL_CASES: DiagnosisCase[] = [
   cardinalityBlastCase,
   distributedMonolithCase,
   loadtestIllusionCase,
+  wsUpgradeCase,
+  replicaLagCase,
+  sqliSortCase,
+  rebalanceStormCase,
+  gracefulShutdownCase,
+  nagleAckCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {
