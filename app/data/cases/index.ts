@@ -90,6 +90,16 @@ import { testingReviewCase } from './testing-review'
 import { configDriftCase } from './config-drift'
 import { happyEyeballsCase } from './happy-eyeballs'
 import { mqDiskCase } from './mq-disk'
+import { chunkOverlapCase } from './chunk-overlap'
+import { callbackMismatchCase } from './callback-mismatch'
+import { deepPaginationCase } from './deep-pagination'
+import { ruleSprawlCase } from './rule-sprawl'
+import { mqDualWriteCase } from './mq-dualwrite'
+import { probeMismatchCase } from './probe-mismatch'
+import { wrongEnvCase } from './wrong-env'
+import { bandwidthHogCase } from './bandwidth-hog'
+import { ndotsTrapCase } from './ndots-trap'
+import { envContentionCase } from './env-contention'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -182,6 +192,16 @@ export const ALL_CASES: DiagnosisCase[] = [
   configDriftCase,
   happyEyeballsCase,
   mqDiskCase,
+  chunkOverlapCase,
+  callbackMismatchCase,
+  deepPaginationCase,
+  ruleSprawlCase,
+  mqDualWriteCase,
+  probeMismatchCase,
+  wrongEnvCase,
+  bandwidthHogCase,
+  ndotsTrapCase,
+  envContentionCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {

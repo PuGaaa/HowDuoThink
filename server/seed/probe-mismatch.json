@@ -1,0 +1,299 @@
+{
+  "id": "probe-mismatch",
+  "title": "发布卡进死循环：新实例刚起来就被杀",
+  "intro": "发布卡进滚动循环：新实例 8 秒启动完成、探针 404、被杀、再起、再杀——容量被悄悄掏空。",
+  "domain": "deploy",
+  "layer": "探针与路由是代码与配置的契约——重构永远不碰健康端点",
+  "part": "master",
+  "chapterId": "deployment",
+  "order": 8,
+  "typeTags": [
+    "deploy",
+    "config",
+    "verification"
+  ],
+  "difficulty": 2,
+  "scene": {
+    "role": "你是「票到手」支付网关的负责人，一次常规发布演变成了容量事故。",
+    "architecture": "k8s Deployment(readinessProbe: GET /healthz, 8s 间隔) → 网关服务 v2.1(路由框架重构) → 上游",
+    "tag": "故障现场",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "发布循环",
+        "text": "新实例：启动 8s 完成 → 探针 GET /healthz → 404 → 永不就绪 → 到 terminationGrace 被杀 → 下一个实例再起——12 次循环。\n404 状态码（不是超时）：路径性问题，不是慢启动。"
+      },
+      {
+        "type": "text",
+        "title": "连带伤害",
+        "text": "滚动策略逐个替换旧实例：替换一个少一个可用容量（新实例全不就绪）。\n60 分钟后容量 10 → 4，网关限流自保，上游批量报错。"
+      }
+    ],
+    "timeline": "v2.1 发布内容：路由框架重构（\"对外行为完全不变\"）｜ 探针配置一年未动 ｜ 旧实例被替换到剩 4 个时人工熔断",
+    "impactHint": "404 说明\"应用活着但路径不对\"——谁定义了 /healthz，谁又动了这个约定？"
+  },
+  "hypotheses": [
+    {
+      "id": "h-probe",
+      "text": "路由重构改变了健康端点路径：探针打的 /healthz 在 v2.1 已不存在（迁到 /actuator/health）",
+      "excludeActionId": "a-probecheck"
+    },
+    {
+      "id": "h-port",
+      "text": "容器端口与探针端口不一致",
+      "excludeActionId": "a-portcheck"
+    },
+    {
+      "id": "h-dep",
+      "text": "就绪探针依赖的下游检查失败（DB 连不上）",
+      "excludeActionId": "a-depcheck"
+    },
+    {
+      "id": "h-start",
+      "text": "新实例启动慢，未在窗口内就绪",
+      "excludeActionId": "a-startlog"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-impact",
+      "name": "切分\"启动成功\"与\"探针失败\"",
+      "desc": "影响面：应用到底活着吗、404 从哪来",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "code",
+        "title": "状态切分",
+        "text": "应用进程：正常启动（日志\"server started on 8080\"）✓\n探针：GET /healthz → 404 Not Found（非超时/非 5xx）\n应用内直接 curl /healthz：404；curl /actuator/health：200 ✓\n→ 应用活着、端口对、是\"路径\"对不上——404 是精确的症状：约定被改了。"
+      }
+    },
+    {
+      "id": "a-probecheck",
+      "name": "对照两版的健康端点与探针配置",
+      "desc": "路由重构动了什么、探针配置跟了吗",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-probe"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-probe",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "契约对照",
+        "text": "v2.0：GET /healthz → 200 ✓（探针与路由匹配）\nv2.1：路由框架重构，健康检查迁至 /actuator/health；/healthz 随旧路由组一起移除\n探针配置：readinessProbe /healthz —— 一年未动、也不在 v2.1 的发布检查范围\n实锤：代码动了\"约定\"，配置没人通知——探针与路由的契约单方面撕毁。"
+      }
+    },
+    {
+      "id": "a-portcheck",
+      "name": "核对端口链路",
+      "desc": "排除端口不一致",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-port"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-port",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "端口核对",
+        "text": "容器 8080 = 监听 8080 = 探针 targetPort 8080——链路一致。\n→ 排除端口：404 来自应用路由层。"
+      }
+    },
+    {
+      "id": "a-depcheck",
+      "name": "核对探针的下游依赖",
+      "desc": "排除依赖检查失败",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-dep"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-dep",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "依赖核对",
+        "text": "readinessProbe 是纯 HTTP 路径检查（不执行依赖探测）；DB 连接正常。\n→ 排除依赖侧。"
+      }
+    },
+    {
+      "id": "a-startlog",
+      "name": "核对启动耗时与就绪窗口",
+      "desc": "排除慢启动",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-start"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-start",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "启动核对",
+        "text": "启动 8 秒完成，远小于 60s 就绪窗口；404 是确定性响应不是超时。\n→ 排除慢启动。"
+      }
+    },
+    {
+      "id": "a-danger",
+      "name": "紧急改用 TCP 探活绕过",
+      "desc": "【状态变更】readinessProbe 改 tcpSocket 8080",
+      "cost": 1,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "TCP 探活结果",
+        "text": "新实例就绪，发布推进，容量恢复。\n隐患埋下：TCP 探活只能证明\"端口开着\"——未来路由全挂但进程活着的故障，探针全部放行。\n→ 复盘点评：把\"检查粒度\"降级来换\"发布推进\"，是用长期盲区换短期可用。"
+      }
+    },
+    {
+      "id": "a-fixprobe",
+      "name": "修复：健康端点契约化",
+      "desc": "【状态变更】框架统一健康端点 /healthz（永不随业务路由重构移动）+ v2.1 兼容路由恢复",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "修复结果",
+        "text": "① 健康端点从业务路由剥离：由框架独立挂载——业务路由重构永不触碰 /healthz\n② v2.1 恢复 /healthz 兼容路由\n③ 应用启动时自声明 probe 路径到部署元数据（配置引用声明值）。\n重新发布：12/12 实例就绪，容量曲线平稳。"
+      }
+    },
+    {
+      "id": "a-fixcanary",
+      "name": "沉淀：发布前探针自测进流水线",
+      "desc": "【状态变更】CI 增加：容器内自测 probe 路径返回 200，失败拦截发布",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "流水线门禁",
+        "text": "发布前自测：构建产物容器内 curl 探针路径断言 200。\n这次的 404 在流水线里 10 秒就能发现——而不是让 12 个实例轮流\"就义\"。"
+      }
+    },
+    {
+      "id": "a-fixcap",
+      "name": "沉淀：滚动保护与容量水位",
+      "desc": "【状态变更】maxUnavailable=0 + 发布期容量水位告警（可用副本 < 80% 即告警）",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "滚动保护",
+        "text": "① maxUnavailable=0：新实例就绪前不杀旧实例——滚动失败不再掏空容量\n② 发布期可用副本水位告警：从 10 → 4 的\"温水煮青蛙\"不再发生。\n→ 探针错了会死一个实例，滚动策略错了会死全队——两层都要有保险。"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-probe",
+      "text": "路由框架重构把健康端点 /healthz 迁移至 /actuator/health，探针配置（一年未动、不在发布检查范围）仍打旧路径——新实例永不就绪被循环杀掉，旧实例被逐个替换致容量 10→4",
+      "correct": true
+    },
+    {
+      "id": "rc-port",
+      "text": "容器端口与探针端口不一致",
+      "correct": false
+    },
+    {
+      "id": "rc-dep",
+      "text": "就绪探针依赖的下游检查失败",
+      "correct": false
+    },
+    {
+      "id": "rc-start",
+      "text": "新实例启动慢未在窗口内就绪",
+      "correct": false
+    }
+  ],
+  "expertCost": 4,
+  "restartActionId": "a-danger",
+  "expertChain": [
+    {
+      "thought": "404 是精确的症状：应用活着、端口通、是路径不对——先切分\"活着\"与\"就绪\"两层。",
+      "update": "进程正常、容器内 curl 证实 /healthz 404、/actuator/health 200——约定被单方面改变。",
+      "actionId": "a-impact",
+      "why": "1⚡︎ 状态码分层是发布问题的第一切片：超时（没起来/太慢）、5xx（起来但坏）、404（起来但路径不对）指向完全不同的根因层。",
+      "conclusion": "嫌疑锁定：健康端点契约（h-probe 升权）。"
+    },
+    {
+      "thought": "对照两版的健康端点与探针配置——谁定义了约定、谁动了它。",
+      "update": "实锤：路由重构迁移端点，探针配置不在发布检查范围——契约被单方面撕毁。",
+      "actionId": "a-probecheck",
+      "why": "2⚡︎ 契约对照揭示\"沉默的耦合\"：探针路径与路由的耦合从没被写进任何检查单——它不是配置错误，是耦合关系从未被管理。",
+      "conclusion": "根因实锤 → 排除端口/依赖/启动。"
+    },
+    {
+      "thought": "端口、依赖、启动三个常规嫌疑各 1⚡︎ 排除——留证防止复盘时被\"是不是端口改了\"重新带偏。",
+      "update": "三层全部一致且正常——嫌疑收敛到契约单点。",
+      "actionId": "a-portcheck",
+      "why": "1⚡︎ 排除清单是发布类事故的标配：探针/端口/依赖/启动四个维度逐个留证，修复才不会\"顺手全改\"掩盖真因。",
+      "conclusion": "嫌疑收敛 → 修复契约。"
+    },
+    {
+      "thought": "止血（TCP 探活有长期代价）、修复（端点契约化）、门禁（探针自测）、保险（滚动保护）。停止收集。",
+      "update": "停止。",
+      "actionId": "",
+      "why": "【停止规则】机制（契约撕毁）✓ 放大器（滚动策略掏空容量）✓ 防线（自测+maxUnavailable）✓——机制、放大、防线三层闭合。",
+      "conclusion": "沉淀：探针与路由是代码与配置的契约——契约要显式管理（框架固定/自声明），发布要自测契约，滚动要有容量保险。"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "探针路径与路由是代码与配置的隐性契约：路由重构\"对外行为不变\"不包括健康端点——契约必须显式管理。",
+      "principle": "验证思维：健康端点由框架独立挂载（业务路由重构永不触碰），或应用启动时自声明探针路径到部署元数据。\"发布前容器内自测探针路径\"进流水线——契约的验证成本是 10 秒，失守的代价是容量事故。"
+    },
+    {
+      "text": "滚动失败会悄悄掏空容量：一个实例不就绪只是\"发布慢\"，配合替换策略就成了\"容量事故\"——温水煮青蛙最危险。",
+      "principle": "发布设计：maxUnavailable=0（新不就绪不杀旧）+ 发布期可用副本水位告警。探针错误死一个实例，滚动策略错误死全队——两层保险各自独立，探针修好了也保留滚动保护。"
+    },
+    {
+      "text": "降级检查粒度是短期可用换长期盲区：TCP 探活推进了发布，也关闭了\"应用假死\"的探测能力。",
+      "principle": "止血权衡：紧急绕过（TCP 探活/跳过检查）要登记为\"待恢复项\"并设定恢复期限——检查粒度的降级必须与它的探测价值一起记账，否则盲区永久化。"
+    }
+  ]
+}
