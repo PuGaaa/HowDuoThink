@@ -76,10 +76,10 @@ export function chaptersInPart(partId: string): ChapterDef[] {
   return CHAPTERS.filter((c) => c.part === partId)
 }
 
-// —— 解锁：篇内序贯 + 跳级挑战 ————————————————
-// 编号与解锁均按篇独立：篇门 = 前一篇每章破 ≥1 关（第一篇恒开）；
-// 章解锁 = 本章已破 ≥1 关 ∥ 篇门已开 且（篇首章直开 ∥ 篇内前一章破 ≥1 关）；
-// 跳级挑战 = 锁定章的 order 最小关恒可玩，通关即解锁本章。
+// —— 解锁：单调锁链 + 跳级挑战 ————————————————
+// 锁链严格单调（前一章锁 → 后一章必锁），唯一例外是跳级挑战通关：
+// 章解锁 = 跳级挑战关已通关 ∥（篇门 ∧ 篇首章）∥（前一章已解锁 ∧ 前一章已破 ≥1）；
+// 篇门 = 前一篇每章破 ≥1 关（第一篇恒开）；跳级挑战 = 锁定章 order 最小关恒可玩。
 // 全部从 solved 进度派生，无独立存储。
 
 /** 章内已破案数（本地 + 远端 casepack） */
@@ -118,14 +118,33 @@ export function chapterUnlockHint(chapterId: string): string {
   return '通关上一章任意 1 关解锁本章'
 }
 
-/** 章解锁 = 本章已破 ≥1 关（跳级挑战通关后的自动解锁）∥ 篇门已开 且（篇首章直开 ∥ 篇内前一章破 ≥1 关） */
+/** 本章跳级挑战关是否已通关（跳级承诺：赢了立即解锁本章） */
+function challengeSolved(chapterId: string): boolean {
+  const cid = chapterChallengeCaseId(chapterId)
+  if (cid.length === 0) return false
+  const p = getCaseProgress(cid)
+  return p != null && p.solved
+}
+
+/** 章解锁 = 跳级挑战关已通关 ∥（篇门已开 ∧ 篇首章）∥（前一章已解锁 ∧ 前一章已破 ≥1）——锁链递归单调 */
 export function isChapterUnlocked(chapterId: string): boolean {
-  if (chapterSolvedCount(chapterId) >= 1) return true
   const partId = chapterPartId(chapterId)
   if (partId.length === 0) return true
-  const idx = chapterIndexInPart(chapterId)
-  if (idx <= 0) return isPartUnlocked(partId)
-  return chapterSolvedCount(chaptersInPart(partId)[idx - 1].id) >= 1
+  const list = chaptersInPart(partId)
+  const gate = isPartUnlocked(partId)
+  let prevUnlocked = false
+  for (let i = 0; i < list.length; i++) {
+    const id = list[i].id
+    let un: boolean
+    if (i === 0) {
+      un = gate || challengeSolved(id)
+    } else {
+      un = challengeSolved(id) || (prevUnlocked && chapterSolvedCount(list[i - 1].id) >= 1)
+    }
+    if (id === chapterId) return un
+    prevUnlocked = un
+  }
+  return false
 }
 
 /** 篇解锁 = 前一篇每章已破 ≥1 关；PARTS 首篇恒开 */
