@@ -85,6 +85,11 @@ import { traceBreakCase } from './trace-break'
 import { apiSunsetCase } from './api-sunset'
 import { implicitCastCase } from './implicit-cast'
 import { capacityReviewCase } from './capacity-review'
+import { certSniCase } from './cert-sni'
+import { testingReviewCase } from './testing-review'
+import { configDriftCase } from './config-drift'
+import { happyEyeballsCase } from './happy-eyeballs'
+import { mqDiskCase } from './mq-disk'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -172,6 +177,11 @@ export const ALL_CASES: DiagnosisCase[] = [
   apiSunsetCase,
   implicitCastCase,
   capacityReviewCase,
+  certSniCase,
+  testingReviewCase,
+  configDriftCase,
+  happyEyeballsCase,
+  mqDiskCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {
