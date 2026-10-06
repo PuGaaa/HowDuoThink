@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 接入层之夜（Nginx 配置陷阱 L2）
+ * 第 2 章 · 接入层之夜（Nginx 配置陷阱 L2）
  * 教学点："偶发"常常是没找到分桶维度；请求没到应用，应用日志永远无辜；
  * 网关默认值是隐形合同；配置漂移 = 测试好的生产不行。
  * 专家路径：impact(1) + sizecorr(2) + nginxconf(2) + confdiff(1) = 6⚡︎

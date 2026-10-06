@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 4 章 · 运行时暗面（无界缓存 OOM L3）
+ * 第 8 章 · 运行时暗面（无界缓存 OOM L3）
  * 教学点：OOMKilled 是内核杀的不是自己崩的；锯齿曲线是泄漏的指纹；
  * 无界缓存 = 慢性泄漏；重启是止血不是修复。
  * 专家路径：impact(1) + k8sevent(1) + rsscurve(1) + heapsnap(2) + coderead(2) = 7⚡︎

@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 12 章 · 测试与质量（覆盖率假象 L2）
+ * 第 16 章 · 测试与质量（覆盖率假象 L2）
  * 教学点：验证思维——覆盖率度量"执行了"，不度量"验证了"；
  * 测试没有断言 = 只是把代码跑了一遍；变异分数才是测试质量的照妖镜。
  * 专家路径：impact(1) + assertscan(1) + branchreport(1) + datadiff(1) = 4⚡︎

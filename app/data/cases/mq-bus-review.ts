@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 9 章 · 消息与异步 结业评审（评审现场 L3）
+ * 第 13 章 · 消息与异步 结业评审（评审现场 L3）
  * 教学点：架构设计——事件总线的四张必答卷：保序（分区键）、隔离（消费组）、契约（schema 版本）、兜底（死信+对账）；
  * 评审现场：在故障发生之前把种子找出来。收益由作者证明，风险由评审证明。
  * 专家路径：orderproof(2) + dropprobe(2) + slowprobe(1) + schemaprobe(1) + benefit(1) + histreview(1) = 8⚡︎

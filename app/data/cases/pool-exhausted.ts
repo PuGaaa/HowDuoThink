@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 3 章 · 数据的脾气（连接池）：数据库连接池耗尽
+ * 第 6 章 · 数据的脾气（连接池）：数据库连接池耗尽
  * 教学点：池是共享资源；"慢查询吃掉连接"是池耗尽的头号成因；无超时的连接等于泄漏。
  * 专家路径：impact(1) + dblog(1) + poolstat(2) + slowquery(2) = 6⚡︎
  * 双路径：poolstat 与 slowquery 可互换；errorlog 与 impact 可互换

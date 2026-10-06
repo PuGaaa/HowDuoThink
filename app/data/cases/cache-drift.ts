@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 3 章 · 数据的脾气（缓存不一致 L2）
+ * 第 6 章 · 数据的脾气（缓存不一致 L2）
  * 教学点：缓存与 DB 是两份数据；"先更新 DB 再删缓存"的时序窗口；TTL 是最后防线。
  * 专家路径：impact(1) + userprobe(1) + dbcheck(2) = 4⚡︎
  */

@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 3 章 · 数据的脾气 结业（深分页 OFFSET 陷阱 L2）
+ * 第 6 章 · 数据的脾气 结业（深分页 OFFSET 陷阱 L2）
  * 教学点：程序设计——OFFSET 的代价是"扫过并丢弃"：翻页深度即扫描量；
  * 游标分页（keyset）代价恒定；产品方案与实现代价要一起设计。
  * 专家路径：impact(1) + explain(2) + indexcheck(1) = 4⚡︎

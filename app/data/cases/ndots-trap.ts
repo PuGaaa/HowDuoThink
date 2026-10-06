@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 11 章 · 网络深处 第六批（DNS 搜索域放大 L2）
+ * 第 15 章 · 网络深处 第六批（DNS 搜索域放大 L2）
  * 教学点：全栈视野——ndots:5 让"短于 5 个点"的域名先试遍搜索域：外部调用解析放大 5 倍；
  * 内外域名分流（绝对域名尾点）+ NodeLocal 缓存是 K8s DNS 的标准治理。
  * 专家路径：impact(1) + resolvcheck(2) + repro(1) = 4⚡︎

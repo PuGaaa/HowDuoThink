@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 2 章 · 构建与依赖（依赖版本冲突教学关）
+ * 第 3 章 · 构建与依赖（依赖版本冲突教学关）
  * 教学点："我这里好好的"= 依赖树差异；锁文件是依赖版本的真相；报错指纹（xxx is not a function）。
  * 专家路径：impact(1) + diff(1) + lockfile(2) = 4⚡︎
  */

@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 5 章 · 并发迷宫（秒杀超卖 L3）
+ * 第 9 章 · 并发迷宫（秒杀超卖 L3）
  * 教学点：check-then-act 竞态；并发故障的证据在毫秒级时间线里；"请求都在排队"假象。
  * 专家路径：impact(1) + orderlog(1) + code(2) = 4⚡︎（redis 2⚡︎ 为可选加固证据）
  */

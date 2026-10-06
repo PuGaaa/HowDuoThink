@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 接入层之夜（DNS 劫持 L2）
+ * 第 2 章 · 接入层之夜（DNS 劫持 L2）
  * 教学点：DNS 解析链路（本地缓存→运营商→权威）；"部分用户+特定地域"形状；TTL 决定恢复速度。
  * 专家路径：impact(1) + dnsquery(1) + compare(2) = 4⚡︎
  */

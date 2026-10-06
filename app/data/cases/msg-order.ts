@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 5 章 · 并发迷宫（消息错序 L2）
+ * 第 9 章 · 并发迷宫（消息错序 L2）
  * 教学点：至少一次投递必然带来重复与乱序；覆盖写没有版本校验 = 旧数据可以覆盖新数据；
  * 扩容消费者时最容易丢掉"顺序键"。
  * 专家路径：impact(1) + apiread(1) + msgtrace(2) + codepush(2) = 6⚡︎

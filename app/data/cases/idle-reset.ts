@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 11 章 · 网络深处 第二批（空闲连接被回收 L2）
+ * 第 15 章 · 网络深处 第二批（空闲连接被回收 L2）
  * 教学点：全栈视野——你复用的连接，链路上每一跳都有权单方面关闭它；
  * keep-alive 必须对齐链路上最小的 idle timeout；"放久了会坏"的连接要用边界实验画出死窗。
  * 专家路径：impact(1) + idlemath(2) + serverlog(1) = 4⚡︎

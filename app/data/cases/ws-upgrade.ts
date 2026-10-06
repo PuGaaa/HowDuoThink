@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 接入层之夜 第二批（WebSocket 升级头被吞 L2）
+ * 第 2 章 · 接入层之夜 第二批（WebSocket 升级头被吞 L2）
  * 教学点：全栈视野——WebSocket 升级三件套（Upgrade/Connection/HTTP1.1）必须逐跳透传；
  * "本地好、线上坏"的差异藏在中间层；网关配置合并是最常见的回归源。
  * 专家路径：impact(1) + nginxdump(2) + origincmp(1) = 4⚡︎

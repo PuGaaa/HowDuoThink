@@ -100,6 +100,14 @@ import { wrongEnvCase } from './wrong-env'
 import { bandwidthHogCase } from './bandwidth-hog'
 import { ndotsTrapCase } from './ndots-trap'
 import { envContentionCase } from './env-contention'
+import { firstNpeCase } from './first-npe'
+import { causedByCase } from './caused-by'
+import { fieldMismatchCase } from './field-mismatch'
+import { cookieLostCase } from './cookie-lost'
+import { requiredFieldCase } from './required-field'
+import { docDriftCase } from './doc-drift'
+import { configTypoCase } from './config-typo'
+import { bootOrderCase } from './boot-order'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -202,6 +210,14 @@ export const ALL_CASES: DiagnosisCase[] = [
   bandwidthHogCase,
   ndotsTrapCase,
   envContentionCase,
+  firstNpeCase,
+  causedByCase,
+  fieldMismatchCase,
+  cookieLostCase,
+  requiredFieldCase,
+  docDriftCase,
+  configTypoCase,
+  bootOrderCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {

@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 10 章 · 部署与发布（蓝绿切换 L2）
+ * 第 14 章 · 部署与发布（蓝绿切换 L2）
  * 教学点：蓝绿切换切的是"流量入口"，而入口不止网关一个——DNS/CDN/长连接/客户端都是入口；
  * HTML 与 hash 资源的缓存策略必须分层。
  * 专家路径：impact(1) + edgefetch(1) + origincmp(1) = 3⚡︎

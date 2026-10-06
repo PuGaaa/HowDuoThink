@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 2 章 · 构建与依赖 第二批（镜像标签漂移 L2）
+ * 第 3 章 · 构建与依赖 第二批（镜像标签漂移 L2）
  * 教学点：验证思维——"同一个标签"不等于"同一个镜像"；latest 是移动的指针；
  * 不可变引用（digest）+ 拉取策略对齐才能保证"测的就是发布的"。
  * 专家路径：impact(1) + pullpolicy(2) + imageinspect(1) = 4⚡︎

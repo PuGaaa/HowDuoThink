@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 接入层之夜（CORS 教学关）
+ * 第 2 章 · 接入层之夜（CORS 教学关）
  * 教学点：CORS 是浏览器的安全机制不是服务器错误；报错在浏览器控制台而非服务端日志；预检请求。
  * 专家路径：impact(1) + console(1) + serverlog(1) + options(2) = 5⚡︎
  * 双路径：console 与 serverlog 可互换

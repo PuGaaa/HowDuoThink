@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 10 章 · 部署与发布（feature flag 泄露 L2）
+ * 第 14 章 · 部署与发布（feature flag 泄露 L2）
  * 教学点：验证思维——规则"写对"不等于求值"跑对"；灰度配置上线前必须做求值分布断言；
  * 语义歧义（0~1 还是 0~100）是事故温床。
  * 专家路径：impact(1) + ruleeval(2) + timeout(1) = 4⚡︎

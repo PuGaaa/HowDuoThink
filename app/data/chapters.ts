@@ -27,18 +27,22 @@ export const PARTS: PartDef[] = [
 ]
 
 export const CHAPTERS: ChapterDef[] = [
-  { id: 'access', part: 'apprentice', no: '第 1 章', name: '接入层之夜', pact: 'TLS 是两端协商，任何一侧校验策略的差异都会造成"部分失败"' },
-  { id: 'build', part: 'apprentice', no: '第 2 章', name: '构建与依赖', pact: '构建产物与运行环境的差异，是白屏的高发地带' },
-  { id: 'data', part: 'engineer', no: '第 3 章', name: '数据的脾气', pact: '缓存与数据库之间，永远隔着一致性窗口' },
-  { id: 'runtime', part: 'engineer', no: '第 4 章', name: '运行时暗面', pact: '内存与连接是有生命周期的资源' },
-  { id: 'concurrency', part: 'master', no: '第 5 章', name: '并发迷宫', pact: '时间与顺序是隐藏的维度：竞态只在重放时现形' },
-  { id: 'observability', part: 'master', no: '第 6 章', name: '可观测性迷雾', pact: '你看到的日志和指标，本身也会说谎' },
-  { id: 'security', part: 'master', no: '第 7 章', name: '安全攻防', pact: '每一个便利的捷径，都可能是别人进来的门' },
-  { id: 'evolution', part: 'master', no: '第 8 章', name: '架构演进', pact: '故障的种子在设计时种下——容量、限流、降级是偿还' },
-  { id: 'messaging', part: 'master', no: '第 9 章', name: '消息与异步', pact: '消息不是数据，是承诺——发出去就要到，到了就要对，对了就只能一次' },
-  { id: 'deployment', part: 'master', no: '第 10 章', name: '部署与发布', pact: '上线不是终点，是另一次排错的起点' },
-  { id: 'network', part: 'master', no: '第 11 章', name: '网络深处', pact: '你以为是代码的问题，其实是网络在偷偷改你的数据' },
-  { id: 'testing', part: 'master', no: '第 12 章', name: '测试与质量', pact: '测试是代码的镜子——照不出问题的时候，问题最大' },
+  { id: 'error-reading', part: 'apprentice', no: '第 1 章', name: '读懂报错', pact: '报错不是噪音，是地图——堆栈的每一行都在告诉你去哪看' },
+  { id: 'access', part: 'apprentice', no: '第 2 章', name: '接入层之夜', pact: 'TLS 是两端协商，任何一侧校验策略的差异都会造成"部分失败"' },
+  { id: 'build', part: 'apprentice', no: '第 3 章', name: '构建与依赖', pact: '构建产物与运行环境的差异，是白屏的高发地带' },
+  { id: 'integration', part: 'apprentice', no: '第 4 章', name: '联调之夜', pact: '联调问题的第一问：数据在哪一层变了形——每一跳都要留证' },
+  { id: 'contract', part: 'engineer', no: '第 5 章', name: '接口与契约', pact: '接口是两个系统的契约——每一次变更都要对面还认' },
+  { id: 'data', part: 'engineer', no: '第 6 章', name: '数据的脾气', pact: '缓存与数据库之间，永远隔着一致性窗口' },
+  { id: 'config-boot', part: 'engineer', no: '第 7 章', name: '配置与启动', pact: '应用启动的每一秒都在读环境——配置的默认值就是它在生产的命运' },
+  { id: 'runtime', part: 'engineer', no: '第 8 章', name: '运行时暗面', pact: '内存与连接是有生命周期的资源' },
+  { id: 'concurrency', part: 'master', no: '第 9 章', name: '并发迷宫', pact: '时间与顺序是隐藏的维度：竞态只在重放时现形' },
+  { id: 'observability', part: 'master', no: '第 10 章', name: '可观测性迷雾', pact: '你看到的日志和指标，本身也会说谎' },
+  { id: 'security', part: 'master', no: '第 11 章', name: '安全攻防', pact: '每一个便利的捷径，都可能是别人进来的门' },
+  { id: 'evolution', part: 'master', no: '第 12 章', name: '架构演进', pact: '故障的种子在设计时种下——容量、限流、降级是偿还' },
+  { id: 'messaging', part: 'master', no: '第 13 章', name: '消息与异步', pact: '消息不是数据，是承诺——发出去就要到，到了就要对，对了就只能一次' },
+  { id: 'deployment', part: 'master', no: '第 14 章', name: '部署与发布', pact: '上线不是终点，是另一次排错的起点' },
+  { id: 'network', part: 'master', no: '第 15 章', name: '网络深处', pact: '你以为是代码的问题，其实是网络在偷偷改你的数据' },
+  { id: 'testing', part: 'master', no: '第 16 章', name: '测试与质量', pact: '测试是代码的镜子——照不出问题的时候，问题最大' },
 ]
 
 /** 章内关卡：按 chapterId 动态聚合 + order 排序；本地与远端（casepack）合并，按 id 去重 */

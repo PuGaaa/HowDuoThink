@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 9 章 · 消息与异步 第三批（重平衡风暴 L2）
+ * 第 13 章 · 消息与异步 第三批（重平衡风暴 L2）
  * 教学点：假设思维——消费者被"请"出组的两个时钟：session timeout（心跳）与 max.poll.interval（拉取间隔）；
  * 单批处理时间必须有预算；慢消息隔离是组稳定性的前提。
  * 专家路径：impact(1) + pollaudit(2) + repro(1) = 4⚡︎
