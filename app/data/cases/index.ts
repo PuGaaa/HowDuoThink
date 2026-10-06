@@ -49,6 +49,10 @@ import { mqLostCase } from './mq-lost'
 import { mqDuplicateCase } from './mq-duplicate'
 import { mqDlqCase } from './mq-dlq'
 import { mqDelayCase } from './mq-delay'
+import { bgSplitCase } from './bg-split'
+import { flagLeakCase } from './flag-leak'
+import { mixVersionCase } from './mixversion'
+import { cdnStaleCase } from './cdn-stale'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -100,6 +104,10 @@ export const ALL_CASES: DiagnosisCase[] = [
   mqDuplicateCase,
   mqDlqCase,
   mqDelayCase,
+  bgSplitCase,
+  flagLeakCase,
+  mixVersionCase,
+  cdnStaleCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {

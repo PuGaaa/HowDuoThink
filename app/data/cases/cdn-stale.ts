@@ -1,0 +1,273 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * 第 10 章 · 部署与发布（CDN 缓存不一致 L3）
+ * 教学点：验证思维——"发布完成"必须定义在用户视角（边缘抽样验证），不是 build 绿+源站对；
+ * 多层缓存从里向外剥，每层用响应头说话；流程变更也是变更。
+ * 专家路径：impact(1) + edgeprobe(1) + headers(1) + originlog(1) = 4⚡︎
+ */
+export const cdnStaleCase: DiagnosisCase = {
+  id: 'cdn-stale',
+  title: 'CDN 缓存了刚发布的旧页面',
+  intro: '发布机器人报"发布完成"，源站文件比对无误；但华东用户打开的是旧页面，还有一批白屏报 JS 404。',
+  domain: 'deploy',
+  layer: '发布完成的定义在用户视角——边缘节点的最后一跳才算数',
+  part: 'master',
+  chapterId: 'deployment',
+  order: 4,
+  typeTags: ['deploy', 'cache', 'verification'],
+  difficulty: 3,
+
+  scene: {
+    role: '你是「鲜到家」商城的前端工程负责人，今晚大促页 H5 发布由你值守。',
+    architecture: 'CI/CD(构建+上传+清理旧资源) → 源站 OSS → CDN(边缘缓存) → 浏览器(index.html + hash JS)',
+    tag: '故障现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '用户端报错监控',
+        text: 'GET https://cdn.example.com/assets/app.7d21a9.js → 404（华东集中爆发）\n该 hash 是旧版本资源——页面还在引用已被清理的旧 JS。',
+      },
+      {
+        type: 'text',
+        title: '发布机器人报告',
+        text: '构建成功 ✓ 源站文件比对一致 ✓ 状态：发布完成 ✓\n但客服侧：部分用户打开的还是上一期大促页（旧版式），部分直接白屏。',
+      },
+    ],
+    timeline: '今晚 22:00 大促页发布 ｜ 发布流程 3 个月未变更 ｜ 昨天 purge 操作被移出发布脚本、改为独立审批（审批流程今天才建好，无人提交过）',
+    impactHint: '源站是对的、用户拿到的是错的——中间隔着几层？每一层各缓存了什么、各自多久过期？',
+  },
+
+  hypotheses: [
+    { id: 'h-htmlttl', text: 'HTML 被 CDN 边缘长缓存：index.html 与 hash 资源共用一套长 TTL 策略，边缘返回旧 HTML', excludeActionId: 'a-edgeprobe' },
+    { id: 'h-purge', text: '发布后未执行 CDN purge：purge 移出发布脚本后无人审批执行，旧缓存自然存活', excludeActionId: 'a-purgelog' },
+    { id: 'h-browser', text: '浏览器强缓存了 index.html（Cache-Control 配置错），用户本地就是旧页', excludeActionId: 'a-headers' },
+    { id: 'h-stalewhile', text: 'CDN 配置 stale-while-revalidate，回源失败的节点持续吐旧副本', excludeActionId: 'a-originlog' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '圈定两类症状的分布',
+      desc: '影响面：旧页面与白屏 404 各是谁、什么分布',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '症状交叉分析',
+        text: '症状A（旧页面）：HTML 是旧版式，但页面功能正常——HTML 来自缓存\n症状B（白屏 404）：旧 HTML + 引用的旧 hash JS 已被清理 → 资源加载失败\n分布：与区域/运营商无关，与"命中的边缘节点"强相关；同一用户强刷（Ctrl+F5）仍是旧页\n→ 两类症状是同一条根因链的两环：缓存层有旧 HTML，源站的旧资源又被清理了。',
+      },
+    },
+    {
+      id: 'a-edgeprobe',
+      name: '从三个边缘节点抓 index.html',
+      desc: '边缘现在吐的 HTML 是新是旧、缓存头是什么',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-htmlttl'],
+      hypotheses: [{ id: 'h-htmlttl', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: '边缘节点抽样（3 节点）',
+        text: '节点1(华东)：旧 HTML  x-cache: HIT   age: 5200\n节点2(华北)：旧 HTML  x-cache: HIT   age: 5200\n节点3(华南)：旧 HTML  x-cache: MISS → 回源拿到新 HTML\n统一响应头：Cache-Control: max-age=86400（HTML 缓存 24h！）\n→ HTML 在边缘缓存 24 小时：index.html 与 hash 资源共用了一套"静态资源"缓存策略。',
+      },
+    },
+    {
+      id: 'a-headers',
+      name: '核对源站对 HTML 的缓存头',
+      desc: '排除浏览器层：源站让浏览器存了多久',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-browser'],
+      hypotheses: [{ id: 'h-browser', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '源站响应头',
+        text: '源站 index.html：Cache-Control: no-cache（浏览器每次要 revalidate）——配置正确。\n旁证：用户强刷也拿到旧页 → 旧值不来自浏览器本地，来自边缘。\n→ 排除浏览器层：策略对，但边缘根本没来问。',
+      },
+    },
+    {
+      id: 'a-purgelog',
+      name: '查 purge 执行记录',
+      desc: '今晚发布有没有触发缓存清理',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-purge'],
+      hypotheses: [{ id: 'h-purge', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: 'purge 审计',
+        text: '昨晚前：每次发布自动 purge（脚本内置）✓ 历史记录齐全\n今晚 22:00 发布：purge 执行 0 次 ✗\n流程日志：昨天"purge 移出发布脚本，改为独立审批"——审批工单 0 份提交。\n→ 发布脚本少了关键步骤，接手的审批流程又没人走：purge 就此断档。',
+      },
+    },
+    {
+      id: 'a-originlog',
+      name: '查边缘回源日志与 stale 配置',
+      desc: '排除 stale-while-revalidate 吐旧副本',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-stalewhile'],
+      hypotheses: [{ id: 'h-stalewhile', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '回源审计',
+        text: '今晚回源成功率 100%，无失败记录；CDN 配置无 stale-while-revalidate / stale-on-error。\n→ 排除 stale 策略：边缘不是"回源失败才吐旧"，是压根没到过期时间、理直气壮地吐旧。',
+      },
+    },
+    {
+      id: 'a-assetclean',
+      name: '查发布脚本的旧资源清理策略',
+      desc: '白屏 404 的另一半机制：旧 JS 是谁删的',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '清理策略',
+        text: '脚本配置："发布后清理 24h 前的旧 hash 资源"（为控制存储成本）\n→ 旧 HTML 引用的 app.7d21a9.js 在源站已被删除：\n缓存里的旧 HTML 找不到资源 → 404 白屏。两环闭合：缓存旧 HTML（未 purge）× 资源被清理。',
+      },
+    },
+    {
+      id: 'a-smallpurge',
+      name: '选择性 purge：只清 HTML 路径',
+      desc: '【状态变更】清 index.html 等入口，不清 hash 静态资源',
+      cost: 2,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '选择性 purge',
+        text: 'purge 范围：/index.html、/home 等 12 个入口路径；静态资源目录不动。\n风险控制：hash 资源天然内容寻址（名字变了缓存自然失效），清它们只会白白打爆回源带宽。\n→ 5 分钟内全量边缘拿到新 HTML，白屏消失。',
+      },
+    },
+    {
+      id: 'a-fullpurge',
+      name: '全站 purge（含全部静态资源）',
+      desc: '【状态变更】一键清空全部缓存——最省事的选项',
+      cost: 2,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '全站 purge（陷阱动作）',
+        text: '全量缓存清空 → 所有资源回源 → 源站带宽瞬间 ×40，P99 飙升，大促前夜的源站在高压线上走了一遭。\n→ 复盘点评：能用"选择性 purge"解决的事故，不要用"全站重置"来还——图省事的操作会制造第二个事故。',
+      },
+    },
+    {
+      id: 'a-fixttl',
+      name: '缓存策略分级重构',
+      desc: '【状态变更】HTML 短 TTL/no-cache，hash 资源长缓存 immutable',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '策略分层',
+        text: 'index.html / 入口 HTML：no-cache（每次 revalidate，秒级生效）\n/assets/*（hash 资源）：max-age=31536000, immutable（一年，名字变即失效）\n清理策略同步放宽：旧 hash 资源保留 30 天——给缓存里的旧 HTML 留好它引用的资源。',
+      },
+    },
+    {
+      id: 'a-fixverify',
+      name: '发布流程加"边缘验证"终态',
+      desc: '【状态变更】发布后自动抽样边缘节点断言 HTML hash；purge 回到发布脚本内置',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '发布流程 v2',
+        text: '新终态：构建 → 上传 → purge（内置，不再独立审批）→ 三地边缘节点抓取 index.html → 断言 hash = 新版本 → 通过才标"发布完成"。\n机器人报告新增一行：用户视角验证 ✓（节点1/2/3 全部新 HTML）。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-purge', text: 'purge 被移出发布脚本改为独立审批，审批流程未启用无人提交——发布后缓存未清理；HTML 与 hash 资源共用 24h 长 TTL 使旧 HTML 长期存活，叠加源站清理旧资源导致 404 白屏', correct: true },
+    { id: 'rc-htmlttl', text: 'CDN 对 HTML 配置了 24h 长 TTL（与静态资源混用策略）', correct: false },
+    { id: 'rc-browser', text: '浏览器强缓存 index.html，用户本地旧页未失效', correct: false },
+    { id: 'rc-stalewhile', text: 'CDN stale-while-revalidate 配置导致回源失败时吐旧副本', correct: false },
+  ],
+
+  expertCost: 4,
+  restartActionId: 'a-fullpurge',
+
+  expertChain: [
+    {
+      thought: '两类症状（旧页面 / 白屏 404）——它们是两条故障还是一条链？先看分布形状。',
+      update: '与区域无关、与边缘节点强相关、强刷无效——旧 HTML 在缓存层；404 = 旧 HTML 引用了被清理的资源。一条链两环。',
+      actionId: 'a-impact',
+      why: '1⚡︎ 先建立症状之间的结构关系再逐层排查——把两个现象收进一条因果链，排查对象立刻从"两个问题"缩成"一个机制"。',
+      conclusion: '主线确定：缓存层有旧 HTML × 源站资源被清理。',
+    },
+    {
+      thought: '从边缘节点直接抓 HTML——用户视角的第一手证据，顺带看缓存头把策略暴露出来。',
+      update: '三节点两旧一新、x-cache: HIT、max-age=86400——HTML 在边缘缓存 24h，与 hash 资源混用了一套策略。',
+      actionId: 'a-edgeprobe',
+      why: '1⚡︎ 边缘抓包一次拿到三样东西：内容新旧、命中状态、缓存策略——"假装自己是用户"是发布类排查的第一动作。',
+      conclusion: 'HTML 长 TTL 实锤（放大器）→ 继续查为什么缓存没被清理。',
+    },
+    {
+      thought: '清理为什么没发生？查 purge 审计——发布机器人说"完成"，审计日志说没说 purge？',
+      update: '实锤：今晚 purge 0 次——昨晚流程变更（purge 移出脚本改审批），审批工单 0 份。',
+      actionId: 'a-purgelog',
+      why: '2⚡︎ 流程变更也是变更：时间线上"昨天"的操作在今晚引爆——根因不是 purge 失败，是 purge 从"自动"变成"无人执行"。',
+      conclusion: '根因实锤：流程断档。修复要同时补流程和策略。',
+    },
+    {
+      thought: '浏览器层和 stale 策略用 1⚡︎ 各自排除——源站 no-cache 配置正确、回源全成功，两个假设有证据排除。',
+      update: '浏览器无责（no-cache 且强刷无效）、stale 策略未启用——缓存链只剩边缘一层在作恶。',
+      actionId: 'a-headers',
+      why: '1⚡︎ 多层缓存排查要逐层留证：每层的"无责证明"（响应头/回源日志）都是复盘材料，防止下次再怀疑一遍。',
+      conclusion: '责任链闭合：边缘（旧 HTML）× 脚本（删旧资源）× 流程（没 purge）。',
+    },
+    {
+      thought: '止血用选择性 purge（别碰 hash 资源），修复用策略分级，终态加边缘验证断言。停止收集。',
+      update: '停止。',
+      actionId: '',
+      why: '【停止规则】根因（purge 断档）✓ 放大器（HTML 长 TTL）✓ 触发器（清理旧资源）✓——三环齐了，且修复方案覆盖每一环。',
+      conclusion: '沉淀："发布完成"的新定义 = 边缘节点用户视角验证通过。build 绿和源站对，只是发布的前置条件。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '"发布完成"必须定义在用户视角：边缘节点抽样断言通过才算完成——build 绿 + 源站对只是前置条件。',
+      principle: '验证思维：发布链路每多一层缓存，"部署成功"与"用户生效"之间就多一个可能断开的环节。终态验证要在链路最末端（边缘/用户侧）做，中间层的绿灯不能代表末端。',
+    },
+    {
+      text: '缓存策略必须分级：HTML 是指针（no-cache/短 TTL），hash 资源是内容（长缓存 immutable）。',
+      principle: '指针必须实时（否则新内容找不到），内容可以永久缓存（名字变了缓存自然失效）。配套规则：清理旧资源要给缓存的旧 HTML 留足引用期——清理节奏和缓存 TTL 是一对约束，改一个必须核对另一个。',
+    },
+    {
+      text: '流程变更也是变更：purge 移出脚本改审批，审批流程没人用——断档发生在两个"都对"的决定的接缝上。',
+      principle: '变更管理：从"自动"改"人工"要交接（审批流程上线并验证后才停用旧路径），新旧机制必须重叠运行一段时间。事故时间线上，引爆点常在流程切换的缝隙里，而不是流程本身。',
+    },
+  ],
+}
