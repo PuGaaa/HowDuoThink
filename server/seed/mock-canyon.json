@@ -1,0 +1,299 @@
+{
+  "id": "mock-canyon",
+  "title": "联调全绿，上线翻车：我们验证了一个不存在的世界",
+  "intro": "新结算功能联调全绿、上线首日 47% 金额异常：联调环境的支付依赖挂着 mock 档——从没摘过。",
+  "domain": "network",
+  "layer": "mock 档未摘 = 验证了不存在的世界——联调报告要注明依赖档位",
+  "part": "apprentice",
+  "chapterId": "integration",
+  "order": 5,
+  "typeTags": [
+    "config",
+    "data",
+    "process"
+  ],
+  "difficulty": 2,
+  "scene": {
+    "role": "你是「鲜到家」结算服务的新人，上线首日的金额事故让你怀疑上周的联调是不是做梦。",
+    "architecture": "结算服务 → 支付回调处理(金额入账) ｜ 联调环境: 支付依赖挂 mock 档(mock.enabled=true, 固定模板回调) ｜ 生产: 真实网关回调",
+    "tag": "故障现场",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "上线首日",
+        "text": "结算单金额异常 47%：金额全部 ×100（1 元结算成 100 元）。\n联调时同样的代码：金额全部正确——\"联调全绿\"的报告还在群里。"
+      },
+      {
+        "type": "text",
+        "title": "金额线索",
+        "text": "×100 是\"分转元\"的经典错位：mock 回调金额单位=分；\n生产真实回调金额单位=元（支付网关 v2 规范）。"
+      }
+    ],
+    "timeline": "结算功能两周前联调通过 ｜ 支付网关 v2 规范同步上线（回调单位改为元 + 新增字段）｜ 联调环境的 mock 档两个月前配置后从未动过",
+    "impactHint": "同一份代码两个结果——联调时它对接的\"支付网关\"，是真网关还是一张 mock 的面具？"
+  },
+  "hypotheses": [
+    {
+      "id": "h-mock",
+      "text": "联调环境支付依赖 mock 档未摘：验证的是两个月前写的 mock 模板（单位=分、旧结构），不是真实网关",
+      "excludeActionId": "a-mockcheck"
+    },
+    {
+      "id": "h-format",
+      "text": "生产网关 v2 变更（单位改元+新字段）本身有缺陷",
+      "excludeActionId": "a-gatewaychangelog"
+    },
+    {
+      "id": "h-sign",
+      "text": "回调签名校验失败被吞，走了默认分支",
+      "excludeActionId": "a-signcheck"
+    },
+    {
+      "id": "h-idem",
+      "text": "回调幂等处理错位，重复回调污染金额",
+      "excludeActionId": "a-idemcheck"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-impact",
+      "name": "对照联调与生产的金额处理",
+      "desc": "影响面：同一代码在两个环境的输入差异",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "code",
+        "title": "双环境输入对照",
+        "text": "联调环境回调（联调报告记录）：amount: 880（分）→ 代码 ×100 换算 → 8.8 元 ✓\n生产回调：amount: 8.80（元）→ 代码 ×100 → 880 元 ✗ 47% 命中\n→ 同一份\"换算代码\"在两个环境收到\"单位不同\"的输入——代码没错，世界的规则不同。"
+      }
+    },
+    {
+      "id": "a-mockcheck",
+      "name": "审计联调环境的依赖档位",
+      "desc": "支付依赖是真网关沙箱还是 mock 档",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-mock"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-mock",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "联调环境审计",
+        "text": "依赖档位：mock.enabled=true（两个月前配置）——支付依赖全程指向 mock 档\nmock 模板：固定回调 { amount: 分, 缺 v2 字段 }——两个月前的旧规范\n联调报告：\"全绿\"——它验证的是 mock 的行为，不是真实网关的行为。\n实锤：我们验证了一个不存在的世界：mock 的单位、mock 的结构、mock 的规则。"
+      }
+    },
+    {
+      "id": "a-gatewaychangelog",
+      "name": "核对支付网关 v2 变更",
+      "desc": "评估\"真实回调变更\"与 mock 过期各自的责任",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-format"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-format",
+          "status": "down"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "v2 变更评估",
+        "text": "网关 v2 确实改了单位（分→元）并新增字段——变更本身合规（提前 60 天公告）。\n双因结构：mock 档过期（两个月前的旧规范）× 真实规范演进（v2）——\n即便 mock 是新的，v2 新字段联调也该覆盖。主因=mock 未摘（假世界），v2 是\"揭穿者\"。"
+      }
+    },
+    {
+      "id": "a-signcheck",
+      "name": "核对回调签名校验",
+      "desc": "排除签名分支",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-sign"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-sign",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "签名核对",
+        "text": "生产回调签名全部校验通过（签名规则 v1/v2 兼容）。\n→ 排除签名：金额异常不是\"未授权回调\"造成的。"
+      }
+    },
+    {
+      "id": "a-idemcheck",
+      "name": "核对回调幂等",
+      "desc": "排除重复回调",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-idem"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-idem",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "幂等核对",
+        "text": "回调 ID 去重正常，无重复入账。\n→ 排除幂等：异常金额是\"单次回调就错\"。"
+      }
+    },
+    {
+      "id": "a-danger",
+      "name": "紧急手工把 mock 改成与生产一致",
+      "desc": "【状态变更】联调环境 mock 模板手工拷贝生产真实回调样例",
+      "cost": 1,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "手工拷贝结果",
+        "text": "联调\"通过\"了（mock 与生产此刻一致）。\n但下次生产网关再变更，手工拷贝的 mock 又漂——没有机制的同步是定时炸弹。\n→ 复盘点评：手工对齐 mock = 用第二份文档替代第一份——漂移只会更快。"
+      }
+    },
+    {
+      "id": "a-fixunmock",
+      "name": "修复：摘 mock 档接真实沙箱 + 单位统一",
+      "desc": "【状态变更】联调环境接支付网关沙箱（真实协议）；金额统一以\"分\"为内部单位",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "修复结果",
+        "text": "① 联调环境接网关沙箱：真实协议、真实回调结构（沙箱与生产同源）\n② 金额内部单位统一\"分\"：入口换算一次，出口按目标规范\n③ 47% 异常单冲正，历史结算重放验证零差异。"
+      }
+    },
+    {
+      "id": "a-fixmocklife",
+      "name": "沉淀：mock 档生命周期制度",
+      "desc": "【状态变更】mock 档带 TTL 与负责人；过期自动摘除+告警；联调报告注明依赖档位",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "mock 治理",
+        "text": "① mock 档登记：TTL 30 天 + 负责人——过期自动摘除并通知\n② 联调报告模板新增\"依赖档位\"一栏：mock/沙箱/真实——\"联调通过\"必须注明在哪个世界验证的。\n→ mock 是脚手架，不是永久建筑——脚手架要有拆除日期。"
+      }
+    },
+    {
+      "id": "a-fixshadow",
+      "name": "沉淀：生产影子回放",
+      "desc": "【状态变更】新逻辑上线前用生产真实回调做影子回放——mock 的替代信任源",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "影子回放",
+        "text": "生产真实回调流量录制 → 新逻辑影子执行 → 输出比对。\nmock 验证\"逻辑对不对\"，影子回放验证\"真实世界接不接得住\"——两层验证缺一，就有一个世界没验过。"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-mock",
+      "text": "联调环境支付依赖 mock 档两个月未摘：mock 模板（单位=分、旧结构）成为验证对象——联调验证的是假世界；生产网关 v2 规范演进（单位=元+新字段）揭开差距，47% 结算单金额 ×100",
+      "correct": true
+    },
+    {
+      "id": "rc-format",
+      "text": "网关 v2 变更自身缺陷（揭穿者非主因）",
+      "correct": false
+    },
+    {
+      "id": "rc-sign",
+      "text": "回调签名校验失败走默认分支",
+      "correct": false
+    },
+    {
+      "id": "rc-idem",
+      "text": "回调幂等错位重复入账",
+      "correct": false
+    }
+  ],
+  "expertCost": 4,
+  "restartActionId": "a-danger",
+  "expertChain": [
+    {
+      "thought": "同一份代码两个结果——先对照双环境的\"输入\"：代码没错的话，是世界不同。",
+      "update": "联调输入=分、生产输入=元——\"换算代码\"在两个世界收到不同规则。",
+      "actionId": "a-impact",
+      "why": "1⚡︎ 双环境输入对照把\"上线翻车\"翻译成\"输入不同\"——排查从\"查代码\"转向\"查环境给的数据\"。",
+      "conclusion": "方向锁定：联调环境的依赖世界（h-mock 升权）。"
+    },
+    {
+      "thought": "审计联调依赖档位——联调时对接的\"支付网关\"是真身还是面具。",
+      "update": "实锤：mock 档两个月未摘，模板停在旧规范——\"联调全绿\"验证的是 mock 的行为。",
+      "actionId": "a-mockcheck",
+      "why": "2⚡︎ 教学核心：验证的价值取决于\"验证对象的真实度\"——对着 mock 全绿，只证明代码与 mock 自洽。依赖档位审计是联调复盘的第一问：我们在哪个世界验的？",
+      "conclusion": "根因实锤：mock 档未摘。"
+    },
+    {
+      "thought": "网关 v2 变更单独定权——它是\"揭穿者\"：即便 mock 是新的，v2 新字段也该被联调覆盖。",
+      "update": "双因结构确认：mock 过期（主）× 规范演进（揭穿）——修复要同时接真实沙箱与适配 v2。",
+      "actionId": "a-gatewaychangelog",
+      "why": "1⚡︎ 双因的定权防止修复偏斜：把责任全推给\"网关变了\"会漏掉 mock 治理；全推给\"没摘 mock\"会漏掉 v2 适配——两层都要修。",
+      "conclusion": "定权完成 → 排除签名/幂等。"
+    },
+    {
+      "thought": "签名/幂等各 1⚡︎ 排除；止血陷阱（手工拷贝 mock）点评；修复（沙箱+单位统一）+ 双防线（mock 生命周期+影子回放）。停止收集。",
+      "update": "停止。",
+      "actionId": "",
+      "why": "【停止规则】根因（假世界）✓ 双因（v2 揭穿）✓ 防线（mock 生命周期+影子回放）✓——个案、机制、防线三层闭合。",
+      "conclusion": "沉淀：mock 档未摘 = 验证了不存在的世界——联调报告注明依赖档位，影子回放补上真实世界那一层。"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "mock 档未摘 = 验证了不存在的世界：对着 mock 全绿只证明代码与 mock 自洽，不证明与真实世界兼容。",
+      "principle": "验证思维：联调报告必须注明\"依赖档位\"（mock/沙箱/真实）——验证的价值取决于验证对象的真实度。mock 档要有生命周期（TTL+负责人+过期自动摘除）：脚手架要有拆除日期。"
+    },
+    {
+      "text": "手工拷贝生产样例到 mock 是用第二份文档替代第一份：没有机制同步的对齐，漂移只会更快。",
+      "principle": "流程设计：mock 与真实世界的同步必须机制化——沙箱直连（同源协议）或 schema 驱动生成。手工拷贝的对齐是瞬时快照，生产每变更一次就漂一次——对齐的成本要付给机制，不是付给加班。"
+    },
+    {
+      "text": "mock 验证逻辑，影子回放验证世界：新逻辑上线前用生产真实流量回放——两层验证缺一，就有一个世界没验过。",
+      "principle": "验证思维：验证分层——mock/单测管逻辑正确性，影子回放（生产真实回调录制回放）管真实世界兼容性。\"联调全绿\"只是第一层；把生产流量引给新逻辑看输出，才补上第二层。"
+    }
+  ]
+}

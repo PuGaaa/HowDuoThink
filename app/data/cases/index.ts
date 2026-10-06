@@ -116,6 +116,14 @@ import { asyncSwallowCase } from './async-swallow'
 import { pollStormCase } from './poll-storm'
 import { enumDriftCase } from './enum-drift'
 import { priorityClashCase } from './priority-clash'
+import { symptomClusterCase } from './symptom-cluster'
+import { firstDominoCase } from './first-domino'
+import { mockCanyonCase } from './mock-canyon'
+import { triPlatformCase } from './tri-platform'
+import { errorContractCase } from './error-contract'
+import { contractReviewCase } from './contract-review'
+import { profileMazeCase } from './profile-maze'
+import { bootStormCase } from './boot-storm'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -234,6 +242,14 @@ export const ALL_CASES: DiagnosisCase[] = [
   pollStormCase,
   enumDriftCase,
   priorityClashCase,
+  symptomClusterCase,
+  firstDominoCase,
+  mockCanyonCase,
+  triPlatformCase,
+  errorContractCase,
+  contractReviewCase,
+  profileMazeCase,
+  bootStormCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {
