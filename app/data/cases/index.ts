@@ -53,6 +53,10 @@ import { bgSplitCase } from './bg-split'
 import { flagLeakCase } from './flag-leak'
 import { mixVersionCase } from './mixversion'
 import { cdnStaleCase } from './cdn-stale'
+import { tcpRetransCase } from './tcp-retrans'
+import { h2HolCase } from './h2-hol'
+import { cdnPenetrationCase } from './cdn-penetration'
+import { proxyHeadersCase } from './proxy-headers'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -108,6 +112,10 @@ export const ALL_CASES: DiagnosisCase[] = [
   flagLeakCase,
   mixVersionCase,
   cdnStaleCase,
+  tcpRetransCase,
+  h2HolCase,
+  cdnPenetrationCase,
+  proxyHeadersCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {

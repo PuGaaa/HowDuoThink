@@ -1,0 +1,257 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * 第 11 章 · 网络深处（CDN 缓存穿透 L3）
+ * 教学点：架构设计——缓存键决定命中率：URL 上任何一个"每人不同"的参数都会让缓存键全唯一；
+ * 产品思维——追踪参数的需求合理，但实现方式要为可缓存性让路。
+ * 专家路径：impact(1) + origheaders(1) + keycalc(2) = 4⚡︎
+ */
+export const cdnPenetrationCase: DiagnosisCase = {
+  id: 'cdn-penetration',
+  title: 'CDN 缓存穿透：每次都回源',
+  intro: '大促预热页上线，源站带宽 ×10 告警：CDN 命中率从 92% 掉到 3%——几乎每个请求都在回源。',
+  domain: 'network',
+  layer: '缓存键里混进一个"每人不同"，缓存就等于不存在',
+  part: 'master',
+  chapterId: 'network',
+  order: 3,
+  typeTags: ['network', 'cache', 'architecture'],
+  difficulty: 3,
+
+  scene: {
+    role: '你是「鲜到家」商城的平台架构师，大促前三天源站告急，CDN 形同虚设。',
+    architecture: '用户(分享链接进入) → CDN(预热页, 命中率 3%) → 源站 OSS(带宽 ×10 告警)',
+    tag: '故障现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: 'CDN 监控',
+        text: '预热页路径命中率：92% → 3.1%\n回源带宽：2.1Gbps（上线前 210Mbps），源站 OSS 流量费按小时飙升。',
+      },
+      {
+        type: 'text',
+        title: 'URL 采样',
+        text: '预热页 URL 变成了这样：\n/promo/2026bigsale?uid=88991&ts=1727901234&share_from=copylink&invite=30221\n——每个用户点开的链接参数都不一样。这是市场部上周上线的"分享溯源"功能。',
+      },
+    ],
+    timeline: '上周五市场部上线分享溯源链接（要求精确到人和时间）｜ 昨晚预热页上线，两者首次相遇 ｜ CDN 侧策略 3 个月未变更',
+    impactHint: '命中率 3% 意味着 CDN 认为"每个请求都是第一次见"——它凭什么觉得彼此不同？',
+  },
+
+  hypotheses: [
+    { id: 'h-querykey', text: '缓存键含完整 URL：uid/ts/share_from 等追踪参数每人不同，缓存键全唯一 → 全部 MISS', excludeActionId: 'a-keycalc' },
+    { id: 'h-nostore', text: '源站响应头改为 no-store/private，CDN 尊重头策略不缓存', excludeActionId: 'a-origheaders' },
+    { id: 'h-cookies', text: '请求带 Cookie 登录态，CDN 按"带 Cookie 即回源"处理', excludeActionId: 'a-cookierule' },
+    { id: 'h-bypass', text: 'CDN 上残留调试期 bypass 规则（该路径直接回源），上线忘删', excludeActionId: 'a-rulecheck' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '统计回源请求的 URL 形状',
+      desc: '影响面：回源的请求有什么共同点',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '回源 URL 采样（1000 条）',
+        text: '路径：100% 是 /promo/2026bigsale（同一个页面！）\nquery：uid / ts / share_from / invite 四个参数，采样 1000 条无一重复组合\n去重后实际唯一资源数：1（按路径）/ 1000（按完整 URL）\n→ CDN 的视角里这不是 1000 次对同一页面的请求，是 1000 个不同页面各被请求一次。',
+      },
+    },
+    {
+      id: 'a-origheaders',
+      name: '核对源站响应缓存头',
+      desc: '排除源站不让缓存',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-nostore'],
+      hypotheses: [{ id: 'h-nostore', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '源站响应头',
+        text: 'Cache-Control: public, max-age=600 —— 明确允许缓存 10 分钟。\n→ 排除源站头问题：源站的邀请函写得清清楚楚，是 CDN 没把它当同一份邀请。',
+      },
+    },
+    {
+      id: 'a-cookierule',
+      name: '查 CDN 的 Cookie 处理规则',
+      desc: '排除 Cookie 导致回源',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-cookies'],
+      hypotheses: [{ id: 'h-cookies', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: 'Cookie 规则',
+        text: 'CDN 配置：缓存时忽略 Cookie（登录态不参与键、不触发回源）——3 个月未变。\n未登录用户的分享链接（无 Cookie）命中率同样 3%。\n→ 排除 Cookie：无 Cookie 的请求一样全 MISS。',
+      },
+    },
+    {
+      id: 'a-rulecheck',
+      name: '审计 CDN 路径规则',
+      desc: '排除 bypass 规则残留',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-bypass'],
+      hypotheses: [{ id: 'h-bypass', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '规则审计',
+        text: '/promo/* 路径无 bypass、无"回源拉取"规则；上月调试规则已随下线删除。\n→ 排除规则残留：CDN 想缓存，只是每次都以为是新页面。',
+      },
+    },
+    {
+      id: 'a-keycalc',
+      name: '用缓存键计算器验证键的构成',
+      desc: 'CDN 实际拿什么算缓存键',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-querykey'],
+      hypotheses: [{ id: 'h-querykey', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: '缓存键计算器',
+        text: '键公式：scheme + host + 完整 path + 全部 query（默认配置）\n请求A：/promo/2026bigsale?uid=88991&ts=1727901234… → 键 K_a\n请求B：/promo/2026bigsale?uid=88992&ts=1727901235… → 键 K_b\nK_a ≠ K_b → 两次都是 MISS → 各自回源\n理论命中率 = 唯一 URL 数 / 请求数 = 1000/1000 → 命中率 0%\n实锤：追踪参数让缓存键全唯一。CDN 没坏，是键里混进了"每人不同"。',
+      },
+    },
+    {
+      id: 'a-hitdata',
+      name: '分层验证：去掉 query 后的命中率',
+      desc: '证明差距全部来自 query 参数',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '反事实验证',
+        text: '把采样请求去掉 query 后按路径重放统计：\n同路径请求数 998,400 → 若只按路径作键，理论命中率 94.2%\nvs 当前实际 3.1% —— 差距 91 个百分点全部来自 query 参与键计算。\n→ 修复目标明确：让键忽略追踪参数。',
+      },
+    },
+    {
+      id: 'a-rollback',
+      name: '下线分享溯源功能',
+      desc: '【状态变更】摘掉 URL 上的追踪参数，链接回到干净形状',
+      cost: 1,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '止血结果',
+        text: '分享链接不再带 uid/ts 参数，命中率 10 分钟内回升到 93%，源站带宽回落。\n代价：市场部的溯源数据全部归零——产品诉求被一刀切掉，复盘要讨论更聪明的方案。',
+      },
+    },
+    {
+      id: 'a-fixkey',
+      name: '缓存键规范化：忽略追踪参数',
+      desc: '【状态变更】CDN 键改为"路径 + 白名单参数"，追踪参数不参与键',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '修复结果',
+        text: '① CDN 缓存键改为：path + 白名单 query（当前白名单为空，追踪参数全部忽略）\n② 平台下发"键规范化"配置模板：新增参数默认不参与键，需要参与必须显式登记\n③ 回归验证：带参请求命中率 93.8%，与无参数基线一致。',
+      },
+    },
+    {
+      id: 'a-utmredesign',
+      name: '溯源需求重新设计：参数不上 URL',
+      desc: '【状态变更】分享溯源改用短链跳转/落地后 SDK 上报，URL 保持可缓存形状',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '产品方案 v2',
+        text: '分享链接统一改为短链（s.example.com/x8Kq2）→ 落地页打开后由 SDK 上报溯源上下文。\nURL 永远是干净的"可缓存形状"；市场部拿到的溯源数据反而更准（落点时机精确）。\n→ 需求保住了，缓存也保住了。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-querykey', text: '分享溯源功能在 URL 上追加 uid/ts 等每人不同的参数，而 CDN 缓存键默认含全部 query——每个用户的每个请求都生成唯一键，全部 MISS 回源，命中率 92%→3%', correct: true },
+    { id: 'rc-nostore', text: '源站响应头改为 no-store，CDN 尊重头策略不缓存', correct: false },
+    { id: 'rc-cookies', text: '带 Cookie 的请求触发 CDN 强制回源', correct: false },
+    { id: 'rc-bypass', text: 'CDN 残留调试期 bypass 规则导致全量回源', correct: false },
+  ],
+
+  expertCost: 4,
+  restartActionId: 'a-rollback',
+
+  expertChain: [
+    {
+      thought: '命中率 3% = CDN 认为每个请求都是初见。先看回源请求的 URL 形状——它凭什么觉得彼此不同。',
+      update: '同一页面、1000 个请求、1000 个不同 query 组合——"追踪参数"让每个 URL 都独一无二。',
+      actionId: 'a-impact',
+      why: '1⚡︎ URL 形状分析直接把"命中率暴跌"翻译成"键唯一化"——症状和机制之间只隔一层窗户纸，捅破它的证据就在 URL 里。',
+      conclusion: 'h-querykey 升权：键含全量 query。',
+    },
+    {
+      thought: '先用 1⚡︎ 排掉三个"环境性"解释：源站头、Cookie 规则、bypass 残留——它们都不需要懂键计算就能查。',
+      update: '源站 public/max-age=600、Cookie 忽略规则未变、无 bypass——三个假设有证据排除。',
+      actionId: 'a-origheaders',
+      why: '1⚡︎ 便宜的排除先行：环境类假设查起来快，先排掉它们，剩下的就是需要实验验证的"结构性"原因。',
+      conclusion: '嫌疑收敛到缓存键结构（h-querykey）。',
+    },
+    {
+      thought: '用缓存键计算器做最终实锤：把两个真实请求喂进去，看键是不是真的不同。',
+      update: '实锤：默认键 = 完整 URL 含全部 query → 两个请求键不同 → 双双 MISS。理论命中率 0%。',
+      actionId: 'a-keycalc',
+      why: '2⚡︎ "我以为的键"和"CDN 实际用的键"必须对质——文档记忆不算数，用平台工具算一遍才是验证思维。',
+      conclusion: '根因实锤：追踪参数 × 默认键公式 = 全量穿透。',
+    },
+    {
+      thought: '做反事实量化：同样这批请求如果按路径作键，命中率该是多少。',
+      update: '反事实命中率 94.2% vs 实际 3.1%——91 个百分点的差距全部可归因于 query 参与键。',
+      actionId: 'a-hitdata',
+      why: '1⚡︎ 反事实验证把归因做实：差距可精确解释时，修复的预期收益（94%）就能写进方案——而不是"改了试试看"。',
+      conclusion: '修复目标与预期收益明确 → 落地键规范化。',
+    },
+    {
+      thought: '止血（摘参数）、修复（键白名单）、产品方案（溯源改短链+SDK）。三层都动了，停止收集。',
+      update: '停止。',
+      actionId: '',
+      why: '【停止规则】机制（键唯一化）✓ 量化（反事实 94%）✓ 协作（产品方案 v2）✓——技术闭环且需求没被牺牲。',
+      conclusion: '沉淀：URL 是公共契约——每一个参数都是对缓存的投票。追踪数据要走自己的通道，不搭"可缓存资源"的便车。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '缓存键里混进一个"每人不同"，缓存就等于不存在：uid/ts/邀请码这类参数必须排除在键外。',
+      principle: '架构设计：缓存键 = 资源身份，不是请求身份。键规范化的默认姿势：白名单制——参数需要参与键必须显式登记，新参数默认忽略。"默认全参与"的键公式会等一个带追踪参数的功能来引爆。',
+    },
+    {
+      text: 'URL 是公共契约：改 URL 形状（加参数）的不只是前端——任何一方加参数都在改所有人的缓存行为。',
+      principle: '全栈视野：市场部的"分享溯源"和架构师的"缓存命中率"在同一个 URL 上相遇。跨职能变更（营销参数、埋点参数、AB 实验参数）进 URL 前必须过"可缓存性"评审。',
+    },
+    {
+      text: '产品诉求不能一刀切掉：溯源要的是数据，不是参数挂在 URL 上这个实现——短链 + SDK 上报两全其美。',
+      principle: '产品思维：听到"需求与架构冲突"时先拆需求——溯源的本质是"知道谁分享给了谁"，实现方式有 N 种，URL 参数只是最先被想到的那种。跟产品一起找第三条路，比在群里争论谁改代码更专业。',
+    },
+  ],
+}

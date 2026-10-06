@@ -1,0 +1,257 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * 第 11 章 · 网络深处（TCP 重传 L2）
+ * 教学点：全栈视野——"能 ping 通"不等于"网络没问题"；分层验证（变包大小、看响应头）；
+ * MTU 不一致 + PMTUD 黑洞是容器网络经典暗坑。
+ * 专家路径：impact(1) + pingsize(1) + gclog(1) + conntrack(1) = 4⚡︎
+ */
+export const tcpRetransCase: DiagnosisCase = {
+  id: 'tcp-retrans',
+  title: '每隔几分钟就丢一个包——TCP 重传',
+  intro: '支付回调 P99 正常，但每天几十笔回调随机超时：监控显示偶发延迟毛刺——200ms 直跳 3 秒，无法复现。',
+  domain: 'network',
+  layer: '能 ping 通不等于网络没问题——分层验证才能看到传输层',
+  part: 'master',
+  chapterId: 'network',
+  order: 1,
+  typeTags: ['network', 'resource'],
+  difficulty: 2,
+
+  scene: {
+    role: '你是「票到手」支付平台的接收服务负责人，第三方支付的回调偶发超时由你排查。',
+    architecture: '支付网关(第三方) → SLB → k8s Pod(回调接收服务, VXLAN overlay 网络) → 业务处理',
+    tag: '故障现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '第三方回调告警',
+        text: '回调超时重试告警：日均 47 笔，占全部回调 0.3%。\n超时请求重试 3 次后全部成功——但第三方按超时次数计费并降级接口评分。',
+      },
+      {
+        type: 'text',
+        title: '监控曲线',
+        text: 'P99 200ms 稳如直线；超时请求的耗时 2.8~3.2s（约等于 TCP 重传退避总和）。\n时间分布完全随机，与发布/流量峰值无关——压测复现不了。',
+      },
+    ],
+    timeline: '两周前接入层网络架构调整：Pod 网络从扁平网络切换到 VXLAN overlay ｜ 超时自此开始出现',
+    impactHint: '毛刺 ≈ TCP 重传退避的时间形状——什么原因会让"某些包"被丢，而其他包都好好的？',
+  },
+
+  hypotheses: [
+    { id: 'h-mtu', text: '链路 MTU 不一致：overlay 封装吃掉了 MTU，大包被丢且 ICMP 分片通告被禁（PMTUD 黑洞）', excludeActionId: 'a-pingsize' },
+    { id: 'h-app', text: '应用偶发 GC 停顿/线程池打满，响应变慢被网关判超时', excludeActionId: 'a-gclog' },
+    { id: 'h-conntrack', text: 'conntrack 连接跟踪表满/老化异常，长连接被静默丢弃', excludeActionId: 'a-conntrack' },
+    { id: 'h-qps', text: '带宽打满或网卡丢包', excludeActionId: 'a-nicstat' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '圈定超时回调的特征',
+      desc: '影响面：超时请求按大小/路径/时间怎么分布',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '超时请求特征',
+        text: '响应体大小：超时的 47 笔回调响应体全部 > 1400 字节（带完整票据信息）\n小响应（< 1000B 的 ACK 类回调）：零超时\n时间/路径：完全随机，无接口聚集\n→ 只有"大包"超时——传输层特征，与应用逻辑无关。',
+      },
+    },
+    {
+      id: 'a-gclog',
+      name: '查应用 GC 与线程池监控',
+      desc: '排除应用层停顿',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-app'],
+      hypotheses: [{ id: 'h-app', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '应用监控',
+        text: 'GC 最大停顿 48ms、线程池排队 0——应用侧一切正常。\n→ 排除应用：48ms 解释不了 3s，且解释不了"只有大响应超时"。',
+      },
+    },
+    {
+      id: 'a-nicstat',
+      name: '查带宽利用率与网卡丢包',
+      desc: '排除带宽/网卡',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-qps'],
+      hypotheses: [{ id: 'h-qps', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '网络设备面',
+        text: '带宽峰值利用率 12%，网卡 drop 计数器为零。\n→ 排除容量问题：链路很闲，但"闲"不等于"通"。',
+      },
+    },
+    {
+      id: 'a-conntrack',
+      name: '查 conntrack 表状态',
+      desc: '排除连接跟踪异常',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-conntrack'],
+      hypotheses: [{ id: 'h-conntrack', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: 'conntrack',
+        text: '表使用率 34%，drop 统计为零，老化时间正常。\n→ 排除 conntrack：连接建立和保持都正常。',
+      },
+    },
+    {
+      id: 'a-pingsize',
+      name: '变包大小分层 ping 探测',
+      desc: '从小到大逐档 ping，找到"开始丢"的尺寸',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-mtu'],
+      hypotheses: [{ id: 'h-mtu', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: '分层 ping（Pod → 网关侧）',
+        text: 'ping -s 1000  ✓ 100% 通\nping -s 1300  ✓ 100% 通\nping -s 1421  ✗ 100% 丢\nping -s 1421 -M do  → 无 ICMP frag-needed 返回\n→ 链路 MTU = 1450（VXLAN 封装吃掉 50B）：1421+28(IP/ICMP头) = 1449 > 1450 的包全丢。\n且"不分片 + 无 ICMP 通告" = PMTUD 黑洞：发送端永远不知道该缩小。',
+      },
+    },
+    {
+      id: 'a-tcpdump',
+      name: '抓包看重传与 ICMP',
+      desc: '机制闭合：大包的完整生命周期',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: 'tcpdump 关键帧',
+        text: '回调响应 1460B 数据包发出 → 无 ACK 返回\n1.0s 重传 → 无 ACK    2.0s 再传 → 无 ACK\n（网关侧 3 次重试超时断开 ≈ 3s 毛刺的来源）\n关键缺失：全网没有任何 ICMP "fragmentation needed" 报文——\n安全组 ACL 把 ICMP type 3 code 4 全禁了，PMTUD 彻底失聪。\n→ 两周前的网络切换（VXLAN）+ ACL 禁 ICMP = 大包黑洞。',
+      },
+    },
+    {
+      id: 'a-rollback',
+      name: '把回调服务迁移出问题节点池',
+      desc: '【状态变更】紧急调度到未切 overlay 的旧节点池',
+      cost: 1,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '止血结果',
+        text: 'Pod 全部漂移到扁平网络节点池，MTU 恢复 1500 一致。\n超时清零。overlay 节点池暂拉黑，等待 MTU 修复后回收。',
+      },
+    },
+    {
+      id: 'a-fixmtu',
+      name: 'MTU 全链路对齐 + MSS clamp + 放行 ICMP',
+      desc: '【状态变更】修复三件套一次落地',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '修复结果',
+        text: '① overlay 全链路 MTU 显式统一为 1450（宿主网卡/VXLAN/容器 veth 逐跳核对）\n② TCP MSS clamp 到 1360——应用大包在握手时协商到安全尺寸\n③ 安全组放行 ICMP type 3 code 4——PMTUD 恢复听力\n回归验证：-s 1400/1421 分层 ping 全通，大响应回调压测 0 超时。',
+      },
+    },
+    {
+      id: 'a-checklist',
+      name: '网络变更检查单升级',
+      desc: '【状态变更】MTU/分片/ICMP 三项进网络架构变更必检清单',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '检查单 v2',
+        text: '网络架构变更必检：□ 全链路 MTU 逐跳核对 □ 变包大小分层探测（1000/1300/1400+）\n□ ICMP 3/4 放行确认 □ 大响应场景回归压测。\n"能 ping 通"从验收标准里删掉——它只证明 64 字节的包能通。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-mtu', text: 'VXLAN overlay 切换后链路 MTU 降至 1450 但未全链路对齐，大包（>1450）被丢弃；同时 ACL 禁了 ICMP frag-needed，PMTUD 黑洞让发送端无从自愈——只有大响应回调超时', correct: true },
+    { id: 'rc-app', text: '应用偶发 GC 停顿导致响应超时', correct: false },
+    { id: 'rc-conntrack', text: 'conntrack 表满导致连接被静默丢弃', correct: false },
+    { id: 'rc-qps', text: '带宽打满或网卡丢包', correct: false },
+  ],
+
+  expertCost: 4,
+  restartActionId: 'a-rollback',
+
+  expertChain: [
+    {
+      thought: '毛刺 2.8~3.2s ≈ TCP 重传退避的时间形状——先看超时请求自身的特征，找"什么条件下才超时"。',
+      update: '只有大响应（>1400B）超时、小响应零超时、时间随机——传输层的尺寸敏感问题，与应用无关。',
+      actionId: 'a-impact',
+      why: '1⚡︎ "大包才超时"这一个特征直接把排查从应用层拉到传输层——全栈视野的价值：特征在最底层，就在最底层看。',
+      conclusion: '假设升权：MTU/分片问题（h-mtu）；应用类假设降权。',
+    },
+    {
+      thought: '验证 MTU 假设最便宜的办法：变包大小逐档 ping——找"开始丢"的临界尺寸。',
+      update: '实锤：1421B 起全丢，且无 ICMP frag-needed 返回——MTU 1450 + PMTUD 黑洞。',
+      actionId: 'a-pingsize',
+      why: '1⚡︎ 分层探测把"网络问题"从一句抱怨变成精确数字（1450）——变尺寸是网络分层验证的基本功，一次探测值三次猜测。',
+      conclusion: 'MTU 不一致实锤 → 抓包闭合机制（重传与 ICMP 的因果）。',
+    },
+    {
+      thought: '抓包看大包的完整生命周期——丢在哪、为什么没人知道该缩小。',
+      update: '实锤闭环：大包三次重传无 ACK + 全网无 frag-needed 报文（ACL 禁 ICMP）——黑洞成立。',
+      actionId: 'a-tcpdump',
+      why: '2⚡︎ 探测给出"现象"，抓包给出"机制"：两层证据叠在一起，修复方案才能精确到"改 MTU + 放行 ICMP"而不是"重启试试"。',
+      conclusion: '机制完整：切换（VXLAN）+ 配置（禁 ICMP）+ 尺寸（大响应）三要素闭合。',
+    },
+    {
+      thought: '应用/GC 假设补一个排除证据，conntrack/带宽已查——每层都留"无责证明"。',
+      update: 'GC 48ms、线程池空——应用层彻底排除。',
+      actionId: 'a-gclog',
+      why: '1⚡︎ 复盘时"查过并排除"是可信度：尤其是 GC 这种最常见的嫌疑，必须有数据洗清而不是靠感觉跳过。',
+      conclusion: '嫌疑收敛单点。',
+    },
+    {
+      thought: '止血（迁移出问题节点池）→ 修复（MTU 对齐 + MSS clamp + 放行 ICMP）→ 沉淀（分层探测进检查单）。停止收集。',
+      update: '停止。',
+      actionId: '',
+      why: '【停止规则】机制（MTU）✓ 放大器（PMTUD 黑洞）✓ 触发器（网络切换）✓——三环闭合，修复覆盖每一环。',
+      conclusion: '沉淀："能 ping 通"只证明 64 字节能通。网络验证必须变尺寸、变路径、看分片——数据在传输层，就在传输层验。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '"能 ping 通"不等于"网络没问题"：ping 只验证 64 字节小包，你的业务包可能比它大得多。',
+      principle: '全栈视野：网络验证要变包大小分层探测（1000/1300/1400+），临界尺寸就是 MTU 的自白书。应用问题看应用层，传输问题看传输层——特征出现在哪一层，验证就必须下探到哪一层。',
+    },
+    {
+      text: 'MTU 不一致 + ICMP 被禁 = PMTUD 黑洞：大包静默丢弃，发送端永远不知道该缩小，只剩重传到超时。',
+      principle: '网络架构：overlay 封装（VXLAN -50B、IPsec 更大）必然吃 MTU，全链路必须显式对齐；ICMP type 3 code 4 是路径 MTU 发现的耳朵，禁它等于让 TCP 失聪。修复三件套：MTU 对齐 + MSS clamp + 放行 frag-needed。',
+    },
+    {
+      text: '偶发且无法复现的毛刺，先看时间形状：2.8~3.2s 是 TCP 重传退避的指纹，200ms→3s 的跳变不是应用能解释的。',
+      principle: '验证思维：耗时分布的形状自带层信息——GC 毛刺是锯齿状、重传毛刺是退避阶梯、排队毛刺随流量起伏。把毛刺当"时间指纹"比对，比逐层排除快一个量级。',
+    },
+  ],
+}

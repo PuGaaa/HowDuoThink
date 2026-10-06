@@ -1,0 +1,257 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * 第 11 章 · 网络深处（HTTP/2 队头阻塞 L2）
+ * 教学点：架构设计——多路复用是双刃剑：TCP 层一个丢包阻塞整条连接的所有流；
+ * 隔离（连接分片）是架构层解法；per-stream 监控让共享资源的问题显形。
+ * 专家路径：impact(1) + streamtrace(2) + upstream(1) = 4⚡︎
+ */
+export const h2HolCase: DiagnosisCase = {
+  id: 'h2-hol',
+  title: 'HTTP/2 队头阻塞：一个慢请求堵住整条连接',
+  intro: '网关升级 HTTP/2 后接口偶发集体变慢：服务器 CPU 空闲、DB 空闲，但所有请求一起慢——像被什么东西堵住了。',
+  domain: 'network',
+  layer: '多路复用把独享变共享——共享就要为别人的慢买单',
+  part: 'master',
+  chapterId: 'network',
+  order: 2,
+  typeTags: ['network', 'architecture'],
+  difficulty: 2,
+
+  scene: {
+    role: '你是「票到手」App 的接入网关负责人，HTTP/2 升级后两周，客服在抱怨"App 随机卡"。',
+    architecture: 'App → HTTP/2 连接(多路复用, 每客户端 ~6 条长连接) → 接入网关 → 上游服务集群',
+    tag: '故障现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '网关监控',
+        text: 'HTTP/2 升级后 P99 从 180ms 涨到 900ms，且呈"整批变慢"形态：\n同一秒内一批请求一起超时，下一秒全部正常——按连接聚类，不按接口聚类。',
+      },
+      {
+        type: 'text',
+        title: '资源面',
+        text: '网关 CPU 18%、上游 CPU 15%、DB 连接池空闲 80%——服务器毫无压力。\n应用日志零错误：请求没失败，只是慢。',
+      },
+    ],
+    timeline: '两周前网关开启 HTTP/2（此前 HTTP/1.1）｜ 卡顿自此随机出现 ｜ 客户端预加载了一个 8MB 的活动视频资源',
+    impactHint: '"一起慢"而不是"单个慢"——什么东西被请求们共享了？',
+  },
+
+  hypotheses: [
+    { id: 'h-hol', text: 'HTTP/2 多路复用下 TCP 层队头阻塞：一个丢包/慢流卡住同连接所有流', excludeActionId: 'a-streamtrace' },
+    { id: 'h-flowwin', text: 'HTTP/2 流控窗口配置过小，大响应把窗口占满拖慢同流其他请求', excludeActionId: 'a-flowwindow' },
+    { id: 'h-connpool', text: '连接数不足，大量请求挤在少数连接上互相争抢', excludeActionId: 'a-connpool' },
+    { id: 'h-server', text: '上游服务偶发变慢（CPU/锁/DB），拖慢经它处理的请求', excludeActionId: 'a-upstream' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '按连接聚类分析慢请求',
+      desc: '影响面：慢请求按接口聚类还是按连接聚类',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '慢请求聚类',
+        text: '按接口聚类：无规律（/pay /list /detail 都有慢有快）\n按连接聚类：强规律——同一 TCP 连接上的全部流一起慢，其他连接正常 ✓\n慢批次时长：0.9~2.3s，与连接级 RTT 抖动曲线吻合\n→ "一起慢"的单位是"连接"——问题在连接这个共享层，不在接口。',
+      },
+    },
+    {
+      id: 'a-upstream',
+      name: '核对上游服务与 DB 的耗时',
+      desc: '排除服务端变慢',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-server'],
+      hypotheses: [{ id: 'h-server', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '上游监控',
+        text: '上游服务自身处理耗时 P99 45ms 稳定；DB 查询无慢查询。\n→ 排除服务端：它自己很快，慢发生在"数据到你手机的路上"。',
+      },
+    },
+    {
+      id: 'a-connpool',
+      name: '审计连接数与流分布',
+      desc: '排除连接数不足',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-connpool'],
+      hypotheses: [{ id: 'h-connpool', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '连接审计',
+        text: '客户端 6 条长连接（浏览器规范值），单连接流数峰值 30+，流分布均匀。\n→ 连接数本身够用——但"6 条连接承载全部流量"意味着任何一条出事，1/6 的请求遭殃。\n多路复用把故障半径从"一个请求"变成了"一条连接"。',
+      },
+    },
+    {
+      id: 'a-streamtrace',
+      name: '抓包做 per-stream 时间线',
+      desc: '同连接内逐流对比：谁先慢、谁被拖慢',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-hol'],
+      hypotheses: [{ id: 'h-hol', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: '连接级时间线（stream 视角）',
+        text: 'conn#3 上 31 个流：\nstream#1：8MB 视频大响应传输中（占满接收窗口）\nT+0.0s  该连接发生 TCP 丢包 → 快速重传\nT+0.0~1.2s  连接级 cwnd 收缩，全部 31 个流的数据停止推进\nstream#2~31：API 响应早已在网关缓存，被堵在 TCP 缓冲区出不去\n其他连接：同期正常服务 ✓\n→ TCP 层一次丢包阻塞整条连接——HTTP/2 只解决了 HTTP 层队头，TCP 层队头原样保留。',
+      },
+    },
+    {
+      id: 'a-flowwindow',
+      name: '核对流控窗口配置',
+      desc: '排除窗口过小',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-flowwin'],
+      hypotheses: [{ id: 'h-flowwin', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '流控配置',
+        text: '连接级窗口 64KB / 流级窗口 256KB（合理配置）；单独压测大响应无异常。\n→ 排除流控：窗口不背锅，丢包才背锅。',
+      },
+    },
+    {
+      id: 'a-lossrate',
+      name: '对比升级前后丢包率与影响面',
+      desc: 'HTTP/1.1 时代同样的丢包影响多少请求',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '丢包敏感度对比',
+        text: '链路丢包率：升级前后同为 0.08%（没变差）\nHTTP/1.1：每请求独立连接 → 0.08% 丢包只卡住它自己的请求\nHTTP/2：6 条连接承载全部请求 → 同样丢包卡住 1/6 流量\n→ 丢包没变多，是"故障半径"被多路复用放大了 20 倍。',
+      },
+    },
+    {
+      id: 'a-rollback',
+      name: '网关整体回退 HTTP/1.1',
+      desc: '【状态变更】全量回退协议版本',
+      cost: 1,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '回退结果',
+        text: '卡顿消失（每请求独享连接，队头阻塞不再跨请求传染）。\n代价：连接数 ×6、头部压缩收益归零、首屏慢 30ms。\n→ 止血有效但把婴儿和洗澡水一起倒了——复盘重点点评：该隔离的是"重流量"，不是放弃多路复用。',
+      },
+    },
+    {
+      id: 'a-fixsplit',
+      name: '连接分片：重流量隔离到独立连接',
+      desc: '【状态变更】视频/大文件走独立连接，API 与重流量物理隔离',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '修复结果',
+        text: '① 客户端按资源类型分片：API 走 4 条轻连接，媒体走 2 条重连接\n② 网关对单流设发送上限（大响应限速），防单个流耗尽连接 cwnd\n③ 重新启用 HTTP/2，首屏收益保住，队头阻塞半径缩小到媒体连接\n回归：人为注入 1% 丢包，API P99 波动 < 15ms（修复前 900ms）。',
+      },
+    },
+    {
+      id: 'a-fixmonitor',
+      name: '上线 per-stream 延迟监控',
+      desc: '【状态变更】按"连接→流"两级维度监控，慢流自动关联同连接受害者',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '监控 v2',
+        text: '告警规则：同连接 5 个以上流 P99 同步劣化 → 判定"连接级阻塞"并输出丢包关联。\n下次同类问题 1 分钟定位，而不是两周的用户投诉。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-hol', text: 'HTTP/2 多路复用把全部请求压进 6 条 TCP 连接：链路 0.08% 丢包触发连接级 cwnd 收缩，同连接所有流一起停摆——TCP 层队头阻塞被多路复用放大（视频大流量加剧窗口占用）', correct: true },
+    { id: 'rc-flowwin', text: 'HTTP/2 流控窗口配置过小导致大响应拖慢同流请求', correct: false },
+    { id: 'rc-connpool', text: '连接数不足导致请求挤在少数连接上争抢', correct: false },
+    { id: 'rc-server', text: '上游服务偶发变慢拖慢请求', correct: false },
+  ],
+
+  expertCost: 4,
+  restartActionId: 'a-rollback',
+
+  expertChain: [
+    {
+      thought: '"一批请求一起慢"——先确定"一起"的度量单位：按接口聚类还是按连接聚类。',
+      update: '强规律：同一连接上的流一起慢——问题在"连接"这个共享层。',
+      actionId: 'a-impact',
+      why: '1⚡︎ 聚类维度就是排查方向：按接口聚集查应用，按连接聚集查传输——一张交叉表决定往哪层走。',
+      conclusion: '方向锁定：连接级共享资源问题（HTTP/2 层或 TCP 层）。',
+    },
+    {
+      thought: '做 per-stream 时间线：同一连接里逐流对比——谁先慢、谁被连累，队头阻塞的铁证在这里。',
+      update: '实锤：8MB 视频流 + 一次 TCP 丢包 → 连接 cwnd 收缩 → 31 个流全部停摆 1.2s。',
+      actionId: 'a-streamtrace',
+      why: '2⚡︎ 抓包逐流展开把"HTTP/2 队头阻塞"从教科书名词变成看得见的时间线——TCP 丢包在 HTTP 层不可见，必须在 TCP 层看。',
+      conclusion: '队头阻塞实锤：多路复用放大了 TCP 层的故障半径。',
+    },
+    {
+      thought: '丢包率对比升级前后——如果没变差，变的不是网络，是"架构对丢包的敏感度"。',
+      update: '丢包率恒定 0.08%，但影响面从单请求放大到 1/6 流量——架构放大器确认。',
+      actionId: 'a-lossrate',
+      why: '1⚡︎ "环境没变，架构变了"是多路复用类事故的经典结构——控制变量对比把责任从网络移到设计。',
+      conclusion: '修复方向：不是修网络，是做隔离。',
+    },
+    {
+      thought: '流控窗口和上游各用 1⚡︎ 快查排除——留证据，也防止"两个原因叠加"的叙事混进来。',
+      update: '窗口配置合理、上游耗时稳定——两个假设有证据排除。',
+      actionId: 'a-upstream',
+      why: '1⚡︎ 排除动作的产出是"无责证明"：复盘的可信度由这些证据支撑，不是由结论的语气支撑。',
+      conclusion: '嫌疑收敛单点。',
+    },
+    {
+      thought: '止血（回退）→ 修复（连接分片隔离重流量）→ 监控（per-stream）。停止收集。',
+      update: '停止。',
+      actionId: '',
+      why: '【停止规则】机制（TCP 队头）✓ 放大器（多路复用）✓ 触发器（视频大流+丢包）✓——三环闭合，修复方案保收益、消风险。',
+      conclusion: '沉淀：共享一切的多路复用，也要为"隔离关键流量"留后门。架构设计的第一性：先想故障半径，再谈性能收益。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '多路复用把独享变共享：共享提升效率，也把故障半径从"一个请求"放大到"整条连接"。',
+      principle: '架构设计：一切共享资源（连接、线程池、缓存、队列）都要评估"一个使用者出事，多少人陪葬"。HTTP/2 解决了 HTTP 层队头阻塞，TCP 层的队头阻塞原样保留——直到 HTTP/3(QUIC) 才在传输层根治。',
+    },
+    {
+      text: '隔离是共享时代的架构基本功：重流量（大文件/视频/批量导出）必须与关键路径（API）物理隔离。',
+      principle: '连接分片是队头阻塞的架构解法：API 走轻连接、媒体走重连接、单流限速防窗口耗尽。设计原则：故障半径 = 隔离单元的大小，隔离粒度越细，爆炸时波及越小。',
+    },
+    {
+      text: '"环境没变，架构变了"：丢包率恒定 0.08%，影响面却被放大 20 倍——责任从网络移到设计。',
+      principle: '验证思维：控制变量对比是归因利器。升级前后各测一次丢包敏感度，放大倍数就是架构引入的隐形成本——性能收益要和故障半径一起上会议桌。',
+    },
+  ],
+}
