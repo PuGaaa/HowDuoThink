@@ -67,6 +67,12 @@ import { poolDeadlockCase } from './pool-deadlock'
 import { lockExpiryCase } from './lock-expiry'
 import { idleResetCase } from './idle-reset'
 import { mqBusReviewCase } from './mq-bus-review'
+import { threadlocalLeakCase } from './threadlocal-leak'
+import { imageTagDriftCase } from './image-tag-drift'
+import { regexCatastropheCase } from './regex-catastrophe'
+import { cardinalityBlastCase } from './cardinality-blast'
+import { distributedMonolithCase } from './distributed-monolith'
+import { loadtestIllusionCase } from './loadtest-illusion'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -136,6 +142,12 @@ export const ALL_CASES: DiagnosisCase[] = [
   lockExpiryCase,
   idleResetCase,
   mqBusReviewCase,
+  threadlocalLeakCase,
+  imageTagDriftCase,
+  regexCatastropheCase,
+  cardinalityBlastCase,
+  distributedMonolithCase,
+  loadtestIllusionCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {

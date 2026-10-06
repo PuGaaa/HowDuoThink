@@ -1,0 +1,273 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * 第 2 章 · 构建与依赖 第二批（镜像标签漂移 L2）
+ * 教学点：验证思维——"同一个标签"不等于"同一个镜像"；latest 是移动的指针；
+ * 不可变引用（digest）+ 拉取策略对齐才能保证"测的就是发布的"。
+ * 专家路径：impact(1) + pullpolicy(2) + imageinspect(1) = 4⚡︎
+ */
+export const imageTagDriftCase: DiagnosisCase = {
+  id: 'image-tag-drift',
+  title: '测试验证通过的修复，生产上不存在',
+  intro: '测试环境验证通过的修复，部署到生产后问题依旧——查了半天，两边跑的根本不是同一个镜像。',
+  domain: 'build',
+  layer: '同一个标签不等于同一个镜像——标签是指针，digest 才是实体',
+  part: 'engineer',
+  chapterId: 'build',
+  order: 5,
+  typeTags: ['build', 'deploy', 'verification'],
+  difficulty: 2,
+
+  scene: {
+    role: '你是「票到手」平台的 DevOps 工程师，一个"修了又没修好"的 bug 让所有人怀疑人生。',
+    architecture: '代码合并 → CI 构建镜像(推送 app:latest) → 镜像仓库 → 测试环境(Always 拉取) / 生产集群(IfNotPresent)',
+    tag: '故障现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '镜像元数据对比',
+        text: '测试环境容器镜像构建时间：今天 10:22（含昨天的修复提交）\n生产容器镜像构建时间：三周前 15:07（修复提交之前！）',
+      },
+      {
+        type: 'text',
+        title: '部署记录',
+        text: '两环境的部署清单写的是同一个标签：app:latest。\n修复的 PR 昨天合入，测试环境今天验证通过，生产"部署成功"后 bug 依旧。',
+      },
+    ],
+    timeline: '上周 CI 改为"合入即构建并推送 latest" ｜ 测试环境部署脚本强制 pull ｜ 生产 kubelet 镜像拉取策略 IfNotPresent（建集群时的默认值）',
+    impactHint: '"同一个标签"在两边解析出了两个镜像——标签指向谁，由谁在什么时刻决定？',
+  },
+
+  hypotheses: [
+    { id: 'h-taglatest', text: 'latest 标签漂移 + 生产拉取策略 IfNotPresent：本地旧镜像缓存让生产永远不更新', excludeActionId: 'a-pullpolicy' },
+    { id: 'h-buildcache', text: 'CI 构建缓存污染，新镜像里打包了旧二进制', excludeActionId: 'a-imageinspect' },
+    { id: 'h-registry', text: '多仓库/多 region 镜像不同步，生产拉的是旧副本', excludeActionId: 'a-registrycmp' },
+    { id: 'h-config', text: '修复依赖的功能开关/环境变量，生产没配', excludeActionId: 'a-configdiff' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '核对两环境运行的镜像 digest',
+      desc: '影响面：标签相同，实体相同吗',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '镜像 digest 对比',
+        text: '测试环境：app:latest → sha256:ab12ef…（今天 10:22 构建，含修复）\n生产环境：app:latest → sha256:cd34ab…（三周前构建，不含修复）\n同一个标签，两个 digest——"标签相同"只说明它们指向过同一根指针，\n指针已经被人动了，而有人手里还攥着旧的照片。',
+      },
+    },
+    {
+      id: 'a-pullpolicy',
+      name: '核对生产节点的镜像拉取策略',
+      desc: 'kubelet 什么时候才去仓库看一眼',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-taglatest'],
+      hypotheses: [{ id: 'h-taglatest', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: '拉取策略审计',
+        text: '生产节点：imagePullPolicy: IfNotPresent（建集群默认值）\n节点本地缓存：app:latest = 三周前镜像（一直没被清）\n行为：部署时 kubelet 发现本地"已有 app:latest" → 跳过拉取 → 旧镜像继续跑。\n测试环境：imagePullPolicy: Always + 部署脚本强制 pull → 每次拿最新。\n实锤：同一标签两套语义——测试的 latest 是"现在"，生产的 latest 是"三周前"。',
+      },
+    },
+    {
+      id: 'a-imageinspect',
+      name: '检查新镜像的构建层',
+      desc: '排除 CI 构建缓存污染',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-buildcache'],
+      hypotheses: [{ id: 'h-buildcache', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '镜像层检查',
+        text: '仓库中 app:latest 当前指向的镜像：包含修复代码层 ✓ 构建产物正确。\n→ 排除构建缓存：CI 是无辜的，问题在"分发与拉取"环节。',
+      },
+    },
+    {
+      id: 'a-registrycmp',
+      name: '核对仓库同步状态',
+      desc: '排除多 region 副本不同步',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-registry'],
+      hypotheses: [{ id: 'h-registry', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '仓库核对',
+        text: '两环境引用同一 registry 同一 repo，副本同步正常。\n→ 排除仓库问题。',
+      },
+    },
+    {
+      id: 'a-configdiff',
+      name: '对比两环境配置与开关',
+      desc: '排除配置差异',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-config'],
+      hypotheses: [{ id: 'h-config', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '配置核对',
+        text: '修复不依赖任何开关/环境变量；两环境配置一致。\n→ 排除配置：镜像里根本没有修复代码，配置救不了。',
+      },
+    },
+    {
+      id: 'a-digitaudit',
+      name: '全集群扫描同类隐患',
+      desc: '多少服务在用浮动标签 × IfNotPresent',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '同类隐患普查',
+        text: '部署清单扫描：14 个服务使用 latest 或浮动标签；\n其中 9 个服务的生产拉取策略是 IfNotPresent——9 颗同款定时炸弹。\n规律：测试 Always / 生产 IfNotPresent 的"两套语义"是集群搭建时的历史遗留。',
+      },
+    },
+    {
+      id: 'a-danger',
+      name: '手动删除生产节点旧镜像强制重拉',
+      desc: '【状态变更】ssh 到生产节点 docker rmi 旧镜像，触发重新拉取',
+      cost: 1,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '人肉救火结果',
+        text: '修复生效，bug 消失。但这是"人肉救火"：其余 9 处隐患原样躺着，\n下次换个服务还会重演——救火要有，制度更要有。',
+      },
+    },
+    {
+      id: 'a-fixdigest',
+      name: '修复：部署清单改用不可变 digest',
+      desc: '【状态变更】CI 产出"版本 tag ↔ digest"对照表，生产清单引用 sha256 地址',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '修复结果',
+        text: '生产部署清单：app:latest → app@sha256:ab12ef…（不可变）。\nCI 每次构建产出对照表，发布单自动带上 digest。\n→ "测的镜像"与"发布的镜像"从机制上强制同一——digest 不会漂移。',
+      },
+    },
+    {
+      id: 'a-fixpolicy',
+      name: '沉淀：拉取策略与标签规范',
+      desc: '【状态变更】生产 Always + 不可变引用；latest 禁止进生产清单；其余 9 处同批整改',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '规范 v2',
+        text: '① 生产 imagePullPolicy: Always（配合不可变引用零成本）\n② latest/浮动标签禁止进生产清单（lint 拦截）\n③ 9 处存量隐患随本周迭代全部迁移 digest 引用。',
+      },
+    },
+    {
+      id: 'a-fixdrift',
+      name: '沉淀：镜像漂移每日巡检',
+      desc: '【状态变更】巡检对比"运行中容器 digest vs 清单期望 digest"，漂移即告警',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '巡检上线',
+        text: '每日巡检报告：集群内任何"实际运行 ≠ 清单声明"的漂移（含手动改部署、镜像被覆盖）当日曝光。\n"我以为在跑的镜像"与"实际在跑的镜像"从此每天对一次账。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-taglatest', text: 'latest 浮动标签 × 生产 IfNotPresent 拉取策略：CI 持续覆盖 latest 指针，生产节点本地缓存的旧镜像永不更新——同一标签在两环境解析出两个镜像，测试验证的修复从未到达生产', correct: true },
+    { id: 'rc-buildcache', text: 'CI 构建缓存污染，新镜像打包旧二进制', correct: false },
+    { id: 'rc-registry', text: '多仓库/多 region 镜像副本不同步', correct: false },
+    { id: 'rc-config', text: '修复依赖的开关/环境变量生产未配置', correct: false },
+  ],
+
+  expertCost: 4,
+  restartActionId: 'a-danger',
+
+  expertChain: [
+    {
+      thought: '"验证通过但问题依旧"——先别怀疑修复本身，核对两环境实际运行的镜像实体：digest 一致吗。',
+      update: '同一标签两个 digest，生产的镜像早于修复提交——"验证通过"验证的是一个没到生产的镜像。',
+      actionId: 'a-impact',
+      why: '1⚡︎ digest 对比是镜像类问题的第一动作：标签是给人看的名字，digest 是机器认的实体——实体不同，一切"部署成功"都另有所指。',
+      conclusion: '嫌疑锁定：标签解析链路（h-taglatest 升权）。',
+    },
+    {
+      thought: '标签从 CI 到容器要过两关：仓库里指向谁、节点上拉不拉。逐关对账。',
+      update: '实锤：latest 指针被 CI 持续移动 + 生产 IfNotPresent 跳过拉取——旧镜像永久驻留。',
+      actionId: 'a-pullpolicy',
+      why: '2⚡︎ 两关对账把"玄学部署"还原成一行配置：IfNotPresent 对浮动标签等于"永不更新"——单看每项都常见，组合起来是必然事故。',
+      conclusion: '根因实锤 → 排除构建与仓库侧。',
+    },
+    {
+      thought: '构建与仓库用 1⚡︎ 各排一次——确认 CI 与仓库无辜，修复才不会打错靶子。',
+      update: '构建产物正确、仓库同步正常——问题收敛在"拉取语义"单点。',
+      actionId: 'a-imageinspect',
+      why: '1⚡︎ 排除证据防止"顺手重建 CI"式浪费：靶子找准后，修复只需动两处配置而非重构流水线。',
+      conclusion: '嫌疑收敛单点。',
+    },
+    {
+      thought: '一个 case 抓到后立即普查同类面——浮动标签 × IfNotPresent 的组合还有几处。',
+      update: '9 处同款隐患：修一处不修制度，事故换个服务重演。',
+      actionId: 'a-digitaudit',
+      why: '1⚡︎ 普查把修复范围从"这个服务"升级到"这类配置"——与 mock 泄露普查同理：根因修复的单位是模式。',
+      conclusion: '整改方案：digest 引用 + 策略规范 + 漂移巡检三层。',
+    },
+    {
+      thought: '止血（强制重拉）、修复（不可变引用）、制度（规范+巡检）。停止收集。',
+      update: '停止。',
+      actionId: '',
+      why: '【停止规则】机制（指针漂移×缓存驻留）✓ 同类面（9 处）✓ 制度（digest+巡检）✓——个案与系统两层闭合。',
+      conclusion: '沉淀：latest 是移动的指针，digest 才是不可变的实体。"测的就是发布的"这句话，靠 digest 引用兑现，不靠部署纪律许愿。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '浮动标签（latest）在持续构建下是移动的指针：CI 每次推送都在改写它——"同一个标签"随时可能是两个镜像。',
+      principle: '验证思维：镜像引用只有 digest（sha256）不可变。生产部署必须用 tag↔digest 对照表锁定实体；latest 禁止进生产清单。"验证通过"的语义完整性取决于"验证的实体 = 发布的实体"。',
+    },
+    {
+      text: 'IfNotPresent 对浮动标签等于"永不更新"：本地缓存的旧镜像会一直顶替仓库里的新版本。',
+      principle: '拉取策略与标签语义必须配对：Always 配不可变引用（零成本且幂等），IfNotPresent 只配唯一版本 tag。两环境语义不一致（测试 Always / 生产 IfNotPresent）等于两边活在不同的时间线上。',
+    },
+    {
+      text: '"修了又没修好"的 bug 优先怀疑交付链路：修复可能从未到达生产——先对账"运行的实体"，再怀疑代码。',
+      principle: '排查顺序：镜像/制品类问题第一步做实体对账（digest/构建时间/代码版本），而不是重读修复逻辑。交付链路的每一环都可能是"断点"，对账比猜测便宜。',
+    },
+  ],
+}
