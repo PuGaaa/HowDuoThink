@@ -41,7 +41,7 @@
 <script setup lang="uts">
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { CHAPTERS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId } from '../../data/chapters'
+import { CHAPTERS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId, chapterUnlockHint } from '../../data/chapters'
 import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress } from '../../utils/storage'
 import { starsLabel } from '../../utils/scoring'
@@ -113,7 +113,7 @@ function openCase(node: NodeVM) {
     return
   }
   if (!node.playable) {
-    uni.showToast({ title: '通关上一章任意 1 关解锁本章', icon: 'none' })
+    uni.showToast({ title: chapterUnlockHint(ch.value.id), icon: 'none' })
     return
   }
   uni.navigateTo({ url: '/pages/play/play?id=' + node.id })

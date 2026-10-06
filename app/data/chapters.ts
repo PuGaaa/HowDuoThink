@@ -76,9 +76,9 @@ export function chaptersInPart(partId: string): ChapterDef[] {
   return CHAPTERS.filter((c) => c.part === partId)
 }
 
-// —— 解锁：轻量序贯 + 跳级挑战 ————————————————
-// 规则：章内关自由顺序；章解锁 = 前一章破 ≥1 关（第 1 章恒开）；
-// 篇解锁 = 前一篇每章破 ≥1 关（第一篇恒开）；
+// —— 解锁：篇内序贯 + 跳级挑战 ————————————————
+// 编号与解锁均按篇独立：篇门 = 前一篇每章破 ≥1 关（第一篇恒开）；
+// 章解锁 = 本章已破 ≥1 关 ∥ 篇门已开 且（篇首章直开 ∥ 篇内前一章破 ≥1 关）；
 // 跳级挑战 = 锁定章的 order 最小关恒可玩，通关即解锁本章。
 // 全部从 solved 进度派生，无独立存储。
 
@@ -93,18 +93,39 @@ export function chapterSolvedCount(chapterId: string): number {
   return n
 }
 
-/** 章解锁 = 前一章已破 ≥1 关 ∥ 本章已破 ≥1 关（后者覆盖跳级挑战通关后的自动解锁） */
-export function isChapterUnlocked(chapterId: string): boolean {
-  let idx = -1
+/** 章所属篇 id（未知返回空串） */
+export function chapterPartId(chapterId: string): string {
   for (let i = 0; i < CHAPTERS.length; i++) {
-    if (CHAPTERS[i].id === chapterId) {
-      idx = i
-      break
-    }
+    if (CHAPTERS[i].id === chapterId) return CHAPTERS[i].part
   }
-  if (idx <= 0) return true
+  return ''
+}
+
+/** 章在篇内的下标（0 起 = 篇首章；未知返回 -1） */
+export function chapterIndexInPart(chapterId: string): number {
+  const partId = chapterPartId(chapterId)
+  if (partId.length === 0) return -1
+  const list = chaptersInPart(partId)
+  for (let i = 0; i < list.length; i++) {
+    if (list[i].id === chapterId) return i
+  }
+  return -1
+}
+
+/** 锁定章的解锁提示语（章页 toast / 首页弹窗共用） */
+export function chapterUnlockHint(chapterId: string): string {
+  if (chapterIndexInPart(chapterId) === 0) return '通关前一篇全部章节，解锁本篇'
+  return '通关上一章任意 1 关解锁本章'
+}
+
+/** 章解锁 = 本章已破 ≥1 关（跳级挑战通关后的自动解锁）∥ 篇门已开 且（篇首章直开 ∥ 篇内前一章破 ≥1 关） */
+export function isChapterUnlocked(chapterId: string): boolean {
   if (chapterSolvedCount(chapterId) >= 1) return true
-  return chapterSolvedCount(CHAPTERS[idx - 1].id) >= 1
+  const partId = chapterPartId(chapterId)
+  if (partId.length === 0) return true
+  const idx = chapterIndexInPart(chapterId)
+  if (idx <= 0) return isPartUnlocked(partId)
+  return chapterSolvedCount(chaptersInPart(partId)[idx - 1].id) >= 1
 }
 
 /** 篇解锁 = 前一篇每章已破 ≥1 关；PARTS 首篇恒开 */

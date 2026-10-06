@@ -55,6 +55,7 @@
             <view class="part__titlerow">
               <text class="part__name">{{ part.name }}</text>
               <text class="part__chcount">{{ partChCount(part.id) }} 章</text>
+              <text v-if="!isPartUnlocked(part.id)" class="part__lock">通关前一篇解锁</text>
             </view>
             <text class="part__desc">{{ part.desc }}</text>
           </view>
@@ -83,7 +84,7 @@
     <confirm-dialog
       :show="challengeShow"
       :title="challengeTitle"
-      message="通关上一章任意 1 关解锁本章；也可以直接挑战本章首关，赢了立即解锁。"
+      :message="challengeMsg"
       confirm-text="去挑战"
       @confirm="goChallenge"
       @cancel="challengeShow = false"
@@ -94,7 +95,7 @@
 <script setup lang="uts">
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { CHAPTERS, PARTS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId } from '../../data/chapters'
+import { CHAPTERS, PARTS, casesInChapter, isChapterUnlocked, isPartUnlocked, isCasePlayable, chapterChallengeCaseId, chapterUnlockHint } from '../../data/chapters'
 import tabbar from '../../components/tabbar/tabbar.uvue'
 import chapterCube from '../../components/chapter-cube/chapter-cube.uvue'
 import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
@@ -162,6 +163,7 @@ function partProgress(chapterId: string) {
 const challengeShow = ref(false)
 const challengeCaseId = ref('')
 const challengeTitle = ref('')
+const challengeMsg = ref('')
 
 function openChapter(chapterId: string) {
   if (isChapterUnlocked(chapterId)) {
@@ -176,6 +178,7 @@ function openChapter(chapterId: string) {
   }
   const ch = CHAPTERS.find((x) => x.id === chapterId)
   challengeTitle.value = (ch != null ? ch.name : '本章') + ' · 跳级挑战'
+  challengeMsg.value = chapterUnlockHint(chapterId) + '；也可以直接挑战本章首关，赢了立即解锁。'
   challengeCaseId.value = challengeId
   challengeShow.value = true
 }
@@ -480,6 +483,15 @@ function onPackTap() {
   font-weight: bold;
   color: #AFA8BD;
   background-color: #FBF3EB;
+  border-radius: 18rpx;
+  padding: 4rpx 16rpx;
+  margin-left: 14rpx;
+}
+.part__lock {
+  font-size: 18rpx;
+  font-weight: bold;
+  color: #F9F6FB;
+  background-color: #B7AFC9;
   border-radius: 18rpx;
   padding: 4rpx 16rpx;
   margin-left: 14rpx;
