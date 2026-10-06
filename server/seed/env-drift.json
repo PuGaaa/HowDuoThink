@@ -1,0 +1,322 @@
+{
+  "id": "env-drift",
+  "title": "测试环境数据与生产不一致",
+  "intro": "支付限额功能测试环境全绿，生产第一天就放行了超限交易——测试库还是三个月前的数据快照。",
+  "domain": "build",
+  "layer": "测试环境验证的是\"过去的生产\"——漂移无声，炸在上线日",
+  "part": "master",
+  "chapterId": "testing",
+  "order": 4,
+  "typeTags": [
+    "testing",
+    "data",
+    "process"
+  ],
+  "difficulty": 2,
+  "scene": {
+    "role": "你是「票到手」支付的测试基础设施负责人，商户分级限额功能由你保障。",
+    "architecture": "功能开关(商户分级限额) → 商户配置表(MySQL) → 支付网关(按限额拦截/放行)",
+    "tag": "故障现场",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "生产监控",
+        "text": "上线首日：127 笔交易超过商户限额被放行（应拦截）。\n特征：全部是三个月内新签约的商户；老商户限额拦截全部正常。"
+      },
+      {
+        "type": "text",
+        "title": "测试侧困惑",
+        "text": "该功能测试环境完整回归过：限额配置、拦截、放行、降级共 23 个用例全绿。\n测试环境里同样的新商户场景是能正常拦截的。"
+      }
+    ],
+    "timeline": "限额功能开发两周前完成 ｜ \"商户分级限额\"字段是三个月前上线的老字段 ｜ 测试库数据初始化于三个月前的一次快照导入，此后只增测试数据",
+    "impactHint": "新商户放行、老商户正常——同一段代码，两类商户命运不同。差异在数据不在代码。"
+  },
+  "hypotheses": [
+    {
+      "id": "h-snapshot",
+      "text": "测试库是三个月前的快照：老商户带着真实的限额数据，新商户相关数据与生产完全脱节",
+      "excludeActionId": "a-schemadiff"
+    },
+    {
+      "id": "h-migration",
+      "text": "测试环境 schema 落后于生产：migration 没在测试库执行，字段缺失导致逻辑降级",
+      "excludeActionId": "a-miglist"
+    },
+    {
+      "id": "h-cfg",
+      "text": "配置中心两环境不同：测试读默认限额配置，生产读运营配置",
+      "excludeActionId": "a-cfgdiff"
+    },
+    {
+      "id": "h-volume",
+      "text": "测试数据量太小，生产量级触发了分页/批量路径的差异",
+      "excludeActionId": "a-volume"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-impact",
+      "name": "按商户签约时间分层统计",
+      "desc": "影响面：放行/拦截与商户签约时间的关系",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "code",
+        "title": "商户分层对账",
+        "text": "三个月内签约（新商户）：127 笔超限放行，放行率 100%\n三个月前签约（老商户）：限额拦截正常，0 笔超限\n同一段代码，两类商户行为完全分裂\n→ 代码对老商户是对的——差异藏在\"商户数据\"里。什么时候的数据？"
+      }
+    },
+    {
+      "id": "a-schemadiff",
+      "name": "对比两环境商户表的 schema 与数据",
+      "desc": "结构一致吗？数据一致吗？分别比对",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-snapshot"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-snapshot",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "schema 与数据双 diff",
+        "text": "schema diff：字段完全一致（risk_limit_tier 三个月前就有了）——结构没漂移\n数据 diff（老商户样本）：tier 值一致 ✓ 限额数值一致 ✓\n数据 diff（新商户样本）：生产 87 个新商户在测试库根本不存在；\n测试库自建的\"模拟新商户\" tier 全为默认值（0 = 不限额）——测试全绿用的是假数据\n实锤：测试库 = 三个月前快照 + 自造数据。它验证的是三个月前的生产。"
+      }
+    },
+    {
+      "id": "a-miglist",
+      "name": "核对 migration 在两环境的执行记录",
+      "desc": "排除 schema 漂移",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-migration"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-migration",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "migration 清单",
+        "text": "两环境 migration 版本一致（Alembic head 相同）。\n→ 排除结构漂移：这次是\"数据漂移\"——更隐蔽，因为它不报错、不缺列，只是值不对。"
+      }
+    },
+    {
+      "id": "a-cfgdiff",
+      "name": "对比配置中心两环境差异",
+      "desc": "排除配置层漂移",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-cfg"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-cfg",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "配置审计",
+        "text": "限额功能读商户表（DB），不读配置中心——配置层无涉。\n→ 排除配置问题：矛头更集中地指向商户数据本身。"
+      }
+    },
+    {
+      "id": "a-volume",
+      "name": "评估数据量对逻辑路径的影响",
+      "desc": "排除量级触发的路径差异",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-volume"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-volume",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "量级评估",
+        "text": "限额校验是单商户单笔查表逻辑，无分页/批量路径。\n→ 排除量级问题。"
+      }
+    },
+    {
+      "id": "a-flowgap",
+      "name": "审计测试环境的数据初始化机制",
+      "desc": "为什么快照三个月没更新——流程缺口的真相",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "流程审计",
+        "text": "测试库初始化 = 一次性快照导入（三个月前），无任何同步机制。\n此后团队各自手工造测试数据——造的数据\"看起来像\"，但与生产规则脱节。\n→ 不是谁的失误，是没有\"环境数据基线\"制度：漂移每天都在发生，只是今天才炸。"
+      }
+    },
+    {
+      "id": "a-danger",
+      "name": "重置测试库：新结构 + 匿名化生产数据子集",
+      "desc": "【状态变更】重建测试环境数据基线",
+      "cost": 1,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "重建结果",
+        "text": "测试库重置：最新 schema + 生产匿名化数据子集（87 个新商户全量覆盖）。\n进行中的测试任务中断 2 小时。\n重放限额 23 用例：新商户超限场景在测试环境如实复现并拦截——测试第一次\"测的是现在的生产\"。"
+      }
+    },
+    {
+      "id": "a-fixsync",
+      "name": "建立数据基线同步机制",
+      "desc": "【状态变更】每周自动同步：schema 全量 + 关键表匿名化子集 + diff 报告告警",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "同步机制",
+        "text": "① 每周自动从生产拉取 schema 全量 diff + 商户/限额/风控等 6 张关键表匿名化子集\n② diff 报告自动生成并告警：结构差异、数据分布漂移超阈值\n③ 同步失败 = 测试环境进入\"不可信\"状态，看板亮黄灯。"
+      }
+    },
+    {
+      "id": "a-fixanon",
+      "name": "落地匿名化管线",
+      "desc": "【状态变更】生产数据进测试环境前：手机号/证件/卡号确定性打码，合规评审通过",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "合规管线",
+        "text": "匿名化规则：可逆打码（同输入同输出，保关联）+ 敏感字段截断 + 外发数据合规评审记录。\n数据真实性与合规性同时满足——\"用生产数据测\"从此有正规通道。"
+      }
+    },
+    {
+      "id": "a-fixgate",
+      "name": "上线检查单增加\"数据基线新鲜度\"",
+      "desc": "【状态变更】涉及配置/数据规则的功能，上线前必须确认测试环境基线 7 天内同步过",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "检查单 v3",
+        "text": "新增检查项：□ 测试环境数据基线 ≤ 7 天 □ 功能涉数据表在同步白名单内 □ 新数据特征有专项用例。\n\"代码是对的，数据是旧的\"这类事故从制度上闭环。"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-snapshot",
+      "text": "测试库是三个月前的一次性快照且无同步机制：老商户数据与生产一致（功能\"看起来\"正常），新商户数据与生产完全脱节（自造数据 tier 默认不限额）——测试全绿验证的是过去的生产",
+      "correct": true
+    },
+    {
+      "id": "rc-migration",
+      "text": "测试环境 schema 落后于生产，migration 未执行",
+      "correct": false
+    },
+    {
+      "id": "rc-cfg",
+      "text": "配置中心两环境限额配置不同",
+      "correct": false
+    },
+    {
+      "id": "rc-volume",
+      "text": "测试数据量级不足触发不同代码路径",
+      "correct": false
+    }
+  ],
+  "expertCost": 4,
+  "restartActionId": "a-danger",
+  "expertChain": [
+    {
+      "thought": "新商户放行、老商户正常——同一份代码两种命运，差异在数据。先按签约时间分层对账，把\"谁不对\"钉准。",
+      "update": "分裂线恰好落在三个月：老商户全对、新商户全放——数据的时间边界清晰可见。",
+      "actionId": "a-impact",
+      "why": "1⚡︎ 分层统计让数据自己说出\"三个月\"这个数字——它直接指向快照导入的时间点，排查从第一天就有方向。",
+      "conclusion": "假设升权：测试库数据与生产脱节（h-snapshot）。"
+    },
+    {
+      "thought": "schema 和数据分开 diff：结构漂移会报错，数据漂移不报错——后者更隐蔽，必须主动比对。",
+      "update": "实锤：schema 一致；老商户数据一致、新商户数据完全脱节（测试自造数据 tier 默认不限额）。",
+      "actionId": "a-schemadiff",
+      "why": "2⚡︎ 双 diff 分离\"结构\"与\"数据\"两个漂移维度：结构漂移有报错掩护你发现它，数据漂移只有对账才能暴露——测试全绿反而成了它的保护色。",
+      "conclusion": "根因实锤：快照式测试库 + 自造数据 = 验证过去的生产。"
+    },
+    {
+      "thought": "migration 清单核对：结构漂移假设单独关闭，也让\"数据漂移\"的定性更扎实。",
+      "update": "两环境 migration head 一致——结构无漂移，问题定性为纯数据漂移。",
+      "actionId": "a-miglist",
+      "why": "1⚡︎ 把\"数据漂移\"与\"结构漂移\"在证据上分开，修复方案才不会做歪（本例不需要补 migration，需要的是数据基线制度）。",
+      "conclusion": "结构假设排除，修复聚焦数据机制。"
+    },
+    {
+      "thought": "审计初始化机制本身：三个月不更新是制度缺失还是偶发遗忘——决定修复的层级。",
+      "update": "一次性快照 + 手工造数据，无同步无巡检——制度缺失，漂移每天都在发生。",
+      "actionId": "a-flowgap",
+      "why": "1⚡︎ 沉淀思维的分界点：修\"这一次\"还是修\"这类问题\"——制度缺失的答案永远是后者。快照不更新不是谁的锅，是没有让\"更新\"自动发生的机制。",
+      "conclusion": "修复升级为制度层：同步机制 + 巡检告警 + 检查单。"
+    },
+    {
+      "thought": "重置（重建基线）、机制（每周同步+diff 告警）、合规（匿名化管线）、门禁（新鲜度检查单）。停止收集。",
+      "update": "停止。",
+      "actionId": "",
+      "why": "【停止规则】机制（快照脱节）✓ 制度缺口（无同步）✓ 合规约束（生产数据外流）✓——三层都闭合，修复可持续。",
+      "conclusion": "沉淀：测试环境是测量仪器，仪器本身必须定期校准。数据漂移不报错——它只让\"全绿\"变得没有意义。"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "测试环境数据过期时，测试验证的是\"过去的生产\"：结构一致不等于数据一致，数据漂移不报错、不缺列，只让全绿失去意义。",
+      "principle": "沉淀思维：环境一致性 = schema 一致 + 关键数据基线一致，两个维度都要有 diff 机制主动巡检。依赖\"报错\"来发现漂移是错觉——数据漂移的特征恰恰是一切正常，除了结论不可信。"
+    },
+    {
+      "text": "手工造的测试数据\"看起来像\"生产数据，但规则脱节时会给你全绿的错觉——自造数据只能覆盖设计内的场景，覆盖不了生产数据的真实分布。",
+      "principle": "测试数据策略分层：结构用 migration、分布用匿名化生产子集、边界用手工构造的专项用例。三层各司其职——生产子集保证\"像真的\"，专项用例保证\"比真的更刁钻\"。"
+    },
+    {
+      "text": "制度缺失的修复层级是机制不是提醒：快照三个月不更新不是谁的失误，是没有让更新自动发生的机制。",
+      "principle": "每周自动同步（schema+关键表）+ diff 报告告警 + 同步失败即环境降级为\"不可信\"——把环境新鲜度做成可观测状态。配套检查单（上线前确认基线 ≤7 天）让制度在最后一道门再拦一次。"
+    }
+  ]
+}

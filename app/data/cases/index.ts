@@ -57,6 +57,10 @@ import { tcpRetransCase } from './tcp-retrans'
 import { h2HolCase } from './h2-hol'
 import { cdnPenetrationCase } from './cdn-penetration'
 import { proxyHeadersCase } from './proxy-headers'
+import { coverageIllusionCase } from './coverage-illusion'
+import { mockLeakCase } from './mock-leak'
+import { flakyTestCase } from './flaky-test'
+import { envDriftCase } from './env-drift'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -116,6 +120,10 @@ export const ALL_CASES: DiagnosisCase[] = [
   h2HolCase,
   cdnPenetrationCase,
   proxyHeadersCase,
+  coverageIllusionCase,
+  mockLeakCase,
+  flakyTestCase,
+  envDriftCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {
