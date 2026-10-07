@@ -56,9 +56,17 @@ async function makeDraft(sid: string) {
         <div class="statbox"><div class="statbox__n">{{ pubCount }}</div><div class="statbox__k">已上线</div></div>
       </div>
 
-      <div style="display: flex; gap: 10px; margin-bottom: 16px">
+      <div style="display: flex; gap: 10px; margin-bottom: 16px; align-items: center">
         <button class="btn btn--ghost" :style="tab === 'submissions' ? '' : 'opacity: .6'" @click="tab = 'submissions'">投稿（{{ subs.length }}）</button>
         <button class="btn btn--ghost" :style="tab === 'cases' ? '' : 'opacity: .6'" @click="tab = 'cases'">Case（{{ cases.length }}）</button>
+        <span style="flex: 1"></span>
+        <button class="btn" style="padding: 8px 18px; font-size: 13px" :disabled="reindexing" @click="reindex">
+          {{ reindexing ? '重建中…' : '重建 AI 索引' }}
+        </button>
+      </div>
+      <div v-if="reindexMsg" class="card" style="margin-bottom: 14px">{{ reindexMsg }}</div>
+      <div v-if="aiWarning" class="card" style="border: 1px solid var(--coral); margin-bottom: 14px; color: var(--coral)">
+        ⚠ {{ aiWarning }}
       </div>
 
       <div v-if="tab === 'submissions'">
@@ -78,6 +86,10 @@ async function makeDraft(sid: string) {
           </details>
           <div style="margin-top: 12px; display: flex; gap: 10px">
             <button v-if="s.status === 'pending'" class="btn" style="padding: 8px 18px; font-size: 13px" @click="makeDraft(s.id)">通过并生成 Case 草稿</button>
+            <button v-if="s.status === 'pending'" class="btn" style="padding: 8px 18px; font-size: 13px; background: var(--sky); color: #fff"
+              :disabled="aiBusyId === s.id" @click="makeAiDraft(s.id)">
+              {{ aiBusyId === s.id ? 'AI 起草中…' : 'AI 预填草稿' }}
+            </button>
             <button v-if="s.status === 'pending'" class="btn btn--ghost" style="padding: 8px 18px; font-size: 13px"
               @click="api.post('/api/admin/submissions/' + s.id + '/status', { status: 'rejected', reviewNote: '暂不采用' }).then(() => s.status = 'rejected')">
               驳回

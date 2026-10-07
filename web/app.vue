@@ -127,6 +127,7 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
     <header class="topbar">
       <NuxtLink to="/" class="topbar__brand">好多星 HowDuoThink · 社区</NuxtLink>
       <nav class="topbar__nav">
+        <NuxtLink to="/ai" class="topbar__link topbar__link--ai">AI 排错</NuxtLink>
         <NuxtLink to="/solutions" class="topbar__link">解决逻辑</NuxtLink>
         <NuxtLink to="/submit" class="topbar__link">投稿</NuxtLink>
         <div ref="menuRef" class="usermenu">

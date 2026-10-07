@@ -16,6 +16,10 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-
 .topbar__brand { font-weight: 800; color: var(--ink); text-decoration: none; }
 .topbar__nav { display: flex; gap: 18px; }
 .topbar__link { color: var(--ink2); text-decoration: none; font-size: 14px; }
+.topbar__link--ai {
+  color: #ff7a50;
+  font-weight: 700;
+}
 .topbar__link:hover { color: var(--coral); }
 .main { padding: 26px 0; }
 .footer { color: var(--ink3); font-size: 12px; text-align: center; padding: 30px 0; }
