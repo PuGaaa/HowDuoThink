@@ -14,7 +14,7 @@ export const wsUpgradeCase: DiagnosisCase = {
   layer: '升级协议要逐跳协商——中间层吞掉一个头，协议就停在原地',
   part: 'apprentice',
   chapterId: 'access',
-  order: 7,
+  order: 6,
   typeTags: ['config', 'dependency'],
   difficulty: 2,
 

@@ -12,7 +12,7 @@
     "capacity",
     "config"
   ],
-  "difficulty": 3,
+  "difficulty": 2,
   "scene": {
     "role": "你是网关负责人，周报的性能数据很漂亮，但超时投诉让你无法自圆其说。",
     "architecture": "用户 → 网关(8 实例) → 商品服务",

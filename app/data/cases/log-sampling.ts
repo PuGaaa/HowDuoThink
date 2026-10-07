@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 2 章 · 可观测性迷雾（日志消失 L3）
+ * 第 2 章 · 可观测性迷雾（日志消失 L2）
  * 教学点：日志平台看到的不是全部真相——采样、级别配置、实例覆盖都会吞日志；"查不到"不等于"没发生"。
  * 专家路径：impact(1) + platsearch(1) + hostdiff(2) = 4⚡︎
  */
@@ -15,7 +15,7 @@ export const logSamplingCase: DiagnosisCase = {
   chapterId: 'observability',
   order: 1,
   typeTags: ['config', 'observability'],
-  difficulty: 3,
+  difficulty: 2,
 
   scene: {
     role: '你是支付服务后端，用户反馈支付失败，你在日志平台搜了十分钟，一无所获。',

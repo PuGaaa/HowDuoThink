@@ -17,7 +17,7 @@ export const canaryDecisionCase: DiagnosisCase = {
   ,
   part: 'apprentice',
   chapterId: 'access',
-  order: 6,
+  order: 8,
   typeTags: ['access', 'decision'],
   difficulty: 3,
 

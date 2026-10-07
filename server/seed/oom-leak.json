@@ -12,7 +12,7 @@
     "capacity",
     "code"
   ],
-  "difficulty": 3,
+  "difficulty": 2,
   "scene": {
     "role": "你是订单查询服务的负责人。运维第三次在群里 @你：你们服务又 OOM 重启了，集市查询超时了 40 秒。",
     "architecture": "K8s Pod(内存限额 2Gi) → 订单查询服务(Node.js 18) → 订单库 MySQL",

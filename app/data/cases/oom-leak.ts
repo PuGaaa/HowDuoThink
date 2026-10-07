@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 4 章 · 运行时暗面（无界缓存 OOM L3）
+ * 第 4 章 · 运行时暗面（无界缓存 OOM L2）
  * 教学点：OOMKilled 是内核杀的不是自己崩的；锯齿曲线是泄漏的指纹；
  * 无界缓存 = 慢性泄漏；重启是止血不是修复。
  * 专家路径：impact(1) + k8sevent(1) + rsscurve(1) + heapsnap(2) + coderead(2) = 7⚡︎
@@ -16,7 +16,7 @@ export const oomLeakCase: DiagnosisCase = {
   chapterId: 'runtime',
   order: 1,
   typeTags: ['resource', 'capacity', 'code'],
-  difficulty: 3,
+  difficulty: 2,
 
   scene: {
     role: '你是订单查询服务的负责人。运维第三次在群里 @你：你们服务又 OOM 重启了，集市查询超时了 40 秒。',

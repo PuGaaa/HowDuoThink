@@ -12,7 +12,7 @@
     "capacity",
     "timing"
   ],
-  "difficulty": 3,
+  "difficulty": 2,
   "scene": {
     "role": "你是订单系统后端，大促秒杀活动结束后的盘点会议上，财务报出一个噩梦般的数字。",
     "architecture": "App → 网关 → 秒杀服务 → Redis(预扣) + MySQL(库存真相)",

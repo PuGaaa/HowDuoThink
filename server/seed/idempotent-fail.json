@@ -11,7 +11,7 @@
     "race",
     "timing"
   ],
-  "difficulty": 3,
+  "difficulty": 2,
   "scene": {
     "role": "你是交易系统后端，仓库同事反馈：23 个订单被重复拣货发货，用户拒收第二件。",
     "architecture": "支付网关 → MQ(支付成功事件) → 履约服务 → 仓库 WMS",

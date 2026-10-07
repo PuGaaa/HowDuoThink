@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 并发迷宫（幂等失效 L3）
+ * 第 1 章 · 并发迷宫（幂等失效 L2）
  * 教学点：支付回调重试机制 + 无幂等键 = 重复发货；重试不是异常而是 MQ/支付系统的设计行为。
  * 专家路径：impact(1) + orderlist(1) + paylog(2) + code(2) = 6⚡︎
  */
@@ -15,7 +15,7 @@ export const idempotentFailCase: DiagnosisCase = {
   chapterId: 'concurrency',
   order: 2,
   typeTags: ['race', 'timing'],
-  difficulty: 3,
+  difficulty: 2,
 
   scene: {
     role: '你是交易系统后端，仓库同事反馈：23 个订单被重复拣货发货，用户拒收第二件。',

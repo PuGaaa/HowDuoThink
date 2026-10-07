@@ -16,7 +16,7 @@ export const timewaitCase: DiagnosisCase = {
   layer: 'TCP 连接是有状态的：每个挥手道别的连接，会在 TIME_WAIT 里停留 60 秒',
   part: 'engineer',
   chapterId: 'runtime',
-  order: 3,
+  order: 4,
   typeTags: ['runtime', 'network'],
   difficulty: 2,
 

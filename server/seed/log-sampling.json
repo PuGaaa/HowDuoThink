@@ -11,7 +11,7 @@
     "config",
     "observability"
   ],
-  "difficulty": 3,
+  "difficulty": 2,
   "scene": {
     "role": "你是支付服务后端，用户反馈支付失败，你在日志平台搜了十分钟，一无所获。",
     "architecture": "8 台支付实例 → Filebeat 采集 → 日志平台(ES)",

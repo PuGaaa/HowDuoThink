@@ -6,7 +6,7 @@
   "layer": "决策依据是风险不对称：回滚 10 分钟可逆，不行动的代价是用户持续受损——疑似即行动",
   "part": "engineer",
   "chapterId": "data",
-  "order": 6,
+  "order": 5,
   "typeTags": [
     "data",
     "sre",

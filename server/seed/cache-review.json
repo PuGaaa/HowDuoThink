@@ -6,12 +6,12 @@
   "layer": "缓存设计的取舍：先问业务时效，再定技术参数",
   "part": "engineer",
   "chapterId": "data",
-  "order": 5,
+  "order": 4,
   "typeTags": [
     "data",
     "architecture"
   ],
-  "difficulty": 3,
+  "difficulty": 2,
   "scene": {
     "role": "你是「鲜到家」的后端负责人，评审会上被指派\"挑刺\"——找出这个方案未来会出事的地方。",
     "architecture": "App → 详情页服务 → Redis(方案新增) → MySQL(商品表 500 万行)",

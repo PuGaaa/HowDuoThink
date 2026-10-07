@@ -16,7 +16,7 @@ export const dataScriptCase: DiagnosisCase = {
   layer: '数据操作脚本的三道防线：测试环境验证 + 备份 + 双人复核——缺一道就是全表灾难',
   part: 'engineer',
   chapterId: 'data',
-  order: 8,
+  order: 7,
   typeTags: ['data', 'database'],
   difficulty: 3,
 

@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 2 章 · 可观测性迷雾（平均值掩盖 L3）
+ * 第 2 章 · 可观测性迷雾（平均值掩盖 L2）
  * 教学点：平均值是并发请求的"民主投票"，少数派的真实体验会被淹没；分位数（P95/P99）与分组才是长尾的显影液。
  * 专家路径：impact(1) + histogram(2) + nodelist(2) = 5⚡︎
  */
@@ -15,7 +15,7 @@ export const avgMetricCase: DiagnosisCase = {
   chapterId: 'observability',
   order: 2,
   typeTags: ['observability', 'capacity', 'config'],
-  difficulty: 3,
+  difficulty: 2,
 
   scene: {
     role: '你是网关负责人，周报的性能数据很漂亮，但超时投诉让你无法自圆其说。',

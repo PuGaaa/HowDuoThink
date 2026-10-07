@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 并发迷宫（秒杀超卖 L3）
+ * 第 1 章 · 并发迷宫（秒杀超卖 L2）
  * 教学点：check-then-act 竞态；并发故障的证据在毫秒级时间线里；"请求都在排队"假象。
  * 专家路径：impact(1) + orderlog(1) + code(2) = 4⚡︎（redis 2⚡︎ 为可选加固证据）
  */
@@ -15,7 +15,7 @@ export const oversellRaceCase: DiagnosisCase = {
   chapterId: 'concurrency',
   order: 1,
   typeTags: ['race', 'capacity', 'timing'],
-  difficulty: 3,
+  difficulty: 2,
 
   scene: {
     role: '你是订单系统后端，大促秒杀活动结束后的盘点会议上，财务报出一个噩梦般的数字。',

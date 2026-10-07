@@ -14,7 +14,7 @@ export const certSniCase: DiagnosisCase = {
   layer: '同 IP 多域名的 TLS 靠 SNI 区分——不带 SNI 的客户端拿到的是默认站点',
   part: 'apprentice',
   chapterId: 'access',
-  order: 8,
+  order: 7,
   typeTags: ['config', 'dependency', 'security'],
   difficulty: 2,
 

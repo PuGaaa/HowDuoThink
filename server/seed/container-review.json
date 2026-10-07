@@ -11,7 +11,7 @@
     "runtime",
     "architecture"
   ],
-  "difficulty": 3,
+  "difficulty": 2,
   "scene": {
     "role": "你是「鲜到家」的架构评审委员。运维团队的\"统一治理\"方案有它的道理（管理成本真的高）——但 17 个服务里，有的需要 4C，有的 500M 就够。",
     "architecture": "17 个服务(资源画像各异) → 统一 2C4G 限额 → HPA(CPU 均值 70% 扩容)",

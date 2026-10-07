@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * B1-3 · runtime L3（oom-leak 的续集）
+ * B1-3 · runtime L2（oom-leak 的续集）
  * 主训思维：程序设计（监听器/闭包的生命周期必须与对象生命周期对齐）
  * 次训思维：验证思维（堆快照对比法可复用——上次修好不代表永远修好）
  * 真实原型：修复无界缓存后，事件监听器重复注册 + 闭包持有请求上下文再次泄漏
@@ -18,7 +18,7 @@ export const closureLeakCase: DiagnosisCase = {
   chapterId: 'runtime',
   order: 3,
   typeTags: ['runtime', 'code'],
-  difficulty: 3,
+  difficulty: 2,
 
   scene: {
     role: '你是「鲜到家」订单查询服务的负责人。40 天前你修掉了无界缓存，今天运维第四次在群里 @你。',

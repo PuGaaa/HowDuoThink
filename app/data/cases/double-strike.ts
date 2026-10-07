@@ -16,7 +16,7 @@ export const doubleStrikeCase: DiagnosisCase = {
   layer: '多因叠加的排错：每条线单独看都"还行"，是因为它们互相掩盖——必须拉全链路同时看',
   part: 'engineer',
   chapterId: 'data',
-  order: 7,
+  order: 6,
   typeTags: ['data', 'cache'],
   difficulty: 3,
 

@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * B3-3 · runtime L3（运行时章结业评审）
+ * B3-3 · runtime L2（运行时章结业评审）
  * 主训思维：架构设计（资源限额"统一管理"是伪简化——不同服务的资源画像不同）
  * 次训思维：程序设计（HPA 指标选错：CPU 均值看不见事件循环的单核阻塞）
  * 真实原型：统一限额 2C4G 一刀切 + HPA 按 CPU 均值扩容（对事件循环服务永远不触发）
@@ -18,7 +18,7 @@ export const containerReviewCase: DiagnosisCase = {
   chapterId: 'runtime',
   order: 5,
   typeTags: ['runtime', 'architecture'],
-  difficulty: 3,
+  difficulty: 2,
 
   scene: {
     role: '你是「鲜到家」的架构评审委员。运维团队的"统一治理"方案有它的道理（管理成本真的高）——但 17 个服务里，有的需要 4C，有的 500M 就够。',

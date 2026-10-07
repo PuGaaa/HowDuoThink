@@ -4,9 +4,9 @@
   "intro": "App 实时推送上线后大面积握手失败：本地直连后端 100% 成功，走网关的新版客户端全挂——升级头像从没到过。",
   "domain": "network",
   "layer": "升级协议要逐跳协商——中间层吞掉一个头，协议就停在原地",
-  "part": "master",
+  "part": "apprentice",
   "chapterId": "access",
-  "order": 7,
+  "order": 6,
   "typeTags": [
     "config",
     "dependency"

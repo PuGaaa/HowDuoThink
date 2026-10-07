@@ -11,7 +11,7 @@
     "runtime",
     "code"
   ],
-  "difficulty": 3,
+  "difficulty": 2,
   "scene": {
     "role": "你是「鲜到家」订单查询服务的负责人。40 天前你修掉了无界缓存，今天运维第四次在群里 @你。",
     "architecture": "K8s Pod(内存限额 2Gi) → 订单查询服务(Node.js 18) → 订单库 MySQL",

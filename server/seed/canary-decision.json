@@ -6,7 +6,7 @@
   "layer": "决策 = 期望值与可逆性，而非完美信息：数据不足时扩灰度收集，设止损线",
   "part": "apprentice",
   "chapterId": "access",
-  "order": 6,
+  "order": 8,
   "typeTags": [
     "access",
     "decision"
