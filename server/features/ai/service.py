@@ -75,8 +75,8 @@ def _embed(texts: list[str]) -> list[list[float]]:
 
 
 def index_case(case_id: str) -> bool:
-    """增量索引单个已发布案例（无 AI 能力时返回 False）。"""
-    if not client.available():
+    """增量索引单个已发布案例（向量供应商未就绪时返回 False）。"""
+    if not client.embed_available():
         return False
     rows = db.q("SELECT payload FROM cases WHERE id=? AND status='published'", (case_id,))
     if not rows:
@@ -84,7 +84,7 @@ def index_case(case_id: str) -> bool:
     payload = db.jload(rows[0]["payload"], {})
     chunks = _case_chunks(payload)
     vectors = _embed([c[1] for c in chunks])
-    model = client.embeddings_model().model
+    model = client.embeddings_model_name()
     with db.tx() as conn:
         for (kind, content), vec in zip(chunks, vectors):
             conn.execute(
@@ -99,8 +99,8 @@ def index_case(case_id: str) -> bool:
 
 def reindex_all() -> dict:
     """全量重建：清除案例类索引，重嵌所有 published 案例。"""
-    if not client.available():
-        return {"ok": False, "reason": "AI 未配置（ZHIPU_API_KEY 缺失）"}
+    if not client.embed_available():
+        return {"ok": False, "reason": "向量供应商未就绪（EMBED_PROVIDER=zhipu 需配 ZHIPU_API_KEY）"}
     db.ex("DELETE FROM ai_index WHERE source_type='case'")
     rows = db.q("SELECT id FROM cases WHERE status='published'")
     done = 0
@@ -124,10 +124,15 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 
 def node_retrieve(query: str, k: int = 4) -> list[dict]:
-    """检索节点：有 key → 向量余弦 top-K；无 key → LIKE 关键词降级。"""
-    if client.available():
+    """检索节点：向量供应商就绪 → 余弦 top-K（按向量器 model 过滤）；未就绪 → LIKE 关键词降级。"""
+    if client.embed_available():
         qvec = client.embeddings_model().embed_query(query)
-        rows = db.q("SELECT source_id, chunk_kind, content, embedding FROM ai_index WHERE source_type='case'")
+        model = client.embeddings_model_name()
+        rows = db.q(
+            "SELECT source_id, chunk_kind, content, embedding FROM ai_index "
+            "WHERE source_type='case' AND model=?",
+            (model,),
+        )
         scored = []
         for r in rows:
             score = _cosine(qvec, json.loads(r["embedding"]))
@@ -166,7 +171,7 @@ def node_answer(question: str, chunks: list[dict]) -> str:
 def chat(question: str, uid: str) -> dict:
     """RAG 对话入口：限速 → 检索 → 应答 → 组装引用。"""
     if not client.available():
-        return {"error": "AI 未配置（ZHIPU_API_KEY 缺失），当前为关键词检索模式", "aiAvailable": False}
+        return {"error": "AI 未配置（DEEPSEEK_API_KEY 缺失），对话不可用；检索可走关键词模式", "aiAvailable": False}
     if not _rate_ok(uid):
         return {"error": "提问太频繁，稍后再试", "aiAvailable": True}
     chunks = node_retrieve(question, k=4)

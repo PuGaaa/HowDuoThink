@@ -61,16 +61,24 @@ def test_chat_degrades_without_key(monkeypatch):
 
 
 def test_search_degrades_to_keyword(monkeypatch):
-    """无 key：检索降级为 LIKE 关键词，命中已索引内容。"""
-    monkeypatch.setattr("features.ai.client.available", lambda: False)
+    """向量供应商未就绪（zhipu 模式缺 key）：检索降级为 LIKE 关键词。"""
+    import core.config as config
+    monkeypatch.setattr("core.config.EMBED_PROVIDER", "zhipu")
+    monkeypatch.setattr("core.config.ZHIPU_API_KEY", "")
     c = _client()
-    make_user(c, "u2")
-    login(c, "u2")
-    add_index_row("case-kw", [0.0, 0.0], "缓存一致性窗口与回源策略")
-    r = c.get("/api/ai/search", params={"q": "缓存一致性"})
-    assert r.status_code == 200
-    results = r.json()["results"]
-    assert len(results) == 1 and results[0]["caseId"] == "case-kw"
+    from features.ai import client as ai_client
+    ai_client.embeddings_model.cache_clear()
+    try:
+        make_user(c, "u2")
+        login(c, "u2")
+        add_index_row("case-kw", [0.0, 0.0], "缓存一致性窗口与回源策略")
+        r = c.get("/api/ai/search", params={"q": "缓存一致性"})
+        assert r.status_code == 200
+        results = r.json()["results"]
+        assert len(results) == 1 and results[0]["caseId"] == "case-kw"
+    finally:
+        from features.ai import client as ai_client
+        ai_client.embeddings_model.cache_clear()
 
 
 def test_reindex_requires_editor():
@@ -82,16 +90,24 @@ def test_reindex_requires_editor():
     assert r.status_code == 403
 
 
-def test_reindex_editor_no_key(monkeypatch):
-    """editor 触发重建：无 key 时返回 ok=False + 原因。"""
-    monkeypatch.setattr("features.ai.client.available", lambda: False)
+def test_reindex_embed_unavailable(monkeypatch):
+    """向量供应商未就绪（zhipu 模式缺 key）：重建返回 ok=False + 原因。"""
+    import core.config as config
+    monkeypatch.setattr("core.config.EMBED_PROVIDER", "zhipu")
+    monkeypatch.setattr("core.config.ZHIPU_API_KEY", "")
     c = _client()
-    make_user(c, "editor2", role="editor")
-    login(c, "editor2")
-    r = c.post("/api/admin/ai/reindex")
-    assert r.status_code == 200
-    d = r.json()
-    assert d["ok"] is False and "未配置" in d["reason"]
+    from features.ai import client as ai_client
+    ai_client.embeddings_model.cache_clear()
+    try:
+        make_user(c, "editor2", role="editor")
+        login(c, "editor2")
+        r = c.post("/api/admin/ai/reindex")
+        assert r.status_code == 200
+        d = r.json()
+        assert d["ok"] is False and "未就绪" in d["reason"]
+    finally:
+        from features.ai import client as ai_client
+        ai_client.embeddings_model.cache_clear()
 
 
 def test_cosine_ranking(monkeypatch):

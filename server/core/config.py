@@ -21,9 +21,14 @@ def oauth_configured() -> bool:
     return bool(CLIENT_ID and CLIENT_SECRET)
 
 
-# —— AI（GLM/智谱，OpenAI 兼容端点）：未配 key 时 AI 功能自动降级 ——
+# —— AI：对话/起草走 DeepSeek（OpenAI 兼容端点）；向量默认本地字符 bigram，可选智谱 embedding-3 ——
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
+AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.deepseek.com")
+AI_CHAT_MODEL = os.environ.get("AI_CHAT_MODEL", "deepseek-chat")
+
+# 向量化：local = 内置字符 bigram 哈希向量（零依赖零 API 费）；zhipu = 智谱 embedding-3（需 ZHIPU_API_KEY）
+EMBED_PROVIDER = os.environ.get("EMBED_PROVIDER", "local")
 ZHIPU_API_KEY = os.environ.get("ZHIPU_API_KEY", "")
-AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
-GLM_MODEL = os.environ.get("GLM_MODEL", "glm-4.5-flash")
+ZHIPU_BASE_URL = os.environ.get("ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
 GLM_EMBED_MODEL = os.environ.get("GLM_EMBED_MODEL", "embedding-3")
 GLM_EMBED_DIM = int(os.environ.get("GLM_EMBED_DIM", "1024"))
