@@ -1,0 +1,250 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * 第 16 章 · 测试与质量 第四批（容量模型隐藏假设 L3）
+ * 教学点：假设思维——压测通过的是"模型里写了的东西"：QPS 覆盖了、连接数/慢查询耦合没写进模型；
+ * 模型的隐藏假设要用故障注入逼出来。
+ * 专家路径：impact(1) + assumptionaudit(2) + inj/replay(1) = 4⚡︎
+ */
+export const capacityAssumptionCase: DiagnosisCase = {
+  id: 'capacity-assumption',
+  title: '压测 8 万 QPS 通过，大促当天 2 万就挂了',
+  intro: '压测 8 万 QPS 全绿，大促 2 万 QPS 就挂：容量模型里写了 QPS，没写"慢查询出现时连接数会翻 4 倍"。',
+  domain: 'build',
+  layer: '容量模型只保护"写进模型的假设"——没写进去的耦合，就是大促的爆点',
+  part: 'master',
+  chapterId: 'testing',
+  order: 10,
+  typeTags: ['testing', 'capacity', 'data'],
+  difficulty: 3,
+
+  scene: {
+    role: '你是「鲜到家」的性能平台负责人，压测报告与大促事故单放在一起，像一张自嘲的漫画。',
+    architecture: '压测体系(全链路 8 万 QPS 模型) → 订单服务(连接池 40/实例 ×20) → DB(max 800 连接) ｜ 大促真实: 2 万 QPS + 一条慢查询',
+    tag: '故障现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '大促事故',
+        text: '2 万 QPS（压测容量的 1/4）稳定运行 40 分钟后，DB 连接数 780/800 → 打满 → 全站超时。\n触发器：运营临时上传的"会员标签查询"活动页 SQL 全表扫描（单条 1.4s），命中率每秒 12 次。',
+      },
+      {
+        type: 'text',
+        title: '压测报告',
+        text: '压测场景：8 万 QPS 纯净流量（标准下单请求），DB 连接峰值 340/800。\n报告结论："容量余量 2.3 倍，安全。"——没有一条慢查询、没有非标准流量。',
+      },
+    ],
+    timeline: '压测 20 天前完成 ｜ 大促当天运营上传活动页（未走性能评审——"只是个页面"）｜ 事故第 40 分钟熔断恢复',
+    impactHint: '2 万 QPS 打挂 8 万 QPS 验证过的系统——差的不是流量，是"模型里没写的东西"。慢查询和连接数的关系，模型里有一条吗？',
+  },
+
+  hypotheses: [
+    { id: 'h-assumption', text: '容量模型缺"慢查询×连接占用"耦合假设：1.4s 慢查询 × 12/s = 每秒 17 个连接被钉住 1.4s → 连接水位模型完全失真', excludeActionId: 'a-assumptionaudit' },
+    { id: 'h-nonstd', text: '非标准流量绕过压测：活动页 SQL 未经性能评审直接上生产', excludeActionId: 'a-nonstd' },
+    { id: 'h-pool', text: '应用连接池 40 过大，放大了慢查询的连接占用', excludeActionId: 'a-poolcfg' },
+    { id: 'h-replay', text: '压测数据集失真，DB 层从未被真实检验（loadtest-illusion 同族）', excludeActionId: 'a-replaycheck' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '重建事故时刻的"连接水位"模型',
+      desc: '影响面：连接数怎么在 40 分钟里爬到 780',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '连接水位重建',
+        text: '基线：2 万 QPS × 平均处理 20ms → 并发占用 ≈ 400 连接（安全）\n慢查询上线：+12/s × 1.4s = 每秒新增 17 个"被钉住 1.4s"的连接\n稳态：400 + 17×1.4/0.02 修正模型……实测爬升曲线：40 分钟线性爬到 780（慢查询连接的释放速率 < 占用速率）\n→ 水位爬升与慢查询流量精确耦合——压测模型里没有这个变量。',
+      },
+    },
+    {
+      id: 'a-assumptionaudit',
+      name: '审计容量模型的隐藏假设清单',
+      desc: '压测模型"默认成立"了哪些前提',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-assumption'],
+      hypotheses: [{ id: 'h-assumption', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: '隐藏假设清单（模型里没写的）',
+        text: '① 所有 SQL 都是标准 SQL（压测回放的请求集）——无慢查询注入\n② 连接占用时长恒定 20ms——无"慢查询钉住连接"耦合\n③ 流量全部来自压测平台——无运营侧临时流量\n④ DB 缓冲池是热的——无冷启动场景\n→ 四条假设在压测中全部成立，在生产中大促日全部被打破。容量模型只保护"写进去的假设"。',
+      },
+    },
+    {
+      id: 'a-nonstd',
+      name: '追查慢查询的准入路径',
+      desc: '活动页 SQL 为什么没走性能评审',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-nonstd'],
+      hypotheses: [{ id: 'h-nonstd', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '准入审计',
+        text: '活动页由运营工具生成（低代码平台），走的是"页面发布"通道而非"代码发布"——\n性能评审挂在代码发布流程上，页面通道是盲区。\n→ 排除"评审缺失"的表面归因：评审流程本身有通道盲区。',
+      },
+    },
+    {
+      id: 'a-poolcfg',
+      name: '核对连接池参数的合理性',
+      desc: '40/实例是否放大了事故',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-pool'],
+      hypotheses: [{ id: 'h-pool', status: 'down' }],
+      result: {
+        type: 'text',
+        title: '连接池评估',
+        text: '40/实例 × 20 实例 = 800 = DB 上限——平时合理（标准查询 20ms 用不满）。\n→ 降权为放大器：慢查询出现时"大池子"加速钉死连接；但缩小池子治标——根因是模型没覆盖慢查询场景。',
+      },
+    },
+    {
+      id: 'a-replaycheck',
+      name: '核对压测数据集与 DB 负载',
+      desc: '排除"DB 层没被压过"（loadtest-illusion 同族）',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-replay'],
+      hypotheses: [{ id: 'h-replay', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '数据集核对',
+        text: '压测数据集已真实化（生产采样，B15 整改后）：DB 层 8 万 QPS 下真实承压 3,400 连接。\n→ 排除数据集失真：DB 被"标准流量"真实压过——被漏掉的是"非标准流量"这个维度。',
+      },
+    },
+    {
+      id: 'a-danger',
+      name: '紧急对全站 SQL 加 10ms 执行超时',
+      desc: '【状态变更】DB 代理层 max_execution_time=10ms 全局生效',
+      cost: 1,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '全局超时结果（陷阱动作）',
+        text: '慢查询被掐，连接释放——但大量合法的报表/导出查询同时被掐：\n运营侧批量功能全挂（10ms 对它们等于必死）。10 分钟后被迫撤掉。\n→ 复盘点评：全局超时是霰弹枪——慢查询需要的是"准入治理"，不是"全员处决"。',
+      },
+    },
+    {
+      id: 'a-fixmodel',
+      name: '修复：容量模型补耦合假设',
+      desc: '【状态变更】模型新增慢查询注入维度：压测必含 1% 慢查询流量，断言"连接水位 < 60%"',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '模型 v2',
+        text: '① 压测流量掺入 1% 慢查询（1.4s 模拟）+ 2% 非标准请求\n② 断言升级：QPS 达标 + 连接水位 < 60% + P99 不因注入恶化超 20%\n③ 重跑：同样注入下 2 万 QPS 连接水位 58% ✓——模型第一次"见过"慢查询。',
+      },
+    },
+    {
+      id: 'a-fixgate',
+      name: '沉淀：低代码页面纳入性能门禁',
+      desc: '【状态变更】运营工具生成的页面 SQL 自动 EXPLAIN 断言（阈值同代码 SQL），盲区通道装闸',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '门禁补盲',
+        text: '低代码平台发布流程加装 SQL EXPLAIN 断言（implicit 通道与代码通道同规）。\n事故的准入根源（页面通道盲区）被制度关闭。',
+      },
+    },
+    {
+      id: 'a-fixmodel2',
+      name: '沉淀：容量模型的"假设清单"制度化',
+      desc: '【状态变更】容量模型必须附"假设清单"（标准 SQL/恒定耗时/单一流量源…），每次事故回填新假设',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '假设清单',
+        text: '容量模型文档新增"前提假设"章节（本例四条）+ 事故回填制度：\n每次容量事故 → 找出"模型里没写的假设" → 回填清单 + 设计对应压测维度。\n模型的进化史 = 隐藏假设的曝光史——每炸一次，模型就少一个盲区。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-assumption', text: '容量模型缺"慢查询×连接占用"耦合假设：压测纯净流量下连接水位模型失真——运营低代码页面的 1.4s 慢查询（未过性能评审，页面通道盲区）以 12/s 钉死连接，40 分钟爬满 800 连接池，2 万 QPS 即雪崩', correct: true },
+    { id: 'rc-nonstd', text: '非标准流量绕过性能评审（低代码页面通道盲区）', correct: false },
+    { id: 'rc-pool', text: '连接池 40/实例放大慢查询的连接钉死（放大器）', correct: false },
+    { id: 'rc-replay', text: '压测数据集失真 DB 层未真实检验（B15 已整改，本次排除）', correct: false },
+  ],
+
+  expertCost: 4,
+  restartActionId: 'a-danger',
+
+  expertChain: [
+    {
+      thought: '2 万 QPS 打挂 8 万验证过的系统——差的不是流量，是"系统当时多了一样压测里没有的东西"。先重建连接水位曲线。',
+      update: '水位爬升与慢查询流量精确耦合：12/s × 1.4s 的钉死效应——压测模型里没有这个变量。',
+      actionId: 'a-impact',
+      why: '1⚡︎ 水位重建把"莫名其妙挂了"翻译成"一个新变量进入系统"：连接数与慢查询流量的耦合曲线是本案的物理证据。',
+      conclusion: '嫌疑锁定：模型缺失耦合假设（h-assumption 升权）。',
+    },
+    {
+      thought: '审计容量模型的隐藏假设：模型"默认成立"了哪些前提——逐条与生产对照。',
+      update: '实锤：四条隐藏假设（标准 SQL/恒定耗时/单一流量源/热缓冲）在生产大促日全部被打破。',
+      actionId: 'a-assumptionaudit',
+      why: '2⚡︎ 教学核心：压测验证的是"模型里写了的假设"，它的保护范围止步于此——列出隐藏假设清单，就是把"模型的边界"变成"可审计的对象"。',
+      conclusion: '根因实锤：模型盲区。',
+    },
+    {
+      thought: '慢查询的准入路径追查——它不是"漏评审的代码"，是"不走代码通道的页面"。评审流程有通道盲区。',
+      update: '准入审计确认：低代码页面通道无性能门禁——制度层面的根源。',
+      actionId: 'a-nonstd',
+      why: '1⚡︎ 准入审计把问题从"运营不该传"升级到"通道没闸"——归咎个人防不住下一次，通道装闸才闭环。',
+      conclusion: '制度根源确认。',
+    },
+    {
+      thought: '池参数/数据集各 1⚡︎ 定权排除；全局超时陷阱（霰弹枪）点评；模型 v2 + 门禁补盲 + 假设清单制度。停止收集。',
+      update: '停止。',
+      actionId: '',
+      why: '【停止规则】机制（耦合假设缺失）✓ 准入（通道盲区）✓ 防线（注入维度+假设清单）✓——机制、制度、防线三层闭合。',
+      conclusion: '沉淀：容量模型只保护写进去的假设——每次事故都是一次"隐藏假设曝光"，回填它，模型才进化。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '容量模型只保护"写进模型的假设"：QPS 达标不承诺慢查询场景——没写进模型的耦合，就是大促的爆点。',
+      principle: '假设思维：容量模型必须附"前提假设清单"（标准 SQL/恒定耗时/单一流量源/热缓冲…），每次容量事故回填一条新假设并设计对应压测维度。模型的进化史 = 隐藏假设的曝光史。',
+    },
+    {
+      text: '慢查询与连接数是耦合变量：12/s × 1.4s 的钉死效应，40 分钟爬满 800 连接池——单独看每秒 12 次毫不起眼。',
+      principle: '程序设计：连接水位 = 并发 × 占用时长，慢查询让"占用时长"放大百倍。治理三板斧：慢查询准入 EXPLAIN 门禁（含低代码隐式通道）、连接池收紧、代理层按查询类型分级超时——全局超时是霰弹枪，会误杀合法慢查询。',
+    },
+    {
+      text: '低代码/运营工具是性能门禁的隐式通道：它生成的 SQL 不走代码发布，性能评审天然失明。',
+      principle: '产品思维：性能门禁要覆盖"所有能产生 SQL 的通道"——低代码页面、运营工具、定时任务脚本。通道盲区的危害是双重的：事故前无门禁，事故后还容易被归因为"运营操作失误"——制度要为盲区装闸，而不是为盲区找人负责。',
+    },
+  ],
+}

@@ -1,0 +1,250 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * 第 14 章 · 部署与发布 第七批（缓存预热风暴 L3）
+ * 教学点：程序设计——预热本身是负载：全量预热 × 瞬时并发 = 自我 DDoS；
+ * 预热要有节奏（分级/限速/错峰），与 boot-storm（惊群）同族不同层。
+ * 专家路径：impact(1) + preheatcurve(2) + poolcheck(1) = 4⚡︎
+ */
+export const warmupStormCase: DiagnosisCase = {
+  id: 'warmup-storm',
+  title: '大促前的预热，把缓存系统自己打穿了',
+  intro: '大促前 30 分钟执行缓存预热，缓存集群先于大促挂了——预热风暴：为扛流量准备的动作，自己成了流量。',
+  domain: 'deploy',
+  layer: '预热本身是负载——没有节奏的预热是自我 DDoS',
+  part: 'master',
+  chapterId: 'deployment',
+  order: 6,
+  typeTags: ['capacity', 'cache', 'deploy'],
+  difficulty: 3,
+
+  scene: {
+    role: '你是「鲜到家」大促保障组的缓存负责人，预热脚本启动 90 秒后，缓存集群先倒了。',
+    architecture: '预热集群(10 节点, 200 并发线程) → 缓存集群(6 分片 Redis) → 回源 DB(大促前也在扩容中) ｜ 预热对象: 40 万 SKU 详情',
+    tag: '故障现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '缓存集群状态',
+        text: '预热启动 90s：3 个分片 OOM 重启、2 个分片主从切换、1 个分片幸存。\n连接数：4.8 万（单分片承载设计 8000）——预热客户端连接未复用，每条 SKU 新建连接。',
+      },
+      {
+        type: 'text',
+        title: '预热配置',
+        text: '预热脚本：200 并发 × 全量 40 万 SKU × 每条"查 DB → 写缓存 → 校验读回"三步。\n大促零点倒计时 30 分钟——预热是零点前的最后一步保障。',
+      },
+    ],
+    timeline: '大促 D-day ｜ 19:30 预热启动 ｜ 19:31:30 缓存集群 3/6 分片不可用 ｜ 20:00 大促开场',
+    impactHint: '预热是为了"大促时缓存是热的"——可它把"大促前的缓存系统"压垮了。负载的形状和大促当天有什么不同？',
+  },
+
+  hypotheses: [
+    { id: 'h-storm', text: '预热风暴：200 并发 × 3 步/条 × 无连接复用——瞬时负载超缓存集群容量 6 倍', excludeActionId: 'a-preheatcurve' },
+    { id: 'h-bigkey', text: '个别大 SKU 序列化体积过大，撑爆分片内存（大键问题）', excludeActionId: 'a-bigkeycheck' },
+    { id: 'h-cluster', text: '缓存集群本来就有隐患（内存碎片/主从同步积压），预热只是压垮它', excludeActionId: 'a-clusterhealth' },
+    { id: 'h-race', text: '多副本预热脚本重复执行（同批 SKU 被多节点重复预热）', excludeActionId: 'a-scriptcount' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '给预热流量画一张"负载画像"',
+      desc: '影响面：QPS/连接数/带宽三线与预热脚本参数对账',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '负载画像 vs 集群容量',
+        text: 'QPS：200 并发 × 3 步/条 ≈ 24 万 ops/s（集群设计 4 万）——×6\n连接：200 线程 × 10 节点 × 每步新连接 = 4.8 万（设计 8000/分片）——×6\n分片不均：SKU 按 hash 打到 3 个热分片（另 3 个近乎空闲）——热分片实际 ×12\n→ 三项指标全部 ×6 起、热分片 ×12——这不是"预热有点猛"，是数量级错配。',
+      },
+    },
+    {
+      id: 'a-preheatcurve',
+      name: '解剖预热脚本的三步放大',
+      desc: '每条 SKU 的三步各自贡献多少负载',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-storm'],
+      hypotheses: [{ id: 'h-storm', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: '脚本解剖',
+        text: 'for sku in all_400k:                    ← 200 线程并行\n  conn = new RedisConn()                ← 每条新建连接（无池化）\n  db.query(sku)                         ← 步1：回源（DB 也在扩容中，雪上加霜）\n  redis.set(sku, json)                  ← 步2：写入（1 条）\n  redis.get(sku)                        ← 步3：校验读（1 条）\n→ 每条 SKU = 3 次操作 + 1 次建连；40 万条 = 120 万 ops + 40 万建连\n设计容量 4 万 ops/s 的集群被要求 24 万 ops/s——预热脚本是按"10 个节点的快乐脚本"\n写的，没按"6 分片集群的容量契约"写。实锤。',
+      },
+    },
+    {
+      id: 'a-bigkeycheck',
+      name: '扫描大键分布',
+      desc: '排除大键问题',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-bigkey'],
+      hypotheses: [{ id: 'h-bigkey', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '大键扫描',
+        text: '最大 value 42KB（大促主会场页）——远低于大键阈值；OOM 分片内存曲线与"连接数"而非"数据量"相关。\n→ 排除大键：撑爆的是连接与 ops，不是内存里的数据。',
+      },
+    },
+    {
+      id: 'a-clusterhealth',
+      name: '核对集群扩容前健康基线',
+      desc: '评估"本来就脆弱"的贡献度',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-cluster'],
+      hypotheses: [{ id: 'h-cluster', status: 'down' }],
+      result: {
+        type: 'text',
+        title: '基线评估',
+        text: '预热前集群健康（内存 42%、无主从延迟）——但扩容中（DB/网关都在动）。\n→ 降权为背景：健康集群也扛不住 24 万 ops；脆弱性放大了后果，不是原因。',
+      },
+    },
+    {
+      id: 'a-scriptcount',
+      name: '核对预热脚本的执行副本',
+      desc: '排除多副本重复执行',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-race'],
+      hypotheses: [{ id: 'h-race', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '副本核对',
+        text: '10 个预热节点按 SKU hash 分片认领（无重复执行）。\n→ 排除重复：负载是"设计出来的"，不是"重复出来的"。',
+      },
+    },
+    {
+      id: 'a-danger',
+      name: '紧急终止预热并重启故障分片',
+      desc: '【状态变更】kill 预热脚本 + 分片重启恢复',
+      cost: 1,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '终止结果',
+        text: '预热终止，分片陆续恢复。零点倒计时 22 分钟：缓存命中率 0%——大促开场将 100% 回源 DB。\n→ 止血救了缓存，把风险推给了开场：没有"分级预热"，就只能在"全量压死"和"全空开场"之间二选一。',
+      },
+    },
+    {
+      id: 'a-fixtiered',
+      name: '修复：分级预热 + 连接池 + 容量断言',
+      desc: '【状态变更】核心 10% 优先 / 限速令牌桶 3 万 ops / 连接池化 / 集群容量断言脚本',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '预热 v2',
+        text: '① 分级：Top10% SKU（覆盖 85% 流量）25 分钟内完成；长尾预热与大促并行进行\n② 客户端：连接池化（4.8 万 → 600 连接）+ 令牌桶限速 3 万 ops（集群容量 75%）\n③ 容量断言：预热脚本启动前自检目标集群 ops 余量，不足即降速\n重放：40 万 SKU 预热全程集群 CPU < 60%，零分片故障，开场命中率 71% 且持续爬升。',
+      },
+    },
+    {
+      id: 'a-fixcontract',
+      name: '沉淀：预热是负载，纳入容量契约',
+      desc: '【状态变更】容量契约扩展：预热/压测/批量任务与大促流量共享同一张容量表（呼应 bandwidth-hog）',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '容量契约',
+        text: '容量登记表新增预热行：峰值 ops / 连接数 / 时窗 / 降速策略。\n规范：任何"为保障而生的批量动作"（预热/压测/对账/归档）与大促流量共用容量契约——\n保障动作无契约，就是自我 DDoS。',
+      },
+    },
+    {
+      id: 'a-fixdry',
+      name: '沉淀：预热演练进大促 checklist',
+      desc: '【状态变更】大促 checklist 新增"T-60min 预热彩排"：以 10% 速率试跑，验证脚本与集群契约',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '彩排机制',
+        text: 'T-60min 以 10% 速率试跑预热：脚本负载曲线提前 30 分钟暴露 ×6 错配。\n彩排通过才允许正式预热——保障动作自己也要走演练。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-storm', text: '预热风暴：200 并发 × 每条 3 次操作 × 每条新建连接 × 40 万 SKU = 24 万 ops/s + 4.8 万连接，超集群容量 6 倍且热分片 ×12——预热脚本按"节点视角"编写，未按"集群容量契约"编写', correct: true },
+    { id: 'rc-bigkey', text: '个别大键撑爆分片内存', correct: false },
+    { id: 'rc-cluster', text: '缓存集群既有隐患被预热压垮（背景脆弱性）', correct: false },
+    { id: 'rc-race', text: '多副本脚本重复预热', correct: false },
+  ],
+
+  expertCost: 4,
+  restartActionId: 'a-danger',
+
+  expertChain: [
+    {
+      thought: '"为扛流量准备的动作自己成了流量"——先画负载画像：QPS/连接/带宽三线与脚本参数对账。',
+      update: '三项指标 ×6 起、热分片 ×12——数量级错配，不是参数微调问题。',
+      actionId: 'a-impact',
+      why: '1⚡︎ 负载画像与容量对账是性能类故障的定标动作：×6 的错配排除了"参数调一调"的幻想，直接进入机制解剖。',
+      conclusion: '嫌疑锁定：预热脚本负载模型（h-storm 升权）。',
+    },
+    {
+      thought: '解剖脚本的三步放大：每条 SKU 到底产生多少操作、多少连接。',
+      update: '实锤：3 步 × 40 万 = 120 万 ops + 40 万建连，脚本按节点视角编写、无视集群契约。',
+      actionId: 'a-preheatcurve',
+      why: '2⚡︎ 脚本解剖揭示了负载的"会计学"：写代码的人数的是"条"，集群数的是"操作与连接"——两条账本差 6 倍。预热与压测/批量任务一样，是大促容量表上的正式行项。',
+      conclusion: '根因实锤：负载模型错配。',
+    },
+    {
+      thought: '集群健康 1⚡︎ 定权为背景脆弱性——健康集群也扛不住 ×6，别让"扩容就没修好"带偏修复方向。',
+      update: '降权确认 → 修复落在脚本侧（分级/限速/池化），集群侧仅需恢复。',
+      actionId: 'a-clusterhealth',
+      why: '1⚡︎ 定权防止修复跑偏：把原因归给"集群不行"会引发临时扩容——而 ×6 的错配扩容到 24 万 ops 也是浪费。先定权，再决定钱花在哪。',
+      conclusion: '定权完成 → 排除旁支。',
+    },
+    {
+      thought: '大键/副本各 1⚡︎ 排除；止血陷阱（两难）点评；分级预热 + 容量契约 + 彩排三层落地。停止收集。',
+      update: '停止。',
+      actionId: '',
+      why: '【停止规则】机制（三步放大）✓ 定权（脚本侧）✓ 防线（分级+契约+彩排）✓——机制、定权、防线三层闭合。',
+      conclusion: '沉淀：预热本身是负载——为保障而生的批量动作必须进容量契约，没有节奏的预热是自我 DDoS。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '预热本身是负载：200 并发 × 3 步 × 40 万条 = 24 万 ops/s——为保障而生的批量动作，自己就是一次大促流量。',
+      principle: '程序设计：预热/压测/对账/归档这类"保障性批量任务"必须纳入容量契约（与大促流量共享一张容量表），脚本按"集群容量"而非"节点便利"编写。启动前自检目标系统余量，不足即降速——保障动作无契约就是自我 DDoS。',
+    },
+    {
+      text: '两条账本的差距就是事故的差距：开发数"条"（40 万 SKU），集群数"操作与连接"（120 万 ops + 4.8 万连接）。',
+      principle: '验证思维：负载核算的单位要对齐——应用视角的"一条数据"在基础设施视角是"多次操作+多次连接"。任何批量动作上量前先做单位换算（条 → ops/连接/带宽），换算结果与目标容量断言比较。',
+    },
+    {
+      text: '分级预热破解"全量压死 vs 全空开场"的二选一：Top10% SKU 覆盖 85% 流量——先保开场，长尾并行补。',
+      principle: '产品思维：预热的目标是"开场体验"，不是"全部缓存就位"。按流量贡献分级（头部优先、长尾并行）+ 限速（容量 75%）+ 彩排（10% 试跑暴露错配）三层设计，让保障动作既达目的又不自毁。',
+    },
+  ],
+}

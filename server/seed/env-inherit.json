@@ -1,0 +1,315 @@
+{
+  "id": "env-inherit",
+  "title": "测试全绿，预发炸了：默认值的三个世界",
+  "intro": "新功能测试环境全绿、预发炸了：同一个\"默认开启\"——三个环境的默认值根本是三个答案。",
+  "domain": "build",
+  "layer": "配置继承链是隐式契约——默认值在不同环境可以不同，这是全绿的最大盲区",
+  "part": "master",
+  "chapterId": "testing",
+  "order": 8,
+  "typeTags": [
+    "testing",
+    "config",
+    "process"
+  ],
+  "difficulty": 3,
+  "scene": {
+    "role": "你是「鲜到家」结算服务的负责人，\"测试全绿\"与\"预发炸了\"同时出现在发版报告里。",
+    "architecture": "新功能\"阶梯服务费\"：feature 开关 + 费率表（配置中心未录入时走代码默认值）｜ 三环境：本地(yml 默认) / 测试(配置中心 test 命名空间) / 预发(配置中心 prod 命名空间)",
+    "tag": "故障现场",
+    "symptoms": [
+      {
+        "type": "error",
+        "title": "预发现场",
+        "text": "阶梯服务费在预发对全部订单生效——费率表为空时按\"全额收费\"兜底（代码默认）。\n测试环境同样的代码：费率表为空时走\"免收\"分支（yml 默认 enabled=false）。"
+      },
+      {
+        "type": "text",
+        "title": "测试报告",
+        "text": "单测 100% 通过、测试环境回归 23 用例全绿——\n全部验证的是\"费率表为空 → 不收费\"这条链。没有任何一个环境验证过\"费率表为空 → 全额收费\"。"
+      }
+    ],
+    "timeline": "阶梯服务费昨天上线预发（大促后生效设计）｜ 预发冒烟发现全订单被收费 ｜ 代码三个环境完全一致",
+    "impactHint": "同一份代码、同一条\"费率表为空\"的路径，三个环境走出了三个世界——\"默认值\"是谁定义的？"
+  },
+  "hypotheses": [
+    {
+      "id": "h-inherit",
+      "text": "配置继承链断裂：yml 默认(enabled=false)只在本地/测试生效，预发的 prod 命名空间覆盖为 true——三个默认值三个世界",
+      "excludeActionId": "a-inherittrace"
+    },
+    {
+      "id": "h-race",
+      "text": "预发的费率表配置被其他团队改动（非默认值问题，是数据问题）",
+      "excludeActionId": "a-rateaudit"
+    },
+    {
+      "id": "h-build",
+      "text": "预发部署了不同构建（feature 分支未合并）",
+      "excludeActionId": "a-artifactcheck"
+    },
+    {
+      "id": "h-gray",
+      "text": "预发流量被灰度规则全量命中新功能",
+      "excludeActionId": "a-graycheck"
+    }
+  ],
+  "actions": [
+    {
+      "id": "a-impact",
+      "name": "三环境\"同路径\"行为矩阵",
+      "desc": "影响面：同一输入（费率表为空）在三环境的输出",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "code",
+        "title": "行为矩阵（输入：费率表为空）",
+        "text": "本地：   阶梯费 = 关（enabled=false，yml 默认）→ 免收\n测试：   阶梯费 = 关（test 命名空间同样无键 → yml 默认）→ 免收\n预发：   阶梯费 = 开（prod 命名空间 feature.enabled=true 残留）→ 走空费率表 → 全额兜底\n→ 全绿的每一项都在\"关\"的世界验证；预发活在\"开\"的世界——两边的\"空表\"行为根本不同。"
+      }
+    },
+    {
+      "id": "a-inherittrace",
+      "name": "追踪 enabled 键的三环境继承链",
+      "desc": "这个键在每个环境的\"最终值\"从哪一层来",
+      "cost": 2,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-inherit"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-inherit",
+          "status": "confirmed"
+        }
+      ],
+      "result": {
+        "type": "code",
+        "title": "继承链追踪",
+        "text": "本地：   yml 默认 enabled=false（代码写的）→ 生效\n测试：   test 命名空间无此键 → 回落 yml false → 生效\n预发：   prod 命名空间 feature.enabled=true ← 上个大促的\"全场收费\"实验残留，从未清理！\n→ 继承链断裂点：prod 命名空间的实验残留键。三个环境的\"默认值\"来自三层不同的历史。"
+      }
+    },
+    {
+      "id": "a-smokematrix",
+      "name": "审计冒烟用例的环境覆盖",
+      "desc": "23 个全绿用例验证的是哪个世界",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "覆盖审计",
+        "text": "23 用例全部在测试环境执行——它们验证\"关\"的世界；\n预发冒烟仅验证服务存活（不验业务语义）——\"开\"的世界零验证。\n→ 全绿 = \"一个世界全绿\"。环境维度是测试覆盖的盲区维度。"
+      }
+    },
+    {
+      "id": "a-rateaudit",
+      "name": "核对预发费率表变更记录",
+      "desc": "排除数据被改",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-race"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-race",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "费率表核对",
+        "text": "费率表 90 天无变更（本来就是空的——阶梯费设计为\"大促后才录入\"）。\n→ 排除数据问题：空表是设计态，错的不是表，是\"空表时的语义\"。"
+      }
+    },
+    {
+      "id": "a-artifactcheck",
+      "name": "核对预发构建产物",
+      "desc": "排除版本差异",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-build"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-build",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "产物核对",
+        "text": "三环境同一镜像 hash。\n→ 排除构建：代码相同，世界的差异全部来自配置继承。"
+      }
+    },
+    {
+      "id": "a-graycheck",
+      "name": "核对预发灰度规则",
+      "desc": "排除灰度全量命中",
+      "cost": 1,
+      "gain": "low",
+      "danger": false,
+      "effects": [],
+      "tests": [
+        "h-gray"
+      ],
+      "hypotheses": [
+        {
+          "id": "h-gray",
+          "status": "excluded"
+        }
+      ],
+      "result": {
+        "type": "text",
+        "title": "灰度核对",
+        "text": "预发无灰度体系（预发即全量）——灰度假设不成立。\n→ 排除灰度。"
+      }
+    },
+    {
+      "id": "a-danger",
+      "name": "紧急在预发 prod 命名空间强制写入 enabled=false",
+      "desc": "【状态变更】配置中心覆盖实验残留键",
+      "cost": 1,
+      "gain": "none",
+      "danger": true,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "覆盖结果",
+        "text": "预发恢复\"免收\"行为——冒烟转绿。\n但残留键仍在 prod 命名空间（只是被显式覆盖）：下个功能若读同一键，\n又会继承这个\"实验尸体\"。清理债被记下但没清。\n→ 复盘点评：覆盖残留是止痛——删除残留才是清创。"
+      }
+    },
+    {
+      "id": "a-fixdefault",
+      "name": "修复：默认值语义统一 + 残留清理",
+      "desc": "【状态变更】代码默认值改为\"安全态\"（未配置=不收费）；prod 命名空间实验残留键删除",
+      "cost": 1,
+      "gain": "high",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "修复结果",
+        "text": "① 代码默认值反转：feature 未配置 → 不收费（安全态）——任何环境的\"未配置\"都是安全的\n② prod 命名空间的实验残留键删除（非覆盖）\n③ 费率表录入流程明确：\"录入费率表\"与\"开启功能\"分两步，各有环境清单。"
+      }
+    },
+    {
+      "id": "a-fixmatrix",
+      "name": "沉淀：三环境行为断言矩阵",
+      "desc": "【状态变更】新功能发布检查新增\"环境×语义\"断言：同一输入在三环境的预期输出表，预发冒烟执行",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "断言矩阵",
+        "text": "发布检查单新增：新功能的关键输入 × 三环境预期输出表（含\"配置缺失\"行）——\n预发冒烟按矩阵逐格断言。\"全绿\"从此必须回答：绿的是哪个世界。"
+      }
+    },
+    {
+      "id": "a-fixhygiene",
+      "name": "沉淀：配置命名空间卫生制度",
+      "desc": "【状态变更】prod 命名空间实验键强制 TTL（30 天自动回收）+ 季度残留审计（呼应 priority-clash）",
+      "cost": 1,
+      "gain": "mid",
+      "danger": false,
+      "effects": [],
+      "tests": [],
+      "hypotheses": [],
+      "result": {
+        "type": "text",
+        "title": "卫生制度",
+        "text": "① 实验类配置键写入 prod 命名空间必须带 TTL（30 天自动回收+通知）\n② 季度残留审计：prod 命名空间全量键盘点（归属/用途/最后读取时间）\n→ 呼应 priority-clash 的来源审计：多源是债，残留也是债——配置的债要像代码一样还。"
+      }
+    }
+  ],
+  "rootCauses": [
+    {
+      "id": "rc-inherit",
+      "text": "配置继承链断裂：feature.enabled 的代码默认(false)只在本地/test 生效，预发的 prod 命名空间存在上个大促实验残留(true)——三个环境的\"默认值\"来自三层不同的历史，测试全绿只覆盖\"关\"的世界",
+      "correct": true
+    },
+    {
+      "id": "rc-rate",
+      "text": "预发费率表被其他团队改动（实为设计态空表）",
+      "correct": false
+    },
+    {
+      "id": "rc-build",
+      "text": "预发部署了不同构建产物",
+      "correct": false
+    },
+    {
+      "id": "rc-gray",
+      "text": "预发流量灰度全量命中",
+      "correct": false
+    }
+  ],
+  "expertCost": 4,
+  "restartActionId": "a-danger",
+  "expertChain": [
+    {
+      "thought": "\"测试全绿预发炸了\"且代码相同——先建三环境同路径行为矩阵：同一输入各自走到哪。",
+      "update": "同一\"空费率表\"输入：本地免收、预发全额——两个世界对\"空\"的语义不同。",
+      "actionId": "a-impact",
+      "why": "1⚡︎ 行为矩阵把\"环境差异\"从一句抱怨变成一格一格的对照——差异格就是断点所在的层。",
+      "conclusion": "嫌疑锁定：配置继承链（h-inherit 升权）。"
+    },
+    {
+      "thought": "追踪 enabled 键的三环境继承链——每个环境的最终值从哪一层来。",
+      "update": "实锤：prod 命名空间的大促实验残留键（true）从未清理——三个默认值来自三层历史。",
+      "actionId": "a-inherittrace",
+      "why": "2⚡︎ 教学核心：配置继承链是隐式契约——\"代码默认值\"只是三层合并中最弱的一层，任何环境层的残留都会改写它。全绿验证的只是\"测试环境那条链\"。",
+      "conclusion": "根因实锤：继承链残留。"
+    },
+    {
+      "thought": "费率表/产物/灰度三个常规嫌疑各 1⚡︎ 排除——尤其\"数据被改\"是环境类故障的第一直觉。",
+      "update": "空表是设计态、镜像一致、无灰度——排除完毕，嫌疑收敛单点。",
+      "actionId": "a-rateaudit",
+      "why": "1⚡︎ 第一直觉的排除要最先做：配置类故障大家第一反应是\"谁改了配置\"——用变更审计回答它，讨论才能回到结构层面。",
+      "conclusion": "嫌疑收敛单点。"
+    },
+    {
+      "thought": "止血（覆盖残留）、修复（安全默认值+删除残留）、防线（行为矩阵+命名空间卫生）。停止收集。",
+      "update": "停止。",
+      "actionId": "",
+      "why": "【停止规则】机制（继承链残留）✓ 语义（空表行为的双世界）✓ 防线（矩阵断言+卫生制度）✓——个案、语义、防线三层闭合。",
+      "conclusion": "沉淀：配置继承链是隐式契约——默认值在不同环境可以不同；行为断言必须三环境跑同一份，全绿要回答\"绿的是哪个世界\"。"
+    }
+  ],
+  "lessons": [
+    {
+      "text": "配置继承链是隐式契约：代码默认值只是三层合并中最弱的一层——任何环境层的残留都会改写它。",
+      "principle": "验证思维：新功能的\"未配置行为\"要在每个环境显式验证，不能默认\"没配置就是代码里的那个默认\"。环境层的实验残留（上个大促的开关）是继承链断裂最常见的炸点——呼应 priority-clash：多源与残留都是配置的债。"
+    },
+    {
+      "text": "\"测试全绿\"必须回答：绿的是哪个世界？——23 个用例验证\"关\"的世界，预发活在\"开\"的世界，全绿与炸裂同时为真。",
+      "principle": "验证思维：环境维度是测试覆盖的盲区维度。发布检查新增\"环境×语义\"断言矩阵（关键输入 × 三环境预期输出，含配置缺失行），预发冒烟按矩阵逐格执行——语义级冒烟，不是存活级冒烟。"
+    },
+    {
+      "text": "代码默认值必须是\"安全态\"：任何环境未配置时的行为 = 不收费、不开启、不放大——未配置是常态而非异常。",
+      "principle": "程序设计：默认值的方向性是安全设计——feature 未配置走\"关闭/免费/保守\"分支，让配置缺失的爆炸半径为零。残留清理是清创（删除），覆盖是止痛（改写）——止血后必须清创，否则残留键继续祸害下一个功能。"
+    }
+  ]
+}

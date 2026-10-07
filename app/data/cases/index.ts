@@ -124,6 +124,14 @@ import { errorContractCase } from './error-contract'
 import { contractReviewCase } from './contract-review'
 import { profileMazeCase } from './profile-maze'
 import { bootStormCase } from './boot-storm'
+import { rollbackDriftCase } from './rollback-drift'
+import { warmupStormCase } from './warmup-storm'
+import { partitionSplitCase } from './partition-split'
+import { replaySurgeCase } from './replay-surge'
+import { mtuBlackholeCase } from './mtu-blackhole'
+import { geoStaleCase } from './geo-stale'
+import { envInheritCase } from './env-inherit'
+import { capacityAssumptionCase } from './capacity-assumption'
 
 /** 案例注册表：新案例入库 = 在此数组追加 */
 export const ALL_CASES: DiagnosisCase[] = [
@@ -250,6 +258,14 @@ export const ALL_CASES: DiagnosisCase[] = [
   contractReviewCase,
   profileMazeCase,
   bootStormCase,
+  rollbackDriftCase,
+  warmupStormCase,
+  partitionSplitCase,
+  replaySurgeCase,
+  mtuBlackholeCase,
+  geoStaleCase,
+  envInheritCase,
+  capacityAssumptionCase,
 ]
 
 export function getCaseById(id: string): DiagnosisCase | null {

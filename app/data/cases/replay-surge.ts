@@ -1,0 +1,250 @@
+import { DiagnosisCase } from '../../types/case'
+
+/**
+ * 第 13 章 · 消息与异步 第七批（死信重放风暴 L3）
+ * 教学点：验证思维——重放不是"把消息再发一遍"：幂等时间窗、下游容量、旧消息的时效语义，
+ * 三者任何一个过期的重放都是二次事故。
+ * 专家路径：impact(1) + idemaudit(2) + downstreamcap(1) = 4⚡︎
+ */
+export const replaySurgeCase: DiagnosisCase = {
+  id: 'replay-surge',
+  title: '死信重放把生产系统炸了',
+  intro: '修复后重放 3 万条死信，10 分钟内生产下单接口雪崩——重放的每一条都是"合法的历史"，合起来是洪水。',
+  domain: 'runtime',
+  layer: '重放是全量负载注入——幂等窗口、下游容量、时效语义都要在重放前对表',
+  part: 'master',
+  chapterId: 'messaging',
+  order: 7,
+  typeTags: ['messaging', 'capacity', 'data'],
+  difficulty: 3,
+
+  scene: {
+    role: '你是「鲜到家」积分平台的负责人，一次"修复性重放"让大促前的系统雪上加霜。',
+    architecture: '积分平台：死信队列(3 万条积分发放失败消息) → 重放工具(批量推送) → 积分服务 → 积分 DB ｜ 同机群: 下单主链路',
+    tag: '故障现场',
+    symptoms: [
+      {
+        type: 'error',
+        title: '重放后雪崩',
+        text: '19:00 重放 3 万条死信（限速 100/s）→ 19:05 下单接口 P99 从 120ms → 4.2s，错误率 14%。\n积分服务 DB 连接池满；同机群的下单主链路被拖垮（共享 DB 实例）。',
+      },
+      {
+        type: 'text',
+        title: '更糟的发现',
+        text: '重放的 3 万条里 2.7 万条其实早已人工补发过积分——重复发放 8.1 万积分（资损）。\n死信是三个月累积的：最早一条的"幂等窗口"早已过期。',
+      },
+    ],
+    timeline: '死信积压三个月（历史遗留）｜ 昨天修复了当初的格式 bug，今天决定重放 ｜ 大促 3 天后 ｜ 重放限速 100/s（"感觉挺保守"）',
+    impactHint: '每一条死信单独看都合法，合起来是洪水——重放前要对哪些表？限速 100/s 又是对谁的 100/s？',
+  },
+
+  hypotheses: [
+    { id: 'h-idemwindow', text: '幂等时间窗过期：重放消息的幂等键已出窗，历史补发的积分被二次发放', excludeActionId: 'a-idemaudit' },
+    { id: 'h-capacity', text: '重放负载挤占共享 DB：100/s 重放 × 每条 5 次查询打满共享实例', excludeActionId: 'a-dbnorm' },
+    { id: 'h-stale', text: '部分死信已失效（订单已退款/用户已注销），重放产生非法发放', excludeActionId: 'a-stalecheck' },
+    { id: 'h-bugremain', text: '当初的格式 bug 未真正修复，重放再次失败堆积', excludeActionId: 'a-fixverify' },
+  ],
+
+  actions: [
+    {
+      id: 'a-impact',
+      name: '给重放建立三层影响账',
+      desc: '影响面：负载账 / 资损账 / 时效账',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'code',
+        title: '三层账本',
+        text: '负载账：100/s 重放 × 每条 5 次 DB 查询（幂等查/用户查/规则查/发放/流水）= 500 QPS 直击共享 DB\n资损账：抽样 200 条 → 90% 已人工补发过 → 估算重复发放 8.1 万积分\n时效账：死信跨 90 天，含已退款订单 1,300 单（重放将发放"已退款的积分"）\n→ 三本账各自都是红灯：这次重放没有对过任何一张表。',
+      },
+    },
+    {
+      id: 'a-idemaudit',
+      name: '审计幂等窗口与死信年龄的匹配',
+      desc: '幂等键的 TTL 是多久、死信最老多老',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: ['h-idemwindow'],
+      hypotheses: [{ id: 'h-idemwindow', status: 'confirmed' }],
+      result: {
+        type: 'code',
+        title: '幂等窗口审计',
+        text: '幂等表：唯一键 (msgId)，TTL 7 天（防重放设计的标准窗口）\n死信年龄分布：7 天内 8% / 8~30 天 24% / 30~90 天 68%\n→ 92% 的重放消息幂等键已过期：DB 里查不到防重记录，重复发放畅通无阻。\n"防重放设计"防的是 7 天内的重放——三个月的死信在它的防御圈外。',
+      },
+    },
+    {
+      id: 'a-dbnorm',
+      name: '核算重放的真实 DB 负载',
+      desc: '"限速 100/s"限的是消息，不是查询',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-capacity'],
+      hypotheses: [{ id: 'h-capacity', status: 'down' }],
+      result: {
+        type: 'text',
+        title: '负载换算',
+        text: '"100/s 挺保守"是消息速率：换算 DB 侧 = 500 QPS，且与下单主链路共享实例（大促前容量余量 20%）。\n每条 5 查询中 3 次是幂等/用户维度查询（无法缓存）。\n→ 降权为并列主因：负载账与资损账双双红灯——重放前任何一张表没对，都不该按下按钮。',
+      },
+    },
+    {
+      id: 'a-stalecheck',
+      name: '抽验死信的时效有效性',
+      desc: '三个月的死信里有多少已"失去发放资格"',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: ['h-stale'],
+      hypotheses: [{ id: 'h-stale', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '时效抽验',
+        text: '抽样 200 条：已退款订单 9 条（4.5%）、注销用户 2 条——时效失效占比小但后果不可逆（积分发出无法收回）。\n→ 排除为主要根因，但确认"重放前必须过滤失效死信"的必要性。',
+      },
+    },
+    {
+      id: 'a-fixverify',
+      name: '核对当初 bug 的修复状态',
+      desc: '排除"重放会再失败"——修复是否真的生效',
+      cost: 1,
+      gain: 'low',
+      danger: false,
+      effects: [],
+      tests: ['h-bugremain'],
+      hypotheses: [{ id: 'h-bugremain', status: 'excluded' }],
+      result: {
+        type: 'text',
+        title: '修复核对',
+        text: '格式 bug 已修复并验证（昨天用 10 条新消息实测通过）——重放本身会成功，\n问题在"成功之后"：重复发放与负载。修复有效 ≠ 重放无害。',
+      },
+    },
+    {
+      id: 'a-danger',
+      name: '紧急中止重放并回滚已发积分',
+      desc: '【状态变更】kill 重放任务 + 按 msgId 回滚 8.1 万重复积分',
+      cost: 1,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '中止结果',
+        text: '重放中止（已发出 1.1 万条）；重复积分按 msgId 冲正回收 7.2 万（其余用户已消费，挂账）。\n下单 P99 逐步恢复 300ms。\n→ 止血完成，但"三个月的死信怎么安全清掉"仍是悬而未决的问题。',
+      },
+    },
+    {
+      id: 'a-fixgate',
+      name: '修复：重放前三张表门禁',
+      desc: '【状态变更】重放工具强制预检：幂等窗口表 / 下游容量表 / 时效过滤表，任一红灯禁止启动',
+      cost: 2,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '门禁 v2',
+        text: '重放工具新增预检三表：\n① 幂等窗口表：死信年龄分布 vs 幂等 TTL——超窗占比 > 0 即要求"先补幂等记录"\n② 容量表：换算后的 DB/下游 QPS vs 当前余量（含共享链路）\n③ 时效表：已退款/注销死信自动过滤\n预检通过才允许设定速率（默认目标容量 30%）。',
+      },
+    },
+    {
+      id: 'a-fixidem',
+      name: '沉淀：死信重放的标准流程',
+      desc: '【状态变更】SOP：补写幂等记录（重放前按 msgId 预插防重表）→ 影子重放 → 分级限速 → 对账',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '重放 SOP',
+        text: '① 预插幂等记录：重放前把全部 msgId 预写防重表（窗口外也防重）\n② 影子重放：全量走 dry-run 模式，只输出"将产生的影响清单"人工抽验\n③ 分级限速：按目标系统余量动态调速（非固定值）\n④ 完成对账：发放数 vs 重放数 vs 预期数三方核对。',
+      },
+    },
+    {
+      id: 'a-fixdrain',
+      name: '沉淀：死信队列的"排水制度"',
+      desc: '【状态变更】死信按周排水（不让它积压三个月）+ 重放预检制度化——杜绝"三个月的雷一次排"',
+      cost: 1,
+      gain: 'mid',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '排水制度',
+        text: '死信排水排班：每周处理当周死信（重放或人工），积压 > 7 天告警。\n——本案例的真正教训：三个月不排水的死信队列，重放那天每一颗都是过期的雷。\n呼应 mq-disk：只进不出的死信，堆的不只是磁盘，还有时效炸弹。',
+      },
+    },
+  ],
+
+  rootCauses: [
+    { id: 'rc-idemwindow', text: '重放绕过幂等防御：幂等表 TTL 7 天而死信积压 90 天——92% 重放消息防重键过期，2.7 万条重复发放 8.1 万积分；重放负载（500 QPS 直击共享 DB）为并列主因，下单主链路 P99 120ms→4.2s', correct: true },
+    { id: 'rc-capacity', text: '重放 DB 负载挤占共享实例（并列主因：100/s 消息 = 500 QPS 查询）', correct: false },
+    { id: 'rc-stale', text: '已退款/注销死信被重放产生非法发放（4.5%，时效过滤缺失）', correct: false },
+    { id: 'rc-bugremain', text: '格式 bug 未真正修复，重放再次失败', correct: false },
+  ],
+
+  expertCost: 4,
+  restartActionId: 'a-danger',
+
+  expertChain: [
+    {
+      thought: '重放出的问题要算三本账：负载账（打垮了谁）、资损账（重复发了什么）、时效账（有多少已失效）。',
+      update: '三本账全部红灯：500 QPS 直击共享 DB、90% 重复补发、4.5% 失效死信——这次重放没对过任何一张表。',
+      actionId: 'a-impact',
+      why: '1⚡︎ 三层账本是重放类操作的完整评估框架：只算负载会漏资损，只算资损会漏雪崩——三账齐审才算"重放前评估"。',
+      conclusion: '双主因并行（h-idemwindow / h-capacity 同升）。',
+    },
+    {
+      thought: '幂等窗口审计是第一优先：防重设计防的是"多久内的重放"，三个月的死信在不在防御圈里。',
+      update: '实锤：幂等 TTL 7 天 vs 死信 90 天——92% 的重放消息在防御圈外，重复发放畅通无阻。',
+      actionId: 'a-idemaudit',
+      why: '2⚡︎ 教学核心："防重放设计"是有时效的防御——幂等表 TTL 只覆盖它设计时预期的重放时距。跨时效的操作（重放旧死信/历史数据修复）必须重建防御（预插幂等记录），而不是信任已有的表。',
+      conclusion: '资损机制实锤。',
+    },
+    {
+      thought: '负载换算戳破"100/s 挺保守"：限速限的是消息，DB 收到的是查询——单位换算定权第二主因。',
+      update: '100/s × 5 查询 = 500 QPS vs 大促前余量 20%——负载账独立成立，与资损账并列。',
+      actionId: 'a-dbnorm',
+      why: '1⚡︎ 单位换算是"保守感觉"的照妖镜：限速值的说服力来自它限的维度——消息/s 与查询/s 之间隔着每条 5 次查询的放大。保守要保守在最终受害资源的单位上。',
+      conclusion: '双主因定案 → 排除时效主导。',
+    },
+    {
+      thought: '时效抽验确认过滤必要性、修复核对排除"白做"、止血+三表门禁+SOP+排水制度。停止收集。',
+      update: '停止。',
+      actionId: '',
+      why: '【停止规则】机制（幂等过期+负载）✓ 时效（过滤缺失）✓ 防线（三表门禁+SOP+排水）✓——机制、时效、防线三层闭合。',
+      conclusion: '沉淀：重放是全量负载注入——幂等窗口、下游容量、时效语义三表全对，才配按下按钮。',
+    },
+  ],
+
+  lessons: [
+    {
+      text: '"防重放设计"是有时效的防御：幂等表 TTL 7 天，三个月的死信重放在防御圈之外——跨时效操作必须重建防御。',
+      principle: '验证思维：幂等/去重/限流这些防御机制都有隐含的时效假设（重放会发生在 N 天内）。跨时效的操作（历史死信重放/老数据修复/迁移回灌）必须先重建防御：预插幂等记录，让"窗口外的重放"也落在防御圈内。',
+    },
+    {
+      text: '限速限的是消息，DB 收到的是查询："100/s 挺保守"要对最终受害资源的单位换算后才成立。',
+      principle: '验证思维：任何速率承诺都要做单位换算——消息/s × 每条操作数 = 真实负载。重放限速应按"目标资源余量的 30%"动态计算，而不是按"感觉保守"的整数。',
+    },
+    {
+      text: '只进不出的死信队列，堆的不只是消息，还有时效炸弹：三个月不排水，重放那天每一条都是过期的雷。',
+      principle: '沉淀思维：死信排水制度（每周处理当周死信，积压 > 7 天告警）与 mq-disk 的排水呼应——队列的两种堆积（磁盘与时效）都源于"只进不出"。修复性重放是排水的最后手段，制度化的周排水才是正解。',
+    },
+  ],
+}
