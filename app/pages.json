@@ -84,6 +84,12 @@
         "navigationStyle": "custom",
         "navigationBarTitleText": "编辑资料"
       }
+    },
+    {
+      "path": "pages/submit/submit"
+    },
+    {
+      "path": "pages/mysubmissions/mysubmissions"
     }
   ],
   "globalStyle": {

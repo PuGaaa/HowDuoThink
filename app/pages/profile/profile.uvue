@@ -55,6 +55,17 @@
         <text class="entryrow__v">生成分享</text>
       </view>
 
+      <view class="entryrow" @click="goSubmit">
+        <image class="entryrow__icon" src="/static/icons/star-lemon.png" mode="aspectFit"></image>
+        <text class="entryrow__label">投稿出题</text>
+        <text class="entryrow__v">把你的坑变成关卡</text>
+      </view>
+      <view class="entryrow" @click="goMySubmissions">
+        <image class="entryrow__icon" src="/static/icons/pen-coral.png" mode="aspectFit"></image>
+        <text class="entryrow__label">我的投稿</text>
+        <text class="entryrow__v">查看状态</text>
+      </view>
+
       <!-- 通用 -->
       <text class="sec">通用</text>
       <view v-for="(row, i) in rows" :key="'r' + i" class="row" @click="onRow(row.label, row.value)">
@@ -172,6 +183,14 @@ function goHandbook() {
 
 function goPoster() {
   uni.navigateTo({ url: '/pages/post/post' })
+}
+
+function goSubmit() {
+  uni.navigateTo({ url: '/pages/submit/submit' })
+}
+
+function goMySubmissions() {
+  uni.navigateTo({ url: '/pages/mysubmissions/mysubmissions' })
 }
 
 function onLogin() {

@@ -1,0 +1,315 @@
+<template>
+  <view class="page">
+    <view class="content">
+      <view class="head">
+        <text class="head__title">投稿出题</text>
+        <text class="head__sub">把你踩过的坑变成所有人的关卡——编辑会把它改造成正式案例</text>
+      </view>
+
+      <view v-if="!loggedIn" class="nologin">
+        <text class="nologin__text">投稿需要登录（编辑才能联系到你）</text>
+        <view class="nologin__btn" @click="goLogin">
+          <text class="nologin__btn-text">去登录</text>
+        </view>
+      </view>
+
+      <template v-else>
+        <view class="field">
+          <text class="field__label">标题 · 一句话概括这个坑</text>
+          <input class="field__input" :value="title" :maxlength="40" placeholder="例：改了个超时配置，雪崩了半个机房" @input="onTitle" />
+          <text class="field__hint">{{ title.length }}/40</text>
+        </view>
+
+        <view class="field">
+          <text class="field__label">症状 · 什么时候发生？谁能看到？影响谁？</text>
+          <textarea class="field__area" :value="symptom" :maxlength="1200" placeholder="例：每天凌晨 2 点起，部分用户下单报错；重启后恢复几小时又复发……" @input="onSymptom" />
+          <text class="field__hint">{{ symptom.length }}/1200</text>
+        </view>
+
+        <view class="field">
+          <text class="field__label">关键报错（选填，但很值钱）</text>
+          <textarea class="field__area field__area--code" :value="keyError" :maxlength="600" placeholder="粘贴最关键的那几行报错/日志" @input="onKeyError" />
+          <text class="field__hint">{{ keyError.length }}/600</text>
+        </view>
+
+        <view class="field">
+          <text class="field__label">时间线（选填）· 何时开始、与什么变更相关</text>
+          <input class="field__input" :value="timeline" :maxlength="300" placeholder="例：上周四发版后开始，与流量峰值无关" @input="onTimeline" />
+        </view>
+
+        <view class="field">
+          <text class="field__label">解决过程 · 按时间顺序：做了什么 → 看到什么 → 结论</text>
+          <textarea class="field__area" :value="resolution" :maxlength="2400" placeholder="例：先看了错误日志，发现是连接池耗尽；然后查了慢查询，找到一条没走索引的 SQL……" @input="onResolution" />
+          <text class="field__hint">{{ resolution.length }}/2400</text>
+        </view>
+
+        <view class="field">
+          <text class="field__label">经验教训（最多 3 条，每条一句话）</text>
+          <view v-for="(ls, i) in lessons" :key="'l' + i" class="lessonrow">
+            <input class="field__input" :value="ls" :maxlength="80" :placeholder="'教训 ' + (i + 1) + '：一句话说透'" @input="onLesson(i, $event)" />
+            <view v-if="lessons.length > 1" class="lessonrow__del" @click="delLesson(i)">
+              <text class="lessonrow__del-text">×</text>
+            </view>
+          </view>
+          <view v-if="lessons.length < 3" class="lessonrow__add" @click="addLesson">
+            <text class="lessonrow__add-text">+ 加一条</text>
+          </view>
+        </view>
+
+        <view class="field">
+          <text class="field__label">领域（帮编辑分到对的章）</text>
+          <view class="chips">
+            <view v-for="(dm, i) in domains" :key="'d' + i" :class="domainHint === dm.v ? 'chip chip--on' : 'chip'" @click="domainHint = dm.v">
+              <text :class="domainHint === dm.v ? 'chip__text chip__text--on' : 'chip__text'">{{ dm.label }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view :class="busy ? 'submitbtn submitbtn--busy' : 'submitbtn'" @click="doSubmit">
+          <text class="submitbtn__text">{{ busy ? '提交中…' : '提交投稿' }}</text>
+        </view>
+        <text class="foot">提交后进入编辑审核；被采纳的投稿会署名并转化为正式关卡。</text>
+      </template>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue'
+import { isLoggedIn } from '../../utils/auth'
+import { API_BASE } from '../../config'
+import { getToken } from '../../utils/auth'
+
+const loggedIn = ref(isLoggedIn())
+const title = ref('')
+const symptom = ref('')
+const keyError = ref('')
+const timeline = ref('')
+const resolution = ref('')
+const lessons = ref<string[]>([''])
+const domainHint = ref('')
+const busy = ref(false)
+const errMsg = ref('')
+
+const domains = [
+  { v: 'network', label: '接入/网络' },
+  { v: 'build', label: '构建/前端' },
+  { v: 'data', label: '数据/DB' },
+  { v: 'runtime', label: '运行时' },
+  { v: 'concurrency', label: '并发' },
+  { v: 'deploy', label: '部署/配置' },
+]
+
+function onTitle(e: any) { title.value = e.detail.value }
+function onSymptom(e: any) { symptom.value = e.detail.value }
+function onKeyError(e: any) { keyError.value = e.detail.value }
+function onTimeline(e: any) { timeline.value = e.detail.value }
+function onResolution(e: any) { resolution.value = e.detail.value }
+function onLesson(i: number, e: any) { lessons.value[i] = e.detail.value }
+function addLesson() { if (lessons.value.length < 3) lessons.value.push('') }
+function delLesson(i: number) { lessons.value.splice(i, 1) }
+
+function goLogin() {
+  uni.navigateTo({ url: '/pages/login/login' })
+}
+
+function doSubmit() {
+  if (busy.value) return
+  if (title.value.trim().length < 4) { errMsg.value = '标题至少 4 个字'; toast(errMsg.value); return }
+  if (symptom.value.trim().length < 10) { errMsg.value = '症状描述至少 10 个字'; toast(errMsg.value); return }
+  if (resolution.value.trim().length < 10) { errMsg.value = '解决过程至少 10 个字'; toast(errMsg.value); return }
+  const ls = lessons.value.filter((x) => x.trim().length > 0)
+  if (ls.length === 0) { errMsg.value = '至少写一条经验教训'; toast(errMsg.value); return }
+  busy.value = true
+  uni.request({
+    url: API_BASE + '/api/submissions',
+    method: 'POST',
+    header: { Authorization: 'Bearer ' + getToken(), 'Content-Type': 'application/json' } as any,
+    data: {
+      title: title.value.trim(),
+      symptom: symptom.value.trim(),
+      resolution: resolution.value.trim(),
+      keyError: keyError.value.trim().length > 0 ? keyError.value.trim() : null,
+      timeline: timeline.value.trim().length > 0 ? timeline.value.trim() : null,
+      lessons: ls,
+      stackTags: [],
+      domainHint: domainHint.value.length > 0 ? domainHint.value : null,
+    } as any,
+    timeout: 8000,
+    success: (res) => {
+      busy.value = false
+      if (res.statusCode === 200) {
+        uni.showToast({ title: '投稿成功，等待编辑审核', icon: 'none' })
+        setTimeout(() => { uni.navigateBack({}) }, 900)
+        return
+      }
+      errMsg.value = '提交失败（' + res.statusCode + '）'
+      toast(errMsg.value)
+    },
+    fail: () => {
+      busy.value = false
+      errMsg.value = '无法连接社区服务'
+      toast(errMsg.value)
+    },
+  })
+}
+
+function toast(t: string) {
+  uni.showToast({ title: t, icon: 'none' })
+}
+</script>
+
+<style>
+.page {
+  background-color: #FAF6F0;
+  min-height: 100vh;
+}
+.content {
+  padding: 24rpx 28rpx 60rpx 28rpx;
+}
+.head {
+  margin-bottom: 24rpx;
+}
+.head__title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #332C4E;
+}
+.head__sub {
+  display: block;
+  font-size: 22rpx;
+  color: #8F87A3;
+  margin-top: 8rpx;
+}
+.nologin {
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 40rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.nologin__text {
+  font-size: 24rpx;
+  color: #8F87A3;
+}
+.nologin__btn {
+  margin-top: 24rpx;
+  background-color: #FF7A50;
+  border-radius: 32rpx;
+  padding: 16rpx 48rpx;
+}
+.nologin__btn-text {
+  color: #FFFFFF;
+  font-size: 26rpx;
+  font-weight: bold;
+}
+.field {
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  display: flex;
+  flex-direction: column;
+}
+.field__label {
+  font-size: 26rpx;
+  font-weight: bold;
+  color: #332C4E;
+  margin-bottom: 14rpx;
+}
+.field__input {
+  font-size: 26rpx;
+  color: #332C4E;
+  background-color: #FAF6F0;
+  border-radius: 14rpx;
+  padding: 16rpx;
+}
+.field__area {
+  font-size: 26rpx;
+  color: #332C4E;
+  background-color: #FAF6F0;
+  border-radius: 14rpx;
+  padding: 16rpx;
+  height: 140rpx;
+  width: auto;
+}
+.field__area--code {
+  font-size: 22rpx;
+  height: 120rpx;
+}
+.field__hint {
+  font-size: 20rpx;
+  color: #C3BDD2;
+  margin-top: 8rpx;
+  align-self: flex-end;
+}
+.lessonrow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+.lessonrow__del {
+  margin-left: 12rpx;
+  padding: 8rpx 16rpx;
+}
+.lessonrow__del-text {
+  font-size: 30rpx;
+  color: #C3BDD2;
+}
+.lessonrow__add {
+  padding: 8rpx 0;
+}
+.lessonrow__add-text {
+  font-size: 24rpx;
+  color: #FF7A50;
+  font-weight: bold;
+}
+.chips {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.chip {
+  border-radius: 24rpx;
+  background-color: #FAF6F0;
+  padding: 10rpx 24rpx;
+  margin: 0 12rpx 12rpx 0;
+}
+.chip--on {
+  background-color: #FF7A50;
+}
+.chip__text {
+  font-size: 24rpx;
+  color: #8F87A3;
+}
+.chip__text--on {
+  color: #FFFFFF;
+  font-weight: bold;
+}
+.submitbtn {
+  background-color: #FF7A50;
+  border-radius: 32rpx;
+  padding: 24rpx;
+  display: flex;
+  justify-content: center;
+  margin-top: 8rpx;
+  padding-bottom: calc(24rpx + 20rpx);
+}
+.submitbtn--busy {
+  background-color: #D9CFC2;
+}
+.submitbtn__text {
+  color: #FFFFFF;
+  font-size: 30rpx;
+  font-weight: bold;
+}
+.foot {
+  display: block;
+  font-size: 20rpx;
+  color: #AFA8BD;
+  margin-top: 20rpx;
+  text-align: center;
+}
+</style>
