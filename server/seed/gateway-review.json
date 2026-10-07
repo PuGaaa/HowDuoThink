@@ -11,7 +11,7 @@
     "access",
     "architecture"
   ],
-  "difficulty": 3,
+  "difficulty": 2,
   "scene": {
     "role": "你是「鲜到家」的架构评审委员。网关 2.0 方案明天定稿，评审会上你的职责：让每个\"听起来很好\"的数字交出依据。",
     "architecture": "App → 网关 2.0(限流/TLS 终止/证书) → 下游服务 ×12(容量差异极大)",

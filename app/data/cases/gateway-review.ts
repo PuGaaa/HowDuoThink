@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * B3-1 · access L3（接入层结业评审）
+ * B3-1 · access L2（接入层结业评审）
  * 主训思维：架构设计（限流是容量契约——一刀切的数字保护不了最弱的下游）
  * 次训思维：安全思维（证书轮换要监控，自动化 ≠ 可靠）
  * 真实原型：全局限流一刀切误伤 NAT 用户 + 证书续期失败无告警
@@ -18,7 +18,7 @@ export const gatewayReviewCase: DiagnosisCase = {
   chapterId: 'access',
   order: 5,
   typeTags: ['access', 'architecture'],
-  difficulty: 3,
+  difficulty: 2,
 
   scene: {
     role: '你是「鲜到家」的架构评审委员。网关 2.0 方案明天定稿，评审会上你的职责：让每个"听起来很好"的数字交出依据。',

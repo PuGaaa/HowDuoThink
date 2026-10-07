@@ -6,12 +6,12 @@
   "layer": "自动化的每一步都要有门禁：没有门禁的自动化，是把人为失误升级为系统性风险",
   "part": "apprentice",
   "chapterId": "build",
-  "order": 4,
+  "order": 8,
   "typeTags": [
     "build",
     "architecture"
   ],
-  "difficulty": 3,
+  "difficulty": 2,
   "scene": {
     "role": "你是「鲜到家」的平台工程评审委员。流水线 2.0 方案宣称\"测试提速 50%、依赖永不过时\"——但上个月投毒事故的整改清单，你还记得。",
     "architecture": "Git → 流水线 2.0(机器人合并/共享缓存/并行测试) → 制品库 → 生产",

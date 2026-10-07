@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * B3-2 · build L3（构建章结业评审）
+ * B3-2 · build L2（构建章结业评审）
  * 主训思维：架构设计（自动化的每一步都要有门禁——"自动 merge"是供应链攻击的自动化入口）
  * 次训思维：验证思维（构建缓存的隔离性——一个项目的污染会传染全部）
  * 真实原型：依赖自动升级 bot 无人工审核 + 跨项目共享构建缓存
@@ -16,9 +16,9 @@ export const pipelineReviewCase: DiagnosisCase = {
   layer: '自动化的每一步都要有门禁：没有门禁的自动化，是把人为失误升级为系统性风险',
   part: 'apprentice',
   chapterId: 'build',
-  order: 4,
+  order: 8,
   typeTags: ['build', 'architecture'],
-  difficulty: 3,
+  difficulty: 2,
 
   scene: {
     role: '你是「鲜到家」的平台工程评审委员。流水线 2.0 方案宣称"测试提速 50%、依赖永不过时"——但上个月投毒事故的整改清单，你还记得。',
