@@ -24,3 +24,7 @@ web/.output/
 dist/
 data.db
 server/.venv/
+
+# AI 本地机密与模型缓存
+server/.env.*.local
+server/local_models/

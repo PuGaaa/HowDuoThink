@@ -26,8 +26,11 @@ DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.deepseek.com")
 AI_CHAT_MODEL = os.environ.get("AI_CHAT_MODEL", "deepseek-chat")
 
-# 向量化：local = 内置字符 bigram 哈希向量（零依赖零 API 费）；zhipu = 智谱 embedding-3（需 ZHIPU_API_KEY）
-EMBED_PROVIDER = os.environ.get("EMBED_PROVIDER", "local")
+# 向量化：fastembed = 本地 BGE-M3（默认，ONNX CPU 推理，模型首用下载到 FASTEMBED_CACHE_DIR）；
+#         zhipu = 智谱 embedding-3（需 ZHIPU_API_KEY）；local = 内置字符 bigram（零资源兜底）
+EMBED_PROVIDER = os.environ.get("EMBED_PROVIDER", "fastembed")
+EMBED_MODEL = os.environ.get("EMBED_MODEL", "BAAI/bge-small-zh-v1.5")
+FASTEMBED_CACHE_DIR = os.environ.get("FASTEMBED_CACHE_DIR", "")
 ZHIPU_API_KEY = os.environ.get("ZHIPU_API_KEY", "")
 ZHIPU_BASE_URL = os.environ.get("ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
 GLM_EMBED_MODEL = os.environ.get("GLM_EMBED_MODEL", "embedding-3")

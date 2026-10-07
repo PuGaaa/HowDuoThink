@@ -3,4 +3,6 @@
 cd "$(dirname "$0")"
 export JWT_SECRET="${JWT_SECRET:-dev-secret-please-change}"
 export ENV=dev
+# 密钥等本地机密放 .env.dev.local（gitignored），勿写进本文件
+[ -f .env.dev.local ] && set -a && . ./.env.dev.local && set +a
 exec "$(dirname "$0")/.venv/bin/uvicorn" main:app --port 8000
