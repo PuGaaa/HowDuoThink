@@ -43,3 +43,15 @@ def create_draft_from_submission(sid: str, uid: str = Depends(current_user)):
         raise HTTPException(401, "未登录")
     require_editor(uid)
     return service.create_draft_from_submission(uid, sid)
+
+
+@router.post("/api/admin/submissions/{sid}/ai-draft")
+def ai_draft_from_submission(sid: str, uid: str = Depends(current_user)):
+    if not uid:
+        raise HTTPException(401, "未登录")
+    require_editor(uid)
+    from features.ai import service as ai_service
+    try:
+        return ai_service.ai_draft_from_submission(uid, sid)
+    except ValueError as e:
+        raise HTTPException(404, str(e))

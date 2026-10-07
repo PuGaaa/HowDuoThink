@@ -169,7 +169,15 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
                  db.jdump(d)),
             )
         article_id = _upsert_article(conn, payload, author_name)
-    return {"id": payload.id, "version": version, "articleId": article_id}
+    # 发布成功 → 增量索引到 AI 案例库（失败不阻塞发布）
+    try:
+        from features.ai import service as ai_service
+        ai_service.index_case(payload.id)
+    except Exception:  # noqa: BLE001 — AI 索引失败只记日志
+        import logging
+        logging.getLogger("uvicorn.error").warning("AI index failed for %s", payload.id)
+    return {
+        "id": payload.id, "version": version, "articleId": article_id}
 
 
 def _upsert_article(conn, payload: CasePayload, author: str) -> str:

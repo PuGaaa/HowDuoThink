@@ -4,3 +4,5 @@ pydantic>=2.6
 httpx>=0.27
 PyJWT>=2.8
 bcrypt
+langchain-core>=0.3
+langchain-openai>=0.2

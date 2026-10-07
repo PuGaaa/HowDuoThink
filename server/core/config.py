@@ -19,3 +19,11 @@ COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "") == "1"
 
 def oauth_configured() -> bool:
     return bool(CLIENT_ID and CLIENT_SECRET)
+
+
+# —— AI（GLM/智谱，OpenAI 兼容端点）：未配 key 时 AI 功能自动降级 ——
+ZHIPU_API_KEY = os.environ.get("ZHIPU_API_KEY", "")
+AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
+GLM_MODEL = os.environ.get("GLM_MODEL", "glm-4.5-flash")
+GLM_EMBED_MODEL = os.environ.get("GLM_EMBED_MODEL", "embedding-3")
+GLM_EMBED_DIM = int(os.environ.get("GLM_EMBED_DIM", "1024"))

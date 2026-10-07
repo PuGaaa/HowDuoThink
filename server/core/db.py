@@ -75,6 +75,17 @@ CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS ai_index (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_type TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  chunk_kind TEXT NOT NULL,
+  content TEXT NOT NULL,
+  embedding TEXT NOT NULL,
+  model TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_ai ON ai_index(source_type, source_id, chunk_kind);
 """
 
 

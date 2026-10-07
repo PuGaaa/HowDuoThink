@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from core import config
+from features.ai.router import router as ai_router
 from features.auth.router import router as auth_router
 from features.cases.router import router as cases_router
 from features.submissions.router import router as submissions_router
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
 
     app.include_router(auth_router)
+    app.include_router(ai_router)
     app.include_router(submissions_router)
     app.include_router(solutions_router)
     app.include_router(cases_router)
