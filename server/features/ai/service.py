@@ -202,16 +202,16 @@ DRAFT_PROMPT = """你是「好多星 HowDuoThink」的出题编辑。根据投�
 - lessons 每条带 principle（层契约原理）
 - difficulty 按六维（推理距离/证据形态/知识层次/反直觉度/跨层跨度/陷阱主动性）中位数自检
 - 输出纯 JSON（不要 markdown 代码块），结构：
-{"title": "...", "intro": "...(≤80字)", "layer": "...(≤120字)", "difficulty": 1~3,
- "scene": {"role": "...", "architecture": "...", "symptoms": [{"type": "text|error|log|code", "title": "...", "text": "..."}], "timeline": "...", "impactHint": "..."},
- "hypotheses": [{"id": "h-xxx", "text": "...", "excludeActionId": "a-xxx"}],
- "actions": [{"id": "a-xxx", "name": "...(≤60字)", "desc": "...", "cost": 1, "gain": "high", "danger": false,
-   "tests": ["h-xxx"], "hypotheses": [{"id": "h-xxx", "status": "excluded|down|confirmed"}],
-   "result": {"type": "text", "title": "...", "text": "..."}}],
- "rootCauses": [{"id": "rc-xxx", "text": "...", "correct": true}],
- "expertChain": [{"thought": "...", "update": "...", "actionId": "a-xxx", "why": "...(≥12字)", "conclusion": "..."}],
- "lessons": [{"text": "...(≤120字)", "principle": "..."}],
- "chapterId": "network|build|data|runtime|concurrency|deploy|error-reading|integration|contract|config-boot|testing|access|messaging|evolution"}
+{{"title": "...", "intro": "...(≤80字)", "layer": "...(≤120字)", "difficulty": 1~3,
+ "scene": {{"role": "...", "architecture": "...", "symptoms": [{{"type": "text|error|log|code", "title": "...", "text": "..."}}], "timeline": "...", "impactHint": "..."}},
+ "hypotheses": [{{"id": "h-xxx", "text": "...", "excludeActionId": "a-xxx"}}],
+ "actions": [{{"id": "a-xxx", "name": "...(≤60字)", "desc": "...", "cost": 1, "gain": "high", "danger": false,
+   "tests": ["h-xxx"], "hypotheses": [{{"id": "h-xxx", "status": "excluded|down|confirmed"}}],
+   "result": {{"type": "text", "title": "...", "text": "..."}}}}],
+ "rootCauses": [{{"id": "rc-xxx", "text": "...", "correct": true}}],
+ "expertChain": [{{"thought": "...", "update": "...", "actionId": "a-xxx", "why": "...(≥12字)", "conclusion": "..."}}],
+ "lessons": [{{"text": "...(≤120字)", "principle": "..."}}],
+ "chapterId": "network|build|data|runtime|concurrency|deploy|error-reading|integration|contract|config-boot|testing|access|messaging|evolution"}}
 
 【投稿素材】
 标题：{title}
