@@ -1,7 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * B5-4 · data L3
+ * B5-4 · data L2
  * 主训思维：沉淀思维（数据操作脚本的安全规范——测试环境验证 + 备份 + 双人复核）
  * 次训思维：程序设计（UPDATE 不加 WHERE 或 WHERE 写错 = 全表灾难）
  * 真实原型：修复库存不一致的脚本少了 WHERE 条件，UPDATE 全表——一个错误变成 5 万个错误
@@ -18,7 +18,7 @@ export const dataScriptCase: DiagnosisCase = {
   chapterId: 'data',
   order: 7,
   typeTags: ['data', 'database'],
-  difficulty: 3,
+  difficulty: 2,
 
   scene: {
     role: '你是「鲜到家」的运营平台后端。运营报了库存显示 -50 的 bug，你 5 分钟写了个修复脚本——执行后 5 万个商品库存全部变成 -50。',
@@ -64,7 +64,7 @@ export const dataScriptCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: 'general log',
-        text: '实际执行的 SQL：\nUPDATE inventory SET stock = -50 WHERE sku_id = 12345\n→ SQL 看起来正确！有 WHERE！但 affected rows = 50000？？\n→ SQL 本身没问题——问题在"执行环境"。再查。',
+        text: 'general log（DB 服务端记录，最诚实的证据）——实际执行的 SQL：\nUPDATE inventory SET stock = -50\n→ 没有 WHERE 子句。而你的脚本文件 fix_stock.sql 里明明写着 WHERE sku_id = 12345。\n→ 执行的和你以为的不是同一条——问题在"从脚本到执行"之间。',
       },
     },
     {
@@ -80,7 +80,7 @@ export const dataScriptCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '环境确认',
-        text: '你执行的连接串指向：mysql://prod-cluster/inventory_db\n库里的 inventory 表确实有 50000 行。\n但 sku_id = 12345 在这张表里不存在（该 SKU 已下架被软删除）。\n→ "WHERE sku_id = 12345" 没匹配到任何行。\n那 affected rows = 50000 是怎么来的？',
+        text: '你执行的连接串指向：mysql://prod-cluster/inventory_db\n库里的 inventory 表确实有 50000 行。\nsku_id = 12345 已下架不在表中：带 WHERE 的版本应影响 0 行；实际影响 50000 行 = 全表 → 执行的确实是无 WHERE 的版本。它是怎么来的？',
       },
     },
     {
@@ -210,10 +210,10 @@ export const dataScriptCase: DiagnosisCase = {
   expertChain: [
     {
       thought: '先读实际执行的 SQL：general log 是最诚实的证据——它记录了到底执行了什么。',
-      update: 'general log 显示的 SQL 有 WHERE 条件且正确——但 affected rows = 50000？？矛盾。',
+      update: 'general log 显示实际执行的 SQL 没有 WHERE 子句——脚本文件里明明有。矛盾。',
       actionId: 'a-sqlcheck',
       why: '1⚡ general log 是最诚实的证据：它记录的是"实际执行的 SQL"，不是"你以为执行的 SQL"。',
-      conclusion: 'SQL 有 WHERE 但影响 5 万行 → 确认执行环境。',
+      conclusion: '执行的和文件里的不是同一条 → 确认执行环境。',
     },
     {
       thought: '确认执行环境：连接串指向生产库、inventory 表 5 万行、sku_id = 12345 不在表中（已下架）。',
