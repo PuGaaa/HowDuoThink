@@ -7,3 +7,4 @@ bcrypt
 langchain-core>=0.3
 langchain-openai>=0.2
 fastembed>=0.8
+PyMySQL>=1.1

@@ -17,6 +17,40 @@ _TMP = Path(tempfile.mkdtemp()) / "test.db"
 coredb.DB_PATH = _TMP
 dbmod.DB_PATH = _TMP
 
+# MySQL 引擎（DB_PROVIDER=mysql）：每轮会话使用全新隔离库，会话结束回收
+if os.environ.get("DB_PROVIDER") == "mysql":
+    import atexit
+
+    import pymysql
+
+    _MYSQL = dict(
+        host=os.environ.get("MYSQL_HOST", "127.0.0.1"),
+        port=int(os.environ.get("MYSQL_PORT", "13306")),
+        user=os.environ.get("MYSQL_USER", "root"),
+        password=os.environ.get("MYSQL_PASSWORD", ""),
+        charset="utf8mb4",
+    )
+    _TEST_DB = "hdt_test_%d" % os.getpid()
+    _admin = pymysql.connect(**_MYSQL)
+    with _admin.cursor() as cur:
+        cur.execute("DROP DATABASE IF EXISTS " + _TEST_DB)
+        cur.execute("CREATE DATABASE " + _TEST_DB + " CHARACTER SET utf8mb4")
+    _admin.commit()
+    _admin.close()
+    os.environ["MYSQL_DATABASE"] = _TEST_DB
+
+    def _drop_test_db() -> None:
+        try:
+            admin = pymysql.connect(**_MYSQL)
+            with admin.cursor() as cur:
+                cur.execute("DROP DATABASE IF EXISTS " + _TEST_DB)
+            admin.commit()
+            admin.close()
+        except Exception:
+            pass
+
+    atexit.register(_drop_test_db)
+
 from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402

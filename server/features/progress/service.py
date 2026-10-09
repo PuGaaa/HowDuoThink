@@ -11,8 +11,8 @@ _BUNDLE_DEFAULTS = {
 
 
 def get_progress(uid: str) -> dict:
-    rows = db.q("SELECT blob, updated_at FROM progress WHERE user_id=?", (uid,))
-    blob = db.jload(rows[0]["blob"], {}) if rows else {}
+    rows = db.q("SELECT payload, updated_at FROM progress WHERE user_id=?", (uid,))
+    blob = db.jload(rows[0]["payload"], {}) if rows else {}
     out = {"cases": blob.get("cases", {})}
     for k, v in _BUNDLE_DEFAULTS.items():
         out[k] = blob.get(k, v)
@@ -22,8 +22,8 @@ def get_progress(uid: str) -> dict:
 
 def put_progress(uid: str, bundle: dict) -> dict:
     db.ex(
-        "INSERT INTO progress(user_id, blob, updated_at) VALUES(?,?,datetime('now')) "
-        "ON CONFLICT(user_id) DO UPDATE SET blob=excluded.blob, updated_at=datetime('now')",
+        "INSERT INTO progress(user_id, payload, updated_at) VALUES(?,?,datetime('now')) "
+        "ON CONFLICT(user_id) DO UPDATE SET payload=excluded.payload, updated_at=datetime('now')",
         (uid, db.jdump(bundle)),
     )
     return {"ok": True, "updatedAt": db.q("SELECT updated_at FROM progress WHERE user_id=?", (uid,))[0]["updated_at"]}

@@ -26,6 +26,14 @@ DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.deepseek.com")
 AI_CHAT_MODEL = os.environ.get("AI_CHAT_MODEL", "deepseek-chat")
 
+# 数据库：sqlite（默认，零部署）/ mysql（生产多用户，配 MYSQL_* 五项）
+DB_PROVIDER = os.environ.get("DB_PROVIDER", "sqlite")
+MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
+MYSQL_PORT = int(os.environ.get("MYSQL_PORT", "3306"))
+MYSQL_USER = os.environ.get("MYSQL_USER", "hdt")
+MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD", "")
+MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE", "hdt")
+
 # 向量化：fastembed = 本地 BGE-M3（默认，ONNX CPU 推理，模型首用下载到 FASTEMBED_CACHE_DIR）；
 #         zhipu = 智谱 embedding-3（需 ZHIPU_API_KEY）；local = 内置字符 bigram（零资源兜底）
 EMBED_PROVIDER = os.environ.get("EMBED_PROVIDER", "fastembed")

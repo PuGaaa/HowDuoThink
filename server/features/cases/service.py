@@ -150,10 +150,10 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
     d["authorName"] = author_name
     exists = db.q("SELECT id FROM cases WHERE id=?", (payload.id,))
     with db.tx() as conn:
-        version_row = conn.execute("SELECT value FROM meta WHERE key='casepack_version'").fetchone()
+        version_row = conn.execute("SELECT value FROM meta WHERE meta_key='casepack_version'").fetchone()
         version = (int(version_row["value"]) if version_row else 0) + 1
         conn.execute(
-            "INSERT INTO meta(key, value) VALUES('casepack_version', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            "INSERT INTO meta(meta_key, value) VALUES('casepack_version', ?) ON CONFLICT(meta_key) DO UPDATE SET value=excluded.value",
             (str(version),),
         )
         if exists:
