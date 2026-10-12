@@ -97,5 +97,31 @@
     "navigationBarTitleText": "好多星",
     "navigationBarBackgroundColor": "#FFF9F4",
     "backgroundColor": "#FFF9F4"
+  },
+  "tabBar": {
+    "color": "#AFA8BD",
+    "selectedColor": "#FF8A5C",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "冒险",
+        "iconPath": "static/icons/flag-ink3.png",
+        "selectedIconPath": "static/icons/flag-coral.png"
+      },
+      {
+        "pagePath": "pages/task/task",
+        "text": "任务",
+        "iconPath": "static/icons/star-empty.png",
+        "selectedIconPath": "static/icons/star-lemon.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的",
+        "iconPath": "static/icons/user-ink3.png",
+        "selectedIconPath": "static/icons/user-coral.png"
+      }
+    ]
   }
 }

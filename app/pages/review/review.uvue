@@ -322,7 +322,7 @@ function goNext() {
   if (hasNext.value) {
     uni.redirectTo({ url: '/pages/play/play?id=' + nextId.value })
   } else {
-    uni.redirectTo({ url: '/pages/index/index' })
+    uni.switchTab({ url: '/pages/index/index' })
   }
 }
 

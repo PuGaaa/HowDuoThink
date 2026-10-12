@@ -81,7 +81,6 @@
         <text class="authbtn__text authbtn__text--main">去登录</text>
       </view>
     </view>
-    <tabbar active="me"></tabbar>
     <confirm-dialog
       :show="showLogout"
       title="退出登录"
@@ -106,7 +105,6 @@ import { getAvatar as resolveAvatar, getDisplayName } from '../../utils/auth'
 import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
 import { getReminder, setReminder, reminderLabel, startReminderPolling, requestNotifyPermission } from '../../utils/reminder'
 import { manualSync, lastSyncLabel, pullServerProgress } from '../../utils/sync-progress'
-import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class RowVM {
   label: string = ''

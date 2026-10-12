@@ -79,7 +79,6 @@
       </view>
       <text class="footer">全部 {{ totalLevels }} 关 · 每关一朵层契约拼图</text>
     </view>
-    <tabbar active="adventure"></tabbar>
     <confirm-dialog
       :show="challengeShow"
       :title="challengeTitle"
@@ -95,7 +94,6 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { CHAPTERS, PARTS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId, chapterUnlockHint } from '../../data/chapters'
-import tabbar from '../../components/tabbar/tabbar.uvue'
 import chapterCube from '../../components/chapter-cube/chapter-cube.uvue'
 import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { ALL_CASES, getCaseById } from '../../data/cases'

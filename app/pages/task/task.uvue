@@ -72,7 +72,6 @@
         <text class="postbtn__text">生成我的侦探档案海报</text>
       </view>
     </view>
-    <tabbar active="task"></tabbar>
   </view>
 </template>
 
@@ -82,7 +81,6 @@ import { onShow } from '@dcloudio/uni-app'
 import { DAILY_TASKS, WEEKLY_TASKS, GROWTH_TASKS } from '../../data/tasks'
 import { getTaskDaily, getTaskWeekly, getCaseProgress, getChecklistUse, getStreak } from '../../utils/storage'
 import { ALL_CASES } from '../../data/cases'
-import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class TaskVM {
   id: string = ''
