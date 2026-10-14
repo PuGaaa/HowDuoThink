@@ -31,3 +31,6 @@ server/.env.*
 !server/.env.example
 server/local_models/
 .superpowers/
+
+# 会话工作区（计划/台账临时区）
+.zcode/
