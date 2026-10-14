@@ -23,9 +23,29 @@ from features.progress.router import router as progress_router
 from features.sync.router import router as sync_router
 from features.users.router import router as users_router
 from features.stats.router import router as stats_router
+from features.ops.router import router as ops_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("server")
+
+
+def _init_sentry() -> None:
+    """错误追踪：无 DSN 不启用（运行时降级；同一份代码所有环境）。"""
+    if not config.SENTRY_DSN:
+        return
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+        sentry_sdk.init(
+            dsn=config.SENTRY_DSN,
+            environment=config.SENTRY_ENV,
+            integrations=[FastApiIntegration()],
+            send_default_pii=False,
+        )
+        logger.info("[sentry] 已启用（env=%s）", config.SENTRY_ENV)
+    except Exception:
+        logger.warning("[sentry] 初始化失败，错误追踪未启用", exc_info=True)
 
 
 def create_app() -> FastAPI:
@@ -33,6 +53,7 @@ def create_app() -> FastAPI:
     import db
 
     db.init()
+    _init_sentry()
 
     app = FastAPI(title="好多星 HowDuoThink · 社区后端", version="0.2.0")
     origins = [config.WEB_ORIGIN, "http://localhost:3000", "http://localhost:5173"]
@@ -49,11 +70,15 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def request_context(request: Request, call_next):
         """每个请求发 8 位短 id：日志全带 [rid] 前缀，响应头回传，方便对账排查。"""
+        from features.ops import metrics
+
         rid = uuid.uuid4().hex[:8]
         request.state.rid = rid
         start = time.perf_counter()
         response = await call_next(request)
-        logger.info("[%s] %s %s -> %s (%.0fms)", rid, request.method, request.url.path, response.status_code, (time.perf_counter() - start) * 1000)
+        duration_ms = (time.perf_counter() - start) * 1000
+        metrics.record(response.status_code, duration_ms)
+        logger.info("[%s] %s %s -> %s (%.0fms)", rid, request.method, request.url.path, response.status_code, duration_ms)
         response.headers["X-Request-Id"] = rid
         return response
 
@@ -73,6 +98,7 @@ def create_app() -> FastAPI:
     app.include_router(progress_router)
     app.include_router(users_router)
     app.include_router(stats_router)
+    app.include_router(ops_router)
 
     # 管理端 SPA（独立工程构建产物）：目录存在才挂载，未构建时 /admin 404 不影响 API。
     # 手写 catch-all 而非 StaticFiles(html=True)：前端路由（/admin/users 等）需回退 index.html。
@@ -96,6 +122,12 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     def health():
         return {"ok": True, "casepackVersion": db.current_version()}
+
+    @app.on_event("startup")
+    def start_ops_snapshot():
+        from features.ops import metrics
+
+        metrics.start_snapshot_thread()
 
     @app.on_event("startup")
     def seed_admin():

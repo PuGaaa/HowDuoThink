@@ -51,6 +51,9 @@ function doLogout() {
         <RouterLink to="/ai-usage" class="nav__item" :class="{ 'nav__item--active': route.name === 'ai-usage' }">
           AI 用量
         </RouterLink>
+        <RouterLink to="/ops" class="nav__item" :class="{ 'nav__item--active': route.name === 'ops' }">
+          服务健康
+        </RouterLink>
       </nav>
       <div class="side__foot">
         <template v-if="user">

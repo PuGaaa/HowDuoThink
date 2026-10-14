@@ -51,6 +51,12 @@ const router = createRouter({
           component: () => import('@/features/ai-usage/pages/AiUsagePage.vue'),
           meta: { title: 'AI 用量' },
         },
+        {
+          path: 'ops',
+          name: 'ops',
+          component: () => import('@/features/ops/pages/HealthPage.vue'),
+          meta: { title: '服务健康' },
+        },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },

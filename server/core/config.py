@@ -51,3 +51,11 @@ GLM_EMBED_DIM = int(os.environ.get("GLM_EMBED_DIM", "1024"))
 # AI 用量审计的成本单价（元 / 百万 tokens），管理端看板按此估算；随供应商调价用环境变量改
 DEEPSEEK_PRICE_IN = float(os.environ.get("DEEPSEEK_PRICE_IN", "2"))
 DEEPSEEK_PRICE_OUT = float(os.environ.get("DEEPSEEK_PRICE_OUT", "8"))
+
+# 错误追踪：Sentry（免费档）。无 DSN = 不启用（运行时降级；所有环境装同一份 requirements 保持同构）
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+SENTRY_ENV = os.environ.get("SENTRY_ENV", os.environ.get("ENV", "prod"))
+
+# 服务健康快照：后台线程间隔（秒）与保留天数
+OPS_SNAPSHOT_INTERVAL = int(os.environ.get("OPS_SNAPSHOT_INTERVAL", "300"))
+OPS_RETENTION_DAYS = int(os.environ.get("OPS_RETENTION_DAYS", "30"))
