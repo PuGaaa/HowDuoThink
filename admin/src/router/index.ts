@@ -33,6 +33,12 @@ const router = createRouter({
           component: () => import('@/features/content/pages/CaseEditPage.vue'),
           meta: { title: 'Case 编辑' },
         },
+        {
+          path: 'users',
+          name: 'users',
+          component: () => import('@/features/users/pages/UsersPage.vue'),
+          meta: { title: '用户管理' },
+        },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },

@@ -12,12 +12,20 @@ from core import sms as sms_core
 
 def verify_login(login: str, password: str) -> dict:
     """账密校验；历史无盐哈希在登录成功时静默升级为 bcrypt。返回 {id, role}。"""
-    rows = db.q("SELECT id, password_hash, role FROM users WHERE id=?", ("pw-" + login,))
+    rows = db.q("SELECT id, password_hash, role, status FROM users WHERE id=?", ("pw-" + login,))
     if not rows or not rows[0]["password_hash"] or not security.verify_password(password, rows[0]["password_hash"]):
         raise HTTPException(401, "账号或密码错误")
+    ensure_active(rows[0]["id"])
     if security.is_legacy_hash(rows[0]["password_hash"]):
         db.ex("UPDATE users SET password_hash=? WHERE id=?", (security.hash_password(password), rows[0]["id"]))
     return {"id": rows[0]["id"], "role": rows[0]["role"]}
+
+
+def ensure_active(uid: str) -> None:
+    """封禁账号拒绝登录（三种入口共用：账密/GitHub/手机验证码）。"""
+    rows = db.q("SELECT status FROM users WHERE id=?", (uid,))
+    if rows and rows[0]["status"] == "banned":
+        raise HTTPException(403, "账号已被封禁")
 
 
 def upsert_oauth_user(u: dict, role: str) -> None:
@@ -115,6 +123,7 @@ def phone_login(phone: str, code: str) -> dict:
     _consume_code(phone, code)
     rows = db.q("SELECT id, login, role, name FROM users WHERE phone=?", (phone,))
     if rows:
+        ensure_active(rows[0]["id"])
         return {"id": rows[0]["id"], "login": rows[0]["login"], "role": rows[0]["role"], "name": rows[0]["name"], "created": False}
     uid = "ph-" + phone
     login_name = "u" + phone[-4:] + phone[:3]

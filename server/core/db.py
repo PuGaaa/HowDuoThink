@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT,
   avatar TEXT,
   role TEXT NOT NULL DEFAULT 'user',
+  status TEXT NOT NULL DEFAULT 'active',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS submissions (
@@ -112,6 +113,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(191),
   avatar VARCHAR(512),
   role VARCHAR(32) NOT NULL DEFAULT 'user',
+  status VARCHAR(32) NOT NULL DEFAULT 'active',
   password_hash VARCHAR(255),
   phone VARCHAR(32),
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -316,6 +318,13 @@ def init() -> None:
         for stmt in SCHEMA_MYSQL.split(";\n"):
             if stmt.strip():
                 cur.execute(stmt)
+        # 轻迁移（存量库补列；MySQL 8 无 ADD COLUMN IF NOT EXISTS，查 information_schema 判断）
+        cur.execute(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS "
+            "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='status'"
+        )
+        if cur.fetchone()[0] == 0:
+            cur.execute("ALTER TABLE users ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'active'")
         conn.commit()
         conn.close()
         return
@@ -332,24 +341,30 @@ def init() -> None:
     meta_cols = [r[1] for r in conn.execute("PRAGMA table_info(meta)")]
     if "key" in meta_cols:
         conn.execute("ALTER TABLE meta RENAME COLUMN key TO meta_key")
+    # 轻迁移：users.status（封禁，管理端引入）
+    if "status" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
     conn.commit()
     conn.close()
 
 
 def q(sql: str, params: tuple = ()) -> list:
     conn = connect()
-    rows = conn.execute(sql, params).fetchall()
-    conn.close()
-    return rows
+    try:
+        return conn.execute(sql, params).fetchall()
+    finally:
+        conn.close()
 
 
 def ex(sql: str, params: tuple = ()) -> int:
     conn = connect()
-    cur = conn.execute(sql, params)
-    conn.commit()
-    last = cur.lastrowid
-    conn.close()
-    return last
+    try:
+        cur = conn.execute(sql, params)
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        # 异常路径也必须释放连接：失败语句未回滚会持有写锁，阻塞后续所有写入
+        conn.close()
 
 
 @contextmanager

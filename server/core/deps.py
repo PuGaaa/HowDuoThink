@@ -19,6 +19,14 @@ def current_user(web_token: SessionCookie = None, authorization: Annotated[str |
         uid = _uid_from_token(authorization[7:].strip())
     if not uid:
         raise HTTPException(401, "未登录")
+    # 封禁即时生效：每个请求查一次主键（量级小），banned 一律 403
+    import db
+
+    rows = db.q("SELECT status FROM users WHERE id=?", (uid,))
+    if not rows:
+        raise HTTPException(401, "用户不存在")
+    if rows[0]["status"] == "banned":
+        raise HTTPException(403, "账号已被封禁")
     return uid
 
 
@@ -28,3 +36,12 @@ def require_editor(uid: str) -> None:
     rows = db.q("SELECT role FROM users WHERE id=?", (uid,))
     if not rows or rows[0]["role"] not in ("editor", "admin"):
         raise HTTPException(403, "需要 editor 权限")
+
+
+def require_admin(uid: str) -> None:
+    """用户管理等敏感操作：仅 admin。"""
+    import db
+
+    rows = db.q("SELECT role FROM users WHERE id=?", (uid,))
+    if not rows or rows[0]["role"] != "admin":
+        raise HTTPException(403, "需要 admin 权限")

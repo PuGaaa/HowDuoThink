@@ -21,6 +21,7 @@ from features.submissions.router import router as submissions_router
 from features.solutions.router import router as solutions_router
 from features.progress.router import router as progress_router
 from features.sync.router import router as sync_router
+from features.users.router import router as users_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("server")
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(cases_router)
     app.include_router(sync_router)
     app.include_router(progress_router)
+    app.include_router(users_router)
 
     # 管理端 SPA（独立工程构建产物）：目录存在才挂载，未构建时 /admin 404 不影响 API。
     # 手写 catch-all 而非 StaticFiles(html=True)：前端路由（/admin/users 等）需回退 index.html。

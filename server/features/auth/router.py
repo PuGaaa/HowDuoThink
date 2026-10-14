@@ -35,6 +35,7 @@ def oauth_callback(code: str, state: str, oauth_state: Annotated[str | None, Coo
         logging.getLogger("server").warning("[oauth] GitHub 回调失败", exc_info=True)
         raise HTTPException(502, "GitHub 登录失败，请稍后重试")
     service.upsert_oauth_user(u, oauth.role_for(u["login"]))
+    service.ensure_active(u["github_id"])
     token = security.sign_session(u["github_id"])
     resp = RedirectResponse(config.WEB_ORIGIN + "/me")
     resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=config.COOKIE_SECURE)
@@ -72,15 +73,10 @@ def dev_login(login: str = Query(default="devuser")):
 
 
 @router.get("/api/me")
-def me(uid: SessionCookie = None):
-    uid_decoded = security.verify_session(uid) if uid else None
-    if not uid_decoded:
-        raise HTTPException(401, "未登录")
+def me(uid: str = Depends(current_user)):
     import db
 
-    rows = db.q("SELECT id, login, name, avatar, role FROM users WHERE id=?", (uid_decoded,))
-    if not rows:
-        raise HTTPException(401, "用户不存在")
+    rows = db.q("SELECT id, login, name, avatar, role FROM users WHERE id=?", (uid,))
     r = rows[0]
     return {"id": r["id"], "login": r["login"], "name": r["name"], "avatar": r["avatar"], "role": r["role"]}
 

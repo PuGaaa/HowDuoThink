@@ -37,6 +37,14 @@ function doLogout() {
         >
           Case 管理
         </RouterLink>
+        <RouterLink
+          v-if="user?.role === 'admin'"
+          to="/users"
+          class="nav__item"
+          :class="{ 'nav__item--active': route.name === 'users' }"
+        >
+          用户管理
+        </RouterLink>
       </nav>
       <div class="side__foot">
         <template v-if="user">
