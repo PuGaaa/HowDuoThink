@@ -90,6 +90,13 @@
     },
     {
       "path": "pages/mysubmissions/mysubmissions"
+    },
+    {
+      "path": "pages/dialog/confirm",
+      "style": {
+        "navigationStyle": "custom",
+        "disableScroll": true
+      }
     }
   ],
   "globalStyle": {
@@ -101,27 +108,25 @@
   "tabBar": {
     "color": "#AFA8BD",
     "selectedColor": "#FF8A5C",
-    "backgroundColor": "#FFFFFF",
-    "borderStyle": "white",
     "list": [
       {
         "pagePath": "pages/index/index",
-        "text": "冒险",
-        "iconPath": "static/icons/flag-ink3.png",
-        "selectedIconPath": "static/icons/flag-coral.png"
+        "iconPath": "static/icons/tab-flag-ink.png",
+        "selectedIconPath": "static/icons/tab-flag-coral.png"
       },
       {
         "pagePath": "pages/task/task",
-        "text": "任务",
-        "iconPath": "static/icons/star-empty.png",
-        "selectedIconPath": "static/icons/star-lemon.png"
+        "iconPath": "static/icons/tab-star-ink.png",
+        "selectedIconPath": "static/icons/tab-star-coral.png"
       },
       {
         "pagePath": "pages/profile/profile",
-        "text": "我的",
-        "iconPath": "static/icons/user-ink3.png",
-        "selectedIconPath": "static/icons/user-coral.png"
+        "iconPath": "static/icons/tab-user-ink.png",
+        "selectedIconPath": "static/icons/tab-user-coral.png"
       }
-    ]
+    ],
+    "backgroundColor": "#FFF9F4",
+    "glassEffect": true,
+    "borderStyle": "white"
   }
 }

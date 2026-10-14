@@ -43,7 +43,7 @@ export function pushProgress(cb?: (r: { error: string }) => void) {
 }
 
 /** 全量拉取（登录态）：后端与本地做并集合并——
- *  关卡：服务端有本地无 → 补入；双方都有 → solved 并集、星级/成本取优；
+ *  关卡：服务端有本地无 → 补入；双方都有 → solved 并集、星级/成本取优、plays/fails 取大；
  *  streak/mascots/tasks/checkuse：逐字段取大；dailyDone：本地为空才采用服务端。
  *  并集语义保证任何时序下不丢数据（离线破的关、后端的旧进度都安全）。 */
 export function pullServerProgress(cb?: (r: { error: string }) => void) {
@@ -80,6 +80,7 @@ export function pullServerProgress(cb?: (r: { error: string }) => void) {
           if (rp.bestGrade === 'S' && lp.bestGrade !== 'S') lp.bestGrade = 'S'
           if ((rp.bestCost ?? 0) > (lp.bestCost ?? 0)) lp.bestCost = rp.bestCost
           lp.plays = Math.max(lp.plays ?? 0, rp.plays ?? 0)
+          lp.fails = Math.max(lp.fails ?? 0, rp.fails ?? 0)
           if (JSON.stringify(lp) !== before) {
             uni.setStorageSync('think_case_' + id, JSON.stringify(lp))
             merged++

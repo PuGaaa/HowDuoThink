@@ -31,7 +31,7 @@ defineEmits(['confirm', 'cancel'])
 </script>
 
 <style>
-/* 统一确认弹窗：全站 showModal 的替代品，与奶油底/珊瑚主按钮/硬边阴影同源 */
+/* 确认弹窗组件：仅用于无 tabBar 的子页面（play 等）；tabBar 页一律走 utils/confirm-dialog 的 dialogPage 版，避免原生 tabBar 层级问题 */
 .cdlg-mask {
   position: fixed;
   top: 0;

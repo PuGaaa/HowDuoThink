@@ -26,5 +26,7 @@ data.db
 server/.venv/
 
 # AI 本地机密与模型缓存
-server/.env.*.local
+server/.env
+server/.env.*
+!server/.env.example
 server/local_models/

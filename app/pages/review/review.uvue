@@ -1,5 +1,6 @@
 <template>
   <view class="page">
+    <safe-top></safe-top>
     <navbar></navbar>
     <view v-if="loaded" class="content">
       <text class="pagetitle">复盘室</text>
@@ -137,6 +138,7 @@
 </template>
 
 <script setup lang="uts">
+import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getCaseById, ALL_CASES } from '../../data/cases'
@@ -336,6 +338,7 @@ function replay() {
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
+  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
@@ -345,7 +348,7 @@ function replay() {
 .content {
   display: flex;
   flex-direction: column;
-  padding-top: 120rpx;
+  padding-top: 88rpx;
 }
 .pagetitle {
   font-size: 44rpx;

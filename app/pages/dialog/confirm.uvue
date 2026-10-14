@@ -1,0 +1,162 @@
+<template>
+  <!-- dialogPage：背景透明的原生弹窗页，层级高于导航栏与 tabBar -->
+  <view class="cpage">
+    <view class="cmask" @click="onCancel"></view>
+    <view class="cwrap">
+      <view class="ccard">
+        <text class="ctitle">{{ title }}</text>
+        <text class="cmsg">{{ message }}</text>
+        <view class="crow">
+          <view class="cbtn cbtn--ghost" @click="onCancel">
+            <text class="cghost-text">{{ cancelText }}</text>
+          </view>
+          <view :class="danger ? 'cbtn cbtn--danger' : 'cbtn cbtn--main'" @click="onConfirm">
+            <text class="cmain-text">{{ confirmText }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
+import { CONFIRM_DIALOG_EVENT, CONFIRM_DIALOG_PAYLOAD_KEY, ConfirmDialogOptions } from '../../utils/confirm-dialog'
+
+const title = ref('')
+const message = ref('')
+const confirmText = ref('确定')
+const cancelText = ref('取消')
+const danger = ref(false)
+
+onLoad(() => {
+  const raw = uni.getStorageSync(CONFIRM_DIALOG_PAYLOAD_KEY)
+  if (raw == null) {
+    return
+  }
+  const str = raw as string
+  if (str.length === 0) {
+    return
+  }
+  try {
+    const opt = JSON.parse(str) as ConfirmDialogOptions
+    title.value = opt.title
+    message.value = opt.message
+    confirmText.value = opt.confirmText
+    cancelText.value = opt.cancelText
+    danger.value = opt.danger
+  } catch (e) {
+    // payload 缺失/损坏：保持默认文案，用户可取消退出
+  }
+})
+
+function onConfirm() {
+  uni.$emit(CONFIRM_DIALOG_EVENT, 'true')
+  uni.closeDialogPage({ animationType: 'fade-out', animationDuration: 100 })
+}
+
+function onCancel() {
+  uni.$emit(CONFIRM_DIALOG_EVENT, 'false')
+  uni.closeDialogPage({ animationType: 'fade-out', animationDuration: 100 })
+}
+</script>
+
+<style>
+/* dialogPage 背景 固定透明，蒙层由页面内部实现；按官方示例补 page 透明声明 */
+page {
+  background-color: transparent;
+}
+/* 与原 confirm-dialog 组件同源的奶油底/珊瑚主按钮/硬边阴影 */
+.cpage {
+  flex: 1;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.cmask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(42, 39, 51, 0.45);
+}
+.cwrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ccard {
+  width: 560rpx;
+  background-color: #FFF9F4;
+  border-radius: 32rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F3CFA9;
+  padding: 36rpx 32rpx 32rpx;
+  box-shadow: 0 10rpx 0 0 #E8DCCB;
+}
+.ctitle {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #4A4458;
+  text-align: center;
+}
+.cmsg {
+  font-size: 24rpx;
+  color: #7A7290;
+  line-height: 40rpx;
+  text-align: center;
+  margin-top: 18rpx;
+}
+.crow {
+  display: flex;
+  flex-direction: row;
+  margin-top: 32rpx;
+  /* 硬边阴影缓冲 */
+  padding-bottom: 8rpx;
+}
+.cbtn {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border-radius: 46rpx;
+  padding: 20rpx;
+}
+.cbtn--main {
+  background-color: #FF8A5C;
+  box-shadow: 0 8rpx 0 0 #E06B38;
+  margin-left: 16rpx;
+}
+.cbtn--danger {
+  background-color: #E86A6A;
+  box-shadow: 0 8rpx 0 0 #C24E4E;
+  margin-left: 16rpx;
+}
+.cbtn--ghost {
+  background-color: #FFFFFF;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+}
+.cmain-text {
+  font-size: 27rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.cghost-text {
+  font-size: 25rpx;
+  font-weight: bold;
+  color: #7A7290;
+}
+</style>

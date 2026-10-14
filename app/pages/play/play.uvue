@@ -1,5 +1,6 @@
 <template>
   <view class="page">
+    <safe-top></safe-top>
     <navbar></navbar>
     <view v-if="loaded" class="content">
       <text class="pagetitle">诊断现场</text>
@@ -10,7 +11,7 @@
           <image class="costbar__bolt" src="/static/icons/bolt-lemon.png" mode="aspectFit"></image>
           <text class="costbar__num">已花 {{ playerCost }}</text>
         </view>
-        <text class="costbar__sub">错误指认 {{ wrongCount }}/2 · 专家基准复盘揭晓</text>
+        <text class="costbar__sub">错误指认 {{ wrongCount }}/{{ maxWrong }} · 专家基准复盘揭晓</text>
       </view>
 
       <!-- 故障现场 -->
@@ -30,7 +31,7 @@
 
       <!-- 终局条 -->
       <view v-if="finished" class="donebar">
-        <text class="donebar__text">{{ solved ? '破案！正在生成复盘……' : '两次错误指认，本案未破。' }}</text>
+        <text class="donebar__text">{{ solved ? '破案！正在生成复盘……' : wrongCount + ' 次错误指认，本案未破。' }}</text>
         <view v-if="!solved" class="primarybtn" @click="goReview">
           <text class="primarybtn__text">看复盘</text>
         </view>
@@ -157,6 +158,7 @@
 </template>
 
 <script setup lang="uts">
+import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import navbar from '../../components/navbar/navbar.uvue'
@@ -172,7 +174,7 @@ import { isDailyCase, markDailyDone } from '../../utils/daily'
 import { scheduleProgressUpload } from '../../utils/sync-progress'
 import { CaseAction, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
 import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse, bumpTask } from '../../utils/storage'
-import { computeGrade, shuffleCauses } from '../../utils/scoring'
+import { computeGrade, shuffleCauses, MAX_WRONG_IDENTIFIES } from '../../utils/scoring'
 import {
   MascotAppearance,
   onSceneOpen,
@@ -228,6 +230,7 @@ const checklistTouched = ref(false)
 const collected = ref<CollectedLesson[]>([])
 const identifyPick = ref('')
 const wrongCount = ref(0)
+const maxWrong: number = MAX_WRONG_IDENTIFIES
 const finished = ref(false)
 const solved = ref(false)
 const frustratedShown = ref(false)
@@ -542,6 +545,11 @@ function confirmIdentify() {
     uni.showToast({ title: '先圈定一个根因', icon: 'none' })
     return
   }
+  // 证据门：顺着"先假设→再验证"的流向，没做过任何验证不许指认（不消耗机会）
+  if (taken.value.length === 0) {
+    uni.showToast({ title: '证据不足：先执行至少 1 个验证动作，再回来指认', icon: 'none' })
+    return
+  }
   const c = findCause(identifyPick.value)
   if (c == null) return
   if (c.correct) {
@@ -558,7 +566,7 @@ function confirmIdentify() {
     pushEvent('identify', '', '', 0, '错误指认：' + c.text, false)
     drawerTab.value = 'identify'
     appear(onWrongIdentify())
-    if (wrongCount.value >= 2) {
+    if (wrongCount.value >= maxWrong) {
       finished.value = true
       appear(onEliminated())
       finishAndSave()
@@ -605,6 +613,7 @@ function goReview() {
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
+  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
@@ -614,7 +623,7 @@ function goReview() {
 .content {
   display: flex;
   flex-direction: column;
-  padding-top: 110rpx;
+  padding-top: 88rpx;
 }
 .pagetitle {
   font-size: 44rpx;

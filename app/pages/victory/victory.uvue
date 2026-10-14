@@ -1,11 +1,11 @@
 <template>
   <view class="page">
-    <!-- 装饰粒子 -->
-    <view class="confetti">
+    <!-- 装饰粒子（仅破案时撒花） -->
+    <view v-if="solved" class="confetti">
       <view v-for="(d, i) in dots" :key="'d' + i" class="dot" :class="'dot-' + (i % 6)" :style="d"></view>
     </view>
 
-    <!-- 五兽庆祝行 -->
+    <!-- 五兽行：破案全员庆祝 / 失败垂耳兔+三角龙安慰 -->
     <view class="mascots">
       <view v-for="(m, i) in mascots" :key="'m' + i" class="mwrap" :class="'mwrap-' + i">
         <view class="mwrap__circle" :style="{ backgroundColor: m.bg }">
@@ -16,13 +16,13 @@
     </view>
 
     <!-- 主标题 -->
-    <text class="victory-title">破案成功！</text>
-    <text class="victory-sub">思维兽们为你欢呼</text>
+    <text :class="solved ? 'victory-title' : 'victory-title victory-title--fail'">{{ solved ? '破案成功！' : '本案未破' }}</text>
+    <text class="victory-sub">{{ solved ? '思维兽们为你欢呼' : '三角龙：证据不够结实的案子，复盘会还你一次公道' }}</text>
 
     <!-- 评级 + 数据 -->
     <view class="stats">
       <view class="stat">
-        <text class="stat__v stat__v--gold">{{ grade }}</text>
+        <text :class="grade === 'F' ? 'stat__v stat__v--fail' : 'stat__v stat__v--gold'">{{ grade }}</text>
         <text class="stat__k">评级</text>
       </view>
       <view class="stat">
@@ -33,16 +33,19 @@
         <text class="stat__v stat__v--mint">{{ expert }}⚡</text>
         <text class="stat__k">专家</text>
       </view>
-      <view class="stat">
+      <view v-if="solved" class="stat">
         <text class="stat__v stat__v--mint">+{{ lessons }}</text>
         <text class="stat__k">检查单</text>
       </view>
     </view>
 
-    <!-- 进入复盘 -->
+    <!-- 进入复盘 / 再战一局 -->
     <view class="btnpad">
       <view class="primarybtn" @click="goReview">
-        <text class="primarybtn__text">进入复盘</text>
+        <text class="primarybtn__text">{{ solved ? '进入复盘' : '查看复盘' }}</text>
+      </view>
+      <view v-if="!solved" class="ghostbtn" @click="replay">
+        <text class="ghostbtn__text">再战一局</text>
       </view>
     </view>
   </view>
@@ -51,10 +54,12 @@
 <script setup lang="uts">
 import { ref, onMounted } from 'vue'
 
+const solved = ref(true)
 const grade = ref('S')
 const cost = ref(0)
 const expert = ref(1)
 const lessons = ref(0)
+const caseId = ref('')
 
 interface MascotItem {
   src: string
@@ -90,7 +95,7 @@ function genDots() {
 }
 
 onMounted(() => {
-  // 读取通关数据（从 storage 的 session）
+  // 读取终局数据（从 storage 的 session）；失败局切换安慰态
   try {
     const raw = uni.getStorageSync('think_session_v1')
     if (raw != null && (raw as string).length > 0) {
@@ -98,18 +103,32 @@ onMounted(() => {
       grade.value = session.grade || 'S'
       cost.value = session.playerCost || 0
       expert.value = session.expertCost || 1
+      solved.value = session.solved != null ? session.solved : true
+      caseId.value = session.caseId || ''
     }
   } catch (e) { }
 
-  // 检查单数量
-  try {
-    const lessonsRaw = uni.getStorageSync('think_lesson_gain')
-    if (lessonsRaw != null) lessons.value = Number(lessonsRaw) || 0
-  } catch (e) { }
-
-  mascots.value = mascotData
-  genDots()
+  if (solved.value) {
+    // 检查单数量（失败局没有检查单）
+    try {
+      const lessonsRaw = uni.getStorageSync('think_lesson_gain')
+      if (lessonsRaw != null) lessons.value = Number(lessonsRaw) || 0
+    } catch (e) { }
+    mascots.value = mascotData
+    genDots()
+  } else {
+    // 垂耳兔（错误指认引导）+ 三角龙（出局安慰）
+    mascots.value = [mascotData[3], mascotData[4]]
+  }
 })
+
+function replay() {
+  if (caseId.value.length > 0) {
+    uni.redirectTo({ url: '/pages/play/play?id=' + caseId.value })
+  } else {
+    uni.redirectTo({ url: '/pages/index/index' })
+  }
+}
 
 function goReview() {
   uni.redirectTo({ url: '/pages/review/review' })
@@ -208,6 +227,10 @@ function goReview() {
   animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 1.2s forwards;
   text-shadow: 0 4rpx 0 rgba(0, 0, 0, 0.06);
 }
+.victory-title--fail {
+  color: #7A7290;
+  text-shadow: none;
+}
 .victory-sub {
   font-size: 24rpx;
   color: #AFA8BD;
@@ -258,6 +281,9 @@ function goReview() {
 .stat__v--mint {
   color: #5FC9A5;
 }
+.stat__v--fail {
+  color: #E06B38;
+}
 .stat__k {
   font-size: 19rpx;
   color: #AFA8BD;
@@ -285,6 +311,24 @@ function goReview() {
 .primarybtn__text {
   font-size: 28rpx;
   color: #FFFFFF;
+  font-weight: bold;
+}
+.ghostbtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  background-color: #FFFFFF;
+  border-radius: 46rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #FF8A5C;
+  padding: 22rpx;
+  margin-top: 20rpx;
+}
+.ghostbtn__text {
+  font-size: 28rpx;
+  color: #FF8A5C;
   font-weight: bold;
 }
 </style>

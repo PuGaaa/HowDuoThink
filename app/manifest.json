@@ -1,25 +1,25 @@
 {
-  "name": "好多星",
-  "appid": "00000000000000000000000000000000",
-  "description": "好多星 HowDuoThink — 诊断推理训练器：看症状 → 建立假设 → 按验证成本排序 → 定位根因",
-  "versionName": "0.1.0",
-  "versionCode": 100,
-  "locale": "zh-Hans",
-  "uni-app-x": {
-    "vapor": true,
-    "vapor-render-target": "bytecode",
-    "flex-direction": "column",
-    "styleIsolationVersion": "2"
-  },
-  "web": {
-    "title": "好多星 HowDuoThink",
-    "router": {
-      "mode": "hash",
-      "base": "/"
-    },
-    "devServer": {
-      "port": 5173,
-      "https": false
-    }
-  }
+	"name": "好多星",
+	"appid": "__UNI__DB88B57",
+	"description": "好多星 HowDuoThink — 诊断推理训练器：看症状 → 建立假设 → 按验证成本排序 → 定位根因",
+	"versionName": "0.1.0",
+	"versionCode": 100,
+	"locale": "zh-Hans",
+	"uni-app-x": {
+		"vapor": true,
+		"vapor-render-target": "bytecode",
+		"flex-direction": "column",
+		"styleIsolationVersion": "2"
+	},
+	"web": {
+		"title": "好多星 HowDuoThink",
+		"router": {
+			"mode": "history",
+			"base": "/"
+		},
+		"devServer": {
+			"port": 5173,
+			"https": false
+		}
+	}
 }

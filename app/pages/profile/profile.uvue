@@ -1,5 +1,6 @@
 <template>
   <view class="page">
+    <safe-top></safe-top>
     <view class="content">
 
       <!-- 档案卡（横排 + 账号身份行）：个人信息为主，称号为次 -->
@@ -81,26 +82,18 @@
         <text class="authbtn__text authbtn__text--main">去登录</text>
       </view>
     </view>
-    <confirm-dialog
-      :show="showLogout"
-      title="退出登录"
-      message="确定退出当前账号？"
-      confirm-text="退出"
-      :danger="true"
-      @confirm="doLogout"
-      @cancel="showLogout = false"
-    ></confirm-dialog>
   </view>
 </template>
 
 <script setup lang="uts">
+import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { ALL_CASES } from '../../data/cases'
 import { getCaseProgress, getStreak, useDay, getTotals } from '../../utils/storage'
 import { rankOf } from '../../utils/scoring'
 import { getStoredUser, logout, AppUser } from '../../utils/auth'
-import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
+import { openConfirmDialog, ConfirmDialogOptions } from '../../utils/confirm-dialog'
 import { getAvatar as resolveAvatar, getDisplayName } from '../../utils/auth'
 import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
 import { getReminder, setReminder, reminderLabel, startReminderPolling, requestNotifyPermission } from '../../utils/reminder'
@@ -229,17 +222,21 @@ function showReminderSheet() {
   })
 }
 
-const showLogout = ref(false)
-
 function onLogout() {
-  showLogout.value = true
-}
-
-function doLogout() {
-  showLogout.value = false
-  logout()
-  refresh()
-  uni.showToast({ title: '已退出', icon: 'none' })
+  const opt = {
+    title: '退出登录',
+    message: '确定退出当前账号？',
+    confirmText: '退出',
+    cancelText: '取消',
+    danger: true,
+  } as ConfirmDialogOptions
+  openConfirmDialog(opt, (confirm: boolean) => {
+    if (confirm) {
+      logout()
+      refresh()
+      uni.showToast({ title: '已退出', icon: 'none' })
+    }
+  })
 }
 
 function onRow(label: string, value: string) {
@@ -271,12 +268,13 @@ function onRow(label: string, value: string) {
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
+  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
   padding: 24rpx 32rpx 200rpx;
-  padding-top: 100rpx;
+  padding-top: 88rpx;
 }
 .content {
   display: flex;

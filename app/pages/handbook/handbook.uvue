@@ -1,5 +1,6 @@
 <template>
   <view class="page">
+    <safe-top></safe-top>
     <navbar></navbar>
     <view class="content">
 
@@ -28,17 +29,16 @@
 
       <text class="footer">破案更多关卡，手册会越来越厚</text>
     </view>
-    <tabbar active="handbook"></tabbar>
   </view>
 </template>
 
 <script setup lang="uts">
+import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { ALL_CASES } from '../../data/cases'
 import { getCaseProgress, getChecklistUse } from '../../utils/storage'
 import { getAvatar as resolveAvatar } from '../../utils/auth'
-import tabbar from '../../components/tabbar/tabbar.uvue'
 
 class LessonCard {
   text: string = ''
@@ -80,12 +80,13 @@ onShow(() => refresh())
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
+  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
   padding: 24rpx 32rpx 200rpx;
-  padding-top: 100rpx;
+  padding-top: 88rpx;
 }
 .content {
   display: flex;

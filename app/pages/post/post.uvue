@@ -1,5 +1,6 @@
 <template>
   <view class="page">
+    <safe-top></safe-top>
     <navbar></navbar>
     <view class="content">
       <!-- 标题区（Figma：品牌行 / 大标题 / 英文小字） -->
@@ -73,6 +74,7 @@
 </template>
 
 <script setup lang="uts">
+import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { ALL_CASES } from '../../data/cases'
@@ -323,6 +325,7 @@ function downloadPoster() {
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
+  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
@@ -332,7 +335,7 @@ function downloadPoster() {
 .content {
   display: flex;
   flex-direction: column;
-  padding-top: 110rpx;
+  padding-top: 88rpx;
 }
 .head__brand {
   font-size: 24rpx;

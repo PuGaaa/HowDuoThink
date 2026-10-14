@@ -1,5 +1,6 @@
 <template>
   <view class="page">
+    <safe-top></safe-top>
     <navbar></navbar>
     <view class="content">
       <!-- 章头（Figma：胶囊章号与章名同行 + 层契约 + 进度行） -->
@@ -26,7 +27,8 @@
             <text :class="node.playable ? 'node__title' : 'node__title node__title--locked'">{{ node.title }}</text>
             <text class="node__meta">{{ node.meta }}</text>
           </view>
-          <text v-if="node.playable" class="node__stars">{{ node.stars }}</text>
+          <text v-if="node.failed" class="node__fail">未破</text>
+          <text v-else-if="node.playable" class="node__stars">{{ node.stars }}</text>
           <view v-else class="node__offchip">
             <text class="node__offchip-text">{{ node.challenge ? '跳级挑战' : '未解锁' }}</text>
           </view>
@@ -39,6 +41,7 @@
 </template>
 
 <script setup lang="uts">
+import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { CHAPTERS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId, chapterUnlockHint } from '../../data/chapters'
@@ -55,6 +58,9 @@ class NodeVM {
   live: boolean = false
   playable: boolean = false
   challenge: boolean = false
+  /** 玩过未破（失败留痕：地图"未破"标 + 重练引导） */
+  failed: boolean = false
+  fails: number = 0
 }
 
 const ch = ref(CHAPTERS[0])
@@ -88,8 +94,14 @@ onLoad((query : OnLoadOptions) => {
     const p = getCaseProgress(c.id)
     const best = p != null && p.bestGrade.length > 0 ? p.bestGrade : ''
     vm.stars = starsLabel(best)
+    if (p != null && !p.solved && p.fails > 0) {
+      vm.failed = true
+      vm.fails = p.fails
+    }
     if (vm.challenge) {
       vm.meta = '跳级挑战 · 赢了立即解锁本章 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
+    } else if (vm.failed) {
+      vm.meta = '★★ 标准 · 失败 ' + vm.fails + ' 次 · 点此重练'
     } else {
       vm.meta = '★★ 标准 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
     }
@@ -125,6 +137,7 @@ function openCase(node: NodeVM) {
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
+  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
@@ -134,7 +147,7 @@ function openCase(node: NodeVM) {
 .content {
   display: flex;
   flex-direction: column;
-  padding-top: 120rpx;
+  padding-top: 88rpx;
 }
 .hero {
   display: flex;
@@ -254,6 +267,17 @@ function openCase(node: NodeVM) {
   font-size: 30rpx;
   color: #FFC94D;
   font-weight: bold;
+}
+.node__fail {
+  font-size: 18rpx;
+  font-weight: bold;
+  color: #E06B38;
+  background-color: #FFF1E7;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F3CFA9;
+  border-radius: 26rpx;
+  padding: 8rpx 20rpx;
 }
 .node__offchip {
   border-width: 1.5rpx;

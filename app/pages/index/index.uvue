@@ -1,5 +1,6 @@
 <template>
   <view class="page">
+    <safe-top></safe-top>
     <view class="content">
       <!-- 头部：档案 + streak -->
       <view class="header">
@@ -79,23 +80,16 @@
       </view>
       <text class="footer">全部 {{ totalLevels }} 关 · 每关一朵层契约拼图</text>
     </view>
-    <confirm-dialog
-      :show="challengeShow"
-      :title="challengeTitle"
-      :message="challengeMsg"
-      confirm-text="去挑战"
-      @confirm="goChallenge"
-      @cancel="challengeShow = false"
-    ></confirm-dialog>
   </view>
 </template>
 
 <script setup lang="uts">
+import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { CHAPTERS, PARTS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId, chapterUnlockHint } from '../../data/chapters'
 import chapterCube from '../../components/chapter-cube/chapter-cube.uvue'
-import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
+import { openConfirmDialog, ConfirmDialogOptions } from '../../utils/confirm-dialog'
 import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress, getStreak, CaseProgress } from '../../utils/storage'
 import { pullServerProgress } from '../../utils/sync-progress'
@@ -158,11 +152,6 @@ function partProgress(chapterId: string) {
   const pct = list.length > 0 ? Math.floor((260 * solved) / list.length) : 0
   return { solved: solved, total: list.length, pct: pct }
 }
-const challengeShow = ref(false)
-const challengeCaseId = ref('')
-const challengeTitle = ref('')
-const challengeMsg = ref('')
-
 function openChapter(chapterId: string) {
   if (isChapterUnlocked(chapterId)) {
     uni.navigateTo({ url: '/pages/chapter/chapter?id=' + chapterId })
@@ -175,15 +164,18 @@ function openChapter(chapterId: string) {
     return
   }
   const ch = CHAPTERS.find((x) => x.id === chapterId)
-  challengeTitle.value = (ch != null ? ch.name : '本章') + ' · 跳级挑战'
-  challengeMsg.value = chapterUnlockHint(chapterId) + '；也可以直接挑战本章首关，赢了立即解锁。'
-  challengeCaseId.value = challengeId
-  challengeShow.value = true
-}
-
-function goChallenge() {
-  challengeShow.value = false
-  uni.navigateTo({ url: '/pages/play/play?id=' + challengeCaseId.value })
+  const opt = {
+    title: (ch != null ? ch.name : '本章') + ' · 跳级挑战',
+    message: chapterUnlockHint(chapterId) + '；也可以直接挑战本章首关，赢了立即解锁。',
+    confirmText: '去挑战',
+    cancelText: '取消',
+    danger: false,
+  } as ConfirmDialogOptions
+  openConfirmDialog(opt, (confirm: boolean) => {
+    if (confirm) {
+      uni.navigateTo({ url: '/pages/play/play?id=' + challengeId })
+    }
+  })
 }
 const headerAvatar = ref('/static/images/default-avatar.png')
 const dailyTitle = ref('')
@@ -263,12 +255,13 @@ function onPackTap() {
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
+  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
   padding: 24rpx 32rpx 200rpx;
-  padding-top: 100rpx;
+  padding-top: 88rpx;
 }
 .content {
   display: flex;

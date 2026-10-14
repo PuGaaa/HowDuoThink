@@ -8,7 +8,7 @@ export interface TaskDef {
   title: string
   /** 目标值 */
   goal: number
-  /** 进度事件 key：win | checkuse | hypo | casewin7 | layers2 | solved3 */
+  /** 进度事件 key：win | checkuse | hypo | casewin7 | layers2 | solved3 | retrain | dailycase */
   metric: string
   /** 图标资产名（app/static/icons/{name}.png） */
   icon: string
@@ -19,6 +19,7 @@ export const DAILY_TASKS: TaskDef[] = [
   { id: 'd-check', type: 'daily', title: '复习检查单 1 次', goal: 1, metric: 'checkuse', icon: 'scroll-coral' },
   { id: 'd-hypo', type: 'daily', title: '立假设 ≥2 个', goal: 2, metric: 'hypo', icon: 'bulb-sky' },
   { id: 'd-daily', type: 'daily', title: '完成今日一题', goal: 1, metric: 'dailycase', icon: 'target-coral' },
+  { id: 'd-retrain', type: 'daily', title: '错案重练：破掉 1 个曾失败的案子', goal: 1, metric: 'retrain', icon: 'flame-lemon' },
 ]
 
 export const WEEKLY_TASKS: TaskDef[] = [

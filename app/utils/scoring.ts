@@ -8,6 +8,9 @@
  */
 import { RootCauseOption } from '../types/case'
 
+/** 全篇统一的错误指认机会上限：第 2 次错误即出局（F） */
+export const MAX_WRONG_IDENTIFIES = 2
+
 /** Fisher-Yates 洗牌（不改原数组）——指认根因选项每次乱序 */
 export function shuffleCauses(list: RootCauseOption[]): RootCauseOption[] {
   const arr: RootCauseOption[] = []

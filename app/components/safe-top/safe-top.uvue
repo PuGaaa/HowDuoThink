@@ -1,0 +1,15 @@
+<template>
+  <!-- 状态栏高度垫片：uvue 原生端不支持 var(--status-bar-height) CSS 变量，
+       安全区让位统一用本组件（JS 取真实状态栏高度，Web 端为 0 自动退化） -->
+  <view class="safe-top" :style="{ height: h + 'px' }"></view>
+</template>
+
+<script setup lang="uts">
+const h: number = uni.getWindowInfo().statusBarHeight
+</script>
+
+<style>
+.safe-top {
+  width: 100%;
+}
+</style>

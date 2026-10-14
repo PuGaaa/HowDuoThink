@@ -10,8 +10,11 @@ onHide(() => {})
 
 <style>
 /* 全局样式：蒸汽模式仅支持 class 选择器（BEM），页面共用背景色。
-   底色与各页 .page 的奶油底一致——短内容页（如海报页）不满屏时 body 不再露灰 */
-uni-page-body,
+   page 选择器做全局兜底底色（dialog/confirm 页有页面级 transparent 覆盖），
+   各页 .page 另有 min-height:100vh 保证盒子本身铺满视口 */
+page {
+  background-color: #FFF9F4;
+}
 .page {
   background-color: #FFF9F4;
 }

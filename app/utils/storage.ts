@@ -8,6 +8,8 @@ export interface CaseProgress {
   bestGrade: string
   bestCost: number
   plays: number
+  /** 失败局数累计（玩过未破：章节地图"未破"标 + 错案重练的数据源） */
+  fails: number
 }
 
 /** 五只动物的出场统计（固定字段，便于 JSON 往返） */
@@ -140,8 +142,9 @@ export function getCaseProgress(caseId: string): CaseProgress | null {
 
 export function saveSession(record: SessionRecord): void {
   uni.setStorageSync(KEY_SESSION, JSON.stringify(record))
-  touchStreak()
+  // 连续天数只认破案：失败局不再续活跃
   if (record.solved) {
+    touchStreak()
     bumpTask('win', 1)
     bumpTask('casewin7', 1)
   }
@@ -159,13 +162,20 @@ export function saveSession(record: SessionRecord): void {
       bestCost = prev.bestCost
     }
   }
+  const prevFails: number = prev != null && prev.fails > 0 ? prev.fails : 0
   const progress: CaseProgress = {
     solved: prev != null ? prev.solved || record.solved : record.solved,
     bestGrade: bestGrade,
     bestCost: bestCost,
     plays: prev != null ? prev.plays + 1 : 1,
+    fails: prevFails + (record.solved ? 0 : 1),
   }
   uni.setStorageSync(key, JSON.stringify(progress))
+
+  // 错案重练：曾失败的关本次破案 → 任务计数
+  if (record.solved && prevFails > 0) {
+    bumpTask('retrain', 1)
+  }
 
   // 累加动物出场统计
   const stats = getMascotStats()

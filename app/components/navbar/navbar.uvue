@@ -1,14 +1,30 @@
 <template>
-  <view class="navbar">
+  <view class="navbar" :style="{ top: topStyle }">
+    <!-- #ifdef APP-IOS -->
+    <!-- 真玻璃返回键：iOS 26 液态玻璃，26 以下自动降级系统毛玻璃（glass-effect-view 仅 iOS 支持） -->
+    <view class="navbar__shadowwrap">
+      <glass-effect-view class="navbar__glass" glass-style="regular" :interactive="true" @click="back">
+        <view class="navbar__center">
+          <image class="navbar__chevron" src="/static/icons/chevl-ink.png" mode="aspectFit"></image>
+        </view>
+      </glass-effect-view>
+    </view>
+    <!-- #endif -->
+    <!-- #ifndef APP-IOS -->
+    <!-- CSS 降级胶囊：Web/Android 用 backdrop-filter 模拟玻璃（官方认可的降级方案） -->
     <view class="navbar__shadowpad">
       <view class="navbar__capsule" @click="back">
         <image class="navbar__chevron" src="/static/icons/chevl-ink.png" mode="aspectFit"></image>
       </view>
     </view>
+    <!-- #endif -->
   </view>
 </template>
 
 <script setup lang="uts">
+// uvue 原生端不支持 var(--status-bar-height)：top 用 JS 取状态栏高度绑定（16rpx≈8px 间距）
+const topStyle = uni.getWindowInfo().statusBarHeight + 8 + 'px'
+
 function back() {
   let depth = 1
   try {
@@ -25,13 +41,37 @@ function back() {
 </script>
 
 <style>
-/* iOS 26 风格：悬浮玻璃圆胶囊返回键（常驻左上，内容从其下滚过） */
 .navbar {
   position: fixed;
-  top: calc(var(--status-bar-height) + 16rpx);
   left: 24rpx;
   z-index: 100;
 }
+.navbar__chevron {
+  width: 36rpx;
+  height: 36rpx;
+}
+/* #ifdef APP-IOS */
+/* 硬边阴影画在等形外层：玻璃容器的 box-shadow 是否生效未定，外层透明 wrap 保住项目签名 */
+.navbar__shadowwrap {
+  width: 80rpx;
+  border-radius: 40rpx;
+  box-shadow: 0 6rpx 0 0 #E8DCCB;
+}
+.navbar__glass {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 40rpx;
+}
+.navbar__center {
+  width: 80rpx;
+  height: 80rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+/* #endif */
+/* #ifndef APP-IOS */
 /* 硬边阴影缓冲：胶囊阴影画在盒外，uni-view 默认 overflow:hidden 会裁 */
 .navbar__shadowpad {
   padding-bottom: 6rpx;
@@ -51,8 +91,5 @@ function back() {
   backdrop-filter: blur(20rpx);
   box-shadow: 0 6rpx 0 0 #E8DCCB;
 }
-.navbar__chevron {
-  width: 36rpx;
-  height: 36rpx;
-}
+/* #endif */
 </style>
