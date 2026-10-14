@@ -14,7 +14,13 @@ const router = createRouter({
       path: '/',
       component: () => import('@/components/AdminLayout.vue'),
       children: [
-        { path: '', redirect: '/submissions' },
+        { path: '', redirect: '/overview' },
+        {
+          path: 'overview',
+          name: 'overview',
+          component: () => import('@/features/stats/pages/OverviewPage.vue'),
+          meta: { title: '数据概览' },
+        },
         {
           path: 'submissions',
           name: 'submissions',

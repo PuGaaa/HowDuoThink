@@ -27,6 +27,9 @@ function doLogout() {
     <aside class="side">
       <div class="brand">⭐ 好多星 · 管理端</div>
       <nav class="nav">
+        <RouterLink to="/overview" class="nav__item" :class="{ 'nav__item--active': route.name === 'overview' }">
+          数据概览
+        </RouterLink>
         <RouterLink to="/submissions" class="nav__item" :class="{ 'nav__item--active': route.name === 'submissions' }">
           投稿审核
         </RouterLink>

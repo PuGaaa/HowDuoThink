@@ -36,6 +36,9 @@ def oauth_callback(code: str, state: str, oauth_state: Annotated[str | None, Coo
         raise HTTPException(502, "GitHub 登录失败，请稍后重试")
     service.upsert_oauth_user(u, oauth.role_for(u["login"]))
     service.ensure_active(u["github_id"])
+    from features.stats import service as stats_service
+
+    stats_service.touch(u["github_id"])
     token = security.sign_session(u["github_id"])
     resp = RedirectResponse(config.WEB_ORIGIN + "/me")
     resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=config.COOKIE_SECURE)
@@ -53,6 +56,9 @@ def logout():
 def auth_login(body: models.LoginBody):
     """账号密码登录：uid = 'pw-' + login（与 GitHub 用户同表不同命名空间）。"""
     user = service.verify_login(body.login, body.password)
+    from features.stats import service as stats_service
+
+    stats_service.touch(user["id"])  # 活跃打点（旁路）
     token = security.sign_session(user["id"])
     # token 同时放响应体：App 端存 storage 走 Bearer 头；Web 端走 cookie（忽略即可）
     resp = JSONResponse({"ok": True, "login": body.login, "role": user["role"], "token": token})
@@ -103,6 +109,9 @@ def sms_send(body: models.SmsSendBody):
 def phone_login(body: models.PhoneLoginBody):
     """手机验证码登录：新手机号自动建号（与 Web 注册互通的账号体系）。"""
     user = service.phone_login(body.phone, body.code)
+    from features.stats import service as stats_service
+
+    stats_service.touch(user["id"])
     token = security.sign_session(user["id"])
     resp = JSONResponse({"ok": True, "login": user["login"], "role": user["role"], "userId": user["id"], "name": user["name"], "token": token})
     resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=config.COOKIE_SECURE)

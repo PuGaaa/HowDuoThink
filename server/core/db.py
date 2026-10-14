@@ -114,6 +114,13 @@ CREATE TABLE IF NOT EXISTS ai_usage (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS ix_ai_usage_created ON ai_usage(created_at);
+CREATE TABLE IF NOT EXISTS user_activity (
+  user_id TEXT NOT NULL,
+  day TEXT NOT NULL,
+  hits INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (user_id, day)
+);
 """
 
 # MySQL 建库脚本：key 是保留字 → meta 主键列名为 meta_key；日期列用 DATETIME（默认 CURRENT_TIMESTAMP）
@@ -209,6 +216,13 @@ CREATE TABLE IF NOT EXISTS ai_usage (
   ok TINYINT NOT NULL DEFAULT 1,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX ix_ai_usage_created (created_at)
+);
+CREATE TABLE IF NOT EXISTS user_activity (
+  user_id VARCHAR(64) NOT NULL,
+  day VARCHAR(10) NOT NULL,
+  hits BIGINT NOT NULL DEFAULT 1,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, day)
 );
 """
 
