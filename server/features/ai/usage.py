@@ -37,7 +37,9 @@ def extract_tokens(resp) -> tuple[int, int]:
 
 
 def estimate_cost(prompt_tokens: int, completion_tokens: int) -> float:
-    return (prompt_tokens * config.DEEPSEEK_PRICE_IN + completion_tokens * config.DEEPSEEK_PRICE_OUT) / 1_000_000
+    # MySQL 的 SUM() 返回 Decimal，与 float 直接运算会 TypeError，统一归一为 int
+    pin, pout = int(prompt_tokens or 0), int(completion_tokens or 0)
+    return (pin * config.DEEPSEEK_PRICE_IN + pout * config.DEEPSEEK_PRICE_OUT) / 1_000_000
 
 
 def daily_summary(days: int) -> dict:
@@ -47,7 +49,7 @@ def daily_summary(days: int) -> dict:
         "SUM(CASE WHEN kind='chat' THEN 1 ELSE 0 END) AS chats, "
         "SUM(CASE WHEN kind='draft' THEN 1 ELSE 0 END) AS drafts, "
         "SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens, "
-        "CAST(AVG(CASE WHEN kind='chat' THEN duration_ms END) AS INTEGER) AS avg_ms "
+        "AVG(CASE WHEN kind='chat' THEN duration_ms END) AS avg_ms "
         "FROM ai_usage WHERE created_at >= ? GROUP BY substr(created_at,1,10) ORDER BY day",
         (cutoff,),
     )
@@ -58,7 +60,8 @@ def daily_summary(days: int) -> dict:
             {
                 "day": r["day"], "chats": r["chats"], "drafts": r["drafts"],
                 "prompt_tokens": r["prompt_tokens"], "completion_tokens": r["completion_tokens"],
-                "avg_ms": r["avg_ms"],
+                # AVG 两引擎返回 float/Decimal，统一 Python 取整（CAST AS INTEGER 不是合法 MySQL）
+                "avg_ms": int(r["avg_ms"]) if r["avg_ms"] is not None else None,
                 "cost": round(estimate_cost(r["prompt_tokens"] or 0, r["completion_tokens"] or 0), 4),
             }
             for r in rows

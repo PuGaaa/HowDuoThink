@@ -51,6 +51,13 @@ if os.environ.get("DB_PROVIDER") == "mysql":
 
     atexit.register(_drop_test_db)
 
+    # config 在 import 时已读走 os.environ，必须直接改配置模块才能真正切到隔离库
+    # （历史 bug：只改 os.environ 不生效，MySQL 轮测试实际跑在配置指向的真实库上）
+    from core import config as core_config
+
+    core_config.MYSQL_DATABASE = _TEST_DB
+    os.environ["MYSQL_DATABASE"] = _TEST_DB
+
 from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402

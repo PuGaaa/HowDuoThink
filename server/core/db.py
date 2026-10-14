@@ -154,8 +154,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   resolution MEDIUMTEXT NOT NULL,
   key_error MEDIUMTEXT,
   timeline VARCHAR(512),
-  lessons MEDIUMTEXT NOT NULL,
-  stack_tags MEDIUMTEXT NOT NULL,
+  lessons MEDIUMTEXT NOT NULL DEFAULT ('[]'),
+  stack_tags MEDIUMTEXT NOT NULL DEFAULT ('[]'),
   domain_hint VARCHAR(64),
   status VARCHAR(32) NOT NULL DEFAULT 'pending',
   review_note VARCHAR(1024),
@@ -271,7 +271,7 @@ def _translate(sql: str) -> str:
         return "NOW() %s INTERVAL %s %s" % (op, n, _UNITS.get(unit, unit))
 
     sql = re.sub(
-        r"datetime\('now',\s*'([+-])(\d+)\s+(seconds|minutes|hours|days|months|years)'\)",
+        r"datetime\('now',\s*'([+-])(\d+)\s+(seconds?|minutes?|hours?|days?|months?|years?)'\)",
         _dtmod,
         sql,
         flags=re.IGNORECASE,
@@ -374,10 +374,10 @@ def init() -> None:
                 cur.execute(stmt)
         # 轻迁移（存量库补列；MySQL 8 无 ADD COLUMN IF NOT EXISTS，查 information_schema 判断）
         cur.execute(
-            "SELECT COUNT(*) FROM information_schema.COLUMNS "
+            "SELECT COUNT(*) AS n FROM information_schema.COLUMNS "
             "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='status'"
         )
-        if cur.fetchone()[0] == 0:
+        if cur.fetchone()["n"] == 0:
             cur.execute("ALTER TABLE users ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'active'")
         conn.commit()
         conn.close()

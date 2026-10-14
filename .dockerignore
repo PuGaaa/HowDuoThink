@@ -1,11 +1,16 @@
 # 构建上下文瘦身：镜像只需要 server/ 与 admin/ 的源码
 .git
 .superpowers
+.zcode
 **/node_modules
 server/.venv
-server/data.db
+server/.env*
+server/data.db*
 server/__pycache__
 **/__pycache__
+admin/dist
+web/.nuxt
+web/.output
 design
 ui
 *.md
