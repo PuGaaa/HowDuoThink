@@ -42,6 +42,28 @@ def update_case_meta(cid: str, body: CaseMetaBody) -> dict:
     return {"ok": True, "meta": {"part": payload.get("part"), "chapterId": payload.get("chapterId"), "order": payload.get("order"), "typeTags": payload.get("typeTags")}}
 
 
+def list_admin_cases(status: str | None = None) -> list[dict]:
+    """管理端案例列表（含草稿），新者在前。"""
+    where, params = ("status=?", [status]) if status else ("1=1", [])
+    rows = db.q(
+        f"SELECT id, title, domain, layer, difficulty, version, status FROM cases WHERE {where} ORDER BY created_at DESC",
+        tuple(params),
+    )
+    return [dict(r) for r in rows]
+
+
+def admin_case_detail(cid: str) -> dict:
+    """管理端案例详情：完整 payload 供编辑器。"""
+    rows = db.q("SELECT id, title, version, status, payload FROM cases WHERE id=?", (cid,))
+    if not rows:
+        raise HTTPException(404, "案例不存在")
+    r = rows[0]
+    return {
+        "id": r["id"], "title": r["title"], "version": r["version"], "status": r["status"],
+        "payload": db.jload(r["payload"], {}),
+    }
+
+
 def draft_skeleton_from_submission(sid: str) -> dict:
     """投稿 → Case 草稿骨架：必填字段自动映射，重字段填占位（编辑器里可见待补）。"""
     rows = db.q("SELECT * FROM submissions WHERE id=?", (sid,))

@@ -53,3 +53,40 @@ def test_publish_rejected_by_gate_422():
         d["title"] = "字" * 41  # 超过 40 字上限
         r = client.post("/api/cases", json=d)
         assert r.status_code == 422
+
+
+def test_admin_cases_list_and_detail():
+    with make_client() as client:
+        login_admin(client)
+        payload = load_seed()
+        client.post("/api/cases", json=payload)
+        lst = client.get("/api/admin/cases")
+        assert lst.status_code == 200, lst.text
+        item = next(c for c in lst.json() if c["id"] == payload["id"])
+        assert item["status"] == "published"
+        assert item["version"] >= 1
+        d = client.get("/api/admin/cases/" + payload["id"])
+        assert d.status_code == 200
+        assert d.json()["payload"]["id"] == payload["id"]
+
+
+def test_admin_cases_list_filters_by_status():
+    with make_client() as client:
+        login_admin(client)
+        payload = load_seed()
+        client.post("/api/cases", json=payload)
+        drafts = client.get("/api/admin/cases", params={"status": "draft"})
+        assert drafts.status_code == 200
+        assert all(c["status"] == "draft" for c in drafts.json())
+        assert all(c["id"] != payload["id"] for c in drafts.json())
+
+
+def test_admin_case_detail_404():
+    with make_client() as client:
+        login_admin(client)
+        assert client.get("/api/admin/cases/no-such-case").status_code == 404
+
+
+def test_admin_cases_require_editor():
+    with make_client() as client:
+        assert client.get("/api/admin/cases").status_code in (401, 403)

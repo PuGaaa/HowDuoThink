@@ -6,10 +6,12 @@ App 同步：GET /api/casepack?since=version。"""
 import logging
 import time
 import uuid
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from core import config
 from features.ai.router import router as ai_router
@@ -31,9 +33,12 @@ def create_app() -> FastAPI:
     db.init()
 
     app = FastAPI(title="好多星 HowDuoThink · 社区后端", version="0.2.0")
+    origins = [config.WEB_ORIGIN, "http://localhost:3000", "http://localhost:5173"]
+    if config.ADMIN_WEB_ORIGIN:
+        origins.append(config.ADMIN_WEB_ORIGIN)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[config.WEB_ORIGIN, "http://localhost:3000", "http://localhost:5173"],
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -64,6 +69,25 @@ def create_app() -> FastAPI:
     app.include_router(cases_router)
     app.include_router(sync_router)
     app.include_router(progress_router)
+
+    # 管理端 SPA（独立工程构建产物）：目录存在才挂载，未构建时 /admin 404 不影响 API。
+    # 手写 catch-all 而非 StaticFiles(html=True)：前端路由（/admin/users 等）需回退 index.html。
+    admin_dist = Path(config.ADMIN_DIST_DIR)
+    if not admin_dist.is_absolute():
+        admin_dist = Path(__file__).resolve().parent / admin_dist
+    if admin_dist.is_dir():
+        admin_root = admin_dist.resolve()
+
+        @app.get("/admin")
+        def admin_root_redirect():
+            return RedirectResponse("/admin/")
+
+        @app.get("/admin/{path:path}")
+        def admin_spa(path: str):
+            candidate = (admin_root / path).resolve()
+            if path and candidate.is_file() and str(candidate).startswith(str(admin_root)):
+                return FileResponse(candidate)
+            return FileResponse(admin_root / "index.html")
 
     @app.get("/api/health")
     def health():

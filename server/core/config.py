@@ -9,6 +9,10 @@ _jwt_secret_env = os.environ.get("JWT_SECRET", "")
 JWT_SECRET = _jwt_secret_env or secrets.token_hex(32)
 JWT_SECRET_EPHEMERAL = not bool(_jwt_secret_env)
 WEB_ORIGIN = os.environ.get("WEB_ORIGIN", "http://localhost:3000")
+# 管理端独立工程（admin/）的访问源：CORS 白名单用；空 = 未部署管理端前端
+ADMIN_WEB_ORIGIN = os.environ.get("ADMIN_WEB_ORIGIN", "")
+# 管理端 SPA 构建产物目录（绝对路径，或相对 server/ 目录）；未构建时 /admin 返回 404
+ADMIN_DIST_DIR = os.environ.get("ADMIN_DIST_DIR", "admin_dist")
 GITHUB_ADMIN_LOGINS = set(filter(None, os.environ.get("GITHUB_ADMIN_LOGINS", "").split(",")))
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 # 显式开发模式开关：/api/dev/login 与 admin* 提权捷径只在 ENV=dev 下可用

@@ -118,8 +118,6 @@ async function savePassword() {
     pwBusy.value = false
   }
 }
-
-const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.value.role))
 </script>
 
 <template>
@@ -142,7 +140,6 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
               </div>
               <button class="usermenu__item" @click="openEdit">个人信息</button>
               <NuxtLink to="/me" class="usermenu__item" @click="menuOpen = false">我的投稿</NuxtLink>
-              <NuxtLink v-if="isAdmin" to="/admin" class="usermenu__item usermenu__item--admin" @click="menuOpen = false">管理端</NuxtLink>
               <button class="usermenu__item usermenu__item--logout" @click="logout">退出登录</button>
             </div>
           </template>
@@ -254,7 +251,6 @@ const isAdmin = computed(() => user.value && ['editor', 'admin'].includes(user.v
   cursor: pointer; text-decoration: none;
 }
 .usermenu__item:hover { background: var(--well); }
-.usermenu__item--admin { color: var(--coral); font-weight: 700; }
 .usermenu__item--logout { color: var(--red); }
 .avatarfield { display: flex; flex-direction: column; }
 .avatarfield__preview { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--line); margin-bottom: 10px; object-fit: cover; }
