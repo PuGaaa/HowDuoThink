@@ -162,7 +162,7 @@ def test_ai_draft_merges_generated(monkeypatch):
     }
     captured = {}
 
-    def fake_node_draft(material):
+    def fake_node_draft(material, uid=None):
         captured.update(material)
         return generated, []
 
@@ -192,7 +192,7 @@ def test_ai_draft_falls_back_without_json(monkeypatch):
     from features.ai import service
     monkeypatch.setattr("features.ai.client.available", lambda: True)
     monkeypatch.setattr("features.ai.service.node_draft",
-                        lambda m: ({}, ["GLM 输出无法解析为 JSON，已回退机械骨架"]))
+                        lambda m, uid=None: ({}, ["GLM 输出无法解析为 JSON，已回退机械骨架"]))
 
     c = _client()
     make_user(c, "editor4", role="editor")

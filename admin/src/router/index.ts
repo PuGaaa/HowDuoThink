@@ -39,6 +39,12 @@ const router = createRouter({
           component: () => import('@/features/users/pages/UsersPage.vue'),
           meta: { title: '用户管理' },
         },
+        {
+          path: 'ai-usage',
+          name: 'ai-usage',
+          component: () => import('@/features/ai-usage/pages/AiUsagePage.vue'),
+          meta: { title: 'AI 用量' },
+        },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },

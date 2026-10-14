@@ -70,7 +70,12 @@ def _case_chunks(payload: dict) -> list[tuple[str, str]]:
 
 
 def _embed(texts: list[str]) -> list[list[float]]:
+    from features.ai import usage
+
+    t0 = time.perf_counter()
     vectors = client.embeddings_model().embed_documents(texts)
+    # 嵌入调用审计：本地 fastembed 无 token 概念，记耗时；zhipu 有量但 LangChain 侧不透出
+    usage.log_usage(None, "embed", duration_ms=int((time.perf_counter() - t0) * 1000))
     return vectors
 
 
@@ -157,14 +162,23 @@ def node_retrieve(query: str, k: int = 4) -> list[dict]:
 
 # ────────────────────────── 节点：应答 ──────────────────────────
 
-def node_answer(question: str, chunks: list[dict]) -> str:
-    """应答节点：检索结果 → system prompt → GLM 回答。"""
+def node_answer(question: str, chunks: list[dict], uid: str | None = None) -> str:
+    """应答节点：检索结果 → system prompt → GLM 回答。调用即审计（token/耗时/成败）。"""
+    from features.ai import usage
+
     context = "\n\n────────\n".join(c["content"] for c in chunks) if chunks else "（案例库检索无结果）"
     messages = [
         ("system", SYSTEM_PROMPT),
         ("human", f"【案例库上下文】\n{context}\n\n【工程师的问题】\n{question}"),
     ]
-    resp = client.chat_model().invoke(messages)
+    t0 = time.perf_counter()
+    try:
+        resp = client.chat_model().invoke(messages)
+    except Exception:
+        usage.log_usage(uid, "chat", duration_ms=int((time.perf_counter() - t0) * 1000), ok=False)
+        raise
+    pin, pout = usage.extract_tokens(resp)
+    usage.log_usage(uid, "chat", pin, pout, int((time.perf_counter() - t0) * 1000))
     return resp.content
 
 
@@ -175,7 +189,7 @@ def chat(question: str, uid: str) -> dict:
     if not _rate_ok(uid):
         return {"error": "提问太频繁，稍后再试", "aiAvailable": True}
     chunks = node_retrieve(question, k=4)
-    answer = node_answer(question, chunks)
+    answer = node_answer(question, chunks, uid=uid)
     sources = []
     seen = set()
     for c in chunks:
@@ -223,9 +237,11 @@ DRAFT_PROMPT = """你是「好多星 HowDuoThink」的出题编辑。根据投�
 领域提示：{domain_hint}"""
 
 
-def node_draft(material: dict) -> tuple[dict, list[str]]:
-    """起草节点：投稿素材 → GLM 预填 JSON →（容错解析）。返回 (payload_dict, warnings)。"""
+def node_draft(material: dict, uid: str | None = None) -> tuple[dict, list[str]]:
+    """起草节点：投稿素材 → GLM 预填 JSON →（容错解析）。返回 (payload_dict, warnings)。调用即审计。"""
     import json as _json
+
+    from features.ai import usage
 
     prompt = DRAFT_PROMPT.format(
         title=material.get("title", ""),
@@ -237,10 +253,17 @@ def node_draft(material: dict) -> tuple[dict, list[str]]:
         domain_hint=material.get("domainHint") or "（无）",
     )
     warnings: list[str] = []
-    resp = client.chat_model().invoke([
-        ("system", "你是资深的出题编辑，输出严格的 JSON。"),
-        ("human", prompt),
-    ])
+    t0 = time.perf_counter()
+    try:
+        resp = client.chat_model().invoke([
+            ("system", "你是资深的出题编辑，输出严格的 JSON。"),
+            ("human", prompt),
+        ])
+    except Exception:
+        usage.log_usage(uid, "draft", duration_ms=int((time.perf_counter() - t0) * 1000), ok=False)
+        raise
+    pin, pout = usage.extract_tokens(resp)
+    usage.log_usage(uid, "draft", pin, pout, int((time.perf_counter() - t0) * 1000))
     text = resp.content.strip()
     if text.startswith("```"):
         text = text.strip("`").removeprefix("json").strip()
@@ -277,7 +300,7 @@ def ai_draft_from_submission(uid: str, sid: str) -> dict:
         "lessons": db.jload(s["lessons"], []), "domainHint": s["domain_hint"],
     }
     warnings: list[str] = []
-    generated, w = node_draft(material)
+    generated, w = node_draft(material, uid=uid)
     warnings.extend(w)
 
     skeleton = sub_service.draft_skeleton_from_submission(sid)

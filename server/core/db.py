@@ -103,6 +103,17 @@ CREATE TABLE IF NOT EXISTS ai_index (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ux_ai ON ai_index(source_type, source_id, chunk_kind);
+CREATE TABLE IF NOT EXISTS ai_usage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uid TEXT,
+  kind TEXT NOT NULL,
+  prompt_tokens INTEGER NOT NULL DEFAULT 0,
+  completion_tokens INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  ok INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS ix_ai_usage_created ON ai_usage(created_at);
 """
 
 # MySQL 建库脚本：key 是保留字 → meta 主键列名为 meta_key；日期列用 DATETIME（默认 CURRENT_TIMESTAMP）
@@ -187,6 +198,17 @@ CREATE TABLE IF NOT EXISTS ai_index (
   model VARCHAR(128) NOT NULL,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY ux_ai (source_type, source_id, chunk_kind)
+);
+CREATE TABLE IF NOT EXISTS ai_usage (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  uid VARCHAR(64),
+  kind VARCHAR(32) NOT NULL,
+  prompt_tokens BIGINT NOT NULL DEFAULT 0,
+  completion_tokens BIGINT NOT NULL DEFAULT 0,
+  duration_ms BIGINT NOT NULL DEFAULT 0,
+  ok TINYINT NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX ix_ai_usage_created (created_at)
 );
 """
 

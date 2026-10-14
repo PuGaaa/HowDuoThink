@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends
 
 from core.deps import current_user, require_editor
-from features.ai import models, service
+from features.ai import models, service, usage
 
 router = APIRouter(tags=["ai"])
 
@@ -21,3 +21,15 @@ def ai_search(q: str, k: int = 4, uid: str = Depends(current_user)):
 def ai_reindex(body: models.ReindexBody | None = None, uid: str = Depends(current_user)):
     require_editor(uid)
     return service.reindex_all()
+
+
+@router.get("/api/admin/ai/usage/users")
+def ai_usage_top_users(days: int = 30, uid: str = Depends(current_user)):
+    require_editor(uid)
+    return {"items": usage.top_users(days)}
+
+
+@router.get("/api/admin/ai/usage")
+def ai_usage_summary(days: int = 30, uid: str = Depends(current_user)):
+    require_editor(uid)
+    return usage.daily_summary(days)

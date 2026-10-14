@@ -47,3 +47,7 @@ ZHIPU_API_KEY = os.environ.get("ZHIPU_API_KEY", "")
 ZHIPU_BASE_URL = os.environ.get("ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
 GLM_EMBED_MODEL = os.environ.get("GLM_EMBED_MODEL", "embedding-3")
 GLM_EMBED_DIM = int(os.environ.get("GLM_EMBED_DIM", "1024"))
+
+# AI 用量审计的成本单价（元 / 百万 tokens），管理端看板按此估算；随供应商调价用环境变量改
+DEEPSEEK_PRICE_IN = float(os.environ.get("DEEPSEEK_PRICE_IN", "2"))
+DEEPSEEK_PRICE_OUT = float(os.environ.get("DEEPSEEK_PRICE_OUT", "8"))
