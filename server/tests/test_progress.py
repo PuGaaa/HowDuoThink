@@ -3,12 +3,12 @@ from tests.conftest import make_client, login_admin
 
 BLOB_V1 = {
     "cases": {
-        "dns-hijack": {"solved": True, "bestGrade": "S", "bestCost": 3, "plays": 1},
+        "dns-hijack": {"solved": False, "bestGrade": "F", "bestCost": 7, "plays": 2, "fails": 2},
     }
 }
 BLOB_V2 = {
     "cases": {
-        "dns-hijack": {"solved": True, "bestGrade": "A", "bestCost": 4, "plays": 2},
+        "dns-hijack": {"solved": True, "bestGrade": "A", "bestCost": 4, "plays": 3, "fails": 2},
         "cors-101": {"solved": True, "bestGrade": "B", "bestCost": 5, "plays": 1},
     }
 }
@@ -26,7 +26,9 @@ def test_progress_put_then_get():
         r = client.post("/api/me/progress", json=BLOB_V1)
         assert r.status_code == 200
         g = client.get("/api/me/progress").json()
-        assert g["cases"]["dns-hijack"]["bestGrade"] == "S"
+        assert g["cases"]["dns-hijack"]["bestGrade"] == "F"
+        # 失败留痕字段不被丢弃
+        assert g["cases"]["dns-hijack"]["fails"] == 2
         assert g["updatedAt"]
 
 
