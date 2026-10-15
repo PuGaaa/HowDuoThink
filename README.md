@@ -49,6 +49,12 @@ docs/案例写作规范.md  →  content/prompts  →  content/seeds（草稿）
 cd server
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./dev.sh
+#    若 .env.dev.local 配了 DB_PROVIDER=mysql（推荐，与线上一致）：本地 MySQL 容器需一次性
+#    建库建号，账号密码与 .env.dev.local 对齐。例：
+#      docker exec <mysql容器> mysql -uroot -p<root密码> -e \
+#        "CREATE DATABASE IF NOT EXISTS hdx CHARACTER SET utf8mb4;
+#         CREATE USER IF NOT EXISTS 'hdx'@'%' IDENTIFIED BY '<密码>';
+#         GRANT ALL ON hdx.* TO 'hdx'@'%';"
 
 # 2. 起管理端（:5174，另开终端）。首次打开会进入"设置初始管理员"向导
 cd admin && npm install && npm run dev
