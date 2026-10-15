@@ -26,8 +26,10 @@ npm install
 npm run dev    # localhost:5174（避开 App H5 dev 的 5173）；/api 代理到本地 server（默认 8000）
 ```
 
-先起 server（见 `server/dev.sh`），管理员由 `ADMIN_PASSWORD` 引导创建（账号 `pw-admin`），
-或用 `GITHUB_ADMIN_LOGINS` 白名单账号。鉴权走 `/api/auth/login` 响应体里的 token，
+先起 server（见 `server/dev.sh`）。**初始账号二选一**：
+部署时配 `ADMIN_PASSWORD`（自动创建 `pw-admin`），或不配——首次打开 `/admin/` 会进入
+"设置初始管理员"向导（库中一旦存在 admin 该通道立即永久关闭）。也可用
+`GITHUB_ADMIN_LOGINS` 白名单账号。鉴权走 `/api/auth/login` 响应体里的 token，
 存 localStorage，全局路由守卫拦未登录。
 
 ## 构建与部署

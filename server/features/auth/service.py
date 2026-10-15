@@ -28,6 +28,29 @@ def ensure_active(uid: str) -> None:
         raise HTTPException(403, "账号已被封禁")
 
 
+def needs_bootstrap() -> bool:
+    """登录页初始化向导探测：库中是否存在任何 admin。"""
+    return not db.q("SELECT id FROM users WHERE role='admin' LIMIT 1")
+
+
+def bootstrap_admin(login: str, password: str) -> dict:
+    """创建首个管理员：事务内复查"无 admin"才写入，通道用后即闭。
+    与 ADMIN_PASSWORD 种子互补——前者是部署自动化的引导，这是没配该变量时的自助通道。"""
+    uid = "pw-" + login
+    pw_hash = security.hash_password(password)
+    with db.tx() as conn:
+        if conn.execute("SELECT id FROM users WHERE role='admin' LIMIT 1").fetchall():
+            raise HTTPException(409, "系统已有管理员，初始化通道已关闭")
+        try:
+            conn.execute(
+                "INSERT INTO users(id, login, name, avatar, role, password_hash) VALUES(?,?,?,?,'admin',?)",
+                (uid, login, login, "", pw_hash),
+            )
+        except Exception:
+            raise HTTPException(409, "该账号已被占用")
+    return {"ok": True, "login": login, "role": "admin"}
+
+
 def upsert_oauth_user(u: dict, role: str) -> None:
     db.ex(
         "INSERT INTO users(id, login, name, avatar, role) VALUES(?,?,?,?,?) "

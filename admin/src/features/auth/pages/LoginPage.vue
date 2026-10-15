@@ -1,17 +1,37 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NInput } from 'naive-ui'
+import { api } from '@/api/client'
 import { useAuth } from '@/composables/useAuth'
 
 const { login } = useAuth()
 const route = useRoute()
 const router = useRouter()
 
+// needsBootstrap = 系统还没有任何管理员 → 展示初始化向导（用后即闭）
+const mode = ref<'login' | 'bootstrap'>('login')
+const bootChecked = ref(false)
+
 const loginName = ref('')
 const password = ref('')
 const err = ref('')
 const busy = ref(false)
+
+const bootForm = ref({ login: '', password: '', confirm: '' })
+const bootErr = ref('')
+const bootBusy = ref(false)
+
+onMounted(async () => {
+  try {
+    const r = await api.get('/api/auth/bootstrap')
+    if (r.needsBootstrap) mode.value = 'bootstrap'
+  } catch {
+    // 探测失败保持登录表单
+  } finally {
+    bootChecked.value = true
+  }
+})
 
 async function submit() {
   err.value = ''
@@ -26,29 +46,83 @@ async function submit() {
     busy.value = false
   }
 }
+
+async function submitBootstrap() {
+  bootErr.value = ''
+  const { login: name, password: pw, confirm } = bootForm.value
+  if (pw.length < 6) {
+    bootErr.value = '密码至少 6 位'
+    return
+  }
+  if (pw !== confirm) {
+    bootErr.value = '两次输入的密码不一致'
+    return
+  }
+  bootBusy.value = true
+  try {
+    await api.post('/api/auth/bootstrap', { login: name.trim(), password: pw })
+    await login(name.trim(), pw)
+    router.push('/')
+  } catch (e: any) {
+    bootErr.value = e?.message || '初始化失败'
+  } finally {
+    bootBusy.value = false
+  }
+}
 </script>
 
 <template>
   <div class="wrap">
     <div class="card">
       <h1 class="title">⭐ 好多星 · 管理端</h1>
-      <p class="hint">仅 editor / admin 角色可登录</p>
-      <div class="field">
-        <label>账号</label>
-        <NInput v-model:value="loginName" placeholder="账号" @keyup.enter="submit" />
-      </div>
-      <div class="field">
-        <label>密码</label>
-        <NInput
-          v-model:value="password"
-          type="password"
-          show-password-on="click"
-          placeholder="密码"
-          @keyup.enter="submit"
-        />
-      </div>
-      <p v-if="err" class="err">{{ err }}</p>
-      <NButton type="primary" block :loading="busy" @click="submit">登录</NButton>
+      <template v-if="mode === 'bootstrap'">
+        <p class="hint">系统还没有管理员账号，请设置初始管理员（创建后此向导自动关闭）</p>
+        <div class="field">
+          <label>管理员账号</label>
+          <NInput v-model:value="bootForm.login" placeholder="2-40 位账号" @keyup.enter="submitBootstrap" />
+        </div>
+        <div class="field">
+          <label>密码（≥6 位）</label>
+          <NInput
+            v-model:value="bootForm.password"
+            type="password"
+            show-password-on="click"
+            placeholder="密码"
+            @keyup.enter="submitBootstrap"
+          />
+        </div>
+        <div class="field">
+          <label>确认密码</label>
+          <NInput
+            v-model:value="bootForm.confirm"
+            type="password"
+            show-password-on="click"
+            placeholder="再输一遍"
+            @keyup.enter="submitBootstrap"
+          />
+        </div>
+        <p v-if="bootErr" class="err">{{ bootErr }}</p>
+        <NButton type="primary" block :loading="bootBusy" @click="submitBootstrap">创建初始管理员并进入</NButton>
+      </template>
+      <template v-else>
+        <p class="hint">仅 editor / admin 角色可登录</p>
+        <div class="field">
+          <label>账号</label>
+          <NInput v-model:value="loginName" placeholder="账号" @keyup.enter="submit" />
+        </div>
+        <div class="field">
+          <label>密码</label>
+          <NInput
+            v-model:value="password"
+            type="password"
+            show-password-on="click"
+            placeholder="密码"
+            @keyup.enter="submit"
+          />
+        </div>
+        <p v-if="err" class="err">{{ err }}</p>
+        <NButton type="primary" block :loading="busy" @click="submit">登录</NButton>
+      </template>
     </div>
   </div>
 </template>
