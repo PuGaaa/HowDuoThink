@@ -57,7 +57,7 @@ onMounted(load)
       <NButton size="small" quaternary @click="load">刷新</NButton>
     </div>
 
-    <div class="stats">
+    <div class="stat-row">
       <div class="statbox">
         <div class="statbox__n">{{ total.cost.toFixed(4) }}</div>
         <div class="statbox__k">估算成本（元）</div>
@@ -74,12 +74,12 @@ onMounted(load)
 
     <NCard size="small" title="按日用量" class="section">
       <p v-if="summary.length === 0 && !loading" class="empty">窗口内暂无 AI 调用。</p>
-      <div v-for="d in summary" :key="d.day" class="dayrow">
-        <span class="dayrow__day">{{ d.day }}</span>
-        <div class="dayrow__bar">
-          <div class="dayrow__fill" :style="{ width: ((d.prompt_tokens + d.completion_tokens) / maxTokens) * 100 + '%' }" />
+      <div v-for="d in summary" :key="d.day" class="barrow">
+        <span class="barrow__label">{{ d.day }}</span>
+        <div class="barrow__bar">
+          <div class="barrow__fill" :style="{ width: ((d.prompt_tokens + d.completion_tokens) / maxTokens) * 100 + '%' }" />
         </div>
-        <span class="dayrow__meta">
+        <span class="barrow__meta">
           对话 {{ d.chats }} · 起草 {{ d.drafts }} · {{ (d.prompt_tokens + d.completion_tokens).toLocaleString() }} tk ·
           {{ d.cost.toFixed(4) }} 元<template v-if="d.avg_ms != null"> · 均耗 {{ d.avg_ms }}ms</template>
         </span>
@@ -96,33 +96,6 @@ onMounted(load)
 </template>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-.stats {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.statbox {
-  flex: 1;
-  background: #fff;
-  border-radius: 12px;
-  padding: 14px;
-  text-align: center;
-}
-.statbox__n {
-  font-size: 22px;
-  font-weight: 800;
-  color: #7c5cd6;
-}
-.statbox__k {
-  font-size: 12px;
-  color: #9c96ad;
-  margin-top: 2px;
-}
 .section {
   margin-bottom: 16px;
 }
@@ -135,35 +108,35 @@ onMounted(load)
 }
 .dayrow__day {
   width: 88px;
-  color: #6b6480;
+  color: var(--ink2);
   flex-shrink: 0;
 }
 .dayrow__bar {
   flex: 1;
   height: 10px;
-  background: #f0eef5;
+  background: var(--well);
   border-radius: 5px;
   overflow: hidden;
 }
 .dayrow__fill {
   height: 100%;
-  background: linear-gradient(90deg, #7c5cd6, #a78bfa);
+  background: linear-gradient(90deg, var(--coral-deep), #a78bfa);
   border-radius: 5px;
 }
 .dayrow__meta {
   width: 330px;
-  color: #9c96ad;
+  color: var(--ink3);
   flex-shrink: 0;
   text-align: right;
 }
 .empty {
-  color: #9c96ad;
+  color: var(--ink3);
   text-align: center;
   padding: 20px 0;
 }
 .hint {
   font-size: 12px;
-  color: #c5c0d0;
+  color: var(--ink3);
   text-align: center;
 }
 </style>

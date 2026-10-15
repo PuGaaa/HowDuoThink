@@ -41,7 +41,7 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
       <NButton size="small" quaternary @click="load">刷新</NButton>
     </div>
 
-    <div class="stats">
+    <div class="stat-row">
       <div class="statbox">
         <div class="statbox__n">{{ data?.dauToday ?? '—' }}</div>
         <div class="statbox__k">今日活跃（DAU）</div>
@@ -68,7 +68,7 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
       <NCard size="small" title="活跃趋势（去重人数 / 日）" class="section">
         <p v-if="(data?.activeDaily.length ?? 0) === 0 && !loading" class="empty">窗口内暂无活跃数据。</p>
         <div v-for="d in data?.activeDaily" :key="d.day" class="barrow">
-          <span class="barrow__label">{{ d.day.slice(5) }}</span>
+          <span class="barrow__label barrow__label--short">{{ d.day.slice(5) }}</span>
           <div class="barrow__bar">
             <div class="barrow__fill" :style="{ width: (d.active / maxActive) * 100 + '%' }" />
           </div>
@@ -79,9 +79,9 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
       <NCard size="small" title="新增用户" class="section">
         <p v-if="(data?.newUsersDaily.length ?? 0) === 0 && !loading" class="empty">窗口内暂无新增。</p>
         <div v-for="d in data?.newUsersDaily" :key="d.day" class="barrow">
-          <span class="barrow__label">{{ d.day.slice(5) }}</span>
+          <span class="barrow__label barrow__label--short">{{ d.day.slice(5) }}</span>
           <div class="barrow__bar">
-            <div class="barrow__fill barrow__fill--green" :style="{ width: (d.n / maxNew) * 100 + '%' }" />
+            <div class="barrow__fill barrow__fill--mint" :style="{ width: (d.n / maxNew) * 100 + '%' }" />
           </div>
           <span class="barrow__n">{{ d.n }}</span>
         </div>
@@ -123,35 +123,6 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
 </template>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-.stats {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-.statbox {
-  flex: 1;
-  min-width: 150px;
-  background: #fff;
-  border-radius: 12px;
-  padding: 14px;
-  text-align: center;
-}
-.statbox__n {
-  font-size: 24px;
-  font-weight: 800;
-  color: #e8604c;
-}
-.statbox__k {
-  font-size: 12px;
-  color: #9c96ad;
-  margin-top: 2px;
-}
 .grid2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -159,38 +130,6 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
 }
 .section {
   margin-bottom: 16px;
-}
-.barrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 0;
-  font-size: 12px;
-}
-.barrow__label {
-  width: 44px;
-  color: #6b6480;
-  flex-shrink: 0;
-}
-.barrow__bar {
-  flex: 1;
-  height: 10px;
-  background: #f0eef5;
-  border-radius: 5px;
-  overflow: hidden;
-}
-.barrow__fill {
-  height: 100%;
-  background: linear-gradient(90deg, #e8604c, #f2917f);
-  border-radius: 5px;
-}
-.barrow__fill--green {
-  background: linear-gradient(90deg, #2e7d5b, #5bb894);
-}
-.barrow__n {
-  width: 30px;
-  text-align: right;
-  color: #9c96ad;
 }
 .flow {
   display: flex;
@@ -205,14 +144,14 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
 .flow__n {
   font-size: 20px;
   font-weight: 800;
-  color: #4a4458;
+  color: var(--ink);
 }
 .flow__k {
   font-size: 12px;
-  color: #9c96ad;
+  color: var(--ink3);
 }
 .flow__arrow {
-  color: #c5c0d0;
+  color: var(--ink3);
   font-size: 18px;
 }
 .flow__chips {
@@ -222,15 +161,5 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
 }
 .spacer {
   flex: 1;
-}
-.empty {
-  color: #9c96ad;
-  text-align: center;
-  padding: 20px 0;
-}
-.hint {
-  font-size: 12px;
-  color: #c5c0d0;
-  text-align: center;
 }
 </style>

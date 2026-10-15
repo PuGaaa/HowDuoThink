@@ -212,7 +212,7 @@ async function publish() {
 }
 .pagehead__id {
   font-size: 13px;
-  color: #afa8bd;
+  color: var(--ink3);
   margin: 6px 0 0;
 }
 .placeholderbar {
@@ -220,20 +220,22 @@ async function publish() {
   margin: 12px 0 18px;
 }
 .placeholderbar .hot {
-  color: #d6455d;
+  color: var(--red-deep);
   font-size: 16px;
 }
 .placeholderbar .ok {
-  color: #2e7d5b;
+  color: var(--mint-deep);
   font-size: 16px;
 }
 .placeholderbar .dim {
-  color: #afa8bd;
+  color: var(--ink3);
   font-size: 12px;
 }
 .panel {
-  background: #fff;
-  border-radius: 14px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 5px 0 var(--edge-cream);
   padding: 20px 22px;
   margin-bottom: 18px;
 }
@@ -257,12 +259,12 @@ async function publish() {
   display: block;
   font-size: 12px;
   font-weight: 700;
-  color: #7a7290;
+  color: var(--ink2);
   margin-bottom: 5px;
 }
 .mfield__vocab {
   font-size: 11px;
-  color: #c5c0d0;
+  color: var(--ink3);
   margin-top: 4px;
   display: block;
 }
@@ -270,7 +272,7 @@ async function publish() {
   width: 100%;
 }
 .errlist {
-  color: #d6455d;
+  color: var(--red-deep);
   font-size: 13px;
   padding-left: 18px;
   margin: 10px 0;
@@ -282,7 +284,7 @@ async function publish() {
 }
 .deployhint {
   font-size: 12px;
-  color: #c5c0d0;
+  color: var(--ink3);
   text-align: center;
   margin-top: 26px;
 }

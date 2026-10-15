@@ -11,7 +11,6 @@ const router = useRouter()
 
 // needsBootstrap = 系统还没有任何管理员 → 展示初始化向导（用后即闭）
 const mode = ref<'login' | 'bootstrap'>('login')
-const bootChecked = ref(false)
 
 const loginName = ref('')
 const password = ref('')
@@ -28,8 +27,6 @@ onMounted(async () => {
     if (r.needsBootstrap) mode.value = 'bootstrap'
   } catch {
     // 探测失败保持登录表单
-  } finally {
-    bootChecked.value = true
   }
 })
 
@@ -74,9 +71,11 @@ async function submitBootstrap() {
 <template>
   <div class="wrap">
     <div class="card">
-      <h1 class="title">⭐ 好多星 · 管理端</h1>
+      <div class="logo">⭐</div>
+      <h1 class="title">好多星 · 管理端</h1>
+
       <template v-if="mode === 'bootstrap'">
-        <p class="hint">系统还没有管理员账号，请设置初始管理员（创建后此向导自动关闭）</p>
+        <p class="hint-line">系统还没有管理员账号，请设置初始管理员（创建后此向导自动关闭）</p>
         <div class="field">
           <label>管理员账号</label>
           <NInput v-model:value="bootForm.login" placeholder="2-40 位账号" @keyup.enter="submitBootstrap" />
@@ -102,10 +101,12 @@ async function submitBootstrap() {
           />
         </div>
         <p v-if="bootErr" class="err">{{ bootErr }}</p>
-        <NButton type="primary" block :loading="bootBusy" @click="submitBootstrap">创建初始管理员并进入</NButton>
+        <NButton type="primary" block size="large" :loading="bootBusy" @click="submitBootstrap">
+          创建初始管理员并进入
+        </NButton>
       </template>
       <template v-else>
-        <p class="hint">仅 editor / admin 角色可登录</p>
+        <p class="hint-line">诊断思维训练场 · 内容与运营控制台</p>
         <div class="field">
           <label>账号</label>
           <NInput v-model:value="loginName" placeholder="账号" @keyup.enter="submit" />
@@ -121,7 +122,7 @@ async function submitBootstrap() {
           />
         </div>
         <p v-if="err" class="err">{{ err }}</p>
-        <NButton type="primary" block :loading="busy" @click="submit">登录</NButton>
+        <NButton type="primary" block size="large" :loading="busy" @click="submit">登录</NButton>
       </template>
     </div>
   </div>
@@ -133,37 +134,56 @@ async function submitBootstrap() {
   display: flex;
   align-items: center;
   justify-content: center;
+  background:
+    radial-gradient(circle at 12% 18%, var(--coral-soft) 0, transparent 34%),
+    radial-gradient(circle at 88% 82%, var(--sky-soft) 0, transparent 34%),
+    var(--bg);
 }
+
 .card {
-  width: 360px;
-  background: #fff;
-  border-radius: 16px;
-  padding: 32px 30px;
-  box-shadow: 0 12px 40px rgba(42, 39, 51, 0.08);
+  width: 380px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 20px;
+  padding: 36px 34px;
+  box-shadow: 0 8px 0 var(--edge-cream);
 }
+
+.logo {
+  font-size: 40px;
+  text-align: center;
+  filter: drop-shadow(0 4px 0 var(--edge-cream));
+}
+
 .title {
-  font-size: 18px;
-  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 8px 0 4px;
   text-align: center;
 }
-.hint {
+
+.hint-line {
   text-align: center;
-  color: #9c96ad;
+  color: var(--ink3);
   font-size: 12px;
-  margin: 0 0 22px;
+  margin: 0 0 24px;
 }
+
 .field {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
+
 .field label {
   display: block;
   font-size: 12px;
   font-weight: 700;
-  color: #7a7290;
-  margin-bottom: 5px;
+  color: var(--ink2);
+  margin-bottom: 6px;
 }
+
 .err {
-  color: #d6455d;
+  color: var(--red-deep);
   font-size: 13px;
   margin: 0 0 10px;
 }

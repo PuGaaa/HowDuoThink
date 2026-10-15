@@ -20,13 +20,15 @@
 
 ## 开发
 
+前置：先起 server（`server/dev.sh`，:8000；首次需 `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`）。完整启动顺序见根 README「快速启动」。
+
 ```bash
 cd admin
 npm install
 npm run dev    # localhost:5174（避开 App H5 dev 的 5173）；/api 代理到本地 server（默认 8000）
 ```
 
-先起 server（见 `server/dev.sh`）。**初始账号二选一**：
+**初始账号二选一**：
 部署时配 `ADMIN_PASSWORD`（自动创建 `pw-admin`），或不配——首次打开 `/admin/` 会进入
 "设置初始管理员"向导（库中一旦存在 admin 该通道立即永久关闭）。也可用
 `GITHUB_ADMIN_LOGINS` 白名单账号。鉴权走 `/api/auth/login` 响应体里的 token，

@@ -89,7 +89,7 @@ async function confirmReject() {
 
 <template>
   <div>
-    <div class="stats">
+    <div class="stat-row">
       <div class="statbox">
         <div class="statbox__n">{{ pendingCount }}</div>
         <div class="statbox__k">待审投稿</div>
@@ -104,7 +104,7 @@ async function confirmReject() {
       </div>
     </div>
 
-    <div class="filter">
+    <div class="toolbar">
       <NButton size="small" :type="filter === 'all' ? 'primary' : 'default'" secondary @click="filter = 'all'">
         全部（{{ subs.length }}）
       </NButton>
@@ -179,33 +179,6 @@ async function confirmReject() {
 </template>
 
 <style scoped>
-.stats {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.statbox {
-  flex: 1;
-  background: #fff;
-  border-radius: 12px;
-  padding: 14px;
-  text-align: center;
-}
-.statbox__n {
-  font-size: 24px;
-  font-weight: 800;
-  color: #e8604c;
-}
-.statbox__k {
-  font-size: 12px;
-  color: #9c96ad;
-  margin-top: 2px;
-}
-.filter {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 14px;
-}
 .sub {
   margin-bottom: 10px;
 }
@@ -216,13 +189,13 @@ async function confirmReject() {
   gap: 10px;
 }
 .sub__meta {
-  color: #9c96ad;
+  color: var(--ink3);
   font-size: 12px;
   margin: 6px 0;
 }
 .sub__detail summary {
   cursor: pointer;
-  color: #9c96ad;
+  color: var(--ink3);
   font-size: 13px;
 }
 .sub__detail p {
@@ -234,10 +207,5 @@ async function confirmReject() {
   margin-top: 10px;
   display: flex;
   gap: 8px;
-}
-.empty {
-  color: #9c96ad;
-  text-align: center;
-  padding: 40px 0;
 }
 </style>

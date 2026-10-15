@@ -38,7 +38,7 @@ const refresh = () => load()
       <NButton size="small" quaternary @click="refresh">刷新</NButton>
     </div>
 
-    <div class="stats">
+    <div class="stat-row">
       <div class="statbox">
         <div class="statbox__dot" :class="data?.db.ok ? 'ok' : 'bad'" />
         <div class="statbox__k">数据库（{{ data?.db.provider }}）</div>
@@ -67,9 +67,9 @@ const refresh = () => load()
         暂无快照——服务启动后第一个快照周期（5 分钟）后出现。
       </p>
       <div v-for="r in recentReversed" :key="r.ts" class="barrow">
-        <span class="barrow__label">{{ r.ts.slice(11, 16) }}</span>
+        <span class="barrow__label barrow__label--short">{{ r.ts.slice(11, 16) }}</span>
         <div class="barrow__bar">
-          <div class="barrow__fill" :style="{ width: (r.requests / maxReq) * 100 + '%' }" />
+          <div class="barrow__fill barrow__fill--sky" :style="{ width: (r.requests / maxReq) * 100 + '%' }" />
         </div>
         <span class="barrow__meta">
           {{ r.requests }} 请求<template v-if="r.errors"> · <b class="err">{{ r.errors }} 错误</b></template>
@@ -91,31 +91,9 @@ const refresh = () => load()
 </template>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  align-items: center;
-  margin-bottom: 14px;
-}
 .auto {
-  color: #9c96ad;
+  color: var(--ink3);
   font-size: 12px;
-}
-.spacer {
-  flex: 1;
-}
-.stats {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-.statbox {
-  flex: 1;
-  min-width: 150px;
-  background: #fff;
-  border-radius: 12px;
-  padding: 14px;
-  text-align: center;
 }
 .statbox__dot {
   width: 14px;
@@ -124,60 +102,20 @@ const refresh = () => load()
   margin: 2px auto 6px;
 }
 .statbox__dot.ok {
-  background: #2e7d5b;
+  background: var(--mint-deep);
 }
 .statbox__dot.bad {
-  background: #d6455d;
-}
-.statbox__n {
-  font-size: 22px;
-  font-weight: 800;
-  color: #4a4458;
-}
-.statbox__k {
-  font-size: 12px;
-  color: #9c96ad;
-  margin-top: 2px;
+  background: var(--red-deep);
 }
 .statbox__s {
   font-size: 11px;
-  color: #c5c0d0;
+  color: var(--ink3);
 }
 .section {
   margin-bottom: 16px;
 }
-.barrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 0;
-  font-size: 12px;
-}
-.barrow__label {
-  width: 40px;
-  color: #6b6480;
-  flex-shrink: 0;
-}
-.barrow__bar {
-  flex: 1;
-  height: 10px;
-  background: #f0eef5;
-  border-radius: 5px;
-  overflow: hidden;
-}
-.barrow__fill {
-  height: 100%;
-  background: linear-gradient(90deg, #4a6fd6, #7fa1ec);
-  border-radius: 5px;
-}
-.barrow__meta {
-  width: 260px;
-  text-align: right;
-  color: #9c96ad;
-  flex-shrink: 0;
-}
 .err {
-  color: #d6455d;
+  color: var(--red-deep);
 }
 .chips {
   display: flex;
@@ -185,7 +123,7 @@ const refresh = () => load()
   flex-wrap: wrap;
 }
 .empty {
-  color: #9c96ad;
+  color: var(--ink3);
   text-align: center;
   padding: 20px 0;
 }

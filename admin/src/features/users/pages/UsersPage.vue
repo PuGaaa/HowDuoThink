@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, onMounted, ref } from 'vue'
 import { useMessage } from 'naive-ui'
-import { NButton, NDataTable, NInput, NPagination, NSelect, NTag } from 'naive-ui'
+import { NButton, NCard, NDataTable, NInput, NPagination, NSelect, NTag } from 'naive-ui'
 import type { DataTableColumns, SelectOption } from 'naive-ui'
 import { usersApi, type AdminUserRow } from '../api/users'
 import { useAuth } from '@/composables/useAuth'
@@ -77,7 +77,7 @@ const columns: DataTableColumns<AdminUserRow> = [
     render(row) {
       return h('div', [
         h('div', { style: 'font-weight:700' }, row.login),
-        h('div', { style: 'font-size:12px;color:#9c96ad' }, row.name || ''),
+        h('div', { style: 'font-size:12px;color:var(--ink3)' }, row.name || ''),
       ])
     },
   },
@@ -116,7 +116,7 @@ const columns: DataTableColumns<AdminUserRow> = [
     key: 'actions',
     width: 110,
     render(row) {
-      if (isSelf(row)) return h('span', { style: 'color:#c5c0d0;font-size:12px' }, '不能操作自己')
+      if (isSelf(row)) return h('span', { style: 'color:var(--ink3);font-size:12px' }, '不能操作自己')
       return h(
         NButton,
         {
@@ -148,30 +148,18 @@ const columns: DataTableColumns<AdminUserRow> = [
       <span class="total">共 {{ total }} 人</span>
     </div>
 
-    <NDataTable :columns="columns" :data="items" :loading="loading" :bordered="false" size="small" />
-    <div class="pager">
-      <NPagination
-        v-model:page="page"
-        :page-size="pageSize"
-        :item-count="total"
-        @update:page="load"
-      />
-    </div>
+    <NCard size="small">
+      <NDataTable :columns="columns" :data="items" :loading="loading" :bordered="false" size="small" />
+      <div class="pager">
+        <NPagination v-model:page="page" :page-size="pageSize" :item-count="total" @update:page="load" />
+      </div>
+    </NCard>
   </div>
 </template>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 14px;
-}
-.spacer {
-  flex: 1;
-}
 .total {
-  color: #9c96ad;
+  color: var(--ink3);
   font-size: 13px;
 }
 .pager {

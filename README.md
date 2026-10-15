@@ -40,6 +40,32 @@ docs/案例写作规范.md  →  content/prompts  →  content/seeds（草稿）
 
 ## 开发
 
+### 快速启动（本地把整套跑起来）
+
+前置：Python 3.12+、Node 20+。以下顺序执行，后端必须先起（管理端/社区站都依赖它）：
+
+```bash
+# 1. 起社区后端（:8000）。首次需建 venv（dev.sh 用的就是它）；dev.sh 已固定 JWT_SECRET、ENV=dev
+cd server
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+./dev.sh
+
+# 2. 起管理端（:5174，另开终端）。首次打开会进入"设置初始管理员"向导
+cd admin && npm install && npm run dev
+#    浏览器开 http://localhost:5174/admin/ → 设置初始管理员账号 → 登录
+#    （也可跳过向导：起后端前 export ADMIN_PASSWORD=你的密码，账号即 pw-admin）
+
+# 3. Web 社区站（:3000，可选）
+cd web && npm install && npm run dev
+```
+
+不想起管理端 dev server？构建一次，由后端直接托管（与生产同款链路）：
+
+```bash
+cd admin && npm run build
+cd ../server && ADMIN_DIST_DIR=../admin/dist ./dev.sh   # 访问 http://localhost:8000/admin/
+```
+
 **App（uni-app X）**
 
 - 用 HBuilderX 5.21+ 打开 `app/` 目录，勾选蒸汽模式（manifest 已配置 `"vapor": true`）

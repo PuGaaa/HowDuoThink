@@ -111,15 +111,6 @@ function reindex() {
 </template>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 14px;
-}
-.spacer {
-  flex: 1;
-}
 .case {
   margin-bottom: 10px;
 }
@@ -134,10 +125,10 @@ function reindex() {
   cursor: pointer;
 }
 .case__title:hover {
-  color: #7c5cd6;
+  color: var(--coral-deep);
 }
 .case__meta {
-  color: #9c96ad;
+  color: var(--ink3);
   font-size: 12px;
   margin: 6px 0;
 }
@@ -145,10 +136,5 @@ function reindex() {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-}
-.empty {
-  color: #9c96ad;
-  text-align: center;
-  padding: 40px 0;
 }
 </style>

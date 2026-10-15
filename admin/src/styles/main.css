@@ -1,3 +1,31 @@
+/* 管理端设计令牌：与社区站同一套品牌语言（奶油底 + 珊瑚主色 + 多邻国式硬边实体积木）。
+   令牌来源：web/assets/css/main.css，两站必须同步改。 */
+:root {
+  --bg: #FFF9F4;
+  --card: #FFFFFF;
+  --line: #F5E6DA;
+  --well: #FBF3EB;
+  --coral: #FF8A5C;
+  --coral-deep: #E06B38;
+  --coral-soft: #FFF1E7;
+  --ink: #4A4458;
+  --ink2: #7A7290;
+  --ink3: #AFA8BD;
+  --mint: #5FC9A5;
+  --mint-soft: #E9F7F1;
+  --mint-deep: #2E7D5B;
+  --sky: #6FB8E8;
+  --sky-soft: #EAF4FC;
+  --sky-deep: #4A7FB5;
+  --lemon: #FFC94D;
+  --lemon-soft: #FFF6DE;
+  --lemon-deep: #8A6D1F;
+  --red: #E86A6A;
+  --red-soft: #FDEDED;
+  --red-deep: #C05050;
+  --edge-cream: #EFE5D6;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -10,12 +38,155 @@ body {
 
 body {
   font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background: #f5f3f7;
-  color: #4a4458;
+  background: var(--bg);
+  color: var(--ink);
   font-size: 14px;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* —— Naive UI 品牌化：硬边实体阴影的卡片 —— */
+.n-card {
+  border-radius: 16px !important;
+  border: 2px solid var(--line) !important;
+  box-shadow: 0 5px 0 var(--edge-cream) !important;
+}
+
+/* —— 共享工具类（各页面禁止再私藏一份同名样式） —— */
+
+/* 页面小工具条：筛选按钮行 / 搜索行 */
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar .spacer {
+  flex: 1;
+}
+
+/* 数字卡：实体积木风，按下浮起 */
+.stat-row {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.statbox {
+  flex: 1;
+  min-width: 140px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 5px 0 var(--edge-cream);
+  padding: 16px 14px;
+  text-align: center;
+}
+
+.statbox__n {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--coral-deep);
+  line-height: 1.2;
+}
+
+.statbox__n--ok {
+  color: var(--mint-deep);
+}
+
+.statbox__k {
+  font-size: 12px;
+  color: var(--ink3);
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.statbox__s {
+  font-size: 11px;
+  color: var(--ink3);
+  margin-top: 2px;
+}
+
+/* 条形趋势行（概览 / AI 用量 / 健康页共用） */
+.barrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.barrow__label {
+  width: 88px;
+  color: var(--ink2);
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.barrow__label--short {
+  width: 40px;
+}
+
+.barrow__bar {
+  flex: 1;
+  height: 12px;
+  background: var(--well);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.barrow__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--coral), #FFB08A);
+  border-radius: 6px;
+  min-width: 2px;
+}
+
+.barrow__fill--mint {
+  background: linear-gradient(90deg, var(--mint-deep), var(--mint));
+}
+
+.barrow__fill--sky {
+  background: linear-gradient(90deg, var(--sky-deep), var(--sky));
+}
+
+.barrow__meta,
+.barrow__n {
+  color: var(--ink3);
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.barrow__meta {
+  width: 320px;
+}
+
+.barrow__n {
+  width: 32px;
+}
+
+.empty {
+  color: var(--ink3);
+  text-align: center;
+  padding: 36px 0;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--ink3);
+  text-align: center;
+  margin-top: 22px;
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
 }
