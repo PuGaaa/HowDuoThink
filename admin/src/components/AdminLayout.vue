@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton } from 'naive-ui'
+import { NButton, NInput, NModal } from 'naive-ui'
+import { api } from '@/api/client'
 import { useAuth } from '@/composables/useAuth'
 
 const { user, fetchMe, logout } = useAuth()
@@ -20,6 +21,12 @@ const NAV = [
 const navItems = computed(() => NAV.filter((n) => !n.adminOnly || user.value?.role === 'admin'))
 const pageTitle = computed(() => (route.meta.title as string) || '管理端')
 
+// 修改密码弹窗
+const pwOpen = ref(false)
+const pwForm = ref({ oldPassword: '', newPassword: '', confirm: '' })
+const pwErr = ref('')
+const pwBusy = ref(false)
+
 onMounted(async () => {
   try {
     await fetchMe()
@@ -35,6 +42,29 @@ function doLogout() {
 
 function isActive(item: (typeof NAV)[number]) {
   return (item.match ?? [item.name]).includes(route.name as string)
+}
+
+async function submitPassword() {
+  pwErr.value = ''
+  const { oldPassword, newPassword, confirm } = pwForm.value
+  if (newPassword.length < 6) {
+    pwErr.value = '新密码至少 6 位'
+    return
+  }
+  if (newPassword !== confirm) {
+    pwErr.value = '两次输入的新密码不一致'
+    return
+  }
+  pwBusy.value = true
+  try {
+    await api.post('/api/me/password', { oldPassword, newPassword })
+    pwOpen.value = false
+    pwForm.value = { oldPassword: '', newPassword: '', confirm: '' }
+  } catch (e: any) {
+    pwErr.value = e?.message || '修改失败'
+  } finally {
+    pwBusy.value = false
+  }
 }
 </script>
 
@@ -70,9 +100,38 @@ function isActive(item: (typeof NAV)[number]) {
             <div class="foot__role">{{ user.role === 'admin' ? '管理员' : '编辑' }}</div>
           </div>
         </div>
-        <NButton size="tiny" quaternary @click="doLogout">退出登录</NButton>
+        <div class="foot__actions">
+          <NButton size="tiny" quaternary @click="pwOpen = true">修改密码</NButton>
+          <NButton size="tiny" quaternary @click="doLogout">退出登录</NButton>
+        </div>
       </div>
     </aside>
+
+    <NModal
+      v-model:show="pwOpen"
+      preset="dialog"
+      title="修改密码"
+      positive-text="保存新密码"
+      negative-text="取消"
+      :loading="pwBusy"
+      @positive-click="submitPassword"
+      @negative-click="pwOpen = false"
+      @close="pwOpen = false"
+    >
+      <div class="pwfield">
+        <label>当前密码</label>
+        <NInput v-model:value="pwForm.oldPassword" type="password" show-password-on="click" placeholder="当前密码" />
+      </div>
+      <div class="pwfield">
+        <label>新密码（≥6 位）</label>
+        <NInput v-model:value="pwForm.newPassword" type="password" show-password-on="click" placeholder="新密码" />
+      </div>
+      <div class="pwfield">
+        <label>确认新密码</label>
+        <NInput v-model:value="pwForm.confirm" type="password" show-password-on="click" placeholder="再输一遍" />
+      </div>
+      <p v-if="pwErr" class="pwerr">{{ pwErr }}</p>
+    </NModal>
 
     <div class="body">
       <header class="pagehead">
@@ -166,6 +225,29 @@ function isActive(item: (typeof NAV)[number]) {
 .side__foot {
   border-top: 2px solid var(--well);
   padding: 14px 8px 0;
+}
+
+.foot__actions {
+  display: flex;
+  gap: 4px;
+}
+
+.pwfield {
+  margin-bottom: 12px;
+}
+
+.pwfield label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink2);
+  margin-bottom: 5px;
+}
+
+.pwerr {
+  color: var(--red-deep);
+  font-size: 13px;
+  margin: 0;
 }
 
 .foot__who {

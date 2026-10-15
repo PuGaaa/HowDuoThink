@@ -9,24 +9,20 @@ const { login } = useAuth()
 const route = useRoute()
 const router = useRouter()
 
-// needsBootstrap = 系统还没有任何管理员 → 展示初始化向导（用后即闭）
-const mode = ref<'login' | 'bootstrap'>('login')
+// default = 初始账号还在用默认密码 → 登录页给出提示（改过密即消失）
+const defaultHint = ref(false)
 
 const loginName = ref('')
 const password = ref('')
 const err = ref('')
 const busy = ref(false)
 
-const bootForm = ref({ login: '', password: '', confirm: '' })
-const bootErr = ref('')
-const bootBusy = ref(false)
-
 onMounted(async () => {
   try {
-    const r = await api.get('/api/auth/bootstrap')
-    if (r.needsBootstrap) mode.value = 'bootstrap'
+    const r = await api.get('/api/auth/default-account')
+    if (r.default) defaultHint.value = true
   } catch {
-    // 探测失败保持登录表单
+    // 探测失败不提示
   }
 })
 
@@ -43,29 +39,6 @@ async function submit() {
     busy.value = false
   }
 }
-
-async function submitBootstrap() {
-  bootErr.value = ''
-  const { login: name, password: pw, confirm } = bootForm.value
-  if (pw.length < 6) {
-    bootErr.value = '密码至少 6 位'
-    return
-  }
-  if (pw !== confirm) {
-    bootErr.value = '两次输入的密码不一致'
-    return
-  }
-  bootBusy.value = true
-  try {
-    await api.post('/api/auth/bootstrap', { login: name.trim(), password: pw })
-    await login(name.trim(), pw)
-    router.push('/')
-  } catch (e: any) {
-    bootErr.value = e?.message || '初始化失败'
-  } finally {
-    bootBusy.value = false
-  }
-}
 </script>
 
 <template>
@@ -73,57 +46,28 @@ async function submitBootstrap() {
     <div class="card">
       <div class="logo">⭐</div>
       <h1 class="title">好多星 · 管理端</h1>
+      <p class="hint-line">诊断思维训练场 · 内容与运营控制台</p>
 
-      <template v-if="mode === 'bootstrap'">
-        <p class="hint-line">系统还没有管理员账号，请设置初始管理员（创建后此向导自动关闭）</p>
-        <div class="field">
-          <label>管理员账号</label>
-          <NInput v-model:value="bootForm.login" placeholder="2-40 位账号" @keyup.enter="submitBootstrap" />
-        </div>
-        <div class="field">
-          <label>密码（≥6 位）</label>
-          <NInput
-            v-model:value="bootForm.password"
-            type="password"
-            show-password-on="click"
-            placeholder="密码"
-            @keyup.enter="submitBootstrap"
-          />
-        </div>
-        <div class="field">
-          <label>确认密码</label>
-          <NInput
-            v-model:value="bootForm.confirm"
-            type="password"
-            show-password-on="click"
-            placeholder="再输一遍"
-            @keyup.enter="submitBootstrap"
-          />
-        </div>
-        <p v-if="bootErr" class="err">{{ bootErr }}</p>
-        <NButton type="primary" block size="large" :loading="bootBusy" @click="submitBootstrap">
-          创建初始管理员并进入
-        </NButton>
-      </template>
-      <template v-else>
-        <p class="hint-line">诊断思维训练场 · 内容与运营控制台</p>
-        <div class="field">
-          <label>账号</label>
-          <NInput v-model:value="loginName" placeholder="账号" @keyup.enter="submit" />
-        </div>
-        <div class="field">
-          <label>密码</label>
-          <NInput
-            v-model:value="password"
-            type="password"
-            show-password-on="click"
-            placeholder="密码"
-            @keyup.enter="submit"
-          />
-        </div>
-        <p v-if="err" class="err">{{ err }}</p>
-        <NButton type="primary" block size="large" :loading="busy" @click="submit">登录</NButton>
-      </template>
+      <div v-if="defaultHint" class="default-tip">
+        初始账号：<b>admin / HaoDuo@2026</b>（仅首次引导，登录后请修改密码）
+      </div>
+
+      <div class="field">
+        <label>账号</label>
+        <NInput v-model:value="loginName" placeholder="账号" @keyup.enter="submit" />
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <NInput
+          v-model:value="password"
+          type="password"
+          show-password-on="click"
+          placeholder="密码"
+          @keyup.enter="submit"
+        />
+      </div>
+      <p v-if="err" class="err">{{ err }}</p>
+      <NButton type="primary" block size="large" :loading="busy" @click="submit">登录</NButton>
     </div>
   </div>
 </template>
@@ -167,7 +111,17 @@ async function submitBootstrap() {
   text-align: center;
   color: var(--ink3);
   font-size: 12px;
-  margin: 0 0 24px;
+  margin: 0 0 20px;
+}
+
+.default-tip {
+  background: var(--lemon-soft);
+  color: var(--lemon-deep);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 12px;
+  margin-bottom: 18px;
+  text-align: center;
 }
 
 .field {

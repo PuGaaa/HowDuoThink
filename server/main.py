@@ -131,25 +131,28 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     def seed_admin():
-        """管理员引导：
-        - 非 dev：仅当库里没有任何管理员时创建（密码必须来自 ADMIN_PASSWORD 环境变量），绝不覆盖已有密码；
-        - ENV=dev：允许用 ADMIN_PASSWORD 重置 pw-admin，方便本地联调。"""
+        """管理员引导（初始账号惯例：种子自带，README 注明，上线前改密）：
+        - ADMIN_PASSWORD 已设置：用它（部署自动化）；ENV=dev 时每次重置，方便本地联调；
+        - 未设置且库中无管理员：创建默认账号 admin / HaoDuo@2026（启动日志与登录页都会提示改密）。"""
         if config.JWT_SECRET_EPHEMERAL:
             logger.warning("未设置 JWT_SECRET，本次运行为进程内随机密钥（重启后所有会话失效；生产必须设置）")
         has_admin = db.q("SELECT id FROM users WHERE role='admin' LIMIT 1")
         if has_admin and not config.DEV_MODE:
             return
-        if not config.ADMIN_PASSWORD:
-            if not has_admin:
-                logger.warning("库中无管理员且未设置 ADMIN_PASSWORD，跳过创建（设置环境变量后重启生效）")
-            return
+        if has_admin and not config.ADMIN_PASSWORD:
+            return  # dev 且未配密码：不动已有管理员
+        pw = config.ADMIN_PASSWORD or config.DEFAULT_ADMIN_PASSWORD
         from core import security
 
         db.ex(
             "INSERT INTO users(id, login, name, avatar, role, password_hash) VALUES('pw-admin', 'pw-admin', '管理员', '', 'admin', ?) "
             "ON CONFLICT(id) DO UPDATE SET password_hash=excluded.password_hash, role='admin'",
-            (security.hash_password(config.ADMIN_PASSWORD),),
+            (security.hash_password(pw),),
         )
+        if not config.ADMIN_PASSWORD:
+            logger.warning(
+                "已创建初始管理员 admin / %s —— 仅限首次引导，上线前务必登录修改密码", config.DEFAULT_ADMIN_PASSWORD
+            )
 
     return app
 

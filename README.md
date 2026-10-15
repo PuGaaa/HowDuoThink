@@ -56,10 +56,10 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 #         CREATE USER IF NOT EXISTS 'hdx'@'%' IDENTIFIED BY '<密码>';
 #         GRANT ALL ON hdx.* TO 'hdx'@'%';"
 
-# 2. 起管理端（:5174，另开终端）。首次打开会进入"设置初始管理员"向导
+# 2. 起管理端（:5174，另开终端）。初始账号 admin / HaoDuo@2026（登录页有提示，登录后请在侧栏修改密码）
 cd admin && npm install && npm run dev
-#    浏览器开 http://localhost:5174/admin/ → 设置初始管理员账号 → 登录
-#    （也可跳过向导：起后端前 export ADMIN_PASSWORD=你的密码，账号即 pw-admin）
+#    浏览器开 http://localhost:5174/admin/ → 用初始账号登录
+#    （部署自动化可用 ADMIN_PASSWORD 覆盖初始密码）
 
 # 3. Web 社区站（:3000，可选）
 cd web && npm install && npm run dev

@@ -15,6 +15,8 @@ ADMIN_WEB_ORIGIN = os.environ.get("ADMIN_WEB_ORIGIN", "")
 ADMIN_DIST_DIR = os.environ.get("ADMIN_DIST_DIR", "admin_dist")
 GITHUB_ADMIN_LOGINS = set(filter(None, os.environ.get("GITHUB_ADMIN_LOGINS", "").split(",")))
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+# 初始管理员默认密码（未配 ADMIN_PASSWORD 时的种子账号 admin / HaoDuo@2026；上线前必须改密）
+DEFAULT_ADMIN_PASSWORD = "HaoDuo@2026"
 # 显式开发模式开关：/api/dev/login 与 admin* 提权捷径只在 ENV=dev 下可用
 DEV_MODE = os.environ.get("ENV", "").lower() == "dev"
 # 生产 HTTPS 部署时设 COOKIE_SECURE=1，会话 cookie 仅经 HTTPS 传输

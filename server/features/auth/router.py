@@ -78,16 +78,10 @@ def dev_login(login: str = Query(default="devuser")):
     return resp
 
 
-@router.get("/api/auth/bootstrap")
-def bootstrap_status():
-    """登录页探测：系统是否还没有任何管理员（决定展示初始化向导）。公开只读。"""
-    return {"needsBootstrap": service.needs_bootstrap()}
-
-
-@router.post("/api/auth/bootstrap")
-def bootstrap_create(body: models.BootstrapBody):
-    """创建首个管理员：仅库中无 admin 时开放，创建后通道即闭。"""
-    return service.bootstrap_admin(body.login.strip(), body.password)
+@router.get("/api/auth/default-account")
+def default_account_hint():
+    """登录页提示探测：初始账号 admin 的默认密码是否尚未修改。公开只读。"""
+    return {"default": service.uses_default_password()}
 
 
 @router.get("/api/me")

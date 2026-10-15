@@ -7,12 +7,6 @@ class LoginBody(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
-class BootstrapBody(BaseModel):
-    """首个管理员自助初始化：仅在库中无任何 admin 时开放。"""
-    login: str = Field(min_length=2, max_length=40)
-    password: str = Field(min_length=6, max_length=72)  # 72 = bcrypt 上限
-
-
 class ProfileUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=40)
     avatar_url: str | None = Field(default=None, max_length=500, alias="avatarUrl")
