@@ -24,8 +24,9 @@
 | `content/tools/`      | 设计与内容工具：Figma 桥（figma-rpc/figma-design）、吉祥物图处理、图标库生成、案例导出                                               |
 | `content/seeds/`      | AI 生成的**待审核**案例草稿                                                                                                          |
 | `docs/`               | 产品文档：《案例写作规范》《角色设定集》、ROADMAP、决策记录                                                                          |
-| `server/`             | FastAPI + SQLite 社区后端：GitHub OAuth + 账密登录（bcrypt）、投稿 → 审核 → AI 辅助转稿 → 门禁（gate.py）→ 发布 → casepack 版本同步  |
-| `web/`                | Nuxt 3 社区站：解决逻辑展示 / 投稿 / 我的 / 管理端（编辑器 + 元数据）                                                                |
+| `server/`             | FastAPI + SQLite 社区后端：GitHub OAuth + 账密登录（bcrypt）、投稿 → 审核 → AI 辅助转稿 → 门禁（gate.py）→ 发布 → casepack 版本同步；托管管理端静态产物 |
+| `web/`                | Nuxt 3 社区站：解决逻辑展示 / 投稿 / 我的（管理端已迁出至 `admin/`）                                                                 |
+| `admin/`              | 管理端独立工程（Vite + Vue3 SPA）：数据概览 / 投稿审核 / Case 管理 / 用户管理 / AI 用量 / 服务健康；产物打进 api 镜像托管 `/admin/`   |
 
 ## 内容流向（生死管线）
 
@@ -59,7 +60,7 @@ python3 seed.py   # 官方案例种子入库
 目录约定：`core/`（横切：config/db/security/deps）；`features/<域>/`（router + service + models，域内仍分层）。
 依赖规则：feature → core 允许；feature → 其他 feature 仅限 cases.service（供 submissions 转稿、sync 拉取）；SQL 只出现在 feature 的 service 层。
 
-- 凭据全部走环境变量：`GITHUB_CLIENT_ID/SECRET`、`JWT_SECRET`（未设置则进程内随机，重启失效）、`ADMIN_PASSWORD`（无默认值）、`WEB_ORIGIN`、`COOKIE_SECURE=1`（HTTPS 部署时）
+- 凭据全部走环境变量：`GITHUB_CLIENT_ID/SECRET`、`JWT_SECRET`（未设置则进程内随机，重启失效）、`ADMIN_PASSWORD`（无默认值）、`WEB_ORIGIN`、`COOKIE_SECURE=1`（HTTPS 部署时）、`ADMIN_WEB_ORIGIN`（管理端独立域名时的 CORS）、`SENTRY_DSN`（错误追踪，空=关闭）
 - 开发绕行登录仅 `ENV=dev` 时开放：`/api/dev/login?login=xxx`
 
 **Web 社区站（Nuxt 3）**
@@ -70,6 +71,16 @@ npm install
 npm run dev   # localhost:3000；后端地址经 NUXT_PUBLIC_API_BASE 覆盖
 ```
 
+**管理端（Vue3 SPA，独立工程）**
+
+```bash
+cd admin
+npm install
+npm run dev   # localhost:5174（避开 App H5 的 5173）；/api 代理到本地 server
+```
+
+登录需 editor/admin 角色（`ADMIN_PASSWORD` 引导的 `pw-admin` 或 GitHub 白名单）。详见 `admin/README.md`。
+
 ## 运行状态速查
 
 | 服务       | 端口 | 说明             |
@@ -77,3 +88,4 @@ npm run dev   # localhost:3000；后端地址经 NUXT_PUBLIC_API_BASE 覆盖
 | App H5 dev | 5173 | HBuilderX vite   |
 | 社区后端   | 8000 | uvicorn main:app |
 | Web 社区站 | 3000 | Nuxt dev         |
+| 管理端 dev | 5174 | vite（/api 代理 8000） |
