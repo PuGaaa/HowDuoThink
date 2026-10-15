@@ -14,110 +14,63 @@
 
 ## 仓库地图
 
-| 目录                  | 职责                                                                                                                                 |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `app/`                | uni-app X**蒸汽模式**主应用（H5 先行验证玩法 → 后编译 iOS）。页面：首页章节地图 / 章节详情 / 闯关 / 复盘 / 任务 / 海报 / 手册 / 我的 |
-| `app/static/mascots/` | 3D 吉祥物图片资产（生图 + 圆形徽章化，96/48/24/192 四档）                                                                            |
-| `app/static/icons/`   | 自有图标库 PNG（36 个，resvg 从设计库 SVG 渲染）                                                                                     |
-| `content/prompts/`    | AI 生成案例的 prompt 模板（从《案例写作规范》派生）                                                                                  |
-| `content/pipeline/`   | Node 脚本：schema 校验（validate.mjs）、跨行字符串 lint                                                                              |
-| `content/tools/`      | 设计与内容工具：Figma 桥（figma-rpc/figma-design）、吉祥物图处理、图标库生成、案例导出                                               |
-| `content/seeds/`      | AI 生成的**待审核**案例草稿                                                                                                          |
-| `docs/`               | 产品文档：《案例写作规范》《角色设定集》、ROADMAP、决策记录                                                                          |
-| `server/`             | FastAPI + SQLite 社区后端：GitHub OAuth + 账密登录（bcrypt）、投稿 → 审核 → AI 辅助转稿 → 门禁（gate.py）→ 发布 → casepack 版本同步；托管管理端静态产物 |
-| `web/`                | Nuxt 3 社区站：解决逻辑展示 / 投稿 / 我的（管理端已迁出至 `admin/`）                                                                 |
-| `admin/`              | 管理端独立工程（Vite + Vue3 SPA）：数据概览 / 投稿审核 / Case 管理 / 用户管理 / AI 用量 / 服务健康；产物打进 api 镜像托管 `/admin/`   |
+每个子工程的**启动、配置、交接说明都在它自己的 README 里**，本文件只做统筹。
 
-## 内容流向（生死管线）
+| 目录 | 职责 | 文档 |
+|---|---|---|
+| `app/` | uni-app X**蒸汽模式**主应用（H5 先行 → iOS）：闯关玩法全部页面 | [app/README.md](app/README.md) |
+| `server/` | FastAPI 社区后端（唯一 API）：账号 / 案例库 / 投稿 / 进度同步 / AI 对话 / 管理端接口 / 监控；托管管理端静态产物 | [server/README.md](server/README.md) |
+| `web/` | Nuxt 3 社区站：解决逻辑展示 / AI 排错 / 投稿 / 我的 | [web/README.md](web/README.md) |
+| `admin/` | 管理端独立工程（Vue3 SPA）：数据概览 / 投稿审核 / Case 管理 / 用户管理 / AI 用量 / 服务健康 | [admin/README.md](admin/README.md) |
+| `content/` | AI 生成案例的 prompts、校验 pipeline、待审核草稿 | [content/README.md](content/README.md) |
+| `docs/` | 产品文档：PRD、案例写作规范、出题总纲、决策记录（decisions/） | — |
 
-```
-docs/案例写作规范.md  →  content/prompts  →  content/seeds（草稿）
-    →  你以玩家+审核者双身份走验  →  content/pipeline/validate.mjs + server/gate.py 双门禁
-    →  app/data/cases/（入库，编译进包）∪ server 发布（casepack 动态同步进包）
-```
+## 快速启动（本地把整套跑起来）
 
-类型定义以 `app/types/case.ts` 为**唯一权威源**（uni-app x 编译要求 import 不出项目根，故不外提）。
-
-## 开发
-
-### 快速启动（本地把整套跑起来）
-
-前置：Python 3.12+、Node 20+。以下顺序执行，后端必须先起（管理端/社区站都依赖它）：
+前置：Python 3.12+、Node 20+、Docker（本地 MySQL）。**后端必须先起**，其余端都依赖它。
 
 ```bash
-# 1. 起社区后端（:8000）。首次需建 venv（dev.sh 用的就是它）；dev.sh 已固定 JWT_SECRET、ENV=dev
+# 1. 社区后端（:8000）—— venv、本地 MySQL 建库建号、.env.dev.local 详见 server/README.md
 cd server
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./dev.sh
-#    若 .env.dev.local 配了 DB_PROVIDER=mysql（推荐，与线上一致）：本地 MySQL 容器需一次性
-#    建库建号，账号密码与 .env.dev.local 对齐。例：
-#      docker exec <mysql容器> mysql -uroot -p<root密码> -e \
-#        "CREATE DATABASE IF NOT EXISTS hdx CHARACTER SET utf8mb4;
-#         CREATE USER IF NOT EXISTS 'hdx'@'%' IDENTIFIED BY '<密码>';
-#         GRANT ALL ON hdx.* TO 'hdx'@'%';"
 
-# 2. 起管理端（:5174，另开终端）。初始账号 admin / HaoDuo@2026（登录页有提示，登录后请在侧栏修改密码）
-cd admin && npm install && npm run dev
-#    浏览器开 http://localhost:5174/admin/ → 用初始账号登录
-#    （部署自动化可用 ADMIN_PASSWORD 覆盖初始密码）
+# 2. 管理端（:5174）。初始账号 admin / HaoDuo@2026（登录页有提示，登录后请在侧栏修改密码）
+cd admin && npm install && npm run dev    # → http://localhost:5174/admin/
 
 # 3. Web 社区站（:3000，可选）
 cd web && npm install && npm run dev
 ```
 
-不想起管理端 dev server？构建一次，由后端直接托管（与生产同款链路）：
+不起管理端 dev server？构建一次由后端托管（与生产同款链路）：
+`cd admin && npm run build && cd ../server && ADMIN_DIST_DIR=../admin/dist ./dev.sh`
+→ 访问 `http://localhost:8000/admin/`。
 
-```bash
-cd admin && npm run build
-cd ../server && ADMIN_DIST_DIR=../admin/dist ./dev.sh   # 访问 http://localhost:8000/admin/
+App 走 HBuilderX（见 app/README.md）。生产部署：`server/部署与运维说明文档.md`
+（docker compose 一条命令拉起 MySQL + api，管理端产物随镜像托管）。
+
+## 内容流向（生死管线）
+
+```
+docs/案例写作规范.md  →  content/prompts  →  content/seeds（草稿）
+    →  你以玩家+审核者双身份走验  →  content/pipeline/validate.mjs + server gate.py 双门禁
+    →  app/data/cases/（入库，编译进包）∪ server 发布（casepack 动态同步进包）
 ```
 
-**App（uni-app X）**
-
-- 用 HBuilderX 5.21+ 打开 `app/` 目录，勾选蒸汽模式（manifest 已配置 `"vapor": true`）
-- 运行到浏览器验证玩法（H5 端自动以 VDOM 模式回落运行，属正常现象）
-- 修改案例内容 → `app/data/cases/`；新增案例前先读 `docs/案例写作规范.md`
-- 入库自检：`node content/pipeline/validate.mjs app/data/cases/<case>.ts`
-
-**后端（FastAPI，Feature 架构）**
-
-```bash
-cd server
-pip install -r requirements.txt
-uvicorn main:app --port 8000
-python3 seed.py   # 官方案例种子入库
-/tmp/pilvenv/bin/python -m pytest tests/ -q   # 单测（隔离临时库）
-```
-
-目录约定：`core/`（横切：config/db/security/deps）；`features/<域>/`（router + service + models，域内仍分层）。
-依赖规则：feature → core 允许；feature → 其他 feature 仅限 cases.service（供 submissions 转稿、sync 拉取）；SQL 只出现在 feature 的 service 层。
-
-- 凭据全部走环境变量：`GITHUB_CLIENT_ID/SECRET`、`JWT_SECRET`（未设置则进程内随机，重启失效）、`ADMIN_PASSWORD`（无默认值）、`WEB_ORIGIN`、`COOKIE_SECURE=1`（HTTPS 部署时）、`ADMIN_WEB_ORIGIN`（管理端独立域名时的 CORS）、`SENTRY_DSN`（错误追踪，空=关闭）
-- 开发绕行登录仅 `ENV=dev` 时开放：`/api/dev/login?login=xxx`
-
-**Web 社区站（Nuxt 3）**
-
-```bash
-cd web
-npm install
-npm run dev   # localhost:3000；后端地址经 NUXT_PUBLIC_API_BASE 覆盖
-```
-
-**管理端（Vue3 SPA，独立工程）**
-
-```bash
-cd admin
-npm install
-npm run dev   # localhost:5174（避开 App H5 的 5173）；/api 代理到本地 server
-```
-
-登录需 editor/admin 角色（`ADMIN_PASSWORD` 引导的 `pw-admin` 或 GitHub 白名单）。详见 `admin/README.md`。
+类型定义以 `app/types/case.ts` 为**唯一权威源**（uni-app x 编译要求 import 不出项目根，故不外提）。
 
 ## 运行状态速查
 
-| 服务       | 端口 | 说明             |
-| ---------- | ---- | ---------------- |
-| App H5 dev | 5173 | HBuilderX vite   |
-| 社区后端   | 8000 | uvicorn main:app |
-| Web 社区站 | 3000 | Nuxt dev         |
-| 管理端 dev | 5174 | vite（/api 代理 8000） |
+| 服务       | 端口 | 说明                       |
+| ---------- | ---- | -------------------------- |
+| 社区后端   | 8000 | `server/dev.sh`            |
+| 管理端 dev | 5174 | vite（/api 代理 8000）     |
+| Web 社区站 | 3000 | Nuxt dev                   |
+| App H5 dev | 5173 | HBuilderX vite             |
+
+## 工程约束与文档
+
+- 工程约束（必读）：[AGENTS.md](AGENTS.md) —— 环境一致性铁律、feature 依赖规则、出题难度六维
+- 产品文档：`docs/`（PRD、案例写作规范、出题总纲、品牌理念、decisions/ 决策记录）
+- 交接各层细节：`server/README.md`（后端接口/环境变量/测试）、`admin/README.md`（管理端页面/部署）、
+  `web/README.md`、`app/README.md`、`content/README.md`（案例工厂流程）
