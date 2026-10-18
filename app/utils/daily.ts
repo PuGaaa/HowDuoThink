@@ -22,7 +22,8 @@ function hashStr(s: string): number {
   return Math.abs(h)
 }
 
-/** 今日一题：日期 hash 对案例注册表取模 */
+/** 今日一题：日期 hash 对案例注册表取模。
+ *  刻意只用官方关池（不含社区 casepack）：池子对所有设备同长，保证"同一天全员同题"。 */
 export function dailyCase(): DiagnosisCase {
   const h = hashStr('daily-' + todayKey())
   return ALL_CASES[h % ALL_CASES.length]

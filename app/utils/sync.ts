@@ -1,5 +1,6 @@
 /** Web 社区同步：拉取 casepack（已发布关卡包），本地校验后落 storage。
- *  v1 范围：拉取 + 落库 + 计数展示；远端关卡的章节合并与游玩放 M3。 */
+ *  增量：带本地版本号 since 只拉 delta，按 id 并入已存整包；
+ *  远端关由 chapters.ts 按章节聚合、getCaseById 兜底取用（本地关同 id 优先）。 */
 import { API_BASE } from '../config'
 import { DiagnosisCase } from '../types/case'
 
