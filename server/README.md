@@ -59,6 +59,13 @@ cp .env.example .env.dev.local && vi .env.dev.local
 **初始管理员**：库中无管理员时自动种子 `admin / HaoDuo@2026`（启动日志有提示；
 `ADMIN_PASSWORD` 可覆盖默认密码）。上线前务必登录修改密码——管理端侧栏「修改密码」。
 
+**官方案例内容（132 关）**：`server/seed/*.json` 是不入 git 的构建产物（镜像构建期从
+`app/data/cases` 自动生成）。本地灌库先导出再入库（幂等，可重复跑）：
+
+```bash
+node ../content/tools/export-case.mjs && .venv/bin/python seed.py
+```
+
 ### 环境变量（全部只进 .env*.local，不进仓库）
 
 | 组 | 变量 |

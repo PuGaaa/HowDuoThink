@@ -18,6 +18,9 @@ server/data.db*
 server/__pycache__/
 __pycache__/
 
+# 案例包构建产物：唯一内容源是 app/data/cases，JSON 由 export-case.mjs / 镜像构建生成
+server/seed/*.json
+
 # Nuxt 构建产物
 web/.nuxt/
 web/.output/

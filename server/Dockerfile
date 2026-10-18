@@ -1,10 +1,14 @@
-# —— 阶段 1：管理端前端构建 ——
+# —— 阶段 1：管理端前端构建 + 官方案例包生成 ——
 FROM node:20-alpine AS admin-build
 WORKDIR /build
 COPY admin/package.json admin/package-lock.json ./
 RUN npm ci
 COPY admin/ ./
 RUN npm run build
+# server/seed/*.json 是不入 git 的构建产物：构建期从唯一内容源 app/data/cases 生成
+COPY content/tools/export-case.mjs content/tools/export-case.mjs
+COPY app/data/cases/ app/data/cases/
+RUN node content/tools/export-case.mjs
 
 # —— 阶段 2：api 运行镜像（含管理端静态产物 admin_dist/）——
 FROM python:3.12-slim
@@ -12,6 +16,7 @@ WORKDIR /app/hdx
 COPY server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY server/ .
+COPY --from=admin-build /build/server/seed ./seed/
 COPY --from=admin-build /build/dist /app/hdx/admin_dist
 ENV FASTEMBED_CACHE_DIR=/srv/hdt/.fastembed
 EXPOSE 8001

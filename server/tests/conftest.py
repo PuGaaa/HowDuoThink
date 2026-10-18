@@ -75,5 +75,6 @@ def login_admin(client: TestClient) -> None:
 def load_seed(case_id: str = "cache-drift") -> dict:
     import json
 
-    p = Path(__file__).parent.parent / "seed" / f"{case_id}.json"
+    # 测试 fixture 独立提交（server/seed/*.json 是不入 git 的构建产物）
+    p = Path(__file__).parent / "fixtures" / f"{case_id}.json"
     return json.loads(p.read_text())
