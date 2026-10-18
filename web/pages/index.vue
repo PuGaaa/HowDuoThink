@@ -7,9 +7,9 @@ const items = computed(() => data.value?.items ?? [])
 <template>
   <div>
     <div class="card hero">
-      <h1 style="margin: 0 0 8px">把你的真实故障，变成别人的训练场</h1>
+      <h1 style="margin: 0 0 8px">把你的真实故障，变成好多星的下一关</h1>
       <p class="muted" style="margin: 0 0 18px">
-        投稿你踩过的坑（一句话症状 + 现象 + 最终解决逻辑），审核后会被加工成 App 里的可玩诊断关卡，
+        投稿你踩过的坑（一句话症状 + 现象 + 最终解决逻辑），审核后会被加工成 App 里可破的案件，
         Web 端展示完整解决逻辑。
       </p>
       <NuxtLink to="/submit" class="btn">去投稿</NuxtLink>

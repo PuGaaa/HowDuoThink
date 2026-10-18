@@ -7,14 +7,14 @@
         <image class="herocard__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
         <text class="herocard__name">好多星</text>
         <text class="herocard__en">HowDuoThink</text>
-        <text class="herocard__sub">诊断思维训练场</text>
-        <text class="herocard__slogan">看症状 · 立假设 · 算成本 · 定根因</text>
+        <text class="herocard__sub">多想，多星。</text>
+        <text class="herocard__slogan">How to think.</text>
         <text class="herocard__ver">v0.1</text>
       </view>
 
       <view class="card">
         <text class="card__title">这是什么</text>
-        <text class="card__text">好多星 训练的是诊断思维：每关一个真实故障现场，提出假设、花 ⚡︎ 预算验证、指认根因，复盘对照专家推理链——练的是高手排错时的思考方式。</text>
+        <text class="card__text">好多星把真实故障做成一桩桩案件：走进现场，提出假设、花 ⚡︎ 预算验证、指认根因，复盘对照专家推理链——多想一步，星就多一颗。</text>
       </view>
 
       <view class="card">

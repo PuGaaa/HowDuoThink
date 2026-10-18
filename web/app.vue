@@ -148,7 +148,7 @@ async function savePassword() {
       </nav>
     </header>
     <main class="main"><NuxtPage /></main>
-    <footer class="footer">好多星 HowDuoThink — 诊断思维训练场 · Web 社区（投稿与解决逻辑展示，闯关在 App）</footer>
+    <footer class="footer">好多星 HowDuoThink · 多想，多星。—— Web 社区（投稿与解决逻辑展示，闯关在 App）</footer>
 
     <!-- 登录弹窗 -->
     <div v-if="showLogin" class="lmask" @click="showLogin = false"></div>

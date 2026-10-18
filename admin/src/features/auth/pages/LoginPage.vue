@@ -46,7 +46,7 @@ async function submit() {
     <div class="card">
       <div class="logo">⭐</div>
       <h1 class="title">好多星 · 管理端</h1>
-      <p class="hint-line">诊断思维训练场 · 内容与运营控制台</p>
+      <p class="hint-line">多想，多星。 · 内容与运营控制台</p>
 
       <div v-if="defaultHint" class="default-tip">
         初始账号：<b>admin / HaoDuo@2026</b>（仅首次引导，登录后请修改密码）
