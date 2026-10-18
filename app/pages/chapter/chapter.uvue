@@ -48,6 +48,8 @@ import { CHAPTERS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterCha
 import { ALL_CASES, getCaseById } from '../../data/cases'
 import { getCaseProgress } from '../../utils/storage'
 import { starsLabel } from '../../utils/scoring'
+import { isLoggedIn } from '../../utils/auth'
+import { openGuestLoginDialog } from '../../utils/login-guide'
 import navbar from '../../components/navbar/navbar.uvue'
 
 class NodeVM {
@@ -89,8 +91,8 @@ onLoad((query : OnLoadOptions) => {
     vm.id = c.id
     vm.title = c.title
     vm.live = true
-    vm.playable = chapterOpen || c.id === challengeId
-    vm.challenge = !chapterOpen && c.id === challengeId
+    vm.playable = isCasePlayable(c.id)
+    vm.challenge = !chapterOpen && isLoggedIn() && c.id === challengeId
     const p = getCaseProgress(c.id)
     const best = p != null && p.bestGrade.length > 0 ? p.bestGrade : ''
     vm.stars = starsLabel(best)
@@ -124,7 +126,12 @@ function openCase(node: NodeVM) {
     uni.showToast({ title: '本题即将上线', icon: 'none' })
     return
   }
-  if (!node.playable) {
+  // 实时判可玩（登录返回等场景下 vm.playable 可能是旧快照）
+  if (!isCasePlayable(node.id)) {
+    if (!isLoggedIn()) {
+      openGuestLoginDialog()
+      return
+    }
     uni.showToast({ title: chapterUnlockHint(ch.value.id), icon: 'none' })
     return
   }

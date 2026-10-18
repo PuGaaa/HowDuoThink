@@ -5,6 +5,7 @@ import { ALL_CASES } from './cases'
 import { DiagnosisCase } from '../types/case'
 import { getCaseProgress } from '../utils/storage'
 import { getRemoteCases } from '../utils/sync'
+import { isLoggedIn } from '../utils/auth'
 
 export interface PartDef {
   id: string
@@ -66,21 +67,25 @@ export function casesInChapter(chapterId: string): DiagnosisCase[] {
   return merged.sort((a, b) => a.order - b.order)
 }
 
-/** 全部可用关（本地 + 远端已同步） */
-export function allPlayableCases(): DiagnosisCase[] {
-  return ALL_CASES
-}
-
 /** 篇内全部章 */
 export function chaptersInPart(partId: string): ChapterDef[] {
   return CHAPTERS.filter((c) => c.part === partId)
 }
 
-// —— 解锁：前一章全部通关 + 跳级挑战 ————————————————
-// 每篇第 1 章恒开（编号按篇起算，篇首即入口）；
-// 章解锁 = 前一章全部通关 ∥ 本章跳级挑战已通关；
-// 跳级挑战 = 锁定章的 order 最小关恒可玩，通关即解锁本章。
-// 全部从 solved 进度派生，无独立存储。
+// —— 解锁：游客留存门禁 + 进度解锁 ————————————————
+// 游客（未登录）：仅开放学徒篇第 1 章前 N 关，其余章节/关卡引导登录（utils/login-guide.ts）。
+// 已登录：沿用进度规则——每篇第 1 章恒开（编号按篇起算，篇首即入口）；
+//   章解锁 = 前一章全部通关 ∥ 本章跳级挑战已通关；跳级挑战 = 锁定章的 order 最小关恒可玩，
+//   通关即解锁本章。全部从 solved 进度派生，无独立存储。
+
+/** 游客免费章 / 免费关数（章内按 order 升序计） */
+export const GUEST_FREE_CHAPTER = 'error-reading'
+export const GUEST_FREE_LEVELS = 3
+
+/** 目标关是否在游客免费范围（rankInChapter = casesInChapter 升序中的下标） */
+function inGuestFreeScope(chapterId: string, rankInChapter: number): boolean {
+  return chapterId === GUEST_FREE_CHAPTER && rankInChapter < GUEST_FREE_LEVELS
+}
 
 /** 章内已破案数（本地 + 远端 casepack） */
 export function chapterSolvedCount(chapterId: string): number {
@@ -112,8 +117,11 @@ export function chapterIndexInPart(chapterId: string): number {
   return -1
 }
 
-/** 锁定章的解锁提示语（章页 toast / 首页弹窗共用） */
+/** 锁定提示语（章页 toast / 首页弹窗共用）；游客态引导登录 */
 export function chapterUnlockHint(chapterId: string): string {
+  if (!isLoggedIn()) {
+    return chapterId === GUEST_FREE_CHAPTER ? '登录后解锁本关' : '登录后解锁本章，继续侦探之旅'
+  }
   return '通关上一章全部关卡，解锁本章'
 }
 
@@ -136,8 +144,9 @@ export function chapterCompleted(chapterId: string): boolean {
   return true
 }
 
-/** 章解锁 = 每篇第 1 章恒开 ∥ 本章跳级挑战已通关 ∥ 前一章全部通关 */
+/** 章解锁：游客 = 仅免费章；已登录 = 每篇第 1 章恒开 ∥ 本章跳级挑战已通关 ∥ 前一章全部通关 */
 export function isChapterUnlocked(chapterId: string): boolean {
+  if (!isLoggedIn()) return chapterId === GUEST_FREE_CHAPTER
   const idx = chapterIndexInPart(chapterId)
   if (idx <= 0) return true
   if (challengeSolved(chapterId)) return true
@@ -151,12 +160,14 @@ export function chapterChallengeCaseId(chapterId: string): string {
   return list.length > 0 ? list[0].id : ''
 }
 
-/** 关可玩 = 所在章已解锁 ∥ 是本章挑战关；未知关返回 false（play 页另有"案例不存在"兜底） */
+/** 关可玩：游客 = 免费章前 N 关；已登录 = 所在章已解锁 ∥ 是本章挑战关。
+ *  未知关返回 false（play 页另有"案例不存在"兜底） */
 export function isCasePlayable(caseId: string): boolean {
   for (let i = 0; i < CHAPTERS.length; i++) {
     const cases = casesInChapter(CHAPTERS[i].id)
     for (let j = 0; j < cases.length; j++) {
       if (cases[j].id === caseId) {
+        if (!isLoggedIn()) return inGuestFreeScope(CHAPTERS[i].id, j)
         if (isChapterUnlocked(CHAPTERS[i].id)) return true
         return chapterChallengeCaseId(CHAPTERS[i].id) === caseId
       }

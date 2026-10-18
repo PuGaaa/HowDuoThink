@@ -171,6 +171,8 @@ import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { getCaseById, getCollectedLessons, CollectedLesson } from '../../data/cases'
 import { isCasePlayable } from '../../data/chapters'
 import { isDailyCase, markDailyDone } from '../../utils/daily'
+import { isLoggedIn } from '../../utils/auth'
+import { openGuestLoginDialog } from '../../utils/login-guide'
 import { scheduleProgressUpload } from '../../utils/sync-progress'
 import { CaseAction, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
 import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse, bumpTask } from '../../utils/storage'
@@ -307,8 +309,16 @@ onLoad((query : OnLoadOptions) => {
     }, 800)
     return
   }
-  // 章节锁最后防线：锁定章的非挑战关不可直达（跳级挑战关放行）
+  // 章节锁最后防线：锁定章的非挑战关不可直达（跳级挑战关放行）；游客引导登录
   if (!isCasePlayable(c.id)) {
+    if (!isLoggedIn()) {
+      uni.navigateBack({})
+      // 等返回动画落定再弹登录引导，避免与页面出栈竞态
+      setTimeout(() => {
+        openGuestLoginDialog()
+      }, 300)
+      return
+    }
     uni.showToast({ title: '本章未解锁：通关上一章 1 关，或从章节页发起挑战', icon: 'none' })
     setTimeout(() => {
       uni.navigateBack({})

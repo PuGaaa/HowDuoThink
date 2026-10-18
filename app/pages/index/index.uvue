@@ -40,9 +40,9 @@
         </view>
         <text class="continue__hint">最近的故障现场，就差一步收网</text>
       </view>
-      <view v-else class="continue continue--done">
-        <text class="continue__title">全部破案！</text>
-        <text class="continue__meta">新的章节正在路上，敬请期待</text>
+      <view v-else class="continue continue--done" @click="onContinueIdleTap">
+        <text class="continue__title">{{ guestWall ? '试玩关卡已通关' : '全部破案！' }}</text>
+        <text class="continue__meta">{{ guestWall ? '登录解锁全部章节，进度云同步' : '新的章节正在路上，敬请期待' }}</text>
       </view>
 
       <!-- 章节地图：篇-章两级 -->
@@ -95,7 +95,8 @@ import { getCaseProgress, getStreak, CaseProgress } from '../../utils/storage'
 import { pullServerProgress } from '../../utils/sync-progress'
 import { getTotals } from '../../utils/storage'
 import { rankOf, starsLabel } from '../../utils/scoring'
-import { getAvatar } from '../../utils/auth'
+import { getAvatar, isLoggedIn } from '../../utils/auth'
+import { openGuestLoginDialog } from '../../utils/login-guide'
 import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
 import { fetchCasepack, getPackCount } from '../../utils/sync'
 
@@ -105,6 +106,8 @@ const continueTitle = ref('')
 const continueMeta = ref('')
 const continueChapterLabel = ref('')
 const hasContinue = ref(false)
+/** 游客已通关全部免费关：继续闯关位变成登录引导 */
+const guestWall = ref(false)
 const rankNext = ref('')
 const streakCount = ref(0)
 const parts = ref<PartVM[]>(PARTS)
@@ -155,6 +158,11 @@ function partProgress(chapterId: string) {
 function openChapter(chapterId: string) {
   if (isChapterUnlocked(chapterId)) {
     uni.navigateTo({ url: '/pages/chapter/chapter?id=' + chapterId })
+    return
+  }
+  // 游客门禁：锁定章先引导登录，不进跳级挑战
+  if (!isLoggedIn()) {
+    openGuestLoginDialog()
     return
   }
   // 锁定章：确认后发起跳级挑战（本章首关恒可玩，通关解锁整章）
@@ -228,6 +236,14 @@ function refreshHome() {
     }
   }
   hasContinue.value = continueFound
+  guestWall.value = !isLoggedIn() && !continueFound
+}
+
+/** 继续闯关空位点击：游客命中登录引导，已登录无动作 */
+function onContinueIdleTap() {
+  if (guestWall.value) {
+    openGuestLoginDialog()
+  }
 }
 onShow(() => {
   refreshHome()

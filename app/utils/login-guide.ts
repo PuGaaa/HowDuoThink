@@ -1,0 +1,20 @@
+/** 游客留存门禁的统一登录引导：章页锁定关 / 首页锁定章 / play 直入共用一个弹窗文案与跳转。 */
+import { CHAPTERS, GUEST_FREE_CHAPTER, GUEST_FREE_LEVELS } from '../data/chapters'
+import { ConfirmDialogOptions, openConfirmDialog } from './confirm-dialog'
+
+/** 弹出"登录解锁"引导，确认后进登录页。仅在游客态调用。 */
+export function openGuestLoginDialog() {
+  const freeCh = CHAPTERS.find((x) => x.id === GUEST_FREE_CHAPTER)
+  const opt = {
+    title: '登录后继续闯关',
+    message: '游客可试玩「' + (freeCh != null ? freeCh.name : '第一章') + '」前 ' + GUEST_FREE_LEVELS + ' 关，登录解锁全部章节，进度还能云同步。',
+    confirmText: '去登录',
+    cancelText: '先逛逛',
+    danger: false,
+  } as ConfirmDialogOptions
+  openConfirmDialog(opt, (confirm: boolean) => {
+    if (confirm) {
+      uni.navigateTo({ url: '/pages/login/login' })
+    }
+  })
+}
