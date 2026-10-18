@@ -56,6 +56,14 @@ def dev_upsert_user(login: str) -> str:
     return uid
 
 
+def get_profile(uid: str) -> dict:
+    rows = db.q("SELECT id, login, name, avatar, role FROM users WHERE id=?", (uid,))
+    if not rows:
+        raise HTTPException(401, "用户不存在")
+    r = rows[0]
+    return {"id": r["id"], "login": r["login"], "name": r["name"], "avatar": r["avatar"], "role": r["role"]}
+
+
 def update_profile(uid: str, name: str, avatar_url: str | None) -> dict:
     sets, params = ["name=?"], [name]
     if avatar_url is not None:
@@ -63,9 +71,7 @@ def update_profile(uid: str, name: str, avatar_url: str | None) -> dict:
         params.append(avatar_url)
     params.append(uid)
     db.ex(f"UPDATE users SET {', '.join(sets)} WHERE id=?", tuple(params))
-    rows = db.q("SELECT id, login, name, avatar, role FROM users WHERE id=?", (uid,))
-    r = rows[0]
-    return {"id": r["id"], "login": r["login"], "name": r["name"], "avatar": r["avatar"], "role": r["role"]}
+    return get_profile(uid)
 
 
 def change_password(uid: str, old_password: str, new_password: str) -> None:

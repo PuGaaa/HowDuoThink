@@ -329,16 +329,7 @@ def ai_draft_from_submission(uid: str, sid: str) -> dict:
     else:
         aiGenerated = False
 
-    case_id = payload["id"]
-    with db.tx() as conn:
-        conn.execute(
-            "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?) "
-            "ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
-            (case_id, sid, uid, payload["title"], payload.get("domain", "runtime"), payload.get("layer", ""),
-             payload.get("difficulty", 2), 0, "draft", db.jdump(payload)),
-        )
-        conn.execute(
-            "UPDATE submissions SET status='accepted', reviewed_at=datetime('now') WHERE id=? AND status='pending'", (sid,),
-        )
-    return {"caseId": case_id, "submissionId": sid, "status": "draft", "aiGenerated": aiGenerated, "warnings": warnings}
+    result = sub_service.create_draft_with_payload(uid, sid, payload)
+    result["aiGenerated"] = aiGenerated
+    result["warnings"] = warnings
+    return result

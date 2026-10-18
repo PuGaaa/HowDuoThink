@@ -1,5 +1,6 @@
-"""Case 的业务逻辑：草稿保存、元数据更新、投稿→草稿骨架、发布（门禁+版本+文章投影）。
-发布与草稿的多表写入都走 db.tx() 事务。约定：服务层只抛 HTTPException。"""
+"""Case 的业务逻辑：草稿保存、元数据更新、发布（门禁+版本+文章投影）。
+发布与草稿的多表写入都走 db.tx() 事务。约定：服务层只抛 HTTPException。
+投稿→草稿的转换（含 AI 起草落库）由 features/submissions/service.py 承载，此处不重复。"""
 from fastapi import HTTPException
 
 import db
@@ -62,92 +63,6 @@ def admin_case_detail(cid: str) -> dict:
         "id": r["id"], "title": r["title"], "version": r["version"], "status": r["status"],
         "payload": db.jload(r["payload"], {}),
     }
-
-
-def draft_skeleton_from_submission(sid: str) -> dict:
-    """投稿 → Case 草稿骨架：必填字段自动映射，重字段填占位（编辑器里可见待补）。"""
-    rows = db.q("SELECT * FROM submissions WHERE id=?", (sid,))
-    if not rows:
-        raise HTTPException(404, "投稿不存在")
-    s = rows[0]
-    title = s["title"]
-    symptoms = [{"type": "text", "title": "现象描述", "text": s["symptom"]}]
-    if s["key_error"]:
-        symptoms.insert(0, {"type": "error", "title": "关键报错", "text": s["key_error"]})
-    timeline = s["timeline"] or "时间线待补充"
-    # 解决过程按行拆分为专家链骨架：每行 → 观察( thought )，动作占位
-    chain = []
-    lines = [ln.strip() for ln in s["resolution"].replace("；", "\n").replace("。", "\n").split("\n") if ln.strip()]
-    for ln in lines[:8]:
-        chain.append({
-            "thought": ln[:120],
-            "update": "（待补充：这一步假设如何更新）",
-            "actionId": "",
-            "why": "（待补充：为什么这一步值这个成本）",
-            "conclusion": "（待补充：排除了什么/确认了什么）",
-        })
-    if not chain:
-        chain.append({"thought": "（待补充）", "update": "（待补充）", "actionId": "", "why": "（待补充）", "conclusion": "（待补充）"})
-    while len(chain) < 4:
-        chain.append({"thought": "（待补充）", "update": "（待补充）", "actionId": "", "why": "（待补充）", "conclusion": "（待补充）"})
-    lessons = db.jload(s["lessons"], [])
-    lesson_list = [{"text": l, "principle": "（待补充：这一层的契约）"} for l in lessons]
-    lesson_list.append({"text": "（待补充检查单）", "principle": "（待补充原理）"})
-    pid = "c-" + sid.replace("s-", "")
-    part_guess = {"network": "access", "data": "data", "build": "build", "runtime": "runtime", "concurrency": "concurrency", "deploy": "access"}.get(s["domain_hint"] or "", "")
-    return {
-        "id": pid,
-        "title": title,
-        "intro": title,
-        "domain": s["domain_hint"] or "network",
-        "layer": "（待补充层契约）",
-        "part": part_guess or "apprentice",
-        "chapterId": part_guess or "",
-        "order": 99,
-        "typeTags": [],
-        "difficulty": 1,
-        "scene": {
-            "role": "（待补充：玩家角色代入）",
-            "architecture": "（待补充：链路图）",
-            "symptoms": symptoms,
-            "timeline": timeline,
-            "impactHint": "（待补充）",
-        },
-        "hypotheses": [
-            {"id": "h-a", "text": "（待补充假设A）", "excludeActionId": ""},
-            {"id": "h-b", "text": "（待补充假设B）", "excludeActionId": ""},
-            {"id": "h-c", "text": "（待补充假设C）", "excludeActionId": ""},
-        ],
-        "actions": [
-            {"id": "act-1", "name": "（待补充动作）", "desc": "（待补充）", "cost": 1, "gain": "high",
-             "danger": False, "effects": [], "tests": [], "hypotheses": [],
-             "result": {"type": "text", "title": "（待补充）", "text": "（待补充）"}},
-        ],
-        "rootCauses": [
-            {"id": "rc-a", "text": "（待补充根因A）", "correct": False},
-            {"id": "rc-b", "text": "（待补充根因B）", "correct": False},
-            {"id": "rc-c", "text": "（待补充根因C）", "correct": False},
-        ],
-        "expertCost": 5,
-        "restartActionId": "",
-        "expertChain": chain,
-        "lessons": lesson_list,
-    }
-
-
-def create_draft_from_submission(uid: str, sid: str) -> dict:
-    payload = draft_skeleton_from_submission(sid)
-    with db.tx() as conn:
-        conn.execute(
-            "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?) "
-            "ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
-            (payload["id"], sid, uid, payload["title"], payload["domain"], payload["layer"], payload["difficulty"], 0, "draft", db.jdump(payload)),
-        )
-        conn.execute(
-            "UPDATE submissions SET status='accepted', reviewed_at=datetime('now') WHERE id=? AND status='pending'", (sid,)
-        )
-    return {"caseId": payload["id"], "submissionId": sid, "status": "draft"}
 
 
 def publish_case(uid: str, payload: CasePayload) -> dict:

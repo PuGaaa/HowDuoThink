@@ -86,11 +86,7 @@ def default_account_hint():
 
 @router.get("/api/me")
 def me(uid: str = Depends(current_user)):
-    import db
-
-    rows = db.q("SELECT id, login, name, avatar, role FROM users WHERE id=?", (uid,))
-    r = rows[0]
-    return {"id": r["id"], "login": r["login"], "name": r["name"], "avatar": r["avatar"], "role": r["role"]}
+    return service.get_profile(uid)
 
 
 @router.patch("/api/me")

@@ -130,16 +130,22 @@ def draft_skeleton_from_submission(sid: str) -> dict:
     }
 
 
-def create_draft_from_submission(uid: str, sid: str) -> dict:
-    payload = draft_skeleton_from_submission(sid)
+def create_draft_with_payload(uid: str, sid: str, payload: dict) -> dict:
+    """给定成品 payload 的转稿落库（cases + submissions 同事务）。
+    机械骨架（create_draft_from_submission）与 AI 起草（ai.service）共用此唯一写入口。"""
     with db.tx() as conn:
         conn.execute(
             "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
             "VALUES(?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
-            (payload["id"], sid, uid, payload["title"], payload["domain"], payload["layer"], payload["difficulty"], 0, "draft", db.jdump(payload)),
+            (payload["id"], sid, uid, payload.get("title", ""), payload.get("domain", "runtime"),
+             payload.get("layer", ""), payload.get("difficulty", 2), 0, "draft", db.jdump(payload)),
         )
         conn.execute(
             "UPDATE submissions SET status='accepted', reviewed_at=datetime('now') WHERE id=? AND status='pending'", (sid,)
         )
     return {"caseId": payload["id"], "submissionId": sid, "status": "draft"}
+
+
+def create_draft_from_submission(uid: str, sid: str) -> dict:
+    return create_draft_with_payload(uid, sid, draft_skeleton_from_submission(sid))
