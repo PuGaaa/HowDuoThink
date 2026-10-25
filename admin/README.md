@@ -28,8 +28,8 @@ npm install
 npm run dev    # localhost:5174（避开 App H5 dev 的 5173）；/api 代理到本地 server（默认 8000）
 ```
 
-**初始账号**：`admin / HaoDuo@2026`（种子数据，bcrypt 入库；启动日志与登录页都会提示，仅限首次引导，
-**上线前务必在管理端侧栏「修改密码」改掉**）。部署自动化场景可用 `ADMIN_PASSWORD` 覆盖默认密码；
+**初始账号**：`admin / HaoDuo@2026`（种子数据，bcrypt 入库；启动日志会提示，dev 环境登录页亦有提示——
+生产不暴露默认密码探测端点；**上线前务必在管理端侧栏「修改密码」改掉**）。部署自动化场景可用 `ADMIN_PASSWORD` 覆盖默认密码；
 也可用 `GITHUB_ADMIN_LOGINS` 白名单账号。鉴权走 `/api/auth/login` 响应体里的 token，
 存 localStorage，全局路由守卫拦未登录。
 

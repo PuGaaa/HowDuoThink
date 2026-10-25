@@ -17,6 +17,9 @@ GITHUB_ADMIN_LOGINS = set(filter(None, os.environ.get("GITHUB_ADMIN_LOGINS", "")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 # 初始管理员默认密码（未配 ADMIN_PASSWORD 时的种子账号 admin / HaoDuo@2026；上线前必须改密）
 DEFAULT_ADMIN_PASSWORD = "HaoDuo@2026"
+# 登录防爆破：窗口内失败次数上限（账密与短信验码共用；单进程内存计数，随进程重启清零）
+LOGIN_MAX_FAILURES = int(os.environ.get("LOGIN_MAX_FAILURES", "5"))
+LOGIN_LOCK_SECONDS = int(os.environ.get("LOGIN_LOCK_SECONDS", "300"))
 # 显式开发模式开关：/api/dev/login 与 admin* 提权捷径只在 ENV=dev 下可用
 DEV_MODE = os.environ.get("ENV", "").lower() == "dev"
 # 生产 HTTPS 部署时设 COOKIE_SECURE=1，会话 cookie 仅经 HTTPS 传输

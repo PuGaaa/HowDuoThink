@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 # 环境与隔离库必须在 import main 之前就位
-os.environ["JWT_SECRET"] = "test-secret-for-pytest-only"
+os.environ["JWT_SECRET"] = "test-secret-for-pytest-only-32bytes!!"  # HS256 建议至少 32 字节
 os.environ["ADMIN_PASSWORD"] = "test-admin-pw"
 os.environ.pop("ENV", None)  # 确保 dev 绕行关闭
 

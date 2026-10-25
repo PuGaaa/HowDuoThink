@@ -115,7 +115,7 @@ def create_app() -> FastAPI:
         @app.get("/admin/{path:path}")
         def admin_spa(path: str):
             candidate = (admin_root / path).resolve()
-            if path and candidate.is_file() and str(candidate).startswith(str(admin_root)):
+            if path and candidate.is_file() and candidate.is_relative_to(admin_root):
                 return FileResponse(candidate)
             return FileResponse(admin_root / "index.html")
 

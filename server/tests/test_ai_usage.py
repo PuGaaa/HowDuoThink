@@ -16,12 +16,29 @@ class _FakeModel:
         return _FakeResp()
 
 
-def test_chat_logs_token_usage(monkeypatch):
+class _FakeEmbed:
+    """检索向量打桩：node_retrieve 的真实实现会加载/下载嵌入模型，测试必须封闭无网络。"""
+
+    model = "fake-embed"  # embeddings_model_name() 会读 .model
+
+    def embed_query(self, q: str) -> list[float]:
+        return [1.0, 0.0]
+
+
+def _mock_ai(monkeypatch, model):
+    """同时打桩对话模型与检索向量（node_retrieve 先于 node_answer 执行）。"""
     from features.ai import client
-    import main
 
     monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "chat_model", lambda: _FakeModel())
+    monkeypatch.setattr(client, "chat_model", lambda: model())
+    monkeypatch.setattr(client, "embed_available", lambda: True)
+    monkeypatch.setattr(client, "embeddings_model", lambda: _FakeEmbed())
+
+
+def test_chat_logs_token_usage(monkeypatch):
+    import main
+
+    _mock_ai(monkeypatch, _FakeModel)
     with TestClient(main.app) as c:
         login_admin(c)
         r = c.post("/api/ai/chat", json={"question": "连接池耗尽怎么排查"})
@@ -37,15 +54,13 @@ def test_chat_logs_token_usage(monkeypatch):
 
 
 def test_llm_failure_logged_as_not_ok(monkeypatch):
-    from features.ai import client
     import main
 
     class Boom:
         def invoke(self, messages):
             raise RuntimeError("上游超时")
 
-    monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "chat_model", lambda: Boom())
+    _mock_ai(monkeypatch, Boom)
     with TestClient(main.app, raise_server_exceptions=False) as c:
         login_admin(c)
         r = c.post("/api/ai/chat", json={"question": "会触发异常的问题"})

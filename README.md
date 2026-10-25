@@ -35,7 +35,7 @@ cd server
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./dev.sh
 
-# 2. 管理端（:5174）。初始账号 admin / HaoDuo@2026（登录页有提示，登录后请在侧栏修改密码）
+# 2. 管理端（:5174）。初始账号 admin / HaoDuo@2026（dev 环境登录页与启动日志有提示，登录后请在侧栏修改密码）
 cd admin && npm install && npm run dev    # → http://localhost:5174/admin/
 
 # 3. Web 社区站（:3000，可选）

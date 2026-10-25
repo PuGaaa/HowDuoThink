@@ -80,7 +80,9 @@ def dev_login(login: str = Query(default="devuser")):
 
 @router.get("/api/auth/default-account")
 def default_account_hint():
-    """登录页提示探测：初始账号 admin 的默认密码是否尚未修改。公开只读。"""
+    """登录页提示探测：仅 ENV=dev。公开暴露等于给攻击者「初始密码是否还在用」的免费情报。"""
+    if not config.DEV_MODE:
+        raise HTTPException(404, "Not Found")
     return {"default": service.uses_default_password()}
 
 

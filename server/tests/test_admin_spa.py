@@ -45,6 +45,25 @@ def test_cors_allows_admin_origin(monkeypatch):
         assert r.headers["access-control-allow-origin"] == "https://admin.example.com"
 
 
+def test_admin_spa_serving_confined_to_dist(monkeypatch, tmp_path):
+    """静态托管边界必须是路径级包含：同前缀姐妹目录（admin_dist_evil）借 symlink 不得骗过字符串前缀校验。"""
+    dist = tmp_path / "admin_dist"
+    dist.mkdir()
+    (dist / "index.html").write_text("<html>admin-spa-ok</html>")
+    evil = tmp_path / "admin_dist_evil"
+    evil.mkdir()
+    (evil / "secret.txt").write_text("SECRET")
+    (dist / "link").symlink_to(evil)
+    from core import config
+    from main import create_app
+
+    monkeypatch.setattr(config, "ADMIN_DIST_DIR", str(dist), raising=False)
+    with TestClient(create_app()) as client:
+        body = client.get("/admin/link/secret.txt").text
+        assert "SECRET" not in body
+        assert "admin-spa-ok" in body  # 越界请求回退 index.html，而非泄露或 404
+
+
 def test_cors_admin_origin_empty_not_leaked(monkeypatch):
     # 未配置 ADMIN_WEB_ORIGIN 时不应出现空串源
     from core import config

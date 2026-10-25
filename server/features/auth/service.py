@@ -3,6 +3,7 @@
 from fastapi import HTTPException
 
 import secrets
+import threading
 import time
 
 import db
@@ -10,12 +11,45 @@ from core import config, security
 from core import sms as sms_core
 
 
+# ---------- 登录防爆破（进程内滑动窗口；单 worker 部署形态下即全局） ----------
+
+_LOGIN_FAILURES: dict[str, list[float]] = {}
+_throttle_lock = threading.Lock()
+
+
+def _throttle_check(key: str) -> None:
+    """窗口内失败次数达上限即拒绝（429）——先于任何校验执行，不再消耗一次 bcrypt。"""
+    now = time.time()
+    with _throttle_lock:
+        fails = [t for t in _LOGIN_FAILURES.get(key, []) if now - t < config.LOGIN_LOCK_SECONDS]
+        _LOGIN_FAILURES[key] = fails
+        if len(fails) >= config.LOGIN_MAX_FAILURES:
+            raise HTTPException(429, "尝试次数过多，请稍后再试")
+
+
+def _throttle_fail(key: str) -> None:
+    with _throttle_lock:
+        _LOGIN_FAILURES.setdefault(key, []).append(time.time())
+
+
+def _throttle_clear(key: str) -> None:
+    with _throttle_lock:
+        _LOGIN_FAILURES.pop(key, None)
+
+
 def verify_login(login: str, password: str) -> dict:
-    """账密校验；历史无盐哈希在登录成功时静默升级为 bcrypt。返回 {id, role}。"""
+    """账密校验（带防爆破频控）；历史无盐哈希在登录成功时静默升级为 bcrypt。返回 {id, role}。"""
+    key = "pw:" + login.lower()
+    _throttle_check(key)
     rows = db.q("SELECT id, password_hash, role, status FROM users WHERE id=?", ("pw-" + login,))
     if not rows or not rows[0]["password_hash"] or not security.verify_password(password, rows[0]["password_hash"]):
+        _throttle_fail(key)
         raise HTTPException(401, "账号或密码错误")
-    ensure_active(rows[0]["id"])
+    if rows[0]["status"] == "banned":
+        # 密码正确但被封禁：同样计入失败——不许被封用户绕开频控无限消耗 bcrypt
+        _throttle_fail(key)
+        raise HTTPException(403, "账号已被封禁")
+    _throttle_clear(key)
     if security.is_legacy_hash(rows[0]["password_hash"]):
         db.ex("UPDATE users SET password_hash=? WHERE id=?", (security.hash_password(password), rows[0]["id"]))
     return {"id": rows[0]["id"], "role": rows[0]["role"]}
@@ -124,11 +158,16 @@ def send_sms_code(phone: str) -> dict:
 
 
 def _consume_code(phone: str, code: str) -> None:
+    key = "sms:" + phone
+    _throttle_check(key)
     row = db.q("SELECT code, expires_at, used FROM sms_codes WHERE phone=?", (phone,))
     if not row or row[0]["used"] or row[0]["code"] != code:
+        _throttle_fail(key)
         raise HTTPException(401, "验证码错误")
     if int(time.time()) > int(row[0]["expires_at"]):
+        _throttle_fail(key)
         raise HTTPException(401, "验证码已过期，请重新获取")
+    _throttle_clear(key)
     db.ex("UPDATE sms_codes SET used=1 WHERE phone=?", (phone,))
 
 

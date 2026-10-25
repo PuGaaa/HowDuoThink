@@ -24,8 +24,6 @@ def seed_case(json_path: Path, author: str = "官方") -> None:
     d = cp.model_dump(by_alias=True)
     d["submissionId"] = None
     d["authorName"] = "官方"
-    d["submissionId"] = None
-    d["authorName"] = "官方"
     exists = db.q("SELECT id FROM cases WHERE id=?", (cp.id,))
     if exists:
         db.ex(
