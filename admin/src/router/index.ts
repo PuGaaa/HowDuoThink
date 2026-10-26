@@ -57,6 +57,12 @@ const router = createRouter({
           component: () => import('@/features/ops/pages/HealthPage.vue'),
           meta: { title: '服务健康' },
         },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('@/features/settings/pages/SettingsPage.vue'),
+          meta: { title: '系统设置' },
+        },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },

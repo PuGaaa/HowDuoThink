@@ -51,4 +51,5 @@ export const api = {
   get: (path: string) => request('GET', path),
   post: (path: string, body?: unknown) => request('POST', path, body),
   patch: (path: string, body: unknown) => request('PATCH', path, body),
+  put: (path: string, body: unknown) => request('PUT', path, body),
 }

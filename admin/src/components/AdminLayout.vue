@@ -16,6 +16,7 @@ const NAV = [
   { to: '/users', name: 'users', icon: '👥', label: '用户管理', adminOnly: true },
   { to: '/ai-usage', name: 'ai-usage', icon: '🤖', label: 'AI 用量' },
   { to: '/ops', name: 'ops', icon: '💚', label: '服务健康' },
+  { to: '/settings', name: 'settings', icon: '⚙️', label: '系统设置', adminOnly: true },
 ]
 
 const navItems = computed(() => NAV.filter((n) => !n.adminOnly || user.value?.role === 'admin'))
