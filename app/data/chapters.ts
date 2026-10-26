@@ -6,6 +6,7 @@ import { DiagnosisCase } from '../types/case'
 import { getCaseProgress } from '../utils/storage'
 import { getRemoteCases } from '../utils/sync'
 import { isLoggedIn } from '../utils/auth'
+import { getGuestFreeChapter, getGuestFreeLevels } from '../utils/app-config'
 
 export interface PartDef {
   id: string
@@ -78,13 +79,11 @@ export function chaptersInPart(partId: string): ChapterDef[] {
 //   章解锁 = 前一章全部通关 ∥ 本章跳级挑战已通关；跳级挑战 = 锁定章的 order 最小关恒可玩，
 //   通关即解锁本章。全部从 solved 进度派生，无独立存储。
 
-/** 游客免费章 / 免费关数（章内按 order 升序计） */
-export const GUEST_FREE_CHAPTER = 'error-reading'
-export const GUEST_FREE_LEVELS = 3
+// 游客免费章 / 免费关数：管理端「系统设置」下发（utils/app-config），拉取失败退内置默认
 
 /** 目标关是否在游客免费范围（rankInChapter = casesInChapter 升序中的下标） */
 function inGuestFreeScope(chapterId: string, rankInChapter: number): boolean {
-  return chapterId === GUEST_FREE_CHAPTER && rankInChapter < GUEST_FREE_LEVELS
+  return chapterId === getGuestFreeChapter() && rankInChapter < getGuestFreeLevels()
 }
 
 /** 章内已破案数（本地 + 远端 casepack） */
@@ -120,7 +119,7 @@ export function chapterIndexInPart(chapterId: string): number {
 /** 锁定提示语（章页 toast / 首页弹窗共用）；游客态引导登录 */
 export function chapterUnlockHint(chapterId: string): string {
   if (!isLoggedIn()) {
-    return chapterId === GUEST_FREE_CHAPTER ? '登录后解锁本关' : '登录后解锁本章，继续侦探之旅'
+    return chapterId === getGuestFreeChapter() ? '登录后解锁本关' : '登录后解锁本章，继续侦探之旅'
   }
   return '通关上一章全部关卡，解锁本章'
 }
@@ -146,7 +145,7 @@ export function chapterCompleted(chapterId: string): boolean {
 
 /** 章解锁：游客 = 仅免费章；已登录 = 每篇第 1 章恒开 ∥ 本章跳级挑战已通关 ∥ 前一章全部通关 */
 export function isChapterUnlocked(chapterId: string): boolean {
-  if (!isLoggedIn()) return chapterId === GUEST_FREE_CHAPTER
+  if (!isLoggedIn()) return chapterId === getGuestFreeChapter()
   const idx = chapterIndexInPart(chapterId)
   if (idx <= 0) return true
   if (challengeSolved(chapterId)) return true
