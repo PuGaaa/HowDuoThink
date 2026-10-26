@@ -6,11 +6,19 @@ import logging
 import os
 import secrets
 
+from core import settings
 
 logger = logging.getLogger("server")
 
-CODE_TTL_SECONDS = 600        # 验证码 10 分钟有效
-RESEND_INTERVAL_SECONDS = 60  # 同号重发限频
+
+def code_ttl_sec() -> int:
+    """验证码有效期（秒）——运行时可在管理端「系统设置」调整（core.settings）。"""
+    return int(settings.get("sms.code_ttl_sec"))
+
+
+def resend_interval_sec() -> int:
+    """同号重发限频（秒）——同上，settings 即时可调。"""
+    return int(settings.get("sms.resend_interval_sec"))
 
 ALIYUN_SMS_ACCESS_KEY = os.environ.get("ALIYUN_SMS_ACCESS_KEY", "")
 ALIYUN_SMS_SECRET = os.environ.get("ALIYUN_SMS_SECRET", "")

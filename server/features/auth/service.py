@@ -7,7 +7,7 @@ import threading
 import time
 
 import db
-from core import config, security
+from core import config, security, settings
 from core import sms as sms_core
 
 
@@ -18,12 +18,14 @@ _throttle_lock = threading.Lock()
 
 
 def _throttle_check(key: str) -> None:
-    """窗口内失败次数达上限即拒绝（429）——先于任何校验执行，不再消耗一次 bcrypt。"""
+    """窗口内失败次数达上限即拒绝（429）——先于任何校验执行，不再消耗一次 bcrypt。阈值经管理端「系统设置」即时可调。"""
     now = time.time()
+    lock_seconds = int(settings.get("login.lock_seconds"))
+    max_failures = int(settings.get("login.max_failures"))
     with _throttle_lock:
-        fails = [t for t in _LOGIN_FAILURES.get(key, []) if now - t < config.LOGIN_LOCK_SECONDS]
+        fails = [t for t in _LOGIN_FAILURES.get(key, []) if now - t < lock_seconds]
         _LOGIN_FAILURES[key] = fails
-        if len(fails) >= config.LOGIN_MAX_FAILURES:
+        if len(fails) >= max_failures:
             raise HTTPException(429, "尝试次数过多，请稍后再试")
 
 
@@ -145,10 +147,10 @@ def send_sms_code(phone: str) -> dict:
         import datetime
 
         t = datetime.datetime.strptime(created, "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
-        if time.time() - t < sms_core.RESEND_INTERVAL_SECONDS:
+        if time.time() - t < sms_core.resend_interval_sec():
             raise HTTPException(429, "发送太频繁，稍后再试")
     code = sms_core.new_code()
-    expires = int(time.time()) + sms_core.CODE_TTL_SECONDS
+    expires = int(time.time()) + sms_core.code_ttl_sec()
     _db.ex(
         "INSERT INTO sms_codes(phone, code, expires_at, used) VALUES(?,?,?,0) "
         "ON CONFLICT(phone) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at, used=0, created_at=datetime('now')",

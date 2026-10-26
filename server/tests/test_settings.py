@@ -123,3 +123,38 @@ def test_app_config_public_and_scoped():
     assert set(cfg.keys()) == {"guest_gate.chapter_id", "guest_gate.free_levels"}
     assert cfg["guest_gate.free_levels"] == 5
     assert "ai.price_in" not in cfg and "login.max_failures" not in cfg
+
+
+# ———————— 接入点：五组参数经 settings 即时生效 ————————
+
+
+def test_sms_ttl_from_settings():
+    from core import sms as sms_core
+
+    _clear("sms.code_ttl_sec")
+    settings.update_many({"sms.code_ttl_sec": 120}, "tester")
+    assert settings.get("sms.code_ttl_sec") == 120
+    assert sms_core.code_ttl_sec() == 120
+    assert sms_core.resend_interval_sec() == 60  # 未改的项仍取默认
+
+
+def test_login_lockout_reads_settings(monkeypatch):
+    from features.auth import service as auth_service
+
+    _clear("login.max_failures")
+    monkeypatch.setattr(auth_service, "_LOGIN_FAILURES", {}, raising=False)
+    settings.update_many({"login.max_failures": 2}, "tester")
+    with make_client() as client:
+        assert client.post("/api/auth/login", json={"login": "admin", "password": "bad"}).status_code == 401
+        assert client.post("/api/auth/login", json={"login": "admin", "password": "bad"}).status_code == 401
+        # 第 3 次即使密码正确也被频控挡下（阈值经 settings 改成 2）
+        r = client.post("/api/auth/login", json={"login": "admin", "password": "test-admin-pw"})
+        assert r.status_code == 429, r.text
+
+
+def test_ai_price_from_settings():
+    from features.ai import usage
+
+    _clear("ai.price_in", "ai.price_out")
+    settings.update_many({"ai.price_in": 4, "ai.price_out": 12}, "tester")
+    assert usage.estimate_cost(1_000_000, 1_000_000) == 16.0

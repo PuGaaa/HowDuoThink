@@ -1,13 +1,13 @@
 """AI 用量审计：记录 + 汇总。ai_usage 是成本台账——只记真实发生的模型调用。
 
 审计是旁路：写失败只告警，绝不影响主流程（对话/起草不受审计库状态牵连）。
-成本按 DeepSeek 单价（config.DEEPSEEK_PRICE_IN/OUT，元/百万 tokens）估算。
+成本按 DeepSeek 单价（settings ai.price_in/out，元/百万 tokens）估算，管理端即时可调。
 """
 import datetime
 import logging
 
 import db
-from core import config
+from core import settings
 
 logger = logging.getLogger("server")
 
@@ -39,7 +39,9 @@ def extract_tokens(resp) -> tuple[int, int]:
 def estimate_cost(prompt_tokens: int, completion_tokens: int) -> float:
     # MySQL 的 SUM() 返回 Decimal，与 float 直接运算会 TypeError，统一归一为 int
     pin, pout = int(prompt_tokens or 0), int(completion_tokens or 0)
-    return (pin * config.DEEPSEEK_PRICE_IN + pout * config.DEEPSEEK_PRICE_OUT) / 1_000_000
+    price_in = float(settings.get("ai.price_in"))
+    price_out = float(settings.get("ai.price_out"))
+    return (pin * price_in + pout * price_out) / 1_000_000
 
 
 def daily_summary(days: int) -> dict:

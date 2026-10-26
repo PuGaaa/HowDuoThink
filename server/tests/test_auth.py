@@ -141,44 +141,59 @@ def _isolate_throttle(monkeypatch):
     monkeypatch.setattr(service, "_LOGIN_FAILURES", {}, raising=False)
 
 
-def test_login_rate_limited_after_repeated_failures(monkeypatch):
-    from core import config
+def _set_throttle(max_failures: int, lock_seconds: int):
+    """阈值经 settings 下发生效（与生产同链路）；返回还原函数，用例 finally 里调用恢复默认。"""
+    from core import settings
 
-    monkeypatch.setattr(config, "LOGIN_MAX_FAILURES", 3, raising=False)
-    monkeypatch.setattr(config, "LOGIN_LOCK_SECONDS", 300, raising=False)
+    settings.update_many({"login.max_failures": max_failures, "login.lock_seconds": lock_seconds}, "test")
+
+    def _restore():
+        import db
+
+        db.ex("DELETE FROM settings WHERE setting_key IN ('login.max_failures','login.lock_seconds')")
+        settings.reset_cache()
+
+    return _restore
+
+
+def test_login_rate_limited_after_repeated_failures(monkeypatch):
+    _restore = _set_throttle(3, 300)
     _isolate_throttle(monkeypatch)
-    with make_client() as client:
-        for _ in range(3):
-            assert client.post("/api/auth/login", json={"login": "admin", "password": "bad"}).status_code == 401
-        # 第 4 次即使密码正确也先被频控挡下，不再消耗一次 bcrypt 校验
-        r = client.post("/api/auth/login", json={"login": "admin", "password": "test-admin-pw"})
-        assert r.status_code == 429, r.text
+    try:
+        with make_client() as client:
+            for _ in range(3):
+                assert client.post("/api/auth/login", json={"login": "admin", "password": "bad"}).status_code == 401
+            # 第 4 次即使密码正确也先被频控挡下，不再消耗一次 bcrypt 校验
+            r = client.post("/api/auth/login", json={"login": "admin", "password": "test-admin-pw"})
+            assert r.status_code == 429, r.text
+    finally:
+        _restore()
 
 
 def test_login_rate_limit_window_expires(monkeypatch):
-    import time
+    """窗口滑动释放：失败记录滑出窗口后不再计数（lock_seconds 下限 30，回拨时间戳免真实等待）。"""
+    from features.auth import service
 
-    from core import config
-
-    monkeypatch.setattr(config, "LOGIN_MAX_FAILURES", 2, raising=False)
-    monkeypatch.setattr(config, "LOGIN_LOCK_SECONDS", 1, raising=False)
+    _restore = _set_throttle(2, 30)
     _isolate_throttle(monkeypatch)
-    with make_client() as client:
-        for _ in range(2):
-            assert client.post("/api/auth/login", json={"login": "admin", "password": "bad"}).status_code == 401
-        assert client.post("/api/auth/login", json={"login": "admin", "password": "bad"}).status_code == 429
-        time.sleep(1.1)  # 窗口滑过最早一次失败
-        assert client.post("/api/auth/login", json={"login": "admin", "password": "test-admin-pw"}).status_code == 200
+    try:
+        with make_client() as client:
+            for _ in range(2):
+                assert client.post("/api/auth/login", json={"login": "admin", "password": "bad"}).status_code == 401
+            assert client.post("/api/auth/login", json={"login": "admin", "password": "bad"}).status_code == 429
+            with service._throttle_lock:
+                service._LOGIN_FAILURES["pw:admin"] = [t - 31 for t in service._LOGIN_FAILURES["pw:admin"]]
+            assert client.post("/api/auth/login", json={"login": "admin", "password": "test-admin-pw"}).status_code == 200
+    finally:
+        _restore()
 
 
 def test_phone_code_rate_limited(monkeypatch):
     import time
 
     import db
-    from core import config
 
-    monkeypatch.setattr(config, "LOGIN_MAX_FAILURES", 3, raising=False)
-    monkeypatch.setattr(config, "LOGIN_LOCK_SECONDS", 300, raising=False)
+    _restore = _set_throttle(3, 300)
     _isolate_throttle(monkeypatch)
     phone, code = "13900000001", "246810"
     db.ex(
@@ -186,22 +201,24 @@ def test_phone_code_rate_limited(monkeypatch):
         "ON CONFLICT(phone) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at, used=0",
         (phone, code, int(time.time()) + 600),
     )
-    with make_client() as client:
-        for _ in range(3):
-            r = client.post("/api/auth/login/phone", json={"phone": phone, "code": "000000"})
-            assert r.status_code == 401
-        # 连错封窗后，正确验证码也不放行（防止用 401/429 差异爆破验证码）
-        r = client.post("/api/auth/login/phone", json={"phone": phone, "code": code})
-        assert r.status_code == 429
+    try:
+        with make_client() as client:
+            for _ in range(3):
+                r = client.post("/api/auth/login/phone", json={"phone": phone, "code": "000000"})
+                assert r.status_code == 401
+            # 连错封窗后，正确验证码也不放行（防止用 401/429 差异爆破验证码）
+            r = client.post("/api/auth/login/phone", json={"phone": phone, "code": code})
+            assert r.status_code == 429
+    finally:
+        _restore()
 
 
 def test_banned_account_login_also_throttled(monkeypatch):
     """被禁账号连正确密码登录也要计失败：知道密码的被封用户不许无限消耗 bcrypt。"""
     import db
-    from core import config, security
+    from core import security
 
-    monkeypatch.setattr(config, "LOGIN_MAX_FAILURES", 3, raising=False)
-    monkeypatch.setattr(config, "LOGIN_LOCK_SECONDS", 300, raising=False)
+    _restore = _set_throttle(3, 300)
     _isolate_throttle(monkeypatch)
     db.ex(
         "INSERT INTO users(id, login, name, avatar, role, status, password_hash) "
@@ -209,10 +226,13 @@ def test_banned_account_login_also_throttled(monkeypatch):
         "ON CONFLICT(id) DO UPDATE SET status='banned', password_hash=excluded.password_hash",
         (security.hash_password("victim-pw-1"),),
     )
-    with make_client() as client:
-        for _ in range(3):
+    try:
+        with make_client() as client:
+            for _ in range(3):
+                r = client.post("/api/auth/login", json={"login": "victim", "password": "victim-pw-1"})
+                assert r.status_code == 403  # 密码正确但被封禁
+            # 第 4 次正确密码也要被频控挡下
             r = client.post("/api/auth/login", json={"login": "victim", "password": "victim-pw-1"})
-            assert r.status_code == 403  # 密码正确但被封禁
-        # 第 4 次正确密码也要被频控挡下
-        r = client.post("/api/auth/login", json={"login": "victim", "password": "victim-pw-1"})
-        assert r.status_code == 429, r.text
+            assert r.status_code == 429, r.text
+    finally:
+        _restore()

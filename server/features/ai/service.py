@@ -9,6 +9,7 @@ import time
 import uuid
 
 import db
+from core import settings
 from features.ai import client
 
 SYSTEM_PROMPT = (
@@ -21,15 +22,15 @@ SYSTEM_PROMPT = (
 )
 
 _RATE: dict[str, list[float]] = {}
-_RATE_LIMIT = 10
-_RATE_WINDOW = 60.0
 
 
 def _rate_ok(uid: str) -> bool:
-    """内存限速：每用户每分钟 10 次。"""
+    """内存限速：阈值/窗口经管理端「系统设置」即时可调（core.settings）。"""
+    limit = int(settings.get("ai.rate_limit"))
+    window = float(settings.get("ai.rate_window_sec"))
     now = time.monotonic()
-    hits = [t for t in _RATE.get(uid, []) if now - t < _RATE_WINDOW]
-    if len(hits) >= _RATE_LIMIT:
+    hits = [t for t in _RATE.get(uid, []) if now - t < window]
+    if len(hits) >= limit:
         _RATE[uid] = hits
         return False
     hits.append(now)
