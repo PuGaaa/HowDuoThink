@@ -130,6 +130,12 @@ CREATE TABLE IF NOT EXISTS ops_snapshots (
   rss_mb REAL NOT NULL DEFAULT 0,
   disk_free_mb REAL NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS settings (
+  setting_key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_by TEXT
+);
 """
 
 # MySQL 建库脚本：key 是保留字 → meta 主键列名为 meta_key；日期列用 DATETIME（默认 CURRENT_TIMESTAMP）
@@ -241,6 +247,12 @@ CREATE TABLE IF NOT EXISTS ops_snapshots (
   avg_ms BIGINT NOT NULL DEFAULT 0,
   rss_mb DOUBLE NOT NULL DEFAULT 0,
   disk_free_mb DOUBLE NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS settings (
+  setting_key VARCHAR(64) PRIMARY KEY,
+  value MEDIUMTEXT NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by VARCHAR(64)
 );
 """
 
