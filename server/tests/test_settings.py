@@ -158,3 +158,27 @@ def test_ai_price_from_settings():
     _clear("ai.price_in", "ai.price_out")
     settings.update_many({"ai.price_in": 4, "ai.price_out": 12}, "tester")
     assert usage.estimate_cost(1_000_000, 1_000_000) == 16.0
+
+
+def test_update_many_rejects_nonfinite():
+    """inf/NaN 是合法 JSON float 但会毒化看板/JSON 序列化——必须在校验层拒绝。"""
+    _clear("ai.price_in")
+    for bad in (float("inf"), float("-inf"), float("nan")):
+        try:
+            settings.update_many({"ai.price_in": bad}, "tester")
+        except ValueError as e:
+            assert "ai.price_in" in str(e)
+        else:
+            raise AssertionError(f"应拒绝 {bad}")
+
+
+def test_get_guards_nonfinite_db_value():
+    """外部直改库塞入 inf：读侧兜底退默认，不毒化 estimate_cost / JSON 响应。"""
+    db.ex(
+        "INSERT INTO settings(setting_key, value) VALUES('ai.price_in','inf') "
+        "ON CONFLICT(setting_key) DO UPDATE SET value=excluded.value"
+    )
+    settings.reset_cache()
+    assert settings.get("ai.price_in") == 2.0
+    assert settings.source_of("ai.price_in") == "default"
+    _clear("ai.price_in")

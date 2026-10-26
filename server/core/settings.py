@@ -6,6 +6,7 @@
 env 层在本模块读 os.environ（与 core/config.py 同属配置层；features 一律经 get() 取值，不自行读 env）。
 """
 import logging
+import math
 import os
 from dataclasses import dataclass
 from typing import Callable
@@ -89,15 +90,27 @@ def _env_value(d: SettingDef) -> str | None:
     return v if v not in (None, "") else None
 
 
+def _coerce(d: SettingDef, raw: str):
+    """parse + 有限数校验；失败返回 None（调用方走降级/拒绝路径）。inf/NaN 是合法
+    JSON float，但会毒化看板运算与 JSON 序列化（设置页整体 500），两侧都要拦。"""
+    try:
+        v = d.parse(raw)
+    except (TypeError, ValueError):
+        return None
+    if isinstance(v, float) and not math.isfinite(v):
+        return None
+    return v
+
+
 def get(key: str) -> int | float | str:
     """取生效值：DB 行 > env > 内置默认。未知 key 是编程错误，直接 KeyError。"""
     d = REGISTRY[key]
     raw = _load().get(key)
     if raw is not None:
-        try:
-            return d.parse(raw)
-        except (TypeError, ValueError):
-            logger.warning("[settings] %s 库中值 %r 解析失败，退 env/默认", key, raw)
+        v = _coerce(d, raw)
+        if v is not None:
+            return v
+        logger.warning("[settings] %s 库中值 %r 非法，退 env/默认", key, raw)
     env = _env_value(d)
     if env is not None:
         return d.parse(env)
@@ -108,12 +121,8 @@ def source_of(key: str) -> str:
     """当前生效值来自哪一层：db / env / default（管理端展示用）。"""
     d = REGISTRY[key]
     raw = _load().get(key)
-    if raw is not None:
-        try:
-            d.parse(raw)
-            return "db"
-        except (TypeError, ValueError):
-            pass
+    if raw is not None and _coerce(d, raw) is not None:
+        return "db"
     return "env" if _env_value(d) is not None else "default"
 
 
@@ -131,10 +140,9 @@ def update_many(values: dict, operator: str) -> None:
         if d is None:
             errors.append(f"{key}=未知配置项")
             continue
-        try:
-            parsed = d.parse(str(val))
-        except (TypeError, ValueError):
-            errors.append(f"{key}=类型非法")
+        parsed = _coerce(d, str(val))
+        if parsed is None:
+            errors.append(f"{key}=类型非法（须为有限数）")
             continue
         if parsed == "":
             errors.append(f"{key}=不能为空")
