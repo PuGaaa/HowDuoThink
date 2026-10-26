@@ -57,3 +57,69 @@ def test_get_survives_db_error(monkeypatch):
     settings.reset_cache()
     monkeypatch.setattr(db, "q", lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("库挂了")))
     assert settings.get("ai.price_out") == 8  # 读库失败退内置默认，不抛
+
+
+# ———————— HTTP 层（features/settings）————————
+
+import uuid  # noqa: E402
+
+from core import security  # noqa: E402
+from tests.conftest import login_admin, make_client  # noqa: E402
+
+
+def _mkuser(role: str = "user") -> str:
+    login = f"setuser-{uuid.uuid4().hex[:6]}"
+    db.ex(
+        "INSERT INTO users(id, login, name, role, password_hash) VALUES(?,?,?,?,?)",
+        ("pw-" + login, login, login, role, security.hash_password("pw-123456")),
+    )
+    return login
+
+
+def test_admin_settings_roundtrip():
+    with make_client() as client:  # startup：种子 pw-admin
+        login_admin(client)
+        _clear("ai.rate_limit")
+        r = client.get("/api/admin/settings")
+        assert r.status_code == 200
+        items = {i["key"]: i for i in r.json()["items"]}
+        assert len(items) == 10
+        assert items["ai.rate_limit"]["value"] == 10
+        assert items["ai.rate_limit"]["source"] in ("env", "default", "db")
+        r = client.put("/api/admin/settings", json={"values": {"ai.rate_limit": 7}})
+        assert r.status_code == 200, r.text
+        items = {i["key"]: i for i in client.get("/api/admin/settings").json()["items"]}
+        assert items["ai.rate_limit"]["value"] == 7
+        assert items["ai.rate_limit"]["source"] == "db"
+
+
+def test_admin_settings_requires_admin():
+    with make_client() as client:
+        assert client.get("/api/admin/settings").status_code in (401, 403)  # 匿名
+        login = _mkuser("user")
+        r = client.post("/api/auth/login", json={"login": login, "password": "pw-123456"})
+        assert r.status_code == 200
+        assert client.get("/api/admin/settings").status_code == 403
+        assert client.put("/api/admin/settings", json={"values": {"ai.rate_limit": 7}}).status_code == 403
+
+
+def test_put_invalid_returns_400():
+    with make_client() as client:
+        login_admin(client)
+        _clear("nope.key")
+        r = client.put("/api/admin/settings", json={"values": {"nope.key": 1}})
+        assert r.status_code == 400
+        assert "nope.key" in r.json()["detail"]
+        assert db.q("SELECT COUNT(*) AS n FROM settings WHERE setting_key='nope.key'")[0]["n"] == 0
+
+
+def test_app_config_public_and_scoped():
+    with make_client() as client:
+        login_admin(client)
+        client.put("/api/admin/settings", json={"values": {"guest_gate.free_levels": 5}})
+    r = make_client().get("/api/app-config")  # 匿名（无需 startup 种子）
+    assert r.status_code == 200
+    cfg = r.json()
+    assert set(cfg.keys()) == {"guest_gate.chapter_id", "guest_gate.free_levels"}
+    assert cfg["guest_gate.free_levels"] == 5
+    assert "ai.price_in" not in cfg and "login.max_failures" not in cfg
