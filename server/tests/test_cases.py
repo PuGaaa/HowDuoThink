@@ -90,3 +90,32 @@ def test_admin_case_detail_404():
 def test_admin_cases_require_editor():
     with make_client() as client:
         assert client.get("/api/admin/cases").status_code in (401, 403)
+
+
+def test_update_meta_bumps_casepack_version():
+    """meta 变更必须进 casepack 增量流（version bump），否则 App 永远拉不到章归属/排序调整。"""
+    import db
+
+    with make_client() as client:
+        login_admin(client)
+        payload = load_seed()
+        r = client.post("/api/cases", json=payload)
+        assert r.status_code == 200, r.text
+        cid = payload["id"]
+        since = db.current_version()
+        r = client.patch(f"/api/admin/cases/{cid}/meta", json={"order": 42})
+        assert r.status_code == 200, r.text
+        assert db.current_version() > since  # 版本推进
+        pack = client.get(f"/api/casepack?since={since}").json()
+        hit = [c for c in pack["cases"] if c["id"] == cid]
+        assert hit and hit[0]["order"] == 42  # casepack 项即 payload，order 在顶层
+
+
+def test_update_meta_unknown_case_404_no_version_bump():
+    import db
+
+    with make_client() as client:
+        login_admin(client)
+        v0 = db.current_version()
+        assert client.patch("/api/admin/cases/no-such-case/meta", json={"order": 1}).status_code == 404
+        assert db.current_version() == v0  # 不虚增版本

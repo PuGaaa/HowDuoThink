@@ -26,7 +26,8 @@ def save_case_draft(uid: str, body: CaseDraftBody) -> dict:
 
 
 def update_case_meta(cid: str, body: CaseMetaBody) -> dict:
-    """结构化更新三级架构元数据（part/chapterId/order/typeTags），不动正文。"""
+    """结构化更新三级架构元数据（part/chapterId/order/typeTags），不动正文。
+    有实际变更时 bump casepack 版本（与 publish_case 同构取号）——否则 App 增量同步永远拉不到 meta 调整。"""
     rows = db.q("SELECT payload FROM cases WHERE id=?", (cid,))
     if not rows:
         raise HTTPException(404, "不存在")
@@ -39,7 +40,18 @@ def update_case_meta(cid: str, body: CaseMetaBody) -> dict:
         payload["order"] = body.order
     if body.type_tags is not None:
         payload["typeTags"] = [t.strip() for t in body.type_tags if t.strip()]
-    db.ex("UPDATE cases SET payload=? WHERE id=?", (db.jdump(payload), cid))
+    changed = bool(body.part) or body.chapter_id is not None or body.order is not None or body.type_tags is not None
+    if changed:
+        with db.tx() as conn:
+            version_row = conn.execute("SELECT value FROM meta WHERE meta_key='casepack_version'").fetchone()
+            version = (int(version_row["value"]) if version_row else 0) + 1
+            conn.execute(
+                "INSERT INTO meta(meta_key, value) VALUES('casepack_version', ?) ON CONFLICT(meta_key) DO UPDATE SET value=excluded.value",
+                (str(version),),
+            )
+            conn.execute("UPDATE cases SET payload=?, version=? WHERE id=?", (db.jdump(payload), version, cid))
+    else:
+        db.ex("UPDATE cases SET payload=? WHERE id=?", (db.jdump(payload), cid))
     return {"ok": True, "meta": {"part": payload.get("part"), "chapterId": payload.get("chapterId"), "order": payload.get("order"), "typeTags": payload.get("typeTags")}}
 
 
