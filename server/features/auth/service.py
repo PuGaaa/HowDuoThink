@@ -72,14 +72,6 @@ def uses_default_password() -> bool:
     return security.verify_password(config.DEFAULT_ADMIN_PASSWORD, rows[0]["password_hash"])
 
 
-def upsert_oauth_user(u: dict, role: str) -> None:
-    db.ex(
-        "INSERT INTO users(id, login, name, avatar, role) VALUES(?,?,?,?,?) "
-        "ON CONFLICT(id) DO UPDATE SET login=excluded.login, name=excluded.name, avatar=excluded.avatar, role=excluded.role",
-        (u["github_id"], u["login"], u["name"], u["avatar"], role),
-    )
-
-
 def dev_upsert_user(login: str) -> str:
     """开发绕行建号（仅 ENV=dev 下被路由调用）。返回 uid。"""
     uid = "dev-" + login
@@ -137,7 +129,7 @@ def random_nickname() -> str:
     return random.choice(_NICK_ADJ) + random.choice(_NICK_NOUN)
 
 def send_sms_code(phone: str) -> dict:
-    """生成并下发验证码；60s 重发限频。dev 模式响应带 devEcho 供联调。"""
+    """生成并下发验证码；60s 重发限频。dev 模式响应带 devEcho 供联调；通道不可用映射 503。"""
     import db as _db
 
     last = _db.q("SELECT created_at FROM sms_codes WHERE phone=?", (phone,))
@@ -156,7 +148,10 @@ def send_sms_code(phone: str) -> dict:
         "ON CONFLICT(phone) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at, used=0, created_at=datetime('now')",
         (phone, code, expires),
     )
-    return sms_core.send_code(phone, code)
+    try:
+        return sms_core.send_code(phone, code)
+    except sms_core.SmsChannelUnavailable as e:
+        raise HTTPException(503, str(e))
 
 
 def _consume_code(phone: str, code: str) -> None:
