@@ -151,14 +151,15 @@ def _int_or(v, default: int) -> int:
 def create_draft_with_payload(uid: str, sid: str, payload: dict) -> dict:
     """给定成品 payload 的转稿落库（cases + submissions 同事务）。
     机械骨架（create_draft_from_submission）与 AI 起草（ai.service）共用此唯一写入口。
-    status 守卫：非 draft 的既有案例拒绝覆盖（发布门禁唯一旁路）；元数据列随 payload 同步。"""
+    status 守卫带条件谓词：预检与写入之间案例被并发发布时，UPDATE ... AND status='draft'
+    的 rowcount=0 仍然拒绝；元数据列随 payload 同步。"""
     with db.tx() as conn:
         exists = conn.execute("SELECT status FROM cases WHERE id=?", (payload["id"],)).fetchone()
-        if exists and exists["status"] != "draft":
-            raise HTTPException(409, "该案例已发布：不能经转稿覆盖，请走重新发布流程")
         if exists:
-            conn.execute(
-                "UPDATE cases SET payload=?, title=?, domain=?, layer=?, difficulty=? WHERE id=?",
+            if exists["status"] != "draft":
+                raise HTTPException(409, "该案例已发布：不能经转稿覆盖，请走重新发布流程")
+            cur = conn.execute(
+                "UPDATE cases SET payload=?, title=?, domain=?, layer=?, difficulty=? WHERE id=? AND status='draft'",
                 (
                     db.jdump(payload),
                     str(payload.get("title", "")),
@@ -168,6 +169,8 @@ def create_draft_with_payload(uid: str, sid: str, payload: dict) -> dict:
                     payload["id"],
                 ),
             )
+            if cur.rowcount != 1:
+                raise HTTPException(409, "案例状态已变化（已发布或已删除）：不能经转稿覆盖")
         else:
             conn.execute(
                 "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "

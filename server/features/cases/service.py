@@ -17,32 +17,35 @@ def _int_or(v, default: int) -> int:
 
 def save_case_draft(uid: str, body: CaseDraftBody) -> dict:
     """保存草稿：不跑门禁（draft 允许半成品）。发布走 publish_case。
-    status 守卫：非 draft 案例拒绝经草稿路径改写——这里是发布门禁的唯一旁路，
-    且覆盖不改 version，App 增量同步会形成"库内已坏、端上仍旧"的分裂。"""
+    status 守卫带条件谓词：预检（快照读）与写入之间案例被并发发布时，
+    UPDATE ... AND status='draft' 的 rowcount=0 仍然拒绝——check-then-act 打不穿。"""
     payload = body.payload or {}
     payload["id"] = body.id
-    exists = db.q("SELECT id, status, version FROM cases WHERE id=?", (body.id,))
-    if exists:
-        if exists[0]["status"] != "draft":
-            raise HTTPException(409, "该案例已发布：修改请走重新发布流程（过发布门禁），不能经草稿覆盖")
-        db.ex(
-            "UPDATE cases SET payload=?, title=?, domain=?, layer=?, difficulty=? WHERE id=?",
-            (
-                db.jdump(payload),
-                str(payload.get("title", "")),
-                str(payload.get("domain", "")),
-                str(payload.get("layer", "")),
-                _int_or(payload.get("difficulty"), 1),
-                body.id,
-            ),
+    exists = db.q("SELECT id, status FROM cases WHERE id=?", (body.id,))
+    if exists and exists[0]["status"] != "draft":
+        raise HTTPException(409, "该案例已发布：修改请走重新发布流程（过发布门禁），不能经草稿覆盖")
+    with db.tx() as conn:
+        if exists:
+            cur = conn.execute(
+                "UPDATE cases SET payload=?, title=?, domain=?, layer=?, difficulty=? WHERE id=? AND status='draft'",
+                (
+                    db.jdump(payload),
+                    str(payload.get("title", "")),
+                    str(payload.get("domain", "")),
+                    str(payload.get("layer", "")),
+                    _int_or(payload.get("difficulty"), 1),
+                    body.id,
+                ),
+            )
+            if cur.rowcount != 1:
+                raise HTTPException(409, "案例状态已变化（已发布或已删除）：不能经草稿覆盖")
+            return {"id": body.id, "status": "draft"}
+        conn.execute(
+            "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (body.id, body.submission_id, uid, str(payload.get("title", "")), "", "", 1, 0, "draft", db.jdump(payload)),
         )
-        return {"id": body.id, "status": exists[0]["status"]}
-    db.ex(
-        "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?)",
-        (body.id, body.submission_id, uid, str(payload.get("title", "")), "", "", 1, 0, "draft", db.jdump(payload)),
-    )
-    return {"id": body.id, "status": "draft"}
+        return {"id": body.id, "status": "draft"}
 
 
 def update_case_meta(cid: str, body: CaseMetaBody) -> dict:

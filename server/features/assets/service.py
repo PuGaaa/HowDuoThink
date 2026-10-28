@@ -99,6 +99,11 @@ def upload(data: bytes, filename: str, category: str, note: str, uid: str) -> di
     ext = _ext_of(filename)
     if ext not in ALLOWED_EXTS:
         raise AssetError(f"不支持的文件类型 .{ext or '（无后缀）'}")
+    if len(filename) > 255:
+        # MySQL filename VARCHAR(255)：超长在严格模式 500、SQLite 无感——入口显式 400 拉平
+        raise AssetError("文件名过长（≤255 字符）")
+    if len(note) > 512:
+        raise AssetError("备注过长（≤512 字符）")
     max_bytes = config.OSS_MAX_UPLOAD_MB * 1024 * 1024
     if len(data) > max_bytes:
         raise AssetError(f"文件超过上限 {config.OSS_MAX_UPLOAD_MB}MB")

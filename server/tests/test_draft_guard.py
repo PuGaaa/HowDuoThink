@@ -60,3 +60,35 @@ def test_published_case_rejects_transcript_overwrite():
 
         row = db.q("SELECT payload FROM cases WHERE id=?", (payload["id"],))
         assert db.jload(row[0]["payload"], {})["title"] == payload["title"]
+
+
+def test_draft_overwrite_races_publish(monkeypatch):
+    """check 与 write 之间案例被并发发布：条件 UPDATE（AND status='draft'）仍然拒绝。
+    原修复是无谓词 UPDATE + 事务外预检，可被 TOCTOU 打穿：任一次"发布干净版 ×
+    草稿保存恶意版"请求对交错成功，未过门禁的 payload 即进入已发布案例。"""
+    import db as dbmod
+    from features.cases import service as cases_service
+    from features.cases.models import CaseDraftBody
+
+    with make_client() as client:
+        login_admin(client)
+        body = {"id": "c-race-guard-x", "payload": {"id": "c-race-guard-x", "title": "竞态草稿"}}
+        assert client.post("/api/admin/cases", json=body).status_code == 200
+        real_q = dbmod.q
+
+        def q_then_publish(sql, params=()):
+            rows = real_q(sql, params)
+            if sql.startswith("SELECT id, status"):
+                # 模拟并发发布抢先提交（在预检读到 draft 之后、写入之前）；ex 自带提交
+                dbmod.ex("UPDATE cases SET status='published' WHERE id=?", ("c-race-guard-x",))
+            return rows
+
+        monkeypatch.setattr(dbmod, "q", q_then_publish)
+        draft_body = CaseDraftBody(id="c-race-guard-x", payload={"id": "c-race-guard-x", "title": "被篡改"})
+        with pytest.raises(HTTPException) as ei:
+            cases_service.save_case_draft("pw-admin", draft_body)
+        assert ei.value.status_code == 409
+        monkeypatch.undo()
+        row = dbmod.q("SELECT status, payload FROM cases WHERE id=?", ("c-race-guard-x",))[0]
+        assert row["status"] == "published"
+        assert dbmod.jload(row["payload"], {})["title"] == "竞态草稿"  # 正文未被覆盖

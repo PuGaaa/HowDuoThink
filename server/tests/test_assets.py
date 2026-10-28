@@ -223,3 +223,21 @@ def test_upload_daily_limit(client, fake_oss, monkeypatch):
     )
     assert r.status_code == 429, r.text
     dbmod.ex("DELETE FROM assets WHERE filename LIKE 'lim-%'")  # 清场，不污染其他用例口径
+
+
+def test_upload_rejects_oversize_filename_and_note(client, fake_oss):
+    """filename/note 超长显式 400（MySQL VARCHAR 严格模式下会 500，SQLite 无感——双引擎分叉）。"""
+    r = client.post(
+        "/api/assets",
+        files={"file": ("n" * 300 + ".png", PNG, "image/png")},
+        data={"category": "misc"},
+    )
+    assert r.status_code == 400, r.text
+    assert "文件名" in r.json()["detail"]
+    r2 = client.post(
+        "/api/assets",
+        files={"file": ("ok.png", PNG + b"1", "image/png")},
+        data={"category": "misc", "note": "x" * 600},
+    )
+    assert r2.status_code == 400, r2.text
+    assert "备注" in r2.json()["detail"]
