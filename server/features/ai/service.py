@@ -5,6 +5,7 @@
 """
 import json
 import math
+import threading
 import time
 import uuid
 
@@ -22,20 +23,33 @@ SYSTEM_PROMPT = (
 )
 
 _RATE: dict[str, list[float]] = {}
+_RATE_LOCK = threading.Lock()
 
 
 def _rate_ok(uid: str) -> bool:
-    """内存限速：阈值/窗口经管理端「系统设置」即时可调（core.settings）。"""
+    """内存限速：阈值/窗口经管理端「系统设置」即时可调。
+    读-判-写持锁原子——同步路由跑在线程池，无锁时同 uid 并发请求会互相覆盖计数、全部放行。"""
     limit = int(settings.get("ai.rate_limit"))
     window = float(settings.get("ai.rate_window_sec"))
     now = time.monotonic()
-    hits = [t for t in _RATE.get(uid, []) if now - t < window]
-    if len(hits) >= limit:
+    with _RATE_LOCK:
+        hits = [t for t in _RATE.get(uid, []) if now - t < window]
+        if len(hits) >= limit:
+            _RATE[uid] = hits
+            return False
+        hits.append(now)
         _RATE[uid] = hits
-        return False
-    hits.append(now)
-    _RATE[uid] = hits
-    return True
+        return True
+
+
+def _daily_used(uid: str) -> int:
+    """当日（UTC 日）该 uid 已发生的模型调用次数——按 ai_usage 审计行计数。"""
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    rows = db.q(
+        "SELECT COUNT(*) AS n FROM ai_usage WHERE uid=? AND kind IN ('chat','draft') AND substr(created_at,1,10)=?",
+        (uid, today),
+    )
+    return int(rows[0]["n"] or 0)
 
 
 # ────────────────────────── 节点：索引 ──────────────────────────
@@ -184,11 +198,14 @@ def node_answer(question: str, chunks: list[dict], uid: str | None = None) -> st
 
 
 def chat(question: str, uid: str) -> dict:
-    """RAG 对话入口：限速 → 检索 → 应答 → 组装引用。"""
+    """RAG 对话入口：限速 → 日配额 → 检索 → 应答 → 组装引用。"""
     if not client.available():
         return {"error": "AI 未配置（DEEPSEEK_API_KEY 缺失），对话不可用；检索可走关键词模式", "aiAvailable": False}
     if not _rate_ok(uid):
         return {"error": "提问太频繁，稍后再试", "aiAvailable": True}
+    if _daily_used(uid) >= int(settings.get("ai.daily_limit")):
+        # 窗口限流之外的日硬顶：并发绕过窗口限流时，成本仍有每日上限兜底
+        return {"error": "今日提问次数已达上限，明天再来", "aiAvailable": True}
     chunks = node_retrieve(question, k=4)
     answer = node_answer(question, chunks, uid=uid)
     sources = []

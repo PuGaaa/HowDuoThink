@@ -46,9 +46,15 @@ def test_update_many_rejects_unknown_and_out_of_range():
 
 def test_client_config_only_client_scope():
     cfg = settings.client_config()
-    assert set(cfg.keys()) == {"guest_gate.chapter_id", "guest_gate.free_levels"}
+    assert set(cfg.keys()) == {
+        "guest_gate.chapter_id",
+        "guest_gate.free_levels",
+        "assets.cdn_base",
+        "assets.remote_enabled",
+    }
     assert cfg["guest_gate.chapter_id"] == "error-reading"
     assert cfg["guest_gate.free_levels"] == 3
+    assert cfg["assets.remote_enabled"] == 0
 
 
 def test_get_survives_db_error(monkeypatch):
@@ -83,7 +89,7 @@ def test_admin_settings_roundtrip():
         r = client.get("/api/admin/settings")
         assert r.status_code == 200
         items = {i["key"]: i for i in r.json()["items"]}
-        assert len(items) == 10
+        assert len(items) == 13  # 注册表新增 ai.daily_limit
         assert items["ai.rate_limit"]["value"] == 10
         assert items["ai.rate_limit"]["source"] in ("env", "default", "db")
         r = client.put("/api/admin/settings", json={"values": {"ai.rate_limit": 7}})
@@ -120,7 +126,12 @@ def test_app_config_public_and_scoped():
     r = make_client().get("/api/app-config")  # 匿名（无需 startup 种子）
     assert r.status_code == 200
     cfg = r.json()
-    assert set(cfg.keys()) == {"guest_gate.chapter_id", "guest_gate.free_levels"}
+    assert set(cfg.keys()) == {
+        "guest_gate.chapter_id",
+        "guest_gate.free_levels",
+        "assets.cdn_base",
+        "assets.remote_enabled",
+    }
     assert cfg["guest_gate.free_levels"] == 5
     assert "ai.price_in" not in cfg and "login.max_failures" not in cfg
 

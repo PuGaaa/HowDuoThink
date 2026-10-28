@@ -51,6 +51,7 @@ REGISTRY: dict[str, SettingDef] = {
         # —— AI ——
         SettingDef("ai.rate_limit", 10, "", _p_int, 1, 1000, "server", "ai", "AI 对话限流", "次/窗口"),
         SettingDef("ai.rate_window_sec", 60, "", _p_int, 10, 3600, "server", "ai", "限流窗口", "秒"),
+        SettingDef("ai.daily_limit", 50, "", _p_int, 1, 10000, "server", "ai", "AI 日配额", "次/人/日"),
         SettingDef("ai.price_in", 2.0, "DEEPSEEK_PRICE_IN", _p_float, 0, None, "server", "ai", "输入单价", "元/百万tokens"),
         SettingDef("ai.price_out", 8.0, "DEEPSEEK_PRICE_OUT", _p_float, 0, None, "server", "ai", "输出单价", "元/百万tokens"),
         # —— 安全频控 ——
@@ -58,6 +59,9 @@ REGISTRY: dict[str, SettingDef] = {
         SettingDef("sms.resend_interval_sec", 60, "", _p_int, 10, 600, "server", "security", "验证码重发间隔", "秒"),
         SettingDef("login.max_failures", 5, "LOGIN_MAX_FAILURES", _p_int, 1, 100, "server", "security", "登录失败上限", "次"),
         SettingDef("login.lock_seconds", 300, "LOGIN_LOCK_SECONDS", _p_int, 30, 86400, "server", "security", "登录锁定时长", "秒"),
+        # —— 资源（client：素材 CDN 前缀与远程开关随 app-config 下发；空前缀 = OSS 直连域名）——
+        SettingDef("assets.cdn_base", "", "", _p_str, None, None, "client", "assets", "素材 CDN 前缀", ""),
+        SettingDef("assets.remote_enabled", 0, "", _p_int, 0, 1, "client", "assets", "启用远程素材", ""),
     ]
 }
 
