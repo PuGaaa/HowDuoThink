@@ -136,6 +136,25 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_by TEXT
 );
+CREATE TABLE IF NOT EXISTS assets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  object_key TEXT NOT NULL UNIQUE,
+  filename TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'misc',
+  content_type TEXT NOT NULL DEFAULT '',
+  size_bytes INTEGER NOT NULL DEFAULT 0,
+  sha256 TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  uploaded_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS ix_assets_category ON assets(category);
+CREATE TABLE IF NOT EXISTS resource_slots (
+  slot TEXT PRIMARY KEY,
+  asset_id INTEGER NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_by TEXT
+);
 """
 
 # MySQL 建库脚本：key 是保留字 → meta 主键列名为 meta_key；日期列用 DATETIME（默认 CURRENT_TIMESTAMP）
@@ -254,6 +273,26 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_by VARCHAR(64)
 );
+CREATE TABLE IF NOT EXISTS assets (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  object_key VARCHAR(512) NOT NULL,
+  filename VARCHAR(255) NOT NULL,
+  category VARCHAR(32) NOT NULL DEFAULT 'misc',
+  content_type VARCHAR(128) NOT NULL DEFAULT '',
+  size_bytes BIGINT NOT NULL DEFAULT 0,
+  sha256 CHAR(64) NOT NULL DEFAULT '',
+  note VARCHAR(512) NOT NULL DEFAULT '',
+  uploaded_by VARCHAR(64),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY ux_assets_object_key (object_key),
+  INDEX ix_assets_category (category)
+);
+CREATE TABLE IF NOT EXISTS resource_slots (
+  slot VARCHAR(64) PRIMARY KEY,
+  asset_id BIGINT NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by VARCHAR(64)
+);
 """
 
 _provider = config.DB_PROVIDER
@@ -291,21 +330,28 @@ def _translate(sql: str) -> str:
     return sql.replace("?", "%s")
 
 
+def _mysql_connect_kwargs() -> dict:
+    """MySQL 连接参数（纯函数便于测试）。init_command 固定会话时区为 UTC：
+    SQLite 的 datetime('now') 是 UTC，翻译后的 NOW()/CURRENT_TIMESTAMP 若随
+    服务器本地时区漂移，短信限频/日分组/用量窗口会在两引擎下行为分叉。"""
+    return dict(
+        host=config.MYSQL_HOST,
+        port=config.MYSQL_PORT,
+        user=config.MYSQL_USER,
+        password=config.MYSQL_PASSWORD,
+        database=config.MYSQL_DATABASE,
+        charset="utf8mb4",
+        autocommit=False,
+        init_command="SET time_zone='+00:00'",
+    )
+
+
 if _provider == "mysql":
     import pymysql
     import pymysql.cursors
 
     def _mysql_conn():
-        return pymysql.connect(
-            host=config.MYSQL_HOST,
-            port=config.MYSQL_PORT,
-            user=config.MYSQL_USER,
-            password=config.MYSQL_PASSWORD,
-            database=config.MYSQL_DATABASE,
-            charset="utf8mb4",
-            autocommit=False,
-            cursorclass=pymysql.cursors.DictCursor,
-        )
+        return pymysql.connect(cursorclass=pymysql.cursors.DictCursor, **_mysql_connect_kwargs())
 
     def connect():
         """当前引擎的连接（MySQL：行按列名访问，DATETIME 字符串化）。"""
