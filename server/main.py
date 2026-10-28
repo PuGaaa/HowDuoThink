@@ -25,6 +25,7 @@ from features.users.router import router as users_router
 from features.stats.router import router as stats_router
 from features.ops.router import router as ops_router
 from features.settings.router import router as settings_router
+from features.assets.router import router as assets_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("server")
@@ -69,6 +70,15 @@ def create_app() -> FastAPI:
     )
 
     @app.middleware("http")
+    async def body_limit_guard(request: Request, call_next):
+        """请求体上限（声明式 Content-Length）：无上限 body 是内存 DoS 面。
+        分块传输无 Content-Length 时由端点级校验兜底（如上传的 file.size 检查）。"""
+        cl = request.headers.get("content-length", "")
+        if cl.isdigit() and int(cl) > config.BODY_LIMIT_MB * 1024 * 1024:
+            return JSONResponse(status_code=413, content={"detail": "请求体过大"})
+        return await call_next(request)
+
+    @app.middleware("http")
     async def request_context(request: Request, call_next):
         """每个请求发 8 位短 id：日志全带 [rid] 前缀，响应头回传，方便对账排查。"""
         from features.ops import metrics
@@ -101,6 +111,7 @@ def create_app() -> FastAPI:
     app.include_router(stats_router)
     app.include_router(ops_router)
     app.include_router(settings_router)
+    app.include_router(assets_router)
 
     # 管理端 SPA（独立工程构建产物）：目录存在才挂载，未构建时 /admin 404 不影响 API。
     # 手写 catch-all 而非 StaticFiles(html=True)：前端路由（/admin/users 等）需回退 index.html。

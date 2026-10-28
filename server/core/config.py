@@ -3,8 +3,6 @@ JWT_SECRET 未设置时使用进程内随机密钥（重启后所有会话失效
 import os
 import secrets
 
-CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "")
-CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
 _jwt_secret_env = os.environ.get("JWT_SECRET", "")
 JWT_SECRET = _jwt_secret_env or secrets.token_hex(32)
 JWT_SECRET_EPHEMERAL = not bool(_jwt_secret_env)
@@ -13,7 +11,6 @@ WEB_ORIGIN = os.environ.get("WEB_ORIGIN", "http://localhost:3000")
 ADMIN_WEB_ORIGIN = os.environ.get("ADMIN_WEB_ORIGIN", "")
 # 管理端 SPA 构建产物目录（绝对路径，或相对 server/ 目录）；未构建时 /admin 返回 404
 ADMIN_DIST_DIR = os.environ.get("ADMIN_DIST_DIR", "admin_dist")
-GITHUB_ADMIN_LOGINS = set(filter(None, os.environ.get("GITHUB_ADMIN_LOGINS", "").split(",")))
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 # 初始管理员默认密码（未配 ADMIN_PASSWORD 时的种子账号 admin / HaoDuo@2026；上线前必须改密）
 DEFAULT_ADMIN_PASSWORD = "HaoDuo@2026"
@@ -23,11 +20,6 @@ DEFAULT_ADMIN_PASSWORD = "HaoDuo@2026"
 DEV_MODE = os.environ.get("ENV", "").lower() == "dev"
 # 生产 HTTPS 部署时设 COOKIE_SECURE=1，会话 cookie 仅经 HTTPS 传输
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "") == "1"
-
-
-def oauth_configured() -> bool:
-    return bool(CLIENT_ID and CLIENT_SECRET)
-
 
 # —— AI：对话/起草走 DeepSeek（OpenAI 兼容端点）；向量默认本地字符 bigram，可选智谱 embedding-3 ——
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
@@ -61,3 +53,21 @@ SENTRY_ENV = os.environ.get("SENTRY_ENV", os.environ.get("ENV", "prod"))
 # 服务健康快照：后台线程间隔（秒）与保留天数
 OPS_SNAPSHOT_INTERVAL = int(os.environ.get("OPS_SNAPSHOT_INTERVAL", "300"))
 OPS_RETENTION_DAYS = int(os.environ.get("OPS_RETENTION_DAYS", "30"))
+
+# —— 对象存储 OSS（素材管理）：阿里云 oss2。四项配齐素材功能才可用，缺任一 = 路由 503 降级 ——
+OSS_ENDPOINT = os.environ.get("OSS_ENDPOINT", "")
+OSS_BUCKET = os.environ.get("OSS_BUCKET", "") or os.environ.get("OSS_BUCKET_NAME", "")
+OSS_ACCESS_KEY_ID = os.environ.get("OSS_ACCESS_KEY_ID", "")
+OSS_ACCESS_KEY_SECRET = os.environ.get("OSS_ACCESS_KEY_SECRET", "") or os.environ.get(
+    "OSS_SECRET_ACCESS_KEY", ""
+)
+# 对象 key 前缀与单文件上限（MB）
+OSS_KEY_PREFIX = os.environ.get("OSS_KEY_PREFIX", "assets")
+OSS_MAX_UPLOAD_MB = int(os.environ.get("OSS_MAX_UPLOAD_MB", "10"))
+
+# 全局请求体上限（MB）：无上限 body 是内存 DoS 面（声明式 Content-Length 超限即 413）
+BODY_LIMIT_MB = int(os.environ.get("BODY_LIMIT_MB", "64"))
+
+
+def oss_configured() -> bool:
+    return bool(OSS_ENDPOINT and OSS_BUCKET and OSS_ACCESS_KEY_ID and OSS_ACCESS_KEY_SECRET)

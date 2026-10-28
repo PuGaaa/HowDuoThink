@@ -3,10 +3,21 @@
 from fastapi import HTTPException
 
 import db
+import time
 import uuid
+
+# 每用户每日投稿上限：防脚本刷爆管理端审核队列（DB 计数，跨重启/进程一致）
+SUBMISSION_DAILY_LIMIT = 20
 
 
 def create_submission(uid: str, body) -> dict:
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    rows = db.q(
+        "SELECT COUNT(*) AS n FROM submissions WHERE user_id=? AND substr(created_at,1,10)=?",
+        (uid, today),
+    )
+    if int(rows[0]["n"] or 0) >= SUBMISSION_DAILY_LIMIT:
+        raise HTTPException(429, "今日投稿次数已达上限，明天再来")
     sid = "s-" + uuid.uuid4().hex[:12]
     db.ex(
         "INSERT INTO submissions(id, user_id, title, symptom, resolution, key_error, timeline, lessons, stack_tags, domain_hint) "
