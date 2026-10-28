@@ -111,3 +111,52 @@ def test_bind_phone_makes_accounts_interoperable():
         me = client.get("/api/me", headers={"Authorization": "Bearer " + r2.json()["token"]}).json()
         assert me["id"] == "pw-admin"
         assert me["role"] == "admin"
+
+
+def test_bind_conflict_does_not_burn_code():
+    """绑定冲突（409）不得烧码：验码消费与账号写入同事务，回滚后验证码仍可用。
+    原实现先消费后检查冲突，验证码被白烧。"""
+    with make_client() as client:
+        p = _phone()
+        _send(client, p)
+        r = client.post("/api/auth/login/phone", json={"phone": p, "code": _read_code(client, p)})
+        assert r.status_code == 200  # 建号，手机号已归属该用户
+        # 重发新码，让 pw-admin 抢绑 → 409
+        import db as dbmod
+
+        dbmod.ex("UPDATE sms_codes SET created_at=datetime('now','-120 seconds') WHERE phone=?", (p,))
+        _send(client, p)
+        code2 = _read_code(client, p)
+        login_admin(client)
+        r = client.post("/api/me/bind-phone", json={"phone": p, "code": code2})
+        assert r.status_code == 409
+        # 码未被烧掉：仍可正常登录
+        r2 = client.post("/api/auth/login/phone", json={"phone": p, "code": code2})
+        assert r2.status_code == 200, f"验证码被白烧：{r2.status_code} {r2.text}"
+
+
+def test_concurrent_login_same_code_single_winner():
+    """同一验证码并发提交：恰有一次成功（原子消费消灭 TOCTOU 双花）。"""
+    import threading
+
+    with make_client() as client:
+        p = _phone()
+        _send(client, p)
+        code = _read_code(client, p)
+        results: list[int] = []
+        lock = threading.Lock()
+        barrier = threading.Barrier(4)
+
+        def hit():
+            c = make_client()
+            barrier.wait()
+            r = c.post("/api/auth/login/phone", json={"phone": p, "code": code})
+            with lock:
+                results.append(r.status_code)
+
+        threads = [threading.Thread(target=hit) for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert results.count(200) == 1, results

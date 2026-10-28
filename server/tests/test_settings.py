@@ -193,3 +193,16 @@ def test_get_guards_nonfinite_db_value():
     assert settings.get("ai.price_in") == 2.0
     assert settings.source_of("ai.price_in") == "default"
     _clear("ai.price_in")
+
+
+def test_env_layer_invalid_value_falls_back_to_default(monkeypatch):
+    """env 层非法值（不可解析 / inf / NaN）必须退内置默认——与 DB 层同规格。
+    原缺陷：env 层裸 parse，LOGIN_LOCK_SECONDS=abc 时每次登录 500，inf 毒化成本核算。"""
+    _clear("login.lock_seconds", "ai.price_in")
+    monkeypatch.setenv("LOGIN_LOCK_SECONDS", "abc")
+    assert settings.get("login.lock_seconds") == 300
+    assert settings.source_of("login.lock_seconds") == "default"
+    monkeypatch.setenv("LOGIN_LOCK_SECONDS", "inf")
+    assert settings.get("login.lock_seconds") == 300
+    monkeypatch.setenv("DEEPSEEK_PRICE_IN", "nan")
+    assert settings.get("ai.price_in") == 2.0

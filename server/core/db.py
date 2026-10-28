@@ -386,6 +386,10 @@ if _provider == "mysql":
         def lastrowid(self):
             return self._cur.lastrowid
 
+        @property
+        def rowcount(self):
+            return self._cur.rowcount
+
     class _MySqlConn:
         def __init__(self, conn):
             self._conn = conn

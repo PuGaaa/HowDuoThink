@@ -154,50 +154,73 @@ def send_sms_code(phone: str) -> dict:
         raise HTTPException(503, str(e))
 
 
-def _consume_code(phone: str, code: str) -> None:
+def _consume_code(conn, phone: str, code: str) -> None:
+    """在给定事务连接上原子消费验证码：单条 UPDATE 的 rowcount 判定。
+    原"先读后写"两步在并发下同一验证码可双花；失败/过期在此计一次防爆破失败。"""
     key = "sms:" + phone
     _throttle_check(key)
-    row = db.q("SELECT code, expires_at, used FROM sms_codes WHERE phone=?", (phone,))
-    if not row or row[0]["used"] or row[0]["code"] != code:
+    now = int(time.time())
+    cur = conn.execute(
+        "UPDATE sms_codes SET used=1 WHERE phone=? AND used=0 AND code=? AND expires_at>?",
+        (phone, code, now),
+    )
+    if cur.rowcount != 1:
         _throttle_fail(key)
+        row = conn.execute("SELECT expires_at FROM sms_codes WHERE phone=?", (phone,)).fetchone()
+        if row and row["expires_at"] is not None and int(row["expires_at"]) <= now:
+            raise HTTPException(401, "验证码已过期，请重新获取")
         raise HTTPException(401, "验证码错误")
-    if int(time.time()) > int(row[0]["expires_at"]):
-        _throttle_fail(key)
-        raise HTTPException(401, "验证码已过期，请重新获取")
     _throttle_clear(key)
-    db.ex("UPDATE sms_codes SET used=1 WHERE phone=?", (phone,))
 
 
 def phone_login(phone: str, code: str) -> dict:
-    """验证码登录：验码 → 按手机号找用户/创建（ph- 前缀）→ 返回 {id, login, role, created}。"""
-    _consume_code(phone, code)
-    rows = db.q("SELECT id, login, role, name FROM users WHERE phone=?", (phone,))
-    if rows:
-        ensure_active(rows[0]["id"])
-        return {"id": rows[0]["id"], "login": rows[0]["login"], "role": rows[0]["role"], "name": rows[0]["name"], "created": False}
-    uid = "ph-" + phone
-    login_name = "u" + phone[-4:] + phone[:3]
-    name = random_nickname()
-    try:
-        db.ex(
-            "INSERT INTO users(id, login, name, role, phone) VALUES(?,?,?,?,?)",
-            (uid, login_name, name, "user", phone),
-        )
-    except Exception:
-        # login 唯一冲突（极小概率）：追加随机后缀重试
-        login_name = login_name + secrets.token_hex(2)
-        db.ex(
-            "INSERT INTO users(id, login, name, role, phone) VALUES(?,?,?,?,?)",
-            (uid, login_name, name, "user", phone),
-        )
-    return {"id": uid, "login": login_name, "role": "user", "name": name, "created": True}
+    """验证码登录：验码 → 按手机号找用户/创建（ph- 前缀）→ 返回 {id, login, role, created}。
+    验码消费与账号写入同事务（建号失败验证码不被烧掉）；被封禁用户在消费前拦截。"""
+    existing = db.q("SELECT id, login, role, name FROM users WHERE phone=?", (phone,))
+    if existing:
+        ensure_active(existing[0]["id"])
+    with db.tx() as conn:
+        _consume_code(conn, phone, code)
+        if existing:
+            return {
+                "id": existing[0]["id"], "login": existing[0]["login"],
+                "role": existing[0]["role"], "name": existing[0]["name"], "created": False,
+            }
+        uid = "ph-" + phone
+        login_name = "u" + phone[-4:] + phone[:3]
+        name = random_nickname()
+        try:
+            conn.execute(
+                "INSERT INTO users(id, login, name, role, phone) VALUES(?,?,?,?,?)",
+                (uid, login_name, name, "user", phone),
+            )
+        except Exception:
+            # 唯一冲突（id/phone/login 皆可能）：login 追随机后缀重试一次；仍冲突说明
+            # 并发建号已赢，回读返回既有账号——非冲突类异常原样上抛交全局兜底
+            login_name = login_name + secrets.token_hex(2)
+            try:
+                conn.execute(
+                    "INSERT INTO users(id, login, name, role, phone) VALUES(?,?,?,?,?)",
+                    (uid, login_name, name, "user", phone),
+                )
+            except Exception:
+                winner = db.q("SELECT id, login, role, name FROM users WHERE phone=?", (phone,))
+                if not winner:
+                    raise
+                return {
+                    "id": winner[0]["id"], "login": winner[0]["login"],
+                    "role": winner[0]["role"], "name": winner[0]["name"], "created": False,
+                }
+        return {"id": uid, "login": login_name, "role": "user", "name": name, "created": True}
 
 
 def bind_phone(uid: str, phone: str, code: str) -> dict:
-    """已登录用户绑定手机号：绑定后可用验证码登录同一账号（注册互通的关键）。"""
-    _consume_code(phone, code)
-    rows = db.q("SELECT id, phone FROM users WHERE phone=?", (phone,))
-    if rows and rows[0]["id"] != uid:
-        raise HTTPException(409, "该手机号已绑定其他账号")
-    db.ex("UPDATE users SET phone=? WHERE id=?", (phone, uid))
+    """已登录用户绑定手机号：绑定后可用验证码登录同一账号（注册互通的关键）。
+    验码消费与绑定同事务：绑定冲突回滚后验证码不被烧掉。"""
+    with db.tx() as conn:
+        _consume_code(conn, phone, code)
+        rows = conn.execute("SELECT id FROM users WHERE phone=?", (phone,)).fetchall()
+        if rows and rows[0]["id"] != uid:
+            raise HTTPException(409, "该手机号已绑定其他账号")
+        conn.execute("UPDATE users SET phone=? WHERE id=?", (phone, uid))
     return {"ok": True, "phone": phone}

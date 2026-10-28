@@ -117,7 +117,10 @@ def get(key: str) -> int | float | str:
         logger.warning("[settings] %s 库中值 %r 非法，退 env/默认", key, raw)
     env = _env_value(d)
     if env is not None:
-        return d.parse(env)
+        v = _coerce(d, env)
+        if v is not None:
+            return v
+        logger.warning("[settings] %s 环境变量 %s=%r 非法，退内置默认", key, d.env, env)
     return d.default
 
 
@@ -127,7 +130,10 @@ def source_of(key: str) -> str:
     raw = _load().get(key)
     if raw is not None and _coerce(d, raw) is not None:
         return "db"
-    return "env" if _env_value(d) is not None else "default"
+    env = _env_value(d)
+    if env is not None and _coerce(d, env) is not None:
+        return "env"
+    return "default"
 
 
 def client_config() -> dict[str, int | float | str]:
