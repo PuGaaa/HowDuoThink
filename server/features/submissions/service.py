@@ -130,17 +130,40 @@ def draft_skeleton_from_submission(sid: str) -> dict:
     }
 
 
+def _int_or(v, default: int) -> int:
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
 def create_draft_with_payload(uid: str, sid: str, payload: dict) -> dict:
     """给定成品 payload 的转稿落库（cases + submissions 同事务）。
-    机械骨架（create_draft_from_submission）与 AI 起草（ai.service）共用此唯一写入口。"""
+    机械骨架（create_draft_from_submission）与 AI 起草（ai.service）共用此唯一写入口。
+    status 守卫：非 draft 的既有案例拒绝覆盖（发布门禁唯一旁路）；元数据列随 payload 同步。"""
     with db.tx() as conn:
-        conn.execute(
-            "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?) "
-            "ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
-            (payload["id"], sid, uid, payload.get("title", ""), payload.get("domain", "runtime"),
-             payload.get("layer", ""), payload.get("difficulty", 2), 0, "draft", db.jdump(payload)),
-        )
+        exists = conn.execute("SELECT status FROM cases WHERE id=?", (payload["id"],)).fetchone()
+        if exists and exists["status"] != "draft":
+            raise HTTPException(409, "该案例已发布：不能经转稿覆盖，请走重新发布流程")
+        if exists:
+            conn.execute(
+                "UPDATE cases SET payload=?, title=?, domain=?, layer=?, difficulty=? WHERE id=?",
+                (
+                    db.jdump(payload),
+                    str(payload.get("title", "")),
+                    str(payload.get("domain", "runtime")),
+                    str(payload.get("layer", "")),
+                    _int_or(payload.get("difficulty"), 2),
+                    payload["id"],
+                ),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (payload["id"], sid, uid, payload.get("title", ""), payload.get("domain", "runtime"),
+                 payload.get("layer", ""), _int_or(payload.get("difficulty"), 2), 0, "draft", db.jdump(payload)),
+            )
         conn.execute(
             "UPDATE submissions SET status='accepted', reviewed_at=datetime('now') WHERE id=? AND status='pending'", (sid,)
         )
