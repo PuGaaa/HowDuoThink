@@ -1,0 +1,16 @@
+# 运行时直接依赖声明（只留直接依赖与下限）
+# 锁文件经 pip-compile 生成：requirements.lock（本文件）/ requirements-dev.lock（含开发工具）
+# 升级流程：改本文件 → pip-compile → lock 进 PR 评审
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+pydantic>=2.6
+httpx>=0.27
+PyJWT>=2.8
+bcrypt
+langchain-core>=0.3
+langchain-openai>=0.2
+fastembed>=0.8
+PyMySQL>=1.1
+oss2>=2.18
+sentry-sdk[fastapi]>=2.0

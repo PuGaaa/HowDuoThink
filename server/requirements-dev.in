@@ -1,0 +1,5 @@
+# 开发/CI 工具依赖（含运行时）；本地 venv 与 CI 的 server job 从 requirements-dev.lock 安装
+-r requirements.in
+pytest>=8.0
+ruff>=0.6
+pip-tools>=7.4

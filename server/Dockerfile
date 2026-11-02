@@ -13,8 +13,8 @@ RUN node content/tools/export-case.mjs
 # —— 阶段 2：api 运行镜像（含管理端静态产物 admin_dist/）——
 FROM python:3.12-slim
 WORKDIR /app/hdx
-COPY server/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY server/requirements.lock server/requirements.in ./
+RUN pip install --no-cache-dir -r requirements.lock
 COPY server/ .
 COPY --from=admin-build /build/server/seed ./seed/
 COPY --from=admin-build /build/dist /app/hdx/admin_dist
