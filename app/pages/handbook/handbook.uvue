@@ -49,7 +49,7 @@ const lessonCount = ref(0)
 const solvedCount = ref(0)
 const lessonCards = ref<LessonCard[]>([])
 const checkUse = ref(0)
-const avatarSrc = ref('/static/images/default-avatar.png')
+const avatarSrc = ref('')
 
 function refresh() {
   avatarSrc.value = resolveAvatar()

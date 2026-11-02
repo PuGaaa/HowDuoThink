@@ -24,6 +24,15 @@ class PasswordChange(BaseModel):
     old_password: str = Field(default="", max_length=128, alias="oldPassword")
     new_password: str = Field(min_length=6, max_length=128, alias="newPassword")
 
+    @field_validator("new_password")
+    @classmethod
+    def _bcrypt_72_bytes(cls, v: str) -> str:
+        # bcrypt 5.0 起 >72 字节直接抛 ValueError（4.x 为静默截断）：入口收口为 400，
+        # 否则改密 500，且 4.x 截断哈希的用户跨版本升级后会被静默锁死
+        if len(v.encode()) > 72:
+            raise ValueError("密码过长（最多 72 字节；中文约 24 个字）")
+        return v
+
 
 class SmsSendBody(BaseModel):
     phone: str = Field(pattern=r"^1[3-9]\d{9}$")

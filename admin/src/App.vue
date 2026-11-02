@@ -2,37 +2,37 @@
 import { NConfigProvider, NDialogProvider, NMessageProvider, zhCN, dateZhCN } from 'naive-ui'
 import type { GlobalThemeOverrides } from 'naive-ui'
 
-// 品牌主题：珊瑚主色 + 各语义色与 web 站令牌一一对应
+// 品牌主题：冷调极简 + 珊瑚点缀；语义色与管理端令牌一一对应（styles/main.css）
 const themeOverrides: GlobalThemeOverrides = {
   common: {
     primaryColor: '#FF8A5C',
     primaryColorHover: '#FF9B76',
     primaryColorPressed: '#E06B38',
     primaryColorSuppl: '#E06B38',
-    infoColor: '#6FB8E8',
-    infoColorHover: '#8BC6ED',
-    infoColorPressed: '#4A7FB5',
-    infoColorSuppl: '#4A7FB5',
-    successColor: '#5FC9A5',
-    successColorHover: '#79D2B1',
+    infoColor: '#4E8FD9',
+    infoColorHover: '#6BA3E0',
+    infoColorPressed: '#3A6FAF',
+    infoColorSuppl: '#3A6FAF',
+    successColor: '#3BA97F',
+    successColorHover: '#55B890',
     successColorPressed: '#2E7D5B',
     successColorSuppl: '#2E7D5B',
-    warningColor: '#F0A937',
-    warningColorHover: '#F3B855',
-    warningColorPressed: '#D18E1F',
-    warningColorSuppl: '#D18E1F',
-    errorColor: '#E86A6A',
-    errorColorHover: '#ED8282',
-    errorColorPressed: '#C05050',
-    errorColorSuppl: '#C05050',
-    borderRadius: '12px',
+    warningColor: '#E9A23B',
+    warningColorHover: '#EDB258',
+    warningColorPressed: '#C98A25',
+    warningColorSuppl: '#C98A25',
+    errorColor: '#D95C5C',
+    errorColorHover: '#E07676',
+    errorColorPressed: '#B04A4A',
+    errorColorSuppl: '#B04A4A',
+    borderRadius: '10px',
+    inputColor: 'rgba(255, 255, 255, 0.72)',
   },
   Button: {
-    // 多邻国式胶囊按钮
-    borderRadiusMedium: '999px',
-    borderRadiusSmall: '999px',
-    borderRadiusTiny: '999px',
-    fontWeight: '700',
+    borderRadiusMedium: '10px',
+    borderRadiusSmall: '10px',
+    borderRadiusTiny: '8px',
+    fontWeight: '600',
   },
   Card: {
     borderRadius: '16px',

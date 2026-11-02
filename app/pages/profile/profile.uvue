@@ -114,7 +114,7 @@ const rows = ref<RowVM[]>([])
 const user = ref<AppUser | null>(null)
 const profilePct = ref(0)
 const displayName = ref('')
-const avatarSrc = ref('/static/images/default-avatar.png')
+const avatarSrc = ref('')
 const dailyTitle = ref('')
 const dailyIsDone = ref(false)
 

@@ -100,6 +100,7 @@ import { openGuestLoginDialog } from '../../utils/login-guide'
 import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
 import { fetchCasepack, getPackCount } from '../../utils/sync'
 import { fetchAppConfig } from '../../utils/app-config'
+import { fetchAppResources } from '../../utils/remote-assets'
 
 const rankName = ref('')
 const continueCaseId = ref('')
@@ -186,7 +187,7 @@ function openChapter(chapterId: string) {
     }
   })
 }
-const headerAvatar = ref('/static/images/default-avatar.png')
+const headerAvatar = ref('')
 const dailyTitle = ref('')
 const dailyDoneToday = ref(false)
 const packCount = ref(0)
@@ -211,6 +212,7 @@ function refreshHome() {
   // 关卡总数：本地注册表与已同步关卡包取大者（包内含社区关）
   totalLevels.value = packCount.value > ALL_CASES.length ? packCount.value : ALL_CASES.length
   fetchAppConfig((_ok) => {})  // 运行时配置（游客门禁等）：失败退内置默认，不阻塞首页
+  fetchAppResources((_ok) => {})  // 吉祥物/头像资源预取：失败保留旧缓存，未拉到时 UI 走 emoji/空占位
   fetchCasepack((r) => {
     if (r.error.length === 0 && r.count > 0) {
       packCount.value = getPackCount()

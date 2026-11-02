@@ -146,7 +146,7 @@ async function publish() {
       </div>
     </div>
 
-    <section class="panel">
+    <section class="panel glass-panel">
       <h2 class="panel__title">三级架构元数据</h2>
       <div class="metagrid">
         <div class="mfield">
@@ -170,7 +170,7 @@ async function publish() {
       <NButton size="small" @click="saveMeta">保存元数据</NButton>
     </section>
 
-    <section class="panel">
+    <section class="panel glass-panel">
       <h2 class="panel__title">Case Payload（JSON）</h2>
       <NInput
         v-model:value="payloadText"
@@ -206,8 +206,8 @@ async function publish() {
   gap: 14px;
 }
 .pagehead__title {
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 700;
   margin: 0;
 }
 .pagehead__id {
@@ -232,16 +232,12 @@ async function publish() {
   font-size: 12px;
 }
 .panel {
-  background: var(--card);
-  border: 2px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 5px 0 var(--edge-cream);
   padding: 20px 22px;
   margin-bottom: 18px;
 }
 .panel__title {
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 600;
   margin: 0 0 14px;
 }
 .metagrid {

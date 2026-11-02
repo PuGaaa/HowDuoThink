@@ -14,6 +14,7 @@ const GROUPS = [
   { key: 'gate', title: '运营门禁', desc: '游客留存门禁：未登录可试玩的章与关数，保存后 App 下次拉取配置即生效' },
   { key: 'ai', title: 'AI', desc: '对话限流与成本单价（AI 用量看板按此估算成本），保存后即时生效' },
   { key: 'security', title: '安全频控', desc: '短信验证码与登录防爆破阈值，保存后即时生效' },
+  { key: 'assets', title: '资源', desc: '素材 CDN 前缀与远程素材开关：随 app-config 下发，App 端远程加载失败自动回退内置资源' },
 ] as const
 
 // 游客免费章候选：学徒篇四章（游客试玩只应落在新手章）
@@ -136,7 +137,7 @@ async function save() {
   align-items: center;
   justify-content: space-between;
   padding: 10px 0;
-  border-bottom: 1px dashed var(--line, #eee);
+  border-bottom: 1px solid var(--line, #eee);
 }
 .row:last-child {
   border-bottom: none;

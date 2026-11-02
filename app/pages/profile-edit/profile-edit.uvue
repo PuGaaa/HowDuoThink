@@ -39,22 +39,25 @@
 import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref } from 'vue'
 import navbar from '../../components/navbar/navbar.uvue'
-import { AVATAR_PRESETS, getAvatar, getDisplayName, setLocalAvatar, updateName, updateAvatar, isLoggedIn } from '../../utils/auth'
+import { getAvatar, getDisplayName, setLocalAvatar, updateName, updateAvatar, isLoggedIn } from '../../utils/auth'
+import { getAvatarPresets } from '../../utils/remote-assets'
 
 class PresetVM {
   path: string = ''
 }
 
+// 头像池来自后端派发（/api/app-resources），包内不再带预设头像
 const presets = ref<PresetVM[]>([])
-for (let i = 0; i < AVATAR_PRESETS.length; i++) {
+const remotePresets = getAvatarPresets()
+for (let i = 0; i < remotePresets.length; i++) {
   const vm = new PresetVM()
-  vm.path = AVATAR_PRESETS[i]
+  vm.path = remotePresets[i]
   presets.value.push(vm)
 }
 const cur = getAvatar()
 let initIdx = 0
-for (let i = 0; i < presets.length; i++) {
-  if (presets[i] === cur) { initIdx = i; break }
+for (let i = 0; i < presets.value.length; i++) {
+  if (presets.value[i].path === cur) { initIdx = i; break }
 }
 const selIdx = ref(initIdx)
 const nickname = ref(getDisplayName())
@@ -65,6 +68,10 @@ function save() {
   const name = nickname.value.trim()
   if (name.length === 0) {
     uni.showToast({ title: '昵称不能为空', icon: 'none' })
+    return
+  }
+  if (presets.value.length === 0) {
+    uni.showToast({ title: '头像池未就绪，请稍后重试', icon: 'none' })
     return
   }
   if (busy.value) return

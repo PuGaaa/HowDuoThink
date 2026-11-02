@@ -41,7 +41,7 @@ tests/                pytest；SQLite 与 MySQL 双引擎都必须全绿
 
 ```bash
 # 1. 建环境（首次）
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+rm -rf .venv && uv venv .venv --python 3.12 --seed && .venv/bin/pip install -r requirements-dev.lock  # Python 3.12 与生产镜像/CI 对齐（见 docs/研发流程.md）
 
 # 2. MySQL 容器一次性建库建号（账号密码须与 .env.dev.local 对齐；示例）
 docker exec <mysql容器> mysql -uroot -p<root密码> -e "

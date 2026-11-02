@@ -1,28 +1,12 @@
 /** App 端登录态：token/user 存 storage，请求带 Authorization: Bearer。
  *  通道与 Web 的 cookie 互不影响；API_BASE 见 config.ts。 */
 import { API_BASE } from '../config'
+import { getAvatarPresets } from './remote-assets'
 
 const KEY_TOKEN = 'think_token'
 const KEY_USER = 'think_user'
 const KEY_LOCAL_AVATAR = 'think_local_avatar'
 const KEY_LOCAL_NAME = 'think_local_name'
-export const DEFAULT_AVATAR = '/static/images/default-avatar.png'
-/** 预设头像：5 吉祥物 + 默认白猫（v0 无上传，六选一） */
-export const AVATAR_PRESETS: string[] = [
-  '/static/images/default-avatar.png',
-  '/static/images/avatar-1.png',
-  '/static/images/avatar-2.png',
-  '/static/images/avatar-3.png',
-  '/static/images/avatar-4.png',
-  '/static/images/avatar-5.png',
-  '/static/images/avatar-6.png',
-  '/static/images/avatar-7.png',
-  '/static/images/avatar-8.png',
-  '/static/images/avatar-9.png',
-  '/static/images/avatar-10.png',
-  '/static/images/avatar-11.png',
-  '/static/images/avatar-12.png',
-]
 
 export interface AppUser {
   id: string
@@ -51,13 +35,17 @@ export function isLoggedIn(): boolean {
   return getToken().length > 0
 }
 
-/** 头像优先级：后端 avatar URL -> 本地预设 -> 默认白猫 */
+/** 头像优先级：后端 avatar URL -> 本地已选 -> 远程头像池首张。
+ *  旧版本 storage 里可能残留 /static/ 本地路径（已随包删除），一律忽略。 */
 export function getAvatar(): string {
   const u = getStoredUser()
   if (u != null && u.avatar.length > 0) return u.avatar
   const local = uni.getStorageSync(KEY_LOCAL_AVATAR)
-  if (local != null && (local as string).length > 0) return local as string
-  return DEFAULT_AVATAR
+  if (local != null && typeof local == 'string' && local.length > 0 && !local.startsWith('/static/')) {
+    return local
+  }
+  const presets = getAvatarPresets()
+  return presets.length > 0 ? presets[0] : ''
 }
 
 /** 昵称优先级：已登录 user.name；未登录本地名；兜底 */

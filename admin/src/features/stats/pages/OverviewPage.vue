@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import { NButton, NCard, NSelect, NTag } from 'naive-ui'
+import { ArrowRight } from 'lucide-vue-next'
 import { statsApi, type StatsOverview } from '../api/stats'
 
 const message = useMessage()
@@ -94,17 +95,17 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
           <div class="flow__n">{{ subs.pending }}</div>
           <div class="flow__k">待审投稿</div>
         </div>
-        <span class="flow__arrow">→</span>
+        <ArrowRight class="flow__arrow" :size="16" :stroke-width="1.75" />
         <div class="flow__item">
           <div class="flow__n">{{ subs.accepted }}</div>
           <div class="flow__k">已采纳</div>
         </div>
-        <span class="flow__arrow">→</span>
+        <ArrowRight class="flow__arrow" :size="16" :stroke-width="1.75" />
         <div class="flow__item">
           <div class="flow__n">{{ data?.publishedInWindow ?? '—' }}</div>
           <div class="flow__k">窗口内发布</div>
         </div>
-        <span class="flow__arrow">→</span>
+        <ArrowRight class="flow__arrow" :size="16" :stroke-width="1.75" />
         <div class="flow__item">
           <div class="flow__n">{{ data?.publishedTotal ?? '—' }}</div>
           <div class="flow__k">已上线案例</div>
@@ -143,7 +144,7 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
 }
 .flow__n {
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
 }
 .flow__k {
@@ -152,7 +153,7 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
 }
 .flow__arrow {
   color: var(--ink3);
-  font-size: 18px;
+  flex-shrink: 0;
 }
 .flow__chips {
   display: flex;

@@ -53,6 +53,7 @@
 
 <script setup lang="uts">
 import { ref, onMounted } from 'vue'
+import { getMascotUrl } from '../../utils/remote-assets'
 
 const solved = ref(true)
 const grade = ref('S')
@@ -70,13 +71,13 @@ interface MascotItem {
 const mascots = ref<MascotItem[]>([])
 const dots = ref<string[]>([])
 
-// 五兽数据
+// 五兽数据（图走后端派发；未拉到时 src 为空，格子显示名字与底色）
 const mascotData: MascotItem[] = [
-  { src: '/static/mascots/frog.png', name: '恐怖蛙', bg: '#FDEDED' },
-  { src: '/static/mascots/otter.png', name: '惊讶獭', bg: '#FFF6DE' },
-  { src: '/static/mascots/snail.png', name: '不行蜗', bg: '#EAF4FC' },
-  { src: '/static/mascots/rabbit.png', name: '垂耳兔', bg: '#E9F7F1' },
-  { src: '/static/mascots/dino.png', name: '三角龙', bg: '#F3F0F8' },
+  { src: getMascotUrl('frog'), name: '恐怖蛙', bg: '#FDEDED' },
+  { src: getMascotUrl('otter'), name: '惊讶獭', bg: '#FFF6DE' },
+  { src: getMascotUrl('snail'), name: '不行蜗', bg: '#EAF4FC' },
+  { src: getMascotUrl('rabbit'), name: '垂耳兔', bg: '#E9F7F1' },
+  { src: getMascotUrl('dino'), name: '三角龙', bg: '#F3F0F8' },
 ]
 
 // 装饰粒子（随机位置/颜色/大小）

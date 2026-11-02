@@ -34,10 +34,16 @@ const router = createRouter({
           meta: { title: 'Case 管理' },
         },
         {
-          path: 'cases/:id',
-          name: 'case-edit',
-          component: () => import('@/features/content/pages/CaseEditPage.vue'),
-          meta: { title: 'Case 编辑' },
+          path: "cases/:id",
+          name: "case-edit",
+          component: () => import("@/features/content/pages/CaseEditPage.vue"),
+          meta: { title: "Case 编辑" },
+        },
+        {
+          path: "assets",
+          name: "assets",
+          component: () => import("@/features/assets/pages/AssetsPage.vue"),
+          meta: { title: "素材管理" },
         },
         {
           path: 'users',

@@ -9,6 +9,8 @@ const KEY_CONFIG = 'think_app_config_v1'
 const DEFAULTS: Record<string, string | number> = {
   'guest_gate.chapter_id': 'error-reading',
   'guest_gate.free_levels': 3,
+  'assets.cdn_base': '',
+  'assets.remote_enabled': 0,
 }
 
 function readLocal(): Record<string, any> {

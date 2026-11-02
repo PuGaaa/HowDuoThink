@@ -1,7 +1,8 @@
 <template>
   <view :class="visible ? 'mascot' : 'mascot mascot--hidden'">
     <view class="mascot__badge">
-      <image class="mascot__avatar" :src="'/static/mascots/' + who + '.png'" mode="aspectFit"></image>
+      <image v-if="imgUrl.length > 0" class="mascot__avatar" :src="imgUrl" mode="aspectFit"></image>
+      <text v-else class="mascot__emoji">{{ emoji }}</text>
     </view>
     <text class="mascot__line">{{ line }}</text>
   </view>
@@ -9,11 +10,30 @@
 
 <script setup lang="uts">
 import { computed } from 'vue'
+import { getMascotUrl } from '../../utils/remote-assets'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
   who: { type: String, default: 'frog' },
   line: { type: String, default: '' },
+})
+
+// 资源未派发时的 emoji 降级（吉祥物图走后端派发，包内不再带图）
+const EMOJI: Record<string, string> = {
+  frog: '🐸',
+  snail: '🐌',
+  otter: '🦦',
+  rabbit: '🐰',
+  dino: '🦖',
+}
+
+const imgUrl = computed((): string => {
+  return getMascotUrl(props.who)
+})
+
+const emoji = computed((): string => {
+  const e = EMOJI[props.who]
+  return e == null ? '🐸' : e
 })
 
 const visible = computed((): boolean => {
@@ -71,6 +91,13 @@ const visible = computed((): boolean => {
 .mascot__avatar {
   width: 72rpx;
   height: 72rpx;
+}
+.mascot__emoji {
+  width: 72rpx;
+  height: 72rpx;
+  font-size: 40rpx;
+  line-height: 72rpx;
+  text-align: center;
 }
 .mascot__line {
   font-size: 26rpx;

@@ -16,7 +16,7 @@
           <view class="deco__b deco__b--m"></view>
         </view>
         <view class="postcard__halo">
-          <image class="postcard__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
+          <image class="postcard__avatar" :src="frogUrl" mode="aspectFit"></image>
         </view>
         <text class="postcard__rank">{{ rankName }}</text>
         <view class="postcard__divider"></view>
@@ -81,6 +81,9 @@ import { ALL_CASES } from '../../data/cases'
 import { CHAPTERS, casesInChapter } from '../../data/chapters'
 import { getCaseProgress, getStreak, getChecklistUse, getTotals } from '../../utils/storage'
 import { rankOf } from '../../utils/scoring'
+import { getMascotUrl } from '../../utils/remote-assets'
+
+const frogUrl = getMascotUrl('frog')
 import navbar from '../../components/navbar/navbar.uvue'
 
 const rankName = ref('')
@@ -312,7 +315,7 @@ function downloadPoster() {
   img.onerror = () => {
     uni.showToast({ title: '头像加载失败', icon: 'none' })
   }
-  img.src = '/static/mascots/frog.png'
+  img.src = getMascotUrl('frog')
   // #endif
   // #ifndef WEB
   uni.showToast({ title: 'App 端海报保存即将上线', icon: 'none' })

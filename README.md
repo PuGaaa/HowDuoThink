@@ -32,7 +32,7 @@
 ```bash
 # 1. 社区后端（:8000）—— venv、本地 MySQL 建库建号、.env.dev.local 详见 server/README.md
 cd server
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+rm -rf .venv && uv venv .venv --python 3.12 --seed && .venv/bin/pip install -r requirements-dev.lock  # Python 3.12 与生产镜像/CI 对齐（见 docs/研发流程.md）
 ./dev.sh
 
 # 2. 管理端（:5174）。初始账号 admin / HaoDuo@2026（dev 环境登录页与启动日志有提示，登录后请在侧栏修改密码）

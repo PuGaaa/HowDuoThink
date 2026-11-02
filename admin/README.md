@@ -20,7 +20,7 @@
 
 ## 开发
 
-前置：先起 server（`server/dev.sh`，:8000；首次需 `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`）。完整启动顺序见根 README「快速启动」。
+前置：先起 server（`server/dev.sh`，:8000；首次需 `rm -rf server/.venv && uv venv server/.venv --python 3.12 --seed && server/.venv/bin/pip install -r server/requirements-dev.lock`）。完整启动顺序见根 README「快速启动」。
 
 ```bash
 cd admin

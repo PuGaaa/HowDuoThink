@@ -4,7 +4,7 @@
     <navbar></navbar>
     <view class="content">
       <view class="herocard">
-        <image class="herocard__avatar" src="/static/mascots/frog.png" mode="aspectFit"></image>
+        <image class="herocard__avatar" :src="frogUrl" mode="aspectFit"></image>
         <text class="herocard__name">好多星</text>
         <text class="herocard__en">HowDuoThink</text>
         <text class="herocard__sub">多想，多星。</text>
@@ -42,6 +42,9 @@
 <script setup lang="uts">
 import safeTop from '../../components/safe-top/safe-top.uvue'
 import navbar from '../../components/navbar/navbar.uvue'
+import { getMascotUrl } from '../../utils/remote-assets'
+
+const frogUrl = getMascotUrl('frog')
 
 function openWeb() {
   // #ifdef WEB

@@ -76,7 +76,7 @@ const columns: DataTableColumns<AdminUserRow> = [
     key: 'login',
     render(row) {
       return h('div', [
-        h('div', { style: 'font-weight:700' }, row.login),
+        h('div', { style: 'font-weight:600' }, row.login),
         h('div', { style: 'font-size:12px;color:var(--ink3)' }, row.name || ''),
       ])
     },

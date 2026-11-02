@@ -2,21 +2,25 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NInput, NModal } from 'naive-ui'
+import { BarChart3, Bot, HeartPulse, ImagePlus, Inbox, LayoutGrid, Settings, Users } from 'lucide-vue-next'
 import { api } from '@/api/client'
 import { useAuth } from '@/composables/useAuth'
+import logoMark from '@/assets/logo-sm.png'
+import ShaderBackground from '@/components/ShaderBackground.vue'
 
 const { user, fetchMe, logout } = useAuth()
 const route = useRoute()
 const router = useRouter()
 
 const NAV = [
-  { to: '/overview', name: 'overview', icon: '📊', label: '数据概览' },
-  { to: '/submissions', name: 'submissions', icon: '📥', label: '投稿审核' },
-  { to: '/cases', name: 'cases', icon: '🧩', label: 'Case 管理', match: ['cases', 'case-edit'] },
-  { to: '/users', name: 'users', icon: '👥', label: '用户管理', adminOnly: true },
-  { to: '/ai-usage', name: 'ai-usage', icon: '🤖', label: 'AI 用量' },
-  { to: '/ops', name: 'ops', icon: '💚', label: '服务健康' },
-  { to: '/settings', name: 'settings', icon: '⚙️', label: '系统设置', adminOnly: true },
+  { to: '/overview', name: 'overview', icon: BarChart3, label: '数据概览' },
+  { to: '/submissions', name: 'submissions', icon: Inbox, label: '投稿审核' },
+  { to: '/cases', name: 'cases', icon: LayoutGrid, label: 'Case 管理', match: ['cases', 'case-edit'] },
+  { to: '/assets', name: 'assets', icon: ImagePlus, label: '素材管理' },
+  { to: '/users', name: 'users', icon: Users, label: '用户管理', adminOnly: true },
+  { to: '/ai-usage', name: 'ai-usage', icon: Bot, label: 'AI 用量' },
+  { to: '/ops', name: 'ops', icon: HeartPulse, label: '服务健康' },
+  { to: '/settings', name: 'settings', icon: Settings, label: '系统设置', adminOnly: true },
 ]
 
 const navItems = computed(() => NAV.filter((n) => !n.adminOnly || user.value?.role === 'admin'))
@@ -71,9 +75,10 @@ async function submitPassword() {
 
 <template>
   <div class="layout">
+    <ShaderBackground />
     <aside class="side">
       <div class="brand">
-        <span class="brand__star">⭐</span>
+        <img class="brand__logo" :src="logoMark" alt="好多星" />
         <div class="brand__text">
           <div class="brand__name">好多星</div>
           <div class="brand__sub">HowDuoThink · 管理端</div>
@@ -88,7 +93,7 @@ async function submitPassword() {
           class="nav__item"
           :class="{ 'nav__item--active': isActive(item) }"
         >
-          <span class="nav__icon">{{ item.icon }}</span>
+          <component :is="item.icon" class="nav__icon" :size="18" :stroke-width="1.75" />
           {{ item.label }}
         </RouterLink>
       </nav>
@@ -154,8 +159,10 @@ async function submitPassword() {
 .side {
   width: 216px;
   flex-shrink: 0;
-  background: var(--card);
-  border-right: 2px solid var(--line);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   padding: 22px 14px 18px;
@@ -171,14 +178,16 @@ async function submitPassword() {
   padding: 2px 8px 20px;
 }
 
-.brand__star {
-  font-size: 26px;
-  filter: drop-shadow(0 3px 0 var(--edge-cream));
+.brand__logo {
+  width: 30px;
+  height: 30px;
+  display: block;
+  border-radius: 8px;
 }
 
 .brand__name {
-  font-weight: 800;
-  font-size: 17px;
+  font-weight: 700;
+  font-size: 16px;
   color: var(--ink);
   line-height: 1.2;
 }
@@ -201,9 +210,9 @@ async function submitPassword() {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--ink2);
   transition: background 0.12s, color 0.12s;
 }
@@ -214,17 +223,17 @@ async function submitPassword() {
 }
 
 .nav__item--active {
-  background: var(--coral-soft);
+  background: rgba(255, 138, 92, 0.12);
   color: var(--coral-deep);
-  box-shadow: inset 0 0 0 2px #FFD3BC;
+  font-weight: 600;
 }
 
 .nav__icon {
-  font-size: 16px;
+  flex-shrink: 0;
 }
 
 .side__foot {
-  border-top: 2px solid var(--well);
+  border-top: 1px solid var(--glass-border);
   padding: 14px 8px 0;
 }
 
@@ -262,17 +271,16 @@ async function submitPassword() {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--coral);
-  color: #fff;
-  font-weight: 800;
+  background: rgba(255, 138, 92, 0.15);
+  color: var(--coral-deep);
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 0 var(--coral-deep);
 }
 
 .foot__name {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 13px;
   color: var(--ink);
 }
@@ -292,8 +300,8 @@ async function submitPassword() {
 }
 
 .pagehead__title {
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 700;
   color: var(--ink);
   margin: 0;
 }

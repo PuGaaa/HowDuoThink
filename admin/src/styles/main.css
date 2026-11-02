@@ -1,29 +1,52 @@
-/* 管理端设计令牌：与社区站同一套品牌语言（奶油底 + 珊瑚主色 + 多邻国式硬边实体积木）。
-   令牌来源：web/assets/css/main.css，两站必须同步改。 */
+/* 管理端设计令牌：冷调极简底 + 液态玻璃材质 + 珊瑚点缀（OpenAI/DeepSeek 式克制）。
+   设计规格见 Figma「Admin Redesign 液态玻璃」页；管理端令牌独立演化，
+   不再与 web/assets/css/main.css 同步（社区站保留多邻国式消费端风格）。 */
 :root {
-  --bg: #FFF9F4;
-  --card: #FFFFFF;
-  --line: #F5E6DA;
-  --well: #FBF3EB;
+  /* 底色与表面（大面积白为主，彩色只由 ShaderBackground 光晕与点缀元素承担） */
+  --bg: #FBFCFE;
+  --card: rgba(255, 255, 255, 0.62);
+  --card-solid: #FFFFFF;
+  --line: rgba(23, 27, 38, 0.08);
+  --well: rgba(23, 27, 38, 0.05);
+
+  /* 文字三级（近黑冷灰） */
+  --ink: #171B26;
+  --ink2: #5A6478;
+  --ink3: #9AA3B5;
+
+  /* 品牌珊瑚（仅点缀：active 态 / 主按钮 / 强调数字） */
   --coral: #FF8A5C;
   --coral-deep: #E06B38;
-  --coral-soft: #FFF1E7;
-  --ink: #4A4458;
-  --ink2: #7A7290;
-  --ink3: #AFA8BD;
-  --mint: #5FC9A5;
-  --mint-soft: #E9F7F1;
+  --coral-soft: #FFF0E8;
+
+  /* 语义色（降饱和适配冷底） */
+  --mint: #3BA97F;
+  --mint-soft: #E6F5EF;
   --mint-deep: #2E7D5B;
-  --sky: #6FB8E8;
-  --sky-soft: #EAF4FC;
-  --sky-deep: #4A7FB5;
-  --lemon: #FFC94D;
-  --lemon-soft: #FFF6DE;
+  --sky: #4E8FD9;
+  --sky-soft: #EAF2FB;
+  --sky-deep: #3A6FAF;
+  --lemon: #E9A23B;
+  --lemon-soft: #FBF3E4;
   --lemon-deep: #8A6D1F;
-  --red: #E86A6A;
-  --red-soft: #FDEDED;
-  --red-deep: #C05050;
-  --edge-cream: #EFE5D6;
+  --red: #D95C5C;
+  --red-soft: #FBEBEB;
+  --red-deep: #B04A4A;
+
+  /* 液态玻璃材质：更透的卡体 + 内亮边/外暗边双描边 + 悬浮投影 */
+  --glass-bg: rgba(255, 255, 255, 0.42);
+  --glass-bg-strong: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(23, 27, 38, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+  --glass-blur: 20px;
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 0 0 1px rgba(23, 27, 38, 0.07), 0 18px 40px -16px rgba(23, 27, 38, 0.14),
+    0 4px 14px rgba(23, 27, 38, 0.05);
+
+  /* 圆角体系 */
+  --radius-card: 16px;
+  --radius-inner: 12px;
+  --radius-ctl: 10px;
 }
 
 * {
@@ -38,9 +61,10 @@ body {
 
 body {
   font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  background: var(--bg);
   color: var(--ink);
   font-size: 14px;
+  /* 噪波光晕背景由 <ShaderBackground> 组件负责，这里只铺近白底色 */
+  background: var(--bg);
 }
 
 a {
@@ -48,11 +72,32 @@ a {
   text-decoration: none;
 }
 
-/* —— Naive UI 品牌化：硬边实体阴影的卡片 —— */
+/* —— 液态玻璃面板（页面私有面板请复用此类，禁止再手写一份材质） —— */
+.glass-panel {
+  background: var(--glass-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+}
+
+/* —— Naive UI 玻璃化：卡片、表格透明化 —— */
 .n-card {
-  border-radius: 16px !important;
-  border: 2px solid var(--line) !important;
-  box-shadow: 0 5px 0 var(--edge-cream) !important;
+  border: none !important;
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  box-shadow: var(--shadow-card) !important;
+}
+
+.n-card > .n-card-header .n-card-header__main {
+  font-weight: 600;
+}
+
+.n-data-table,
+.n-data-table-th,
+.n-data-table-td {
+  background: transparent !important;
 }
 
 /* —— 共享工具类（各页面禁止再私藏一份同名样式） —— */
@@ -70,7 +115,7 @@ a {
   flex: 1;
 }
 
-/* 数字卡：实体积木风，按下浮起 */
+/* 数字卡：玻璃材质 */
 .stat-row {
   display: flex;
   gap: 14px;
@@ -81,18 +126,19 @@ a {
 .statbox {
   flex: 1;
   min-width: 140px;
-  background: var(--card);
-  border: 2px solid var(--line);
-  border-radius: 16px;
-  box-shadow: 0 5px 0 var(--edge-cream);
-  padding: 16px 14px;
+  background: var(--glass-bg);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  padding: 18px 14px;
   text-align: center;
 }
 
 .statbox__n {
   font-size: 26px;
-  font-weight: 800;
-  color: var(--coral-deep);
+  font-weight: 700;
+  color: var(--ink);
   line-height: 1.2;
 }
 
@@ -103,8 +149,8 @@ a {
 .statbox__k {
   font-size: 12px;
   color: var(--ink3);
-  margin-top: 4px;
-  font-weight: 600;
+  margin-top: 6px;
+  font-weight: 500;
 }
 
 .statbox__s {
@@ -126,7 +172,7 @@ a {
   width: 88px;
   color: var(--ink2);
   flex-shrink: 0;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .barrow__label--short {

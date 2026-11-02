@@ -99,44 +99,4 @@ onMounted(load)
 .section {
   margin-bottom: 16px;
 }
-.dayrow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 0;
-  font-size: 12px;
-}
-.dayrow__day {
-  width: 88px;
-  color: var(--ink2);
-  flex-shrink: 0;
-}
-.dayrow__bar {
-  flex: 1;
-  height: 10px;
-  background: var(--well);
-  border-radius: 5px;
-  overflow: hidden;
-}
-.dayrow__fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--coral-deep), #a78bfa);
-  border-radius: 5px;
-}
-.dayrow__meta {
-  width: 330px;
-  color: var(--ink3);
-  flex-shrink: 0;
-  text-align: right;
-}
-.empty {
-  color: var(--ink3);
-  text-align: center;
-  padding: 20px 0;
-}
-.hint {
-  font-size: 12px;
-  color: var(--ink3);
-  text-align: center;
-}
 </style>
