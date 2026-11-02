@@ -7,7 +7,7 @@ const loaded = ref(false)
 onMounted(async () => {
   try {
     user.value = await api.get('/api/me')
-    subs.value = await api.get('/api/me/submissions')
+    subs.value = await api.get<any[]>('/api/me/submissions')
   } catch { user.value = null }
   loaded.value = true
 })
@@ -19,7 +19,7 @@ onMounted(async () => {
     <div v-if="!loaded" class="muted">加载中……</div>
     <div v-else-if="!user" class="card">
       <p style="margin-top: 0">未登录。</p>
-      <a class="btn" :href="api.base + '/api/oauth/github/login'">GitHub 登录</a>
+      <a class="btn" href="/">去首页登录</a>
     </div>
     <template v-else>
       <div class="card">
