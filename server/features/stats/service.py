@@ -3,6 +3,7 @@
 打点是旁路：失败只告警，绝不影响登录/进度主流程。
 完关口径：服务端解析 progress payload（JSON blob），按已发布案例数计算——量级 = 用户数，安全。
 """
+
 import datetime
 import logging
 
@@ -40,9 +41,7 @@ def overview(days: int = 30) -> dict:
         (d0,),
     )
     dau_today = next((r["active"] for r in active_daily if r["day"] == today), 0)
-    active_users_total = db.q(
-        "SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE day >= ?", (d0,)
-    )[0]["n"]
+    active_users_total = db.q("SELECT COUNT(DISTINCT user_id) AS n FROM user_activity WHERE day >= ?", (d0,))[0]["n"]
 
     new_users = db.q(
         "SELECT substr(created_at,1,10) AS day, COUNT(*) AS n FROM users "

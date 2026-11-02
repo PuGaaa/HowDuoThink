@@ -1,10 +1,12 @@
 """submissions 域业务逻辑：投稿创建、我的投稿、审核状态、投稿→Case 草稿转换。
 转稿会编排写入 cases 表（依赖规则允许 submissions → cases 数据归属的编排流）。"""
+
+import time
+import uuid
+
 from fastapi import HTTPException
 
 import db
-import time
-import uuid
 
 # 每用户每日投稿上限：防脚本刷爆管理端审核队列（DB 计数，跨重启/进程一致）
 SUBMISSION_DAILY_LIMIT = 20
@@ -23,17 +25,34 @@ def create_submission(uid: str, body) -> dict:
         "INSERT INTO submissions(id, user_id, title, symptom, resolution, key_error, timeline, lessons, stack_tags, domain_hint) "
         "VALUES(?,?,?,?,?,?,?,?,?,?)",
         (
-            sid, uid, body.title, body.symptom, body.resolution,
-            body.key_error, body.timeline, db.jdump(body.lessons), db.jdump(body.stack_tags), body.domain_hint,
+            sid,
+            uid,
+            body.title,
+            body.symptom,
+            body.resolution,
+            body.key_error,
+            body.timeline,
+            db.jdump(body.lessons),
+            db.jdump(body.stack_tags),
+            body.domain_hint,
         ),
     )
     return {"id": sid, "status": "pending"}
 
 
 def my_submissions(uid: str) -> list[dict]:
-    rows = db.q("SELECT id, title, status, review_note, created_at FROM submissions WHERE user_id=? ORDER BY created_at DESC", (uid,))
+    rows = db.q(
+        "SELECT id, title, status, review_note, created_at FROM submissions WHERE user_id=? ORDER BY created_at DESC",
+        (uid,),
+    )
     return [
-        {"id": r["id"], "title": r["title"], "status": r["status"], "reviewNote": r["review_note"], "createdAt": r["created_at"]}
+        {
+            "id": r["id"],
+            "title": r["title"],
+            "status": r["status"],
+            "reviewNote": r["review_note"],
+            "createdAt": r["created_at"],
+        }
         for r in rows
     ]
 
@@ -49,11 +68,19 @@ def admin_list(status: str | None = None) -> list[dict]:
     )
     return [
         {
-            "id": r["id"], "title": r["title"], "symptom": r["symptom"], "resolution": r["resolution"],
-            "keyError": r["key_error"], "timeline": r["timeline"],
-            "lessons": db.jload(r["lessons"], []), "stackTags": db.jload(r["stack_tags"], []),
-            "domainHint": r["domain_hint"], "status": r["status"], "reviewNote": r["review_note"],
-            "author": r["author_login"], "createdAt": r["created_at"],
+            "id": r["id"],
+            "title": r["title"],
+            "symptom": r["symptom"],
+            "resolution": r["resolution"],
+            "keyError": r["key_error"],
+            "timeline": r["timeline"],
+            "lessons": db.jload(r["lessons"], []),
+            "stackTags": db.jload(r["stack_tags"], []),
+            "domainHint": r["domain_hint"],
+            "status": r["status"],
+            "reviewNote": r["review_note"],
+            "author": r["author_login"],
+            "createdAt": r["created_at"],
         }
         for r in rows
     ]
@@ -85,22 +112,47 @@ def draft_skeleton_from_submission(sid: str) -> dict:
     chain = []
     lines = [ln.strip() for ln in s["resolution"].replace("；", "\n").replace("。", "\n").split("\n") if ln.strip()]
     for ln in lines[:8]:
-        chain.append({
-            "thought": ln[:120],
-            "update": "（待补充：这一步假设如何更新）",
-            "actionId": "",
-            "why": "（待补充：为什么这一步值这个成本）",
-            "conclusion": "（待补充：排除了什么/确认了什么）",
-        })
+        chain.append(
+            {
+                "thought": ln[:120],
+                "update": "（待补充：这一步假设如何更新）",
+                "actionId": "",
+                "why": "（待补充：为什么这一步值这个成本）",
+                "conclusion": "（待补充：排除了什么/确认了什么）",
+            }
+        )
     if not chain:
-        chain.append({"thought": "（待补充）", "update": "（待补充）", "actionId": "", "why": "（待补充）", "conclusion": "（待补充）"})
+        chain.append(
+            {
+                "thought": "（待补充）",
+                "update": "（待补充）",
+                "actionId": "",
+                "why": "（待补充）",
+                "conclusion": "（待补充）",
+            }
+        )
     while len(chain) < 4:
-        chain.append({"thought": "（待补充）", "update": "（待补充）", "actionId": "", "why": "（待补充）", "conclusion": "（待补充）"})
+        chain.append(
+            {
+                "thought": "（待补充）",
+                "update": "（待补充）",
+                "actionId": "",
+                "why": "（待补充）",
+                "conclusion": "（待补充）",
+            }
+        )
     lessons = db.jload(s["lessons"], [])
-    lesson_list = [{"text": l, "principle": "（待补充：这一层的契约）"} for l in lessons]
+    lesson_list = [{"text": it, "principle": "（待补充：这一层的契约）"} for it in lessons]
     lesson_list.append({"text": "（待补充检查单）", "principle": "（待补充原理）"})
     pid = "c-" + sid.replace("s-", "")
-    part_guess = {"network": "access", "data": "data", "build": "build", "runtime": "runtime", "concurrency": "concurrency", "deploy": "access"}.get(s["domain_hint"] or "", "")
+    part_guess = {
+        "network": "access",
+        "data": "data",
+        "build": "build",
+        "runtime": "runtime",
+        "concurrency": "concurrency",
+        "deploy": "access",
+    }.get(s["domain_hint"] or "", "")
     return {
         "id": pid,
         "title": title,
@@ -125,9 +177,18 @@ def draft_skeleton_from_submission(sid: str) -> dict:
             {"id": "h-c", "text": "（待补充假设C）", "excludeActionId": ""},
         ],
         "actions": [
-            {"id": "act-1", "name": "（待补充动作）", "desc": "（待补充）", "cost": 1, "gain": "high",
-             "danger": False, "effects": [], "tests": [], "hypotheses": [],
-             "result": {"type": "text", "title": "（待补充）", "text": "（待补充）"}},
+            {
+                "id": "act-1",
+                "name": "（待补充动作）",
+                "desc": "（待补充）",
+                "cost": 1,
+                "gain": "high",
+                "danger": False,
+                "effects": [],
+                "tests": [],
+                "hypotheses": [],
+                "result": {"type": "text", "title": "（待补充）", "text": "（待补充）"},
+            },
         ],
         "rootCauses": [
             {"id": "rc-a", "text": "（待补充根因A）", "correct": False},
@@ -175,11 +236,22 @@ def create_draft_with_payload(uid: str, sid: str, payload: dict) -> dict:
             conn.execute(
                 "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
                 "VALUES(?,?,?,?,?,?,?,?,?,?)",
-                (payload["id"], sid, uid, payload.get("title", ""), payload.get("domain", "runtime"),
-                 payload.get("layer", ""), _int_or(payload.get("difficulty"), 2), 0, "draft", db.jdump(payload)),
+                (
+                    payload["id"],
+                    sid,
+                    uid,
+                    payload.get("title", ""),
+                    payload.get("domain", "runtime"),
+                    payload.get("layer", ""),
+                    _int_or(payload.get("difficulty"), 2),
+                    0,
+                    "draft",
+                    db.jdump(payload),
+                ),
             )
         conn.execute(
-            "UPDATE submissions SET status='accepted', reviewed_at=datetime('now') WHERE id=? AND status='pending'", (sid,)
+            "UPDATE submissions SET status='accepted', reviewed_at=datetime('now') WHERE id=? AND status='pending'",
+            (sid,),
         )
     return {"caseId": payload["id"], "submissionId": sid, "status": "draft"}
 

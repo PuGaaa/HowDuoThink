@@ -1,7 +1,8 @@
 """素材域测试：未配置 OSS 时 503 降级；假 OSS 层下 上传/秒传/校验/删除/清单 闭环。"""
+
 import pytest
 
-from tests.conftest import make_client, login_admin
+from tests.conftest import login_admin, make_client
 
 PNG = b"\x89PNG\r\n\x1a\nfake-image-bytes"
 

@@ -1,4 +1,5 @@
 """ops 路由：服务健康（editor/admin）。"""
+
 from fastapi import APIRouter, Depends
 
 from core.deps import current_user, require_editor

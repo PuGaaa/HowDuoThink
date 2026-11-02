@@ -1,5 +1,6 @@
 """素材路由：上传/列表/删除、资源位绑定（editor+，管理端素材页用）；
 清单与资源派发公开只读（App 启动拉取）。"""
+
 import logging
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile

@@ -1,11 +1,12 @@
 """ai 域·限流与配额：窗口限流读-判-写原子（TOCTOU 修复）+ 日配额硬顶。"""
+
 import datetime
 import threading
 
 from fastapi.testclient import TestClient
 
 import main  # noqa: F401
-from tests.conftest import login_admin, make_client
+from tests.conftest import login_admin
 
 
 class _FakeResp:

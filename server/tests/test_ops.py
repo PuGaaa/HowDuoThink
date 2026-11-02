@@ -1,4 +1,5 @@
 """ops 域：进程内请求计数、快照落库、健康端点。"""
+
 from fastapi.testclient import TestClient
 
 from tests.conftest import login_admin, make_client
@@ -24,8 +25,8 @@ def test_metrics_record_and_snapshot():
 
 
 def test_snapshot_failure_does_not_raise(monkeypatch):
-    from features.ops import metrics
     import db
+    from features.ops import metrics
 
     metrics.take_snapshot()  # 归零
     metrics.record(200, 5.0)

@@ -1,5 +1,6 @@
 """测试环境引导：隔离临时库 + 环境变量必须在导入 app 前就位。
 用法：cd server && /tmp/pilvenv/bin/python -m pytest tests/ -q"""
+
 import os
 import tempfile
 from pathlib import Path

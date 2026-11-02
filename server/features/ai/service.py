@@ -3,11 +3,11 @@
 纯节点设计（LangGraph 演进预留）：node_retrieve / node_answer / node_draft 各自独立、
 无隐藏状态——将来引入 LangGraph 时按图组装即可。检索层自研（SQLite+余弦）。
 """
+
 import json
 import math
 import threading
 import time
-import uuid
 
 import db
 from core import settings
@@ -54,6 +54,7 @@ def _daily_used(uid: str) -> int:
 
 # ────────────────────────── 节点：索引 ──────────────────────────
 
+
 def _case_chunks(payload: dict) -> list[tuple[str, str]]:
     """案例 payload → (chunk_kind, content) 列表。"""
     title = payload.get("title", "")
@@ -65,20 +66,13 @@ def _case_chunks(payload: dict) -> list[tuple[str, str]]:
     symptoms = "\n".join(
         f"- {s.get('title', '')}: {s.get('text', '')}" for s in payload.get("scene", {}).get("symptoms", [])
     )
-    overview = (
-        f"{head}\n【症状/现象】\n{symptoms}\n"
-        f"【一句话简介】{payload.get('intro', '')}"
-    )
+    overview = f"{head}\n【症状/现象】\n{symptoms}\n【一句话简介】{payload.get('intro', '')}"
 
     causes = "；".join(
         (("[正确] " if r.get("correct") else "") + r.get("text", "")) for r in payload.get("rootCauses", [])
     )
-    steps = "\n".join(
-        f"- {c.get('conclusion', '')}" for c in payload.get("expertChain", []) if c.get("conclusion")
-    )
-    lessons = "\n".join(
-        f"- {l.get('text', '')}（{l.get('principle', '')}）" for l in payload.get("lessons", [])
-    )
+    steps = "\n".join(f"- {c.get('conclusion', '')}" for c in payload.get("expertChain", []) if c.get("conclusion"))
+    lessons = "\n".join(f"- {it.get('text', '')}（{it.get('principle', '')}）" for it in payload.get("lessons", []))
     resolution = f"{head}\n【根因】{causes}\n【排查步骤/结论】\n{steps}\n【检查单】\n{lessons}"
 
     return [("overview", overview), ("resolution", resolution)]
@@ -132,6 +126,7 @@ def reindex_all() -> dict:
 
 # ────────────────────────── 节点：检索 ──────────────────────────
 
+
 def _cosine(a: list[float], b: list[float]) -> float:
     if not a or not b or len(a) != len(b):
         return -1.0
@@ -149,8 +144,7 @@ def node_retrieve(query: str, k: int = 4) -> list[dict]:
         qvec = client.embeddings_model().embed_query(query)
         model = client.embeddings_model_name()
         rows = db.q(
-            "SELECT source_id, chunk_kind, content, embedding FROM ai_index "
-            "WHERE source_type='case' AND model=?",
+            "SELECT source_id, chunk_kind, content, embedding FROM ai_index WHERE source_type='case' AND model=?",
             (model,),
         )
         scored = []
@@ -176,6 +170,7 @@ def node_retrieve(query: str, k: int = 4) -> list[dict]:
 
 
 # ────────────────────────── 节点：应答 ──────────────────────────
+
 
 def node_answer(question: str, chunks: list[dict], uid: str | None = None) -> str:
     """应答节点：检索结果 → system prompt → GLM 回答。调用即审计（token/耗时/成败）。"""
@@ -273,10 +268,12 @@ def node_draft(material: dict, uid: str | None = None) -> tuple[dict, list[str]]
     warnings: list[str] = []
     t0 = time.perf_counter()
     try:
-        resp = client.chat_model().invoke([
-            ("system", "你是资深的出题编辑，输出严格的 JSON。"),
-            ("human", prompt),
-        ])
+        resp = client.chat_model().invoke(
+            [
+                ("system", "你是资深的出题编辑，输出严格的 JSON。"),
+                ("human", prompt),
+            ]
+        )
     except Exception:
         usage.log_usage(uid, "draft", duration_ms=int((time.perf_counter() - t0) * 1000), ok=False)
         raise
@@ -313,9 +310,13 @@ def ai_draft_from_submission(uid: str, sid: str) -> dict:
         raise ValueError("投稿不存在")
     s = rows[0]
     material = {
-        "title": s["title"], "symptom": s["symptom"], "resolution": s["resolution"],
-        "keyError": s["key_error"], "timeline": s["timeline"],
-        "lessons": db.jload(s["lessons"], []), "domainHint": s["domain_hint"],
+        "title": s["title"],
+        "symptom": s["symptom"],
+        "resolution": s["resolution"],
+        "keyError": s["key_error"],
+        "timeline": s["timeline"],
+        "lessons": db.jload(s["lessons"], []),
+        "domainHint": s["domain_hint"],
     }
     warnings: list[str] = []
     generated, w = node_draft(material, uid=uid)
@@ -326,21 +327,59 @@ def ai_draft_from_submission(uid: str, sid: str) -> dict:
 
     if generated:
         # AI 预填覆盖重字段；id/署名链路保留骨架值；chapterId 校验合法性
-        valid_chapters = {"access", "build", "data", "runtime", "concurrency", "observability",
-                          "security", "evolution", "messaging", "deployment", "network", "testing",
-                          "error-reading", "integration", "contract", "config-boot"}
-        for key in ("title", "intro", "layer", "difficulty", "scene", "hypotheses", "actions", "rootCauses", "expertChain", "lessons"):
+        valid_chapters = {
+            "access",
+            "build",
+            "data",
+            "runtime",
+            "concurrency",
+            "observability",
+            "security",
+            "evolution",
+            "messaging",
+            "deployment",
+            "network",
+            "testing",
+            "error-reading",
+            "integration",
+            "contract",
+            "config-boot",
+        }
+        for key in (
+            "title",
+            "intro",
+            "layer",
+            "difficulty",
+            "scene",
+            "hypotheses",
+            "actions",
+            "rootCauses",
+            "expertChain",
+            "lessons",
+        ):
             if generated.get(key):
                 payload[key] = generated[key]
         ch = generated.get("chapterId")
         if ch in valid_chapters:
             payload["chapterId"] = ch
-            payload["part"] = {"access": "apprentice", "build": "apprentice", "error-reading": "apprentice",
-                               "integration": "apprentice", "contract": "engineer", "data": "engineer",
-                               "config-boot": "engineer", "runtime": "engineer", "concurrency": "master",
-                               "observability": "master", "security": "master", "evolution": "master",
-                               "messaging": "master", "deployment": "master", "network": "master",
-                               "testing": "master"}[ch]
+            payload["part"] = {
+                "access": "apprentice",
+                "build": "apprentice",
+                "error-reading": "apprentice",
+                "integration": "apprentice",
+                "contract": "engineer",
+                "data": "engineer",
+                "config-boot": "engineer",
+                "runtime": "engineer",
+                "concurrency": "master",
+                "observability": "master",
+                "security": "master",
+                "evolution": "master",
+                "messaging": "master",
+                "deployment": "master",
+                "network": "master",
+                "testing": "master",
+            }[ch]
         else:
             warnings.append(f"GLM 返回未知章 id：{ch}，保留领域提示映射")
         aiGenerated = True

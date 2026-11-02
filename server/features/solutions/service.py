@@ -1,15 +1,25 @@
 """solutions 域：articles 表的 Web 展示（只读）。"""
+
 from fastapi import HTTPException
 
 import db
-from features.solutions.models import StepOut, ArticleOut
+from features.solutions.models import ArticleOut, StepOut
 
 
 def article_view(r) -> dict:
-    steps = [StepOut(no=i + 1, observe=s["observe"], act=s["act"], found=s["found"]) for i, s in enumerate(db.jload(r["steps"], []))]
+    steps = [
+        StepOut(no=i + 1, observe=s["observe"], act=s["act"], found=s["found"])
+        for i, s in enumerate(db.jload(r["steps"], []))
+    ]
     return ArticleOut(
-        id=r["id"], title=r["title"], layer=r["layer"], domain=r["domain"],
-        steps=steps, lessons=db.jload(r["lessons"], []), author=r["author"], published_at=r["published_at"],
+        id=r["id"],
+        title=r["title"],
+        layer=r["layer"],
+        domain=r["domain"],
+        steps=steps,
+        lessons=db.jload(r["lessons"], []),
+        author=r["author"],
+        published_at=r["published_at"],
     ).model_dump()
 
 

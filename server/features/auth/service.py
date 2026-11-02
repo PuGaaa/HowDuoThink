@@ -1,15 +1,15 @@
 """auth 域业务逻辑：登录校验（含哈希升级）、OAuth 用户落库、dev 建号、资料与密码管理。
 约定：只抛 HTTPException 表达业务错误，路由层不做业务判断。"""
-from fastapi import HTTPException
 
 import secrets
 import threading
 import time
 
+from fastapi import HTTPException
+
 import db
 from core import config, security, settings
 from core import sms as sms_core
-
 
 # ---------- 登录防爆破（进程内滑动窗口；单 worker 部署形态下即全局） ----------
 
@@ -128,6 +128,7 @@ def random_nickname() -> str:
 
     return random.choice(_NICK_ADJ) + random.choice(_NICK_NOUN)
 
+
 def send_sms_code(phone: str) -> dict:
     """生成并下发验证码；60s 重发限频。dev 模式响应带 devEcho 供联调；通道不可用映射 503。"""
     import db as _db
@@ -183,8 +184,11 @@ def phone_login(phone: str, code: str) -> dict:
         _consume_code(conn, phone, code)
         if existing:
             return {
-                "id": existing[0]["id"], "login": existing[0]["login"],
-                "role": existing[0]["role"], "name": existing[0]["name"], "created": False,
+                "id": existing[0]["id"],
+                "login": existing[0]["login"],
+                "role": existing[0]["role"],
+                "name": existing[0]["name"],
+                "created": False,
             }
         uid = "ph-" + phone
         login_name = "u" + phone[-4:] + phone[:3]
@@ -208,8 +212,11 @@ def phone_login(phone: str, code: str) -> dict:
                 if not winner:
                     raise
                 return {
-                    "id": winner[0]["id"], "login": winner[0]["login"],
-                    "role": winner[0]["role"], "name": winner[0]["name"], "created": False,
+                    "id": winner[0]["id"],
+                    "login": winner[0]["login"],
+                    "role": winner[0]["role"],
+                    "name": winner[0]["name"],
+                    "created": False,
                 }
         return {"id": uid, "login": login_name, "role": "user", "name": name, "created": True}
 

@@ -1,5 +1,6 @@
 """users 域业务逻辑：管理端用户列表/角色/封禁。
 约定：只抛 HTTPException；防自改（角色/封禁）——配合端点 admin-only 即保证系统始终有 admin。"""
+
 from fastapi import HTTPException
 
 import db

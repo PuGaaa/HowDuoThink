@@ -1,4 +1,5 @@
 """settings 机制层：优先级链（DB > env > 内置默认）、缓存失效、写校验、client scope、读库降级。"""
+
 import db
 from core import settings
 
@@ -40,7 +41,9 @@ def test_update_many_rejects_unknown_and_out_of_range():
             assert list(bad)[0] in str(e)
         else:
             raise AssertionError(f"应拒绝 {bad}")
-    n = db.q("SELECT COUNT(*) AS n FROM settings WHERE setting_key IN ('nope.key','guest_gate.free_levels','ai.rate_limit','ai.price_in')")[0]["n"]
+    n = db.q(
+        "SELECT COUNT(*) AS n FROM settings WHERE setting_key IN ('nope.key','guest_gate.free_levels','ai.rate_limit','ai.price_in')"
+    )[0]["n"]
     assert n == 0  # 一个都不落库
 
 

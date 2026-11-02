@@ -1,5 +1,6 @@
 """发布门禁：写作规范红线的 Python 版。
 结构红线代码强制（过不了就不许发布）；语义红线（证据自洽/双路径/噪声质量）人工勾选清单。"""
+
 from features.cases.models import CasePayload
 
 
@@ -7,7 +8,6 @@ def check_case(payload: CasePayload) -> list[str]:
     errors: list[str] = []
     acts = payload.actions
     act_ids = {a.id for a in acts}
-    by_id = {a.id: a for a in acts}
 
     # 影响面动作唯一性（cost=1 且 gain=high 可能多个——影响面特指第一个被专家链引用的）
     impact_ids = [a.id for a in acts if a.cost == 1 and a.gain == "high"]
@@ -20,7 +20,6 @@ def check_case(payload: CasePayload) -> list[str]:
         errors.append("L2 及以上必须含重启/回滚类危险动作")
 
     # 干扰假设排除路径：每个非正确假设至少一个动作把它 excluded/down
-    correct_ids = {r.id for r in payload.root_causes if r.correct}
     effect_map: dict[str, set[str]] = {}
     for a in acts:
         for h in a.hypotheses:

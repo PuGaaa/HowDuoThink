@@ -1,5 +1,6 @@
 """progress 域模型：进度云同步的载荷。
 v1 同步范围：案例进度 + streak + 动物统计 + 任务计数 + 每日一题 + 检查单使用数。"""
+
 from typing import Any
 
 from pydantic import BaseModel, Field

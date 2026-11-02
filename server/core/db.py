@@ -11,13 +11,13 @@ col=excluded.col），MySQL 引擎在执行前统一翻译——方言规则集�
                              → ON DUPLICATE KEY UPDATE col=VALUES(col), ...
   meta 表的 key 列           → meta_key（KEY 是 MySQL 保留字，建库时即改名）
 """
+
 import datetime
 import json
 import re
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-
 from typing import Iterator
 
 import core.config as config
@@ -313,8 +313,14 @@ def _translate(sql: str) -> str:
     sql = re.sub(r"ON CONFLICT\s*\(([^)]+)\)\s*DO UPDATE SET\s+([^;]+)", _dup, sql)
 
     # datetime('now', '±N unit') 修饰符 → NOW() ± INTERVAL N unit
-    _UNITS = {"SECONDS": "SECOND", "MINUTES": "MINUTE", "HOURS": "HOUR",
-              "DAYS": "DAY", "MONTHS": "MONTH", "YEARS": "YEAR"}
+    _UNITS = {
+        "SECONDS": "SECOND",
+        "MINUTES": "MINUTE",
+        "HOURS": "HOUR",
+        "DAYS": "DAY",
+        "MONTHS": "MONTH",
+        "YEARS": "YEAR",
+    }
 
     def _dtmod(m: re.Match) -> str:
         sign, n, unit = m.group(1), m.group(2), m.group(3).upper()
@@ -516,7 +522,10 @@ def next_version() -> int:
     rows = q("SELECT value FROM meta WHERE meta_key='casepack_version'")
     v = int(rows[0]["value"]) if rows else 0
     v += 1
-    ex("INSERT INTO meta(meta_key, value) VALUES('casepack_version', ?) ON CONFLICT(meta_key) DO UPDATE SET value=excluded.value", (str(v),))
+    ex(
+        "INSERT INTO meta(meta_key, value) VALUES('casepack_version', ?) ON CONFLICT(meta_key) DO UPDATE SET value=excluded.value",
+        (str(v),),
+    )
     return v
 
 

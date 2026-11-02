@@ -1,4 +1,5 @@
 """settings 域出入参。"""
+
 from pydantic import BaseModel, Field
 
 

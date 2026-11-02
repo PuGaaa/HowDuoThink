@@ -1,5 +1,6 @@
 """环境变量集中地：所有配置只在这里读 os.environ，其余模块一律 import core.config。
 JWT_SECRET 未设置时使用进程内随机密钥（重启后所有会话失效，生产必须显式配置）。"""
+
 import os
 import secrets
 
@@ -58,9 +59,7 @@ OPS_RETENTION_DAYS = int(os.environ.get("OPS_RETENTION_DAYS", "30"))
 OSS_ENDPOINT = os.environ.get("OSS_ENDPOINT", "")
 OSS_BUCKET = os.environ.get("OSS_BUCKET", "") or os.environ.get("OSS_BUCKET_NAME", "")
 OSS_ACCESS_KEY_ID = os.environ.get("OSS_ACCESS_KEY_ID", "")
-OSS_ACCESS_KEY_SECRET = os.environ.get("OSS_ACCESS_KEY_SECRET", "") or os.environ.get(
-    "OSS_SECRET_ACCESS_KEY", ""
-)
+OSS_ACCESS_KEY_SECRET = os.environ.get("OSS_ACCESS_KEY_SECRET", "") or os.environ.get("OSS_SECRET_ACCESS_KEY", "")
 # 对象 key 前缀与单文件上限（MB）
 OSS_KEY_PREFIX = os.environ.get("OSS_KEY_PREFIX", "assets")
 OSS_MAX_UPLOAD_MB = int(os.environ.get("OSS_MAX_UPLOAD_MB", "10"))

@@ -1,6 +1,7 @@
 """素材服务：校验 → OSS 写入 → 落库；资源位绑定；清单/派发 = 表内容 + CDN 前缀（settings）。
 本模块同时承担数据访问层（assets / resource_slots 表的 SQL 都在这里）。
 异常三态供路由层映射：AssetError→400 / NotConfiguredError→503 / AssetUnavailableError→502 / RateLimitError→429。"""
+
 import datetime
 import hashlib
 import re
@@ -115,9 +116,7 @@ def upload(data: bytes, filename: str, category: str, note: str, uid: str) -> di
         return _public_row(rows[0])
 
     today = datetime.date.today().strftime("%Y%m")
-    object_key = (
-        f"{config.OSS_KEY_PREFIX}/{category}/{today}/{uuid.uuid4().hex[:12]}-{_safe_filename(filename)}"
-    )
+    object_key = f"{config.OSS_KEY_PREFIX}/{category}/{today}/{uuid.uuid4().hex[:12]}-{_safe_filename(filename)}"
     try:
         oss.put_bytes(object_key, data, CONTENT_TYPES[ext])
     except Exception as e:
@@ -209,10 +208,7 @@ def app_resources() -> dict:
         arows = db.q("SELECT object_key FROM assets WHERE id=?", (aid,))
         if arows:
             mascots[s.split(".", 1)[1]] = _url(arows[0]["object_key"])
-    avatars = [
-        _url(r["object_key"])
-        for r in db.q("SELECT object_key FROM assets WHERE category='avatar' ORDER BY id")
-    ]
+    avatars = [_url(r["object_key"]) for r in db.q("SELECT object_key FROM assets WHERE category='avatar' ORDER BY id")]
     digest = hashlib.sha1(
         ("|".join(f"{k}:{v}" for k, v in sorted(mascots.items())) + "||" + "|".join(avatars)).encode()
     ).hexdigest()[:12]
@@ -221,9 +217,7 @@ def app_resources() -> dict:
 
 def manifest() -> dict:
     """公开清单：App 启动拉取后按 url 取用。version 随内容集变化，供客户端做缓存判断。"""
-    rows = db.q(
-        "SELECT object_key, category, size_bytes, sha256, created_at FROM assets ORDER BY id"
-    )
+    rows = db.q("SELECT object_key, category, size_bytes, sha256, created_at FROM assets ORDER BY id")
     items = [
         {
             "key": r["object_key"],
@@ -235,7 +229,5 @@ def manifest() -> dict:
         }
         for r in rows
     ]
-    digest = hashlib.sha1(
-        "|".join(f"{i['key']}:{i['sha256']}" for i in items).encode()
-    ).hexdigest()[:12]
+    digest = hashlib.sha1("|".join(f"{i['key']}:{i['sha256']}" for i in items).encode()).hexdigest()[:12]
     return {"version": digest, "count": len(items), "items": items}

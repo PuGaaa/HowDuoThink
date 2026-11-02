@@ -1,7 +1,6 @@
 """管理端独立工程支撑：CORS 放行 admin 源、/admin SPA 静态托管（含前端路由 fallback）。"""
-from fastapi.testclient import TestClient
 
-from tests.conftest import make_client
+from fastapi.testclient import TestClient
 
 
 def test_admin_spa_served_with_route_fallback(monkeypatch, tmp_path):

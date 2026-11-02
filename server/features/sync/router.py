@@ -1,4 +1,5 @@
 """sync 路由：App 端 casepack 增量同步（公开只读，经 cases.service 取数）。"""
+
 from fastapi import APIRouter, Query
 
 from features.cases import service as cases_service

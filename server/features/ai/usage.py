@@ -3,6 +3,7 @@
 审计是旁路：写失败只告警，绝不影响主流程（对话/起草不受审计库状态牵连）。
 成本按 DeepSeek 单价（settings ai.price_in/out，元/百万 tokens）估算，管理端即时可调。
 """
+
 import datetime
 import logging
 
@@ -60,8 +61,11 @@ def daily_summary(days: int) -> dict:
     return {
         "days": [
             {
-                "day": r["day"], "chats": r["chats"], "drafts": r["drafts"],
-                "prompt_tokens": r["prompt_tokens"], "completion_tokens": r["completion_tokens"],
+                "day": r["day"],
+                "chats": r["chats"],
+                "drafts": r["drafts"],
+                "prompt_tokens": r["prompt_tokens"],
+                "completion_tokens": r["completion_tokens"],
                 # AVG 两引擎返回 float/Decimal，统一 Python 取整（CAST AS INTEGER 不是合法 MySQL）
                 "avg_ms": int(r["avg_ms"]) if r["avg_ms"] is not None else None,
                 "cost": round(estimate_cost(r["prompt_tokens"] or 0, r["completion_tokens"] or 0), 4),

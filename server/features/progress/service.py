@@ -1,4 +1,5 @@
 """progress 域业务逻辑：按用户存取进度 bundle（整体覆盖语义，合并由客户端负责）。"""
+
 import db
 
 _BUNDLE_DEFAULTS = {

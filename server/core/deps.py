@@ -1,5 +1,6 @@
 """路由层共享依赖：会话鉴权与编辑权限。
 身份通道两种：Web 走 session cookie；App 走 Authorization: Bearer <jwt>。"""
+
 from typing import Annotated
 
 from fastapi import Cookie, Header, HTTPException

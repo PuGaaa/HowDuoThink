@@ -1,4 +1,5 @@
 """submissions 路由：投稿、我的投稿、管理端审核与转草稿。"""
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from core.deps import current_user, require_editor
@@ -51,6 +52,7 @@ def ai_draft_from_submission(sid: str, uid: str = Depends(current_user)):
         raise HTTPException(401, "未登录")
     require_editor(uid)
     from features.ai import service as ai_service
+
     try:
         return ai_service.ai_draft_from_submission(uid, sid)
     except ValueError as e:

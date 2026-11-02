@@ -1,4 +1,5 @@
 """cases/submissions 域·草稿写路径 status 守卫：非 draft 案例不可经草稿/转稿覆盖正文。"""
+
 import pytest
 from fastapi import HTTPException
 
@@ -32,7 +33,13 @@ def test_draft_case_still_savable_and_meta_synced():
         login_admin(client)
         body = {
             "id": "c-draft-guard-x",
-            "payload": {"id": "c-draft-guard-x", "title": "草稿一", "domain": "network", "layer": "契约层", "difficulty": 2},
+            "payload": {
+                "id": "c-draft-guard-x",
+                "title": "草稿一",
+                "domain": "network",
+                "layer": "契约层",
+                "difficulty": 2,
+            },
         }
         assert client.post("/api/admin/cases", json=body).status_code == 200, client.post(
             "/api/admin/cases", json=body

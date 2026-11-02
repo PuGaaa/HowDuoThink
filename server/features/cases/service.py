@@ -1,6 +1,7 @@
 """Case 的业务逻辑：草稿保存、元数据更新、发布（门禁+版本+文章投影）。
 发布与草稿的多表写入都走 db.tx() 事务。约定：服务层只抛 HTTPException。
 投稿→草稿的转换（含 AI 起草落库）由 features/submissions/service.py 承载，此处不重复。"""
+
 from fastapi import HTTPException
 
 import db
@@ -75,7 +76,15 @@ def update_case_meta(cid: str, body: CaseMetaBody) -> dict:
             conn.execute("UPDATE cases SET payload=?, version=? WHERE id=?", (db.jdump(payload), version, cid))
     else:
         db.ex("UPDATE cases SET payload=? WHERE id=?", (db.jdump(payload), cid))
-    return {"ok": True, "meta": {"part": payload.get("part"), "chapterId": payload.get("chapterId"), "order": payload.get("order"), "typeTags": payload.get("typeTags")}}
+    return {
+        "ok": True,
+        "meta": {
+            "part": payload.get("part"),
+            "chapterId": payload.get("chapterId"),
+            "order": payload.get("order"),
+            "typeTags": payload.get("typeTags"),
+        },
+    }
 
 
 def list_admin_cases(status: str | None = None) -> list[dict]:
@@ -95,7 +104,10 @@ def admin_case_detail(cid: str) -> dict:
         raise HTTPException(404, "案例不存在")
     r = rows[0]
     return {
-        "id": r["id"], "title": r["title"], "version": r["version"], "status": r["status"],
+        "id": r["id"],
+        "title": r["title"],
+        "version": r["version"],
+        "status": r["status"],
         "payload": db.jload(r["payload"], {}),
     }
 
@@ -137,19 +149,30 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
             conn.execute(
                 "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload, published_at) "
                 "VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now'))",
-                (payload.id, sub_id, uid, payload.title, payload.domain, payload.layer, payload.difficulty, version, "published",
-                 db.jdump(d)),
+                (
+                    payload.id,
+                    sub_id,
+                    uid,
+                    payload.title,
+                    payload.domain,
+                    payload.layer,
+                    payload.difficulty,
+                    version,
+                    "published",
+                    db.jdump(d),
+                ),
             )
         article_id = _upsert_article(conn, payload, author_name)
     # 发布成功 → 增量索引到 AI 案例库（失败不阻塞发布）
     try:
         from features.ai import service as ai_service
+
         ai_service.index_case(payload.id)
     except Exception:  # noqa: BLE001 — AI 索引失败只记日志
         import logging
+
         logging.getLogger("uvicorn.error").warning("AI index failed for %s", payload.id)
-    return {
-        "id": payload.id, "version": version, "articleId": article_id}
+    return {"id": payload.id, "version": version, "articleId": article_id}
 
 
 def _upsert_article(conn, payload: CasePayload, author: str) -> str:
@@ -159,25 +182,37 @@ def _upsert_article(conn, payload: CasePayload, author: str) -> str:
     for st in payload.expert_chain:
         act = st.action_id
         act_name = next((a.name for a in payload.actions if a.id == act), "")
-        steps.append({
-            "observe": st.thought,
-            "act": act_name if act else "（推理收束，停止收集）",
-            "found": st.conclusion,
-        })
-    lessons = [l.text for l in payload.lessons]
+        steps.append(
+            {
+                "observe": st.thought,
+                "act": act_name if act else "（推理收束，停止收集）",
+                "found": st.conclusion,
+            }
+        )
+    lessons = [it.text for it in payload.lessons]
     conn.execute(
         "INSERT INTO articles(id, source_type, source_id, title, layer, domain, steps, lessons, author) "
         "VALUES(?,?,?,?,?,?,?,?,?) "
         "ON CONFLICT(id) DO UPDATE SET title=excluded.title, layer=excluded.layer, steps=excluded.steps, "
         "lessons=excluded.lessons, author=excluded.author, published_at=datetime('now')",
-        (article_id, "case", payload.id, payload.title, payload.layer, payload.domain,
-         db.jdump(steps), db.jdump(lessons), author),
+        (
+            article_id,
+            "case",
+            payload.id,
+            payload.title,
+            payload.layer,
+            payload.domain,
+            db.jdump(steps),
+            db.jdump(lessons),
+            author,
+        ),
     )
     return article_id
 
 
-
 def published_after(since: int) -> tuple[int, list[dict]]:
     """App 同步：version > since 的已发布案例 + 当前版本号（sync feature 经此取数）。"""
-    rows = db.q("SELECT id, version, payload FROM cases WHERE status='published' AND version>? ORDER BY version", (since,))
+    rows = db.q(
+        "SELECT id, version, payload FROM cases WHERE status='published' AND version>? ORDER BY version", (since,)
+    )
     return db.current_version(), [db.jload(r["payload"], {}) for r in rows]

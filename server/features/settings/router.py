@@ -1,4 +1,5 @@
 """settings 路由：管理端读写（admin 专属）+ 客户端配置下发（公开只读白名单）。"""
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from core import settings

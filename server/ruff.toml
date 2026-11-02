@@ -1,0 +1,6 @@
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]  # 中文长注释不换行；代码行宽交给 format

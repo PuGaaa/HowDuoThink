@@ -1,4 +1,5 @@
 """users 域：管理端用户列表/角色/封禁 + 封禁在登录与请求链路的生效。"""
+
 import uuid
 
 from core import security
@@ -61,7 +62,7 @@ def test_ban_blocks_login_and_requests():
         login_admin(admin)
         pw = "userpw-123"
         u1 = _mkuser("banme", role="user", password=pw)
-        login_name = u1[len("pw-"):]  # pw- 命名空间反推真实 login
+        login_name = u1[len("pw-") :]  # pw- 命名空间反推真实 login
         with make_client() as user_client:
             r = user_client.post("/api/auth/login", json={"login": login_name, "password": pw})
             assert r.status_code == 200, r.text

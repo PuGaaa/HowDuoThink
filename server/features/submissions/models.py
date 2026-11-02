@@ -1,10 +1,13 @@
 """submissions 域模型。"""
-from pydantic import BaseModel, Field, field_validator
+
 from typing import Literal
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class SubmissionCreate(BaseModel):
     """用户投稿：必填 3 项 + 选填——轻是设计，字段与 Case 素材一一对应。"""
+
     title: str = Field(min_length=4, max_length=40)
     symptom: str = Field(min_length=10, max_length=1200)
     resolution: str = Field(min_length=10, max_length=2400)

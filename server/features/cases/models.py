@@ -1,4 +1,5 @@
 """cases 域模型：App 关卡完整 schema（与 app/types/case.ts 的 DiagnosisCase 对齐）+ 管理入参。"""
+
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -33,7 +34,7 @@ class ActionIn(BaseModel):
     gain: str
     danger: bool = False
     effects: list[str] = []
-    tests: list[str] = []          # 绑定的假设 id；空 = 通用侦查
+    tests: list[str] = []  # 绑定的假设 id；空 = 通用侦查
     hypotheses: list[HypothesisEffectIn] = []
     result: EvidenceIn
 
@@ -81,15 +82,16 @@ class SceneIn(BaseModel):
 
 class CasePayload(BaseModel):
     """App 关卡完整 schema —— 发布门禁的结构校验层。"""
+
     id: str = Field(pattern=r"^[a-z0-9-]{3,40}$")
     title: str = Field(min_length=1, max_length=40)
     intro: str = Field(min_length=1, max_length=80)
     domain: str
     layer: str = Field(min_length=1, max_length=120)
-    part: str = Field(default='engineer')
-    chapter_id: str = Field(default='', alias='chapterId')
+    part: str = Field(default="engineer")
+    chapter_id: str = Field(default="", alias="chapterId")
     order: int = Field(default=1)
-    type_tags: list[str] = Field(default_factory=list, alias='typeTags')
+    type_tags: list[str] = Field(default_factory=list, alias="typeTags")
     difficulty: int = Field(ge=1, le=3)
     scene: SceneIn
     hypotheses: list[HypothesisIn] = Field(min_length=3, max_length=8)
@@ -102,7 +104,6 @@ class CasePayload(BaseModel):
 
     @model_validator(mode="after")
     def _cross(self) -> "CasePayload":
-        act_ids = {a.id for a in self.actions}
         hyp_ids = {h.id for a in self.actions for h in a.hypotheses}
         # 恰一个正确根因
         if sum(1 for r in self.root_causes if r.correct) != 1:

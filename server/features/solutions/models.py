@@ -1,4 +1,5 @@
 """solutions 域出参模型。"""
+
 from pydantic import BaseModel
 
 

@@ -1,4 +1,5 @@
 """auth 域入参模型。"""
+
 from pydantic import BaseModel, Field, field_validator
 
 

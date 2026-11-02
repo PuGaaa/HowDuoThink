@@ -1,9 +1,8 @@
 """auth 域·手机号身份：验证码发送/登录建号/账号互通绑定/限频。"""
-import time
 
 import pytest
 
-from tests.conftest import make_client, login_admin, load_seed
+from tests.conftest import login_admin, make_client
 
 PHONE = "13800001234"
 _seq = {"n": 0}

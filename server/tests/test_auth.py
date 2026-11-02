@@ -1,5 +1,6 @@
 """auth 域：健康检查、账密鉴权、哈希升级、dev 旁路关闭。"""
-from tests.conftest import make_client, login_admin
+
+from tests.conftest import login_admin, make_client
 
 
 def test_health():
@@ -48,6 +49,7 @@ def test_bearer_token_access():
 
 # ---------- 初始管理员种子（惯例：自带默认账号，README 注明，上线前改密） ----------
 
+
 def _remove_admins():
     import db
 
@@ -57,7 +59,6 @@ def _remove_admins():
 def _restore_pw_admin(password="test-admin-pw"):
     """种子类测试会动 pw-admin——恢复成套件约定的 test-admin-pw，避免污染后续用例。"""
     import db
-
     from core import security
 
     db.ex(
@@ -109,7 +110,9 @@ def test_default_account_hint_flips_after_password_change(monkeypatch):
             # 登录并改密 → 提示消失
             token = client.post("/api/auth/login", json={"login": "admin", "password": "HaoDuo@2026"}).json()["token"]
             h = {"Authorization": "Bearer " + token}
-            r = client.post("/api/me/password", headers=h, json={"oldPassword": "HaoDuo@2026", "newPassword": "new-pw-123"})
+            r = client.post(
+                "/api/me/password", headers=h, json={"oldPassword": "HaoDuo@2026", "newPassword": "new-pw-123"}
+            )
             assert r.status_code == 200, r.text
             assert client.get("/api/auth/default-account").json() == {"default": False}
             # 旧默认密码失效，新密码可登录
@@ -126,6 +129,7 @@ def test_bootstrap_endpoints_removed():
 
 # ---------- 默认密码探测收紧：公开情报只许 dev 看 ----------
 
+
 def test_default_account_hint_hidden_outside_dev():
     """安全：/api/auth/default-account 会暴露「初始密码是否还在用」，生产/未设 ENV 必须 404。"""
     with make_client() as client:
@@ -133,6 +137,7 @@ def test_default_account_hint_hidden_outside_dev():
 
 
 # ---------- 登录防爆破：账密与短信验码共用频控 ----------
+
 
 def _isolate_throttle(monkeypatch):
     """每个用例独享空的失败计数（service 模块级 dict，monkeypatch 自动还原）。"""
@@ -183,7 +188,9 @@ def test_login_rate_limit_window_expires(monkeypatch):
             assert client.post("/api/auth/login", json={"login": "admin", "password": "bad"}).status_code == 429
             with service._throttle_lock:
                 service._LOGIN_FAILURES["pw:admin"] = [t - 31 for t in service._LOGIN_FAILURES["pw:admin"]]
-            assert client.post("/api/auth/login", json={"login": "admin", "password": "test-admin-pw"}).status_code == 200
+            assert (
+                client.post("/api/auth/login", json={"login": "admin", "password": "test-admin-pw"}).status_code == 200
+            )
     finally:
         _restore()
 

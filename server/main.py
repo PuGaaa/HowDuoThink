@@ -3,6 +3,7 @@ Feature 架构：core/（横切）+ features/<域>/（router/service/models）�
 本文件只做 app 工厂：中间件、日志、异常兜底、路由挂载、启动种子。
 三对象：Submission（投稿）→ Case（关卡，过门禁）→ Article（Web 解决逻辑）。
 App 同步：GET /api/casepack?since=version。"""
+
 import logging
 import time
 import uuid
@@ -11,21 +12,20 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
 
 from core import config
 from features.ai.router import router as ai_router
+from features.assets.router import router as assets_router
 from features.auth.router import router as auth_router
 from features.cases.router import router as cases_router
-from features.submissions.router import router as submissions_router
-from features.solutions.router import router as solutions_router
+from features.ops.router import router as ops_router
 from features.progress.router import router as progress_router
+from features.settings.router import router as settings_router
+from features.solutions.router import router as solutions_router
+from features.stats.router import router as stats_router
+from features.submissions.router import router as submissions_router
 from features.sync.router import router as sync_router
 from features.users.router import router as users_router
-from features.stats.router import router as stats_router
-from features.ops.router import router as ops_router
-from features.settings.router import router as settings_router
-from features.assets.router import router as assets_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("server")
@@ -89,7 +89,9 @@ def create_app() -> FastAPI:
         response = await call_next(request)
         duration_ms = (time.perf_counter() - start) * 1000
         metrics.record(response.status_code, duration_ms)
-        logger.info("[%s] %s %s -> %s (%.0fms)", rid, request.method, request.url.path, response.status_code, duration_ms)
+        logger.info(
+            "[%s] %s %s -> %s (%.0fms)", rid, request.method, request.url.path, response.status_code, duration_ms
+        )
         response.headers["X-Request-Id"] = rid
         return response
 

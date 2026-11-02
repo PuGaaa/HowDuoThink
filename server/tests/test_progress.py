@@ -1,5 +1,6 @@
 """progress 域：进度云同步三用例（未登录 401 / 上传拉取一致 / 覆盖语义）。"""
-from tests.conftest import make_client, login_admin
+
+from tests.conftest import login_admin, make_client
 
 BLOB_V1 = {
     "cases": {

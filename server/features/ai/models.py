@@ -1,4 +1,5 @@
 """ai_index 模型：RAG 索引与 AI 请求的载荷。"""
+
 from pydantic import BaseModel, Field
 
 

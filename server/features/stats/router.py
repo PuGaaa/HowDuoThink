@@ -1,4 +1,5 @@
 """stats 路由：运营数据看板（editor/admin）。"""
+
 from fastapi import APIRouter, Depends
 
 from core.deps import current_user, require_editor

@@ -1,7 +1,8 @@
 """stats 域：活跃底座（touch 幂等）+ 运营概览口径 + 登录/进度打点接线。"""
+
 import uuid
 
-from tests.conftest import make_client, login_admin
+from tests.conftest import login_admin, make_client
 
 _PW = "statpw-123"
 
@@ -76,12 +77,17 @@ def test_overview_endpoint():
         "INSERT INTO submissions(id, user_id, title, symptom, resolution, status) VALUES('s-st2',?,'t','s','r','accepted')",
         (u1,),
     )
-    db.ex("INSERT INTO cases(id, title, domain, layer, difficulty, version, status, payload) VALUES('c-st1','t','d','l',1,1,'published','{}')")
+    db.ex(
+        "INSERT INTO cases(id, title, domain, layer, difficulty, version, status, payload) VALUES('c-st1','t','d','l',1,1,'published','{}')"
+    )
     db.ex(
         "INSERT INTO cases(id, title, domain, layer, difficulty, version, status, payload, published_at) "
         "VALUES('c-st2','t','d','l',1,1,'published','{}', datetime('now'))"
     )
-    db.ex("INSERT INTO progress(user_id, payload) VALUES(?, ?)", (u1, db.jdump({"cases": {"c-st1": {"solved": True}, "c-st2": {"solved": False}, "c-st3": {"solved": True}}})))
+    db.ex(
+        "INSERT INTO progress(user_id, payload) VALUES(?, ?)",
+        (u1, db.jdump({"cases": {"c-st1": {"solved": True}, "c-st2": {"solved": False}, "c-st3": {"solved": True}}})),
+    )
 
     with make_client() as c:
         login_admin(c)
@@ -118,10 +124,7 @@ def test_overview_endpoint():
         prog_rows = db.q("SELECT payload FROM progress")
         exp_users_with_prog = sum(1 for r in prog_rows if db.jload(r["payload"], {}).get("cases"))
         exp_solved = sum(
-            1
-            for r in prog_rows
-            for v in db.jload(r["payload"], {}).get("cases", {}).values()
-            if v.get("solved")
+            1 for r in prog_rows for v in db.jload(r["payload"], {}).get("cases", {}).values() if v.get("solved")
         )
         assert body["progress"]["usersWithProgress"] == exp_users_with_prog
         assert body["progress"]["solvedTotal"] == exp_solved

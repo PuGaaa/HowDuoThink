@@ -9,6 +9,7 @@ LangChain 只负责模型 I/O——132 案例量级上 VectorStore 抽象是负�
 - 向量化 = fastembed 本地 BGE-M3（默认，ONNX CPU 推理）/ 智谱 embedding-3 / 内置字符 bigram 兜底
   （DeepSeek 无 embedding 端点，向量与生成按业界惯例分开选型）
 """
+
 import hashlib
 import math
 from functools import lru_cache
@@ -37,6 +38,7 @@ def chat_model():
 
 # ─────────────── 向量化：fastembed BGE-M3（默认） ───────────────
 
+
 class FastEmbedEmbeddings:
     """fastembed 本地 ONNX 推理（与 LangChain Embeddings 接口同形）。"""
 
@@ -44,6 +46,7 @@ class FastEmbedEmbeddings:
 
     def __init__(self):
         from fastembed import TextEmbedding
+
         kwargs = {}
         if config.FASTEMBED_CACHE_DIR:
             kwargs["cache_dir"] = config.FASTEMBED_CACHE_DIR
@@ -57,6 +60,7 @@ class FastEmbedEmbeddings:
 
 
 # ─────────────── 向量化：智谱 embedding-3（可选） ───────────────
+
 
 class ZhipuEmbeddings:
     model = "zhipu-" + config.GLM_EMBED_MODEL
@@ -77,11 +81,12 @@ class ZhipuEmbeddings:
 
 # ─────────────── 向量化：内置字符 bigram（零资源兜底） ───────────────
 
+
 def _local_vec(text: str) -> list[float]:
     """字符 bigram + 词元 哈希到固定维空间，L2 归一化——中文短文本检索兜底。"""
     vec = [0.0] * 512
     t = text.lower()
-    grams = [t[i:i + 2] for i in range(len(t) - 1)] + t.split()
+    grams = [t[i : i + 2] for i in range(len(t) - 1)] + t.split()
     for g in grams:
         h = int(hashlib.md5(g.encode("utf-8")).hexdigest()[:8], 16)
         vec[h % 512] += 1.0

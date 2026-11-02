@@ -1,4 +1,5 @@
 """progress 路由：进度云同步（Bearer/cookie 均可）。"""
+
 from fastapi import APIRouter, Depends
 
 from core.deps import current_user

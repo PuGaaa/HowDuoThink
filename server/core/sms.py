@@ -2,6 +2,7 @@
 - dev（默认 provider）：验证码写日志 + 响应回显，仅 ENV=dev 下生效
 - aliyun：阿里云短信服务（占位）——ALIYUN_SMS_* 环境变量齐备后实现 send() 即启用
 将来"一键登录"接阿里云号码认证服务 SDK，用户模型已预留 phone 身份位。"""
+
 import logging
 import os
 import secrets
@@ -23,6 +24,7 @@ def code_ttl_sec() -> int:
 def resend_interval_sec() -> int:
     """同号重发限频（秒）——同上，settings 即时可调。"""
     return int(settings.get("sms.resend_interval_sec"))
+
 
 ALIYUN_SMS_ACCESS_KEY = os.environ.get("ALIYUN_SMS_ACCESS_KEY", "")
 ALIYUN_SMS_SECRET = os.environ.get("ALIYUN_SMS_SECRET", "")

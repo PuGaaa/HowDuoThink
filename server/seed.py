@@ -1,7 +1,7 @@
 """种子：把 server/seed/*.json（官方案例）注册为 published case + article。
 用法：/tmp/pilvenv 或系统 python3 均可（仅标准库）。"""
+
 import json
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -41,13 +41,28 @@ def seed_case(json_path: Path, author: str = "官方") -> None:
     steps = []
     for st in cp.expert_chain:
         act_name = next((a.name for a in cp.actions if a.id == st.action_id), "")
-        steps.append({"observe": st.thought, "act": act_name if st.action_id else "（推理收束，停止收集）", "found": st.conclusion})
-    exists_a = db.q("SELECT id FROM articles WHERE id=?", (article_id,))
+        steps.append(
+            {
+                "observe": st.thought,
+                "act": act_name if st.action_id else "（推理收束，停止收集）",
+                "found": st.conclusion,
+            }
+        )
     db.ex(
         "INSERT INTO articles(id, source_type, source_id, title, layer, domain, steps, lessons, author) "
         "VALUES(?,?,?,?,?,?,?,?,?) "
         "ON CONFLICT(id) DO UPDATE SET title=excluded.title, steps=excluded.steps, lessons=excluded.lessons, published_at=datetime('now')",
-        (article_id, "case", cp.id, cp.title, cp.layer, cp.domain, db.jdump(steps), db.jdump([l.text for l in cp.lessons]), author),
+        (
+            article_id,
+            "case",
+            cp.id,
+            cp.title,
+            cp.layer,
+            cp.domain,
+            db.jdump(steps),
+            db.jdump([it.text for it in cp.lessons]),
+            author,
+        ),
     )
     print(f"✓ seeded {cp.id} (v{version})")
 

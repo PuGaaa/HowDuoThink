@@ -1,8 +1,8 @@
 """cases 域：门禁红线、发布流程（403/422/事务+幂等）、分页上限。"""
-from tests.conftest import make_client, login_admin, load_seed
 
 from features.cases import gate
 from features.cases.models import CasePayload
+from tests.conftest import load_seed, login_admin, make_client
 
 
 def test_gate_accepts_official_case():

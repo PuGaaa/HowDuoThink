@@ -1,4 +1,5 @@
 """solutions 路由：解决逻辑列表与详情（公开只读）。"""
+
 from fastapi import APIRouter, Query
 
 from features.solutions import service

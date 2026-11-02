@@ -1,4 +1,5 @@
 """ai 路由：RAG 检索/对话（登录）、索引重建与 AI 起草（editor/admin）。"""
+
 from fastapi import APIRouter, Depends
 
 from core.deps import current_user, require_editor

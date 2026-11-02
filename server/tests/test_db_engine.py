@@ -1,5 +1,4 @@
 """core/db 双引擎基础：MySQL 连接参数固定 UTC 会话时区（时间基线统一）。"""
-import pytest
 
 
 def test_mysql_connect_kwargs_pin_utc_timezone():

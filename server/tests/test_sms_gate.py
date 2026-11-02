@@ -1,5 +1,5 @@
 """auth 域·短信通道门禁：dev 回显仅 ENV=dev；非 dev 环境 503 降级，验证码不回显、不进日志。"""
-import pytest
+
 from fastapi.testclient import TestClient
 
 import main  # noqa: F401  (确保 app 已初始化)

@@ -1,4 +1,5 @@
 """submissions 域·投稿频控：按用户日限额（DB 计数）防刷审核队列。"""
+
 import time
 
 from tests.conftest import login_admin, make_client
