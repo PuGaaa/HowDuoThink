@@ -1,48 +1,13 @@
-"""auth 路由：GitHub OAuth、账密登录、dev 绕行、个人信息、密码。只做 参数→service→响应。"""
-from typing import Annotated
+"""auth 路由：账密登录、手机验证码、dev 绕行、个人信息、密码。只做 参数→service→响应。"""
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from core import config, security
-from core.deps import SessionCookie
 from core.deps import current_user
-from core import sms as sms_core
-from features.auth import models, oauth, service
+from features.auth import models, service
 
 router = APIRouter(tags=["auth"])
-
-
-@router.get("/api/oauth/github/login")
-def oauth_login():
-    if not oauth.configured():
-        raise HTTPException(400, "GitHub OAuth 未配置（GITHUB_CLIENT_ID/SECRET）")
-    state = oauth.new_state()
-    resp = RedirectResponse(oauth.authorize_url(state))
-    resp.set_cookie("oauth_state", state, max_age=600, httponly=True)
-    return resp
-
-
-@router.get("/api/oauth/github/callback")
-def oauth_callback(code: str, state: str, oauth_state: Annotated[str | None, Cookie()] = None):
-    if not oauth_state or oauth_state != state:
-        raise HTTPException(400, "state 不匹配")
-    try:
-        u = oauth.exchange_and_fetch(code)
-    except Exception:
-        import logging
-
-        logging.getLogger("server").warning("[oauth] GitHub 回调失败", exc_info=True)
-        raise HTTPException(502, "GitHub 登录失败，请稍后重试")
-    service.upsert_oauth_user(u, oauth.role_for(u["login"]))
-    service.ensure_active(u["github_id"])
-    from features.stats import service as stats_service
-
-    stats_service.touch(u["github_id"])
-    token = security.sign_session(u["github_id"])
-    resp = RedirectResponse(config.WEB_ORIGIN + "/me")
-    resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=config.COOKIE_SECURE)
-    return resp
 
 
 @router.post("/api/auth/logout")
@@ -117,7 +82,16 @@ def phone_login(body: models.PhoneLoginBody):
 
     stats_service.touch(user["id"])
     token = security.sign_session(user["id"])
-    resp = JSONResponse({"ok": True, "login": user["login"], "role": user["role"], "userId": user["id"], "name": user["name"], "token": token})
+    resp = JSONResponse(
+        {
+            "ok": True,
+            "login": user["login"],
+            "role": user["role"],
+            "userId": user["id"],
+            "name": user["name"],
+            "token": token,
+        }
+    )
     resp.set_cookie("session", token, max_age=30 * 86400, httponly=True, samesite="lax", secure=config.COOKIE_SECURE)
     return resp
 
