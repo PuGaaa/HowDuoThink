@@ -6,7 +6,6 @@ const menuRef = ref<HTMLElement | null>(null)
 
 // 登录弹窗
 const showLogin = ref(false)
-const pwLogin = ref(false)
 const loginForm = reactive({ login: '', password: '' })
 const loginErr = ref('')
 const loginBusy = ref(false)
@@ -38,12 +37,7 @@ async function refreshMe() {
 
 function openLogin() {
   showLogin.value = true
-  pwLogin.value = false
   loginErr.value = ''
-}
-
-async function githubLogin() {
-  window.location.href = api.base + '/api/oauth/github/login'
 }
 
 async function passwordLogin() {
@@ -155,28 +149,17 @@ async function savePassword() {
     <div v-if="showLogin" class="lmodal">
       <h2 class="lmodal__title">登录</h2>
 
-      <template v-if="!pwLogin">
-        <a class="btn ghbtn" :href="api.base + '/api/oauth/github/login'">
-          <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 8px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/></svg>
-          使用 GitHub 继续
-        </a>
-        <div class="lmodal__divider"><span>或用账号密码</span></div>
-        <button class="btn btn--ghost lmodal__switch" @click="pwLogin = true">账号密码登录</button>
-      </template>
-
-      <template v-else>
-        <div class="field">
-          <label>账号</label>
-          <input v-model="loginForm.login" autocomplete="username" placeholder="账号" />
-        </div>
-        <div class="field">
-          <label>密码</label>
-          <input v-model="loginForm.password" type="password" autocomplete="current-password" placeholder="密码" @keyup.enter="passwordLogin" />
-        </div>
-        <p v-if="loginErr" style="color: var(--red); font-size: 13px; margin: 0 0 10px">{{ loginErr }}</p>
-        <button class="btn" style="width: 100%" :disabled="loginBusy" @click="passwordLogin">{{ loginBusy ? '登录中…' : '登录' }}</button>
-        <button class="lmodal__back" @click="pwLogin = false">← 其他登录方式</button>
-      </template>
+      <div class="field">
+        <label>账号</label>
+        <input v-model="loginForm.login" autocomplete="username" placeholder="账号" />
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input v-model="loginForm.password" type="password" autocomplete="current-password" placeholder="密码" @keyup.enter="passwordLogin" />
+      </div>
+      <p v-if="loginErr" style="color: var(--red); font-size: 13px; margin: 0 0 10px">{{ loginErr }}</p>
+      <button class="btn" style="width: 100%" :disabled="loginBusy" @click="passwordLogin">{{ loginBusy ? '登录中…' : '登录' }}</button>
+      <p class="hint" style="margin-top: 10px">还没有账号？在 App 内注册后即可登录</p>
     </div>
 
     <!-- 个人信息编辑弹窗 -->
@@ -192,10 +175,10 @@ async function savePassword() {
         <label>昵称</label>
         <input v-model="editName" maxlength="40" @keyup.enter="saveProfile" />
       </div>
-      <div class="field">
-        <label>登录方式</label>
-        <div class="muted">{{ user?.login.startsWith('pw-') ? '账号密码' : 'GitHub · @' + user?.login }}</div>
-      </div>
+        <div class="field">
+          <label>登录方式</label>
+          <div class="muted">账号密码 · @{{ user?.login }}</div>
+        </div>
       <p v-if="editErr" style="color: var(--red); font-size: 13px; margin: 0 0 10px">{{ editErr }}</p>
       <button class="btn" style="width: 100%" :disabled="editBusy" @click="saveProfile">{{ editBusy ? '保存中…' : '保存' }}</button>
       <button class="lmodal__back" @click="editOpen = false">取消</button>
@@ -210,7 +193,6 @@ async function savePassword() {
         <div class="field">
           <label>当前密码</label>
           <input v-model="pwForm.oldPassword" type="password" autocomplete="current-password" />
-          <div class="hint">GitHub 登录的用户没有初始密码，直接设置即可</div>
         </div>
         <div class="field">
           <label>新密码（≥6 位）</label>
@@ -265,11 +247,5 @@ async function savePassword() {
   z-index: 99;
 }
 .lmodal__title { font-size: 19px; margin: 0 0 20px; text-align: center; font-weight: 800; }
-.ghbtn { display: flex; align-items: center; justify-content: center; width: 100%; background: var(--ink); box-shadow: 0 5px 0 #37323F; }
-.lmodal__divider { text-align: center; color: var(--ink3); font-size: 12px; margin: 18px 0; position: relative; }
-.lmodal__divider::before, .lmodal__divider::after { content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--line); }
-.lmodal__divider::before { left: 0; }
-.lmodal__divider::after { right: 0; }
-.lmodal__switch { width: 100%; }
 .lmodal__back { display: block; margin: 14px auto 0; background: none; border: 0; color: var(--ink3); font-size: 13px; cursor: pointer; }
 </style>

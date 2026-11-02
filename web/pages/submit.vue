@@ -41,9 +41,8 @@ async function submit() {
     <p class="muted">必填只有 3 项（症状 / 现象 / 最终解决）。审核通过后：Web 展示解决逻辑，并有机会被加工成 App 的可玩关卡。</p>
 
     <div v-if="!user" class="card">
-      <p style="margin-top: 0">投稿需要 GitHub 登录（用于署名与跟踪状态）。</p>
-      <a class="btn" :href="api.base + '/api/oauth/github/login'">使用 GitHub 登录</a>
-      <p v-if="api.base.includes('localhost')" class="muted" style="margin-top: 10px">本地开发未配置 OAuth？<a :href="api.base + '/api/dev/login?login=devuser'">用开发绕行登录</a></p>
+      <p style="margin-top: 0">投稿需要先登录（用于署名与跟踪状态）。</p>
+      <a class="btn" href="/">去首页登录</a>
     </div>
 
     <div v-else-if="submitted" class="card">
