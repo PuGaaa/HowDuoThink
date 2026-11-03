@@ -7,6 +7,7 @@ import pytest
 
 import db as dbmod
 from alembic import command as alembic_command
+from core import config
 from core import db as coredb
 from core import migrate
 
@@ -32,9 +33,13 @@ BUSINESS_TABLES = {
 
 
 def _use_db(monkeypatch, path: Path) -> None:
-    """沿用 conftest 惯例：core.db.DB_PATH 是函数实际读取处，shim 同步指。"""
+    """沿用 conftest 惯例：core.db.DB_PATH 是函数实际读取处，shim 同步指。
+    本文件全部用例断言 sqlite 分支语义（sqlite_master / 库文件存在性）——
+    MySQL 测试轮（DB_PROVIDER=mysql）下 config 会指向共享隔离库，这里强制
+    sqlite provider，保证 migrate/env.py 走 DB_PATH 的 URL 分支。"""
     monkeypatch.setattr(coredb, "DB_PATH", path)
     monkeypatch.setattr(dbmod, "DB_PATH", path)
+    monkeypatch.setattr(config, "DB_PROVIDER", "sqlite")
 
 
 def _master_rows(path: Path, exclude_alembic: bool = True) -> list[tuple[str, str, str]]:
@@ -67,6 +72,21 @@ def test_replay_sqlite(monkeypatch, tmp_path):
 
     migrate.upgrade_head()
     assert migrate.current_version() == "0001_baseline"
+
+
+def test_downgrade_to_base_sqlite(monkeypatch, tmp_path):
+    """downgrade_to_base() 编程式入口：upgrade 后回滚到 base → 业务表全消失 +
+    current_version() is None（与 test_replay_sqlite 直调 alembic_command 互为入口对拍）。"""
+    path = tmp_path / "down.db"
+    _use_db(monkeypatch, path)
+
+    migrate.upgrade_head()
+    assert migrate.current_version() == "0001_baseline"
+
+    migrate.downgrade_to_base()
+    remaining = {n for _, n, _ in _master_rows(path)}
+    assert not (remaining & BUSINESS_TABLES), remaining
+    assert migrate.current_version() is None
 
 
 def test_upgrade_uses_current_config(monkeypatch, tmp_path):

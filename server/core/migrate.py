@@ -57,3 +57,8 @@ def head_version() -> str:
 
 def stamp_head() -> None:
     alembic.command.stamp(_cfg(), "head")
+
+
+def downgrade_to_base() -> None:
+    """回滚到 base（DROP 全部业务表）——调用前必须先完成备份（docs/备份与恢复.md）。"""
+    alembic.command.downgrade(_cfg(), "base")
