@@ -138,3 +138,16 @@ def test_head_and_stamp(monkeypatch, tmp_path):
     names = {n for _, n, _ in _master_rows(path, exclude_alembic=False)}
     assert "alembic_version" in names
     assert not (names & BUSINESS_TABLES)
+
+
+def test_upgrade_head_cwd_independent(monkeypatch, tmp_path):
+    """编程式唯一入口必须 cwd 无关：从非 server/ 的工作目录调 upgrade_head 也要能
+    解析 script 目录（alembic 对 ini 里的相对 script_location 按进程 cwd 解析，
+    入口若依赖 cwd，任务 2 把启动建表切过来后从任意启动目录都会炸）。"""
+    path = tmp_path / "cwd-free.db"
+    _use_db(monkeypatch, path)
+    monkeypatch.chdir(tmp_path)
+
+    migrate.upgrade_head()
+    assert migrate.current_version() == "0001_baseline"
+    assert {n for _, n, _ in _master_rows(path)} >= BUSINESS_TABLES
