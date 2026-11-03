@@ -7,9 +7,8 @@ import pytest
 
 import db as dbmod
 from alembic import command as alembic_command
-from core import config
+from core import config, migrate
 from core import db as coredb
-from core import migrate
 
 FIXTURE = Path(__file__).parent / "fixtures" / "schema_baseline.sql"
 
