@@ -54,7 +54,7 @@
 
 **接口：**
 - 产出：`core.migrate.upgrade_head() -> None`、`current_version() -> str | None`、`head_version() -> str`、`stamp_head() -> None`；基线 revision id 固定 `"0001_baseline"`。main/conftest/seed/演练任务只经这四个函数接触 alembic。
-- 约束：env.py 通过 `import core.config`（sqlite：`f"sqlite:///{config.DB_PATH.resolve()}"`；mysql：`f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}?charset=utf8mb4"`）在**每次运行时**组装，禁止模块级缓存。
+- 约束：env.py 通过**运行时**读 `from core import db as coredb; coredb.DB_PATH`（sqlite：`f"sqlite:///{coredb.DB_PATH.resolve()}"`；conftest 会 monkeypatch 该属性，禁止 import 时缓存）与 `core.config` 的 MYSQL_*（mysql：`f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}?charset=utf8mb4"`）组装 URL。
 
 - [ ] **步骤 1：依赖与配置**
 
