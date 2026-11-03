@@ -1,4 +1,4 @@
-"""Alembic 基线迁移：与 legacy core/db.py init() 的对拍等价 + 快照把守 + 重放。"""
+"""Alembic 基线迁移：快照把守 + 重放 + 配置/cwd 把守（legacy db.init 已退役）。"""
 
 import sqlite3
 from pathlib import Path
@@ -12,7 +12,7 @@ from core import migrate
 
 FIXTURE = Path(__file__).parent / "fixtures" / "schema_baseline.sql"
 
-# legacy SCHEMA 的全部业务表（对拍/重放断言用；不含 sqlite 内部表与 alembic_version）
+# 基线的全部业务表（重放/快照断言用；不含 sqlite 内部表与 alembic_version）
 BUSINESS_TABLES = {
     "users",
     "submissions",
@@ -50,25 +50,6 @@ def _master_rows(path: Path, exclude_alembic: bool = True) -> list[tuple[str, st
         ]
     finally:
         conn.close()
-
-
-def test_baseline_equals_legacy_init(monkeypatch, tmp_path):
-    """alembic 基线建出的 schema 必须与 legacy db.init() 完全一致（除 alembic_version）。
-    两个 tmp 库：dbA 走 db.init()（此时还在），dbB 走 core.migrate.upgrade_head()；
-    比较双方 sqlite_master 中全部 table/index 的 SQL 文本集合（排序后逐条相等）。"""
-    legacy = tmp_path / "legacy.db"
-    baseline = tmp_path / "baseline.db"
-
-    _use_db(monkeypatch, legacy)
-    coredb.init()
-    _use_db(monkeypatch, baseline)
-    migrate.upgrade_head()
-
-    rows_legacy = _master_rows(legacy)
-    rows_baseline = _master_rows(baseline)
-    assert sorted(rows_legacy) == sorted(rows_baseline)
-    # 对拍对象非空且覆盖全部业务表（防两侧"同空"的假等价）
-    assert {n for _, n, _ in rows_baseline} >= BUSINESS_TABLES
 
 
 def test_replay_sqlite(monkeypatch, tmp_path):

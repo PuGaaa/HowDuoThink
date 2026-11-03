@@ -59,6 +59,14 @@ if os.environ.get("DB_PROVIDER") == "mysql":
     core_config.MYSQL_DATABASE = _TEST_DB
     os.environ["MYSQL_DATABASE"] = _TEST_DB
 
+# 建表必须显式：legacy 靠 import main → create_app → db.init() 的隐式链，init 退役后
+# 由 Alembic boot-migrate 接管。位置约束：DB_PATH / config 补丁之后、import main 之前
+# （upgrade_head 调用时现读 core.db.DB_PATH 与 core.config，打补丁先于建表才落到隔离库）。
+# SQLite 与 MySQL 两分支共用这一次调用。
+from core import migrate  # noqa: E402
+
+migrate.upgrade_head()
+
 from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402

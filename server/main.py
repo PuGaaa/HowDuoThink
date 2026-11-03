@@ -51,10 +51,11 @@ def _init_sentry() -> None:
 
 
 def create_app() -> FastAPI:
-    """app 工厂：无 import 副作用（建库/建表由 db.init 显式调用）。"""
+    """app 工厂：无 import 副作用（建库/建表由 Alembic boot-migrate 显式调用）。"""
     import db
+    from core import migrate
 
-    db.init()
+    migrate.upgrade_head()
     _init_sentry()
 
     app = FastAPI(title="好多星 HowDuoThink · 社区后端", version="0.2.0")

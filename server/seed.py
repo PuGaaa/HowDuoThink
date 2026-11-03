@@ -68,7 +68,9 @@ def seed_case(json_path: Path, author: str = "官方") -> None:
 
 
 if __name__ == "__main__":
-    db.init()
+    from core import migrate
+
+    migrate.upgrade_head()
     seed_dir = HERE / "seed"
     for f in sorted(seed_dir.glob("*.json")):
         seed_case(f)
