@@ -2,6 +2,7 @@
 create_app 每次调用都重复执行全部检查（boot-migrate 幂等），测试直接反复调用，无需重建客户端。
 monkeypatch 目标一律是 core.config / core.sms / core.migrate 的模块属性。"""
 
+import pymysql
 import pytest
 
 import main  # noqa: F401  (conftest 已先行建库并导入)
@@ -33,12 +34,25 @@ def test_refuse_dev_sms_channel_when_env_set(monkeypatch):
 
 
 def test_refuse_when_mysql_unreachable(monkeypatch):
-    """DB_PROVIDER=mysql 且 MYSQL_HOST=127.0.0.1 MYSQL_PORT=1（必拒）：抛 RuntimeError 含 'MySQL'。"""
+    """DB_PROVIDER=mysql 且 MYSQL_HOST=127.0.0.1 MYSQL_PORT=1（必拒）：抛 RuntimeError 含 'MySQL'。
+    探针必须真实拨号（评审 I-1）：sqlite 导入环境下 core.db 的 _mysql_conn/_MySqlConn 未定义
+    （仅 _provider=="mysql" 时创建），只 patch config 会 NameError 被 ③ 包装成目标文案的假阳性；
+    故 patch _mysql_conn 直连必拒端口（真实 pymysql 拨号），并补 _MySqlConn 占位
+    （CPython 先解析可调用名再求值实参，不补则拨号前就 NameError），随后断言 __cause__
+    是 pymysql 连接异常，锁死"真拨号"语义。"""
     monkeypatch.setattr(config, "DB_PROVIDER", "mysql")
     monkeypatch.setattr(config, "MYSQL_HOST", "127.0.0.1")
     monkeypatch.setattr(config, "MYSQL_PORT", 1)
-    with pytest.raises(RuntimeError, match="MySQL"):
+    monkeypatch.setattr(
+        coredb,
+        "_mysql_conn",
+        lambda: pymysql.connect(host="127.0.0.1", port=1, user="x", password="x", database="x"),
+        raising=False,
+    )
+    monkeypatch.setattr(coredb, "_MySqlConn", lambda conn: conn, raising=False)
+    with pytest.raises(RuntimeError, match="MySQL") as excinfo:
         main.create_app()
+    assert isinstance(excinfo.value.__cause__, pymysql.err.OperationalError)
 
 
 def test_refuse_when_schema_behind(monkeypatch, tmp_path):
