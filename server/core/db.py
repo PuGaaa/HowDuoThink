@@ -108,7 +108,9 @@ if _provider == "mysql":
             self._cur = cur
 
         def execute(self, sql: str, params: tuple = ()):
-            self._cur.execute(_translate(sql), params)
+            # pymysql 对非 None 参数做 % 格式化插值：SQL 文本含字面 %（如 LIKE 'x-%'）
+            # 且无参执行时会被误当格式符——空参传 None 跳过插值（DB-API 语义；sqlite 分支无此问题）
+            self._cur.execute(_translate(sql), params or None)
             return self
 
         def fetchall(self) -> list[dict]:
@@ -135,7 +137,7 @@ if _provider == "mysql":
 
         def execute(self, sql: str, params: tuple = ()):
             cur = self.cursor()
-            cur.execute(_translate(sql), params)
+            cur.execute(_translate(sql), params or None)
             return cur
 
         def commit(self):

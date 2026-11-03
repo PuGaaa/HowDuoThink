@@ -55,10 +55,12 @@ def test_refuse_when_mysql_unreachable(monkeypatch):
     assert isinstance(excinfo.value.__cause__, pymysql.err.OperationalError)
 
 
-def test_refuse_when_schema_behind(monkeypatch, tmp_path):
-    """schema 版本断言：upgrade_head 被 no-op 且 DB 指向从未迁移的空 tmp 库
-    （current_version() 为 None != head）→ 抛 RuntimeError 含 'schema'。"""
+def test_refuse_when_schema_behind(monkeypatch):
+    """schema 版本断言：upgrade_head 被 no-op 且 current_version() 读到 None
+    （模拟从未迁移/被清空版本表的老库，None != head）→ 抛 RuntimeError 含 'schema'。
+    机制必须 provider 无关：MySQL 测试轮下 core.config 指向共享隔离库，
+    不能靠 DB_PATH 造空库来制造 None（那是 sqlite 分支专属机制）。"""
     monkeypatch.setattr(migrate, "upgrade_head", lambda: None)
-    monkeypatch.setattr(coredb, "DB_PATH", tmp_path / "empty.db")
+    monkeypatch.setattr(migrate, "current_version", lambda: None)
     with pytest.raises(RuntimeError, match="schema"):
         main.create_app()
