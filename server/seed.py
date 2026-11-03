@@ -1,5 +1,6 @@
 """种子：把 server/seed/*.json（官方案例）注册为 published case + article。
-用法：/tmp/pilvenv 或系统 python3 均可（仅标准库）。"""
+用法：须在项目 venv 下运行（__main__ 经 core.migrate 先 boot-migrate 建表，
+依赖 alembic/sqlalchemy，不再是纯标准库）：cd server && .venv/bin/python seed.py。"""
 
 import json
 import sys
