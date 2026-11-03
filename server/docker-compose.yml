@@ -15,6 +15,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-13306}:3306"
 
   api:
     build:
@@ -45,6 +47,24 @@ services:
     volumes:
       - fastembed-cache:/app/hdx/.fastembed
 
+  backup:
+    image: mysql:8.0
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - MYSQL_PWD=${MYSQL_PASSWORD}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+    entrypoint:
+      - bash
+      - -c
+      - 'while true; do mysqldump --single-transaction --no-tablespaces -h mysql -u$$MYSQL_USER $$MYSQL_DATABASE | gzip > /backups/hdx-$$(date +%F).sql.gz && find /backups -name "hdx-*.sql.gz" -mtime +7 -delete; sleep 86400; done'
+    volumes:
+      - backups:/backups
+
 volumes:
   mysql-data:
   fastembed-cache:
+  backups:
