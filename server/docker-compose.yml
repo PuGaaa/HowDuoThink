@@ -30,6 +30,7 @@ services:
     environment:
       DB_PROVIDER: mysql
       MYSQL_HOST: mysql
+      MYSQL_PORT: 3306  # 容器内固定连 mysql:3306，覆盖 .env 的 MYSQL_PORT（其新语义=宿主机映射端口）
     healthcheck:
       test:
         [
@@ -60,7 +61,7 @@ services:
     entrypoint:
       - bash
       - -c
-      - 'while true; do mysqldump --single-transaction --no-tablespaces -h mysql -u$$MYSQL_USER $$MYSQL_DATABASE | gzip > /backups/hdx-$$(date +%F).sql.gz && find /backups -name "hdx-*.sql.gz" -mtime +7 -delete; sleep 86400; done'
+      - 'set -o pipefail; while true; do if mysqldump --single-transaction --no-tablespaces -h mysql -u$$MYSQL_USER $$MYSQL_DATABASE | gzip > /backups/.hdx-tmp.sql.gz && [ -s /backups/.hdx-tmp.sql.gz ] && mv /backups/.hdx-tmp.sql.gz /backups/hdx-$$(date +%F).sql.gz; then echo "backup ok: hdx-$$(date +%F).sql.gz"; else echo "backup FAILED: mysqldump/gzip error, previous backups kept" >&2; rm -f /backups/.hdx-tmp.sql.gz; fi; find /backups -name "hdx-*.sql.gz" -mtime +7 -delete; sleep 86400; done'
     volumes:
       - backups:/backups
 
