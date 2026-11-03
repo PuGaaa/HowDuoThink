@@ -1,0 +1,140 @@
+"""Alembic 基线迁移：与 legacy core/db.py init() 的对拍等价 + 快照把守 + 重放。"""
+
+import sqlite3
+from pathlib import Path
+
+import pytest
+
+import db as dbmod
+from alembic import command as alembic_command
+from core import db as coredb
+from core import migrate
+
+FIXTURE = Path(__file__).parent / "fixtures" / "schema_baseline.sql"
+
+# legacy SCHEMA 的全部业务表（对拍/重放断言用；不含 sqlite 内部表与 alembic_version）
+BUSINESS_TABLES = {
+    "users",
+    "submissions",
+    "cases",
+    "articles",
+    "sms_codes",
+    "progress",
+    "meta",
+    "ai_index",
+    "ai_usage",
+    "user_activity",
+    "ops_snapshots",
+    "settings",
+    "assets",
+    "resource_slots",
+}
+
+
+def _use_db(monkeypatch, path: Path) -> None:
+    """沿用 conftest 惯例：core.db.DB_PATH 是函数实际读取处，shim 同步指。"""
+    monkeypatch.setattr(coredb, "DB_PATH", path)
+    monkeypatch.setattr(dbmod, "DB_PATH", path)
+
+
+def _master_rows(path: Path, exclude_alembic: bool = True) -> list[tuple[str, str, str]]:
+    """sqlite_master 中带 SQL 文本的对象（表+索引），按 (type, name) 排序。"""
+    conn = sqlite3.connect(path)
+    try:
+        return [
+            (t, n, s)
+            for t, n, s in conn.execute(
+                "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type, name"
+            )
+            if not (exclude_alembic and n.startswith("alembic_version"))
+        ]
+    finally:
+        conn.close()
+
+
+def test_baseline_equals_legacy_init(monkeypatch, tmp_path):
+    """alembic 基线建出的 schema 必须与 legacy db.init() 完全一致（除 alembic_version）。
+    两个 tmp 库：dbA 走 db.init()（此时还在），dbB 走 core.migrate.upgrade_head()；
+    比较双方 sqlite_master 中全部 table/index 的 SQL 文本集合（排序后逐条相等）。"""
+    legacy = tmp_path / "legacy.db"
+    baseline = tmp_path / "baseline.db"
+
+    _use_db(monkeypatch, legacy)
+    coredb.init()
+    _use_db(monkeypatch, baseline)
+    migrate.upgrade_head()
+
+    rows_legacy = _master_rows(legacy)
+    rows_baseline = _master_rows(baseline)
+    assert sorted(rows_legacy) == sorted(rows_baseline)
+    # 对拍对象非空且覆盖全部业务表（防两侧"同空"的假等价）
+    assert {n for _, n, _ in rows_baseline} >= BUSINESS_TABLES
+
+
+def test_replay_sqlite(monkeypatch, tmp_path):
+    """空库 upgrade_head() → 调 baseline downgrade（经 alembic command.downgrade(cfg, "base")
+    或等价编程式调用）→ 业务表全消失 → 再 upgrade_head() → current_version()=="0001_baseline"。"""
+    path = tmp_path / "replay.db"
+    _use_db(monkeypatch, path)
+
+    migrate.upgrade_head()
+    assert migrate.current_version() == "0001_baseline"
+
+    alembic_command.downgrade(migrate._cfg(), "base")
+    remaining = {n for _, n, _ in _master_rows(path)}
+    assert not (remaining & BUSINESS_TABLES), remaining
+
+    migrate.upgrade_head()
+    assert migrate.current_version() == "0001_baseline"
+
+
+def test_upgrade_uses_current_config(monkeypatch, tmp_path):
+    """连做两个库：第一库 upgrade 后，把 DB_PATH 换到第二个路径再 upgrade——
+    第二个文件被建成库而第一个不受影响（证明 URL 无缓存）。"""
+    first = tmp_path / "one.db"
+    second = tmp_path / "two.db"
+
+    _use_db(monkeypatch, first)
+    migrate.upgrade_head()
+    _use_db(monkeypatch, second)
+    migrate.upgrade_head()
+
+    # 第二个文件确已建成库（含 alembic_version，此处不过滤）
+    assert second.exists()
+    names_second = {n for _, n, _ in _master_rows(second, exclude_alembic=False)}
+    assert "users" in names_second and "alembic_version" in names_second
+    # 第一个库不受影响：schema 完整、版本仍 stamped
+    names_first = {n for _, n, _ in _master_rows(first)}
+    assert names_first >= BUSINESS_TABLES
+    conn = sqlite3.connect(first)
+    try:
+        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0001_baseline"
+    finally:
+        conn.close()
+
+
+@pytest.mark.skipif(not FIXTURE.exists(), reason="快照在对拍测试通过后生成（任务步骤 6）")
+def test_baseline_matches_fixture(monkeypatch, tmp_path):
+    """upgrade 后的库：sqlite_master 中全部 table/index SQL 按名称排序拼接 ==
+    tests/fixtures/schema_baseline.sql 内容（剔除 alembic_version）。"""
+    path = tmp_path / "snapshot.db"
+    _use_db(monkeypatch, path)
+    migrate.upgrade_head()
+
+    rows = sorted(_master_rows(path))
+    rendered = "".join(repr(row) + "\n" for row in rows)
+    assert rendered == FIXTURE.read_text()
+
+
+def test_head_and_stamp(monkeypatch, tmp_path):
+    """head_version 报基线链头；stamp_head 只打版本戳不建业务表（存量库收编入口）。"""
+    assert migrate.head_version() == "0001_baseline"
+
+    path = tmp_path / "stamped.db"
+    _use_db(monkeypatch, path)
+    migrate.stamp_head()
+    assert migrate.current_version() == "0001_baseline"
+    # stamp 只写 alembic_version，不执行 DDL：业务表不应出现
+    names = {n for _, n, _ in _master_rows(path, exclude_alembic=False)}
+    assert "alembic_version" in names
+    assert not (names & BUSINESS_TABLES)
