@@ -315,7 +315,7 @@ onLoad((query : OnLoadOptions) => {
       uni.navigateBack({})
       // 等返回动画落定再弹登录引导，避免与页面出栈竞态
       setTimeout(() => {
-        openGuestLoginDialog()
+        openGuestLoginDialog(c.id)
       }, 300)
       return
     }
@@ -592,8 +592,13 @@ function confirmIdentify() {
 
 function finishAndSave() {
   const grade = computeGrade(solved.value, playerCost.value, expertCost.value, wrongCount.value)
+  const currentCase = getCaseById(caseId.value)
   const rec: SessionRecord = {
+    sessionId: String(Date.now()) + '-' + String(Math.random()),
     caseId: caseId.value,
+    contentRevision: currentCase != null && currentCase.contentRevision != null ? currentCase.contentRevision : 1,
+    scoringVersion: 'v1',
+    occurredAt: new Date().toISOString(),
     solved: solved.value,
     playerCost: playerCost.value,
     expertCost: expertCost.value,
@@ -604,7 +609,6 @@ function finishAndSave() {
     hStates: hStates.value,
   }
   saveSession(rec)
-  const currentCase = getCaseById(caseId.value)
   if (solved.value && currentCase != null && recordSolvedLayer(currentCase.layer)) {
     bumpTask('layers2', 1)
   }

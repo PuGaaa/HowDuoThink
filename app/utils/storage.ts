@@ -47,7 +47,11 @@ export interface HypothesisStateRec {
 }
 
 export interface SessionRecord {
+  sessionId: string
   caseId: string
+  contentRevision: number
+  scoringVersion: string
+  occurredAt: string
   solved: boolean
   playerCost: number
   expertCost: number
@@ -70,10 +74,10 @@ const KEY_MASCOTS = 'think_mascots_v1'
 const KEY_CASE = 'think_case_'
 const KEY_OPS = 'think_progress_ops_v1'
 
-function enqueueOperation(kind: string, payload: any): void {
+function enqueueOperation(kind: string, payload: any, occurredAt?: string): void {
   const raw = uni.getStorageSync(KEY_OPS)
   const ops: ProgressOperation[] = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as ProgressOperation[]
-  ops.push({ opId: String(Date.now()) + '-' + String(Math.random()), kind: kind, occurredAt: new Date().toISOString(), payload: payload })
+  ops.push({ opId: String(Date.now()) + '-' + String(Math.random()), kind: kind, occurredAt: occurredAt ?? new Date().toISOString(), payload: payload })
   uni.setStorageSync(KEY_OPS, JSON.stringify(ops))
 }
 
@@ -235,12 +239,16 @@ export function saveSession(record: SessionRecord): void {
   }
   uni.setStorageSync(KEY_MASCOTS, JSON.stringify(stats))
   enqueueOperation('session_end', {
+    sessionId: record.sessionId,
     caseId: record.caseId,
+    contentRevision: record.contentRevision,
+    scoringVersion: record.scoringVersion,
+    occurredAt: record.occurredAt,
     solved: record.solved,
     grade: record.grade,
     playerCost: record.playerCost,
     mascotEvents: record.mascotEvents,
-  })
+  }, record.occurredAt)
   notifyProgressDirty()
 }
 

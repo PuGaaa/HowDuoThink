@@ -674,8 +674,8 @@ A批适用A01至A16、A22、A24至A25，按该批实际交付边界验收；A15�
 | T04A | 已实现，待批次独立评审 | 主实施会话 | `531cb18` | 四题 validate、基线、目录测试通过；first-npe/caused-by 已按专家路径完成校准并冻结 `calibratedHash`；log-correlation/async-swallow 明确保持 `uncalibrated` | 后两题仍需人工事实/双路径/评分走验；未校准题不得扩量 |
 | T05 | 固定主线门槛第一阶段已实现 | 主实施会话 | 工作区 | 试玩目录固定；章节完成/挑战关优先使用显式 `MAINLINE_CASE_IDS`，避免首批主线被同章选做题扩张 | 仍需接入 T03 历史解锁资格迁移，并核定其余章节的冻结必修集合 |
 | T09A | 最小版本与发布分发已实现，待批次独立评审 | 主实施会话 | `531cb18` | `content_revision/source_*` 新迁移、发布幂等与 stale baseRevision 冲突、文章投影、索引任务均在同一事务；固定 head 同步；MySQL8 定向 38 passed | 仍需补齐 App 真实有效版本读取与开局快照验收；完整内容维护归 T09B |
-| T03 | 操作账本与账号空间已实现第一阶段，待继续补客户端最终验收 | 主实施会话 | `faf6bfc` + 工作区 | `progress_ops` + revision、`baseline/session_end/checklist_use/bootstrap/task_increment/daily_done/streak_touch` 幂等同步、按北京时间投影任务周期与连续天数、用户维度去重、首次登录游客基线、切号清理本地空间、旧全量 POST 426；MySQL8 全套回归 `133 passed` | 客户端版本快照与 HBuilderX 最终编译验收仍待完成 |
-| T06 | 下一关路径第一阶段已实现，待 HBuilderX 实机验收 | 主实施会话 | 工作区 | 复盘页下一关改用稳定 `MAINLINE_CASE_IDS`，不再依赖 `ALL_CASES` 注册顺序；游客引导不再承诺“登录解锁全部章节” | 登录回跳、第四题保存确认、今日入口和 HBuilderX 实际走通仍待验收 |
+| T03 | 操作账本与账号空间已实现第一阶段，待继续补客户端最终验收 | 主实施会话 | `faf6bfc` + 工作区 | `progress_ops` + revision、`baseline/session_end/checklist_use/bootstrap/task_increment/daily_done/streak_touch` 幂等同步、按北京时间投影任务周期与连续天数、用户维度去重；客户端保存 `contentRevision/scoringVersion/sessionId`；首次登录 bootstrap 替换已包含本地投影的待发操作，避免重复计数；旧全量 POST 426；MySQL8 全套回归 `133 passed` | 客户端版本快照与 HBuilderX 最终编译验收仍待完成；后端正确性以独立 progress-integrity 评审提交为准 |
+| T06 | 登录回跳与入口第一阶段已实现，待 HBuilderX 实机验收 | 主实施会话 | 工作区 | 复盘页下一关改用稳定 `MAINLINE_CASE_IDS`；游客登录携带 `returnCaseId` 回原题；保存/拉取失败明确提示；今日入口先检查可玩资格；游客引导不再承诺“登录解锁全部章节” | 第四题完整保存确认、浏览器返回栈、今日题实际走通和 HBuilderX 验收仍待完成 |
 | T07 | 学习事件最小明细链路已实现，待补完整看板口径 | 主实施会话 | 工作区 | `0004_learning_events`；每个新 `session_end` 在 sync 事务内生成唯一事件；管理员事件明细接口；重复同步不重复入账；全套 MySQL8 回归 `131 passed` | 仍需 D1/D7 观察期、漏斗与批次口径，以及 App/Web 全埋点核对 |
 | T08A | 任务事实去重第一阶段已实现，待 HBuilderX 场景验收 | 主实施会话 | 工作区 | 破案层标签使用本地 `solvedLayers` 去重后才记 `layers2`，账号切换随进度空间清理/基线迁移；任务事实操作已接入 sync | 迟到事件的历史周期展示、错案重练跨端验算和 HBuilderX 实际任务路径仍待验收 |
 | T04B、T09B、T10、T11、T12、T13、T14、T15 | 未开始或待前置 | 主实施会话 | — | — | 按 A 批依赖链继续推进 |

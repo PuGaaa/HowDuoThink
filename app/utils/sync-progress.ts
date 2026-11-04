@@ -16,10 +16,10 @@ export function prepareProgressIdentity(uid: string): void {
   }
   if (previous == null || (previous as string).length === 0) {
     const bundle = exportProgressBundle()
-    const raw = uni.getStorageSync('think_progress_ops_v1')
-    const ops = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as any[]
-    ops.unshift({ opId: 'bootstrap-' + String(Date.now()) + '-' + String(Math.random()), kind: 'bootstrap', occurredAt: new Date().toISOString(), payload: { bundle: bundle } })
-    uni.setStorageSync('think_progress_ops_v1', JSON.stringify(ops))
+    uni.setStorageSync('think_progress_ops_v1', JSON.stringify([
+      { opId: 'bootstrap-' + String(Date.now()) + '-' + String(Math.random()), kind: 'bootstrap', occurredAt: new Date().toISOString(), payload: { bundle: bundle },
+      },
+    ]))
   }
   uni.setStorageSync(KEY_PROGRESS_UID, uid)
 }

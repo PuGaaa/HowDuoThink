@@ -2,7 +2,6 @@
  *  通道与 Web 的 cookie 互不影响；API_BASE 见 config.ts。 */
 import { API_BASE } from '../config'
 import { getAvatarPresets } from './remote-assets'
-import { clearProgressLocal } from './storage'
 
 const KEY_TOKEN = 'think_token'
 const KEY_USER = 'think_user'
@@ -154,7 +153,6 @@ export function login(loginName: string, password: string, cb: (r: LoginResult) 
 }
 
 export function logout() {
-  clearProgressLocal()
   uni.removeStorageSync(KEY_TOKEN)
   uni.removeStorageSync(KEY_USER)
   uni.removeStorageSync('think_last_sync')

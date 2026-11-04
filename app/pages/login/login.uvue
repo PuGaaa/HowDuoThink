@@ -66,6 +66,7 @@
 <script setup lang="uts">
 import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import navbar from '../../components/navbar/navbar.uvue'
 import { getStoredUser, login, smsLogin, sendSmsCode, LoginResult } from '../../utils/auth'
 import { prepareProgressIdentity, pullServerProgress, pushProgress } from '../../utils/sync-progress'
@@ -79,6 +80,12 @@ const errMsg = ref('')
 const busy = ref(false)
 const countdown = ref(0)
 let timer = 0
+const returnCaseId = ref('')
+
+onLoad((query: OnLoadOptions) => {
+  const target = query['returnCaseId']
+  returnCaseId.value = target == null ? '' : target as string
+})
 
 function startCountdown() {
   countdown.value = 60
@@ -125,10 +132,22 @@ function finish(r: LoginResult) {
   const u = getStoredUser()
   if (u != null) prepareProgressIdentity(u.id)
   // 登录后：后端为唯一事实源，拉取账号的全量数据覆盖本地
-  pushProgress(() => {
-    pullServerProgress(() => {
+  pushProgress((saved) => {
+    if (saved.error.length > 0) {
+      errMsg.value = '登录成功，但进度保存失败：' + saved.error
+      return
+    }
+    pullServerProgress((pulled) => {
+      if (pulled.error.length > 0) {
+        errMsg.value = '登录成功，但账号进度拉取失败：' + pulled.error
+        return
+      }
       setTimeout(() => {
-        uni.navigateBack({})
+        if (returnCaseId.value.length > 0) {
+          uni.navigateTo({ url: '/pages/play/play?id=' + returnCaseId.value })
+        } else {
+          uni.navigateBack({})
+        }
       }, 600)
     })
   })

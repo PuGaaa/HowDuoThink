@@ -139,4 +139,7 @@ export interface DiagnosisCase {
   restartActionId: string
   expertChain: ExpertStep[]
   lessons: Lesson[]
+  contentRevision?: number
+  sourceType?: string
+  sourceCommit?: string
 }

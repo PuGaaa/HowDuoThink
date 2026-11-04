@@ -258,7 +258,16 @@ onShow(() => {
 const continueCase = computed((): boolean => hasContinue.value)
 
 function openDaily() {
-  uni.navigateTo({ url: '/pages/play/play?id=' + dailyCase().id })
+  const id = dailyCase().id
+  if (!isCasePlayable(id)) {
+    if (!isLoggedIn()) {
+      openGuestLoginDialog(id)
+    } else {
+      uni.showToast({ title: '今日题暂未解锁，请先完成当前主线', icon: 'none' })
+    }
+    return
+  }
+  uni.navigateTo({ url: '/pages/play/play?id=' + id })
 }
 
 function openPlay(id: string) {

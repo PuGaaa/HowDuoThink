@@ -4,7 +4,7 @@ import { getGuestFreeChapter, getGuestFreeLevels } from './app-config'
 import { ConfirmDialogOptions, openConfirmDialog } from './confirm-dialog'
 
 /** 弹出"登录解锁"引导，确认后进登录页。仅在游客态调用。 */
-export function openGuestLoginDialog() {
+export function openGuestLoginDialog(targetCaseId: string = '') {
   const freeCh = CHAPTERS.find((x) => x.id === getGuestFreeChapter())
   const opt = {
     title: '登录后继续闯关',
@@ -15,7 +15,7 @@ export function openGuestLoginDialog() {
   } as ConfirmDialogOptions
   openConfirmDialog(opt, (confirm: boolean) => {
     if (confirm) {
-      uni.navigateTo({ url: '/pages/login/login' })
+      uni.navigateTo({ url: targetCaseId.length > 0 ? '/pages/login/login?returnCaseId=' + targetCaseId : '/pages/login/login' })
     }
   })
 }
