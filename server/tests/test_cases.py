@@ -1,5 +1,8 @@
 """cases 域：门禁红线、发布流程（403/422/事务+幂等）、分页上限。"""
 
+import uuid
+from datetime import datetime, timedelta, timezone
+
 from features.cases import gate
 from features.cases.models import CasePayload
 from tests.conftest import load_seed, login_admin, make_client
@@ -108,6 +111,55 @@ def test_admin_case_detail_404():
     with make_client() as client:
         login_admin(client)
         assert client.get("/api/admin/cases/no-such-case").status_code == 404
+
+
+def test_case_preview_is_scoped_and_does_not_accept_normal_session():
+    import db
+
+    with make_client() as client:
+        login_admin(client)
+        payload = load_seed()
+        payload["id"] = "preview-" + uuid.uuid4().hex[:10]
+        assert client.post("/api/admin/cases", json={"id": payload["id"], "payload": payload}).status_code == 200
+        created = client.post(f"/api/admin/cases/{payload['id']}/preview", json={"payload": payload})
+        assert created.status_code == 200, created.text
+        data = created.json()
+        preview_id = data["previewId"]
+        token = data["previewToken"]
+
+        assert client.get(f"/api/previews/{preview_id}").status_code == 401
+        assert (
+            client.get(f"/api/previews/{preview_id}", headers={"Authorization": "Bearer " + token}).json()["payload"][
+                "id"
+            ]
+            == payload["id"]
+        )
+        assert (
+            client.get(
+                f"/api/previews/{preview_id}", headers={"Authorization": "Bearer " + client.cookies.get("session")}
+            ).status_code
+            == 401
+        )
+        assert db.q("SELECT COUNT(*) AS n FROM progress WHERE user_id='admin'")[0]["n"] == 0
+        db.ex(
+            "UPDATE case_previews SET expires_at=? WHERE id=?",
+            ((datetime.now(timezone.utc) - timedelta(minutes=1)).replace(tzinfo=None).isoformat(sep=" "), preview_id),
+        )
+        assert (
+            client.get(f"/api/previews/{preview_id}", headers={"Authorization": "Bearer " + token}).status_code == 401
+        )
+
+
+def test_draft_is_not_in_public_casepack_but_can_be_previewed():
+    with make_client() as client:
+        login_admin(client)
+        payload = load_seed()
+        payload["id"] = "preview-draft-" + uuid.uuid4().hex[:8]
+        assert client.post("/api/admin/cases", json={"id": payload["id"], "payload": payload}).status_code == 200
+        preview = client.post(f"/api/admin/cases/{payload['id']}/preview", json={"payload": payload})
+        assert preview.status_code == 200
+        public_ids = {item["id"] for item in client.get("/api/casepack?since=0").json()["cases"]}
+        assert payload["id"] not in public_ids
 
 
 def test_admin_cases_require_editor():

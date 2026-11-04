@@ -53,6 +53,13 @@ export interface ReindexResult {
   reason?: string
 }
 
+export interface PreviewResult {
+  previewId: string
+  previewToken: string
+  expiresAt: string
+  previewUrl: string
+}
+
 export const contentApi = {
   submissions: (status?: string): Promise<Submission[]> =>
     api.get('/api/admin/submissions' + (status ? '?status=' + encodeURIComponent(status) : '')),
@@ -68,5 +75,6 @@ export const contentApi = {
   updateMeta: (cid: string, body: { part: string; chapterId: string; order: number; typeTags: string[] }) =>
     api.patch(`/api/admin/cases/${cid}/meta`, body),
   publish: (payload: unknown): Promise<{ version: number; articleId: string }> => api.post('/api/cases', payload),
+  preview: (cid: string, payload: unknown): Promise<PreviewResult> => api.post(`/api/admin/cases/${cid}/preview`, { payload }),
   reindex: (): Promise<ReindexResult> => api.post('/api/admin/ai/reindex', {}),
 }

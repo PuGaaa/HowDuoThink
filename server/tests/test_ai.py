@@ -44,6 +44,39 @@ def add_submission(sub_id: str, title: str) -> None:
             "network",
         ),
     )
+    db.ex("INSERT INTO submission_reviews(submission_id, candidate_ids) VALUES(?, '[]')", (sub_id,))
+
+
+def authorize_submission(client: TestClient, sid: str, title: str) -> None:
+    material = {
+        "title": title,
+        "symptom": "素材症状描述足够长，供骨架引用",
+        "resolution": "解决过程第一行。解决过程第二行",
+        "keyError": "ERR-1",
+        "timeline": "tl",
+        "lessons": ["素材教训"],
+        "stackTags": ["mysql"],
+        "domainHint": "network",
+    }
+    saved = client.put(f"/api/admin/submissions/{sid}/material", json={"material": material})
+    assert saved.status_code == 200, saved.text
+    from features.submissions import review as review_service
+    from features.submissions.models import ConsentBody
+
+    review_service.confirm_material("pw-editor", sid, ConsentBody(version=saved.json()["version"]))
+    candidates = client.get(f"/api/admin/submissions/{sid}/similar")
+    assert candidates.status_code == 200, candidates.text
+    reviewed = client.post(
+        f"/api/admin/submissions/{sid}/review",
+        json={
+            "decision": "distinct",
+            "mechanism": "差异机制已确认",
+            "evidence": "证据链已确认",
+            "reasoning": "推理距离已确认",
+            "candidateIds": [item["key"] for item in candidates.json()["items"]],
+        },
+    )
+    assert reviewed.status_code == 200, reviewed.text
 
 
 def add_index_row(case_id: str, vec: list[float], content: str = "内容") -> None:
@@ -206,6 +239,7 @@ def test_ai_draft_merges_generated(monkeypatch):
     make_user(c, "editor3", role="editor")
     login(c, "editor3")
     add_submission("s-testai01", "素材标题")
+    authorize_submission(c, "s-testai01", "素材标题")
 
     r = service.ai_draft_from_submission("pw-editor3", "s-testai01")
     assert r["aiGenerated"] is True
@@ -234,6 +268,7 @@ def test_ai_draft_falls_back_without_json(monkeypatch):
     make_user(c, "editor4", role="editor")
     login(c, "editor4")
     add_submission("s-testai02", "另一个素材标题")
+    authorize_submission(c, "s-testai02", "另一个素材标题")
 
     r = service.ai_draft_from_submission("pw-editor4", "s-testai02")
     assert r["aiGenerated"] is False

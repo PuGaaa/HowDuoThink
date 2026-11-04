@@ -42,3 +42,17 @@ def verify_session(token: str) -> str | None:
         return payload["uid"]
     except Exception:
         return None
+
+
+def sign_preview(preview_id: str, expires_at: int) -> str:
+    return jwt.encode({"pid": preview_id, "purpose": "case_preview", "exp": expires_at}, JWT_SECRET, algorithm="HS256")
+
+
+def verify_preview(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        if payload.get("purpose") != "case_preview":
+            return None
+        return payload["pid"]
+    except Exception:
+        return None

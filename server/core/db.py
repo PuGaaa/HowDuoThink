@@ -44,6 +44,12 @@ def _translate(sql: str) -> str:
 
     sql = re.sub(r"ON CONFLICT\s*\(([^)]+)\)\s*DO UPDATE SET\s+([^;]+)", _dup, sql)
 
+    def _nothing(m: re.Match) -> str:
+        key = m.group(1).split(",", 1)[0].strip()
+        return "ON DUPLICATE KEY UPDATE " + key + "=" + key
+
+    sql = re.sub(r"ON CONFLICT\s*\(([^)]+)\)\s*DO NOTHING", _nothing, sql)
+
     # datetime('now', '±N unit') 修饰符 → NOW() ± INTERVAL N unit
     _UNITS = {
         "SECONDS": "SECOND",

@@ -15,6 +15,7 @@ const payloadText = ref('')
 const msg = ref('')
 const errs = ref<string[]>([])
 const loading = ref(true)
+const previewUrl = ref('')
 
 const meta = ref({ part: 'engineer', chapterId: '', order: 1, typeTags: '' })
 
@@ -126,6 +127,19 @@ async function publish() {
     else errs.value = [e?.message || String(e)]
   }
 }
+
+async function preview() {
+  try {
+    const payload = JSON.parse(payloadText.value)
+    const r = await contentApi.preview(cid.value, payload)
+    previewUrl.value = r.previewUrl
+    window.open(r.previewUrl, '_blank')
+    message.success('预览链接已生成')
+  } catch (e: any) {
+    if (e instanceof SyntaxError) message.error('JSON 解析失败：' + e.message)
+    else message.error(e?.message || '生成预览失败')
+  }
+}
 </script>
 
 <template>
@@ -187,8 +201,10 @@ async function publish() {
 
     <div class="actions">
       <NButton size="large" secondary @click="saveDraft">保存草稿</NButton>
+      <NButton size="large" secondary @click="preview">生成 H5 预览</NButton>
       <NButton size="large" type="primary" @click="publish">发布（过门禁）</NButton>
     </div>
+    <p v-if="previewUrl" class="previewurl">预览链接：{{ previewUrl }}</p>
     <p class="deployhint">
       发布 = Pydantic 结构校验 + 门禁红线（排除路径/影响面动作/专家链首末步/危险动作）+ version 递增 +
       文章投影。App 端 casepack 拉取后可见。
