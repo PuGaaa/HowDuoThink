@@ -70,7 +70,7 @@ node ../content/tools/export-case.mjs && .venv/bin/python seed.py
 
 | 组 | 变量 |
 |---|---|
-| 会话/来源 | `JWT_SECRET`（缺省=进程内随机，重启失效）、`ENV`（dev 开启绕行登录）、`WEB_ORIGIN`、`ADMIN_WEB_ORIGIN`（管理端独立域名时 CORS）、`COOKIE_SECURE=1`（HTTPS） |
+| 会话/来源 | `JWT_SECRET`（必须写入 gitignored 配置，dev.sh 缺失即停止）、`ENV`（dev 开启绕行登录）、`WEB_ORIGIN`、`ADMIN_WEB_ORIGIN`（管理端独立域名时 CORS）、`COOKIE_SECURE=1`（HTTPS） |
 | 管理员 | `ADMIN_PASSWORD`（覆盖初始密码）、`GITHUB_CLIENT_ID/SECRET`、`GITHUB_ADMIN_LOGINS` |
 | 数据库 | `DB_PROVIDER`（mysql/sqlite）、`MYSQL_HOST/PORT/USER/PASSWORD/DATABASE` |
 | MySQL连接池 | `MYSQL_POOL_SIZE`（默认5，须≥1）、`MYSQL_POOL_MAX_OVERFLOW`（默认5，须≥0）、`MYSQL_POOL_TIMEOUT`（默认5秒，须>0） |

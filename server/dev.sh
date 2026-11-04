@@ -7,8 +7,11 @@ if ! .venv/bin/python --version 2>/dev/null | grep -q "Python 3\.12"; then
   echo "  rm -rf .venv && uv venv .venv --python 3.12 --seed && .venv/bin/pip install -r requirements-dev.lock"
   exit 1
 fi
-export JWT_SECRET="${JWT_SECRET:-dev-secret-please-change}"
-export ENV=dev
 # 密钥等本地机密放 .env.dev.local（gitignored），勿写进本文件
 [ -f .env.dev.local ] && set -a && . ./.env.dev.local && set +a
+if [ -z "${JWT_SECRET:-}" ]; then
+  echo "缺少 JWT_SECRET，请写入 server/.env.dev.local"
+  exit 1
+fi
+export ENV=dev
 exec "$(dirname "$0")/.venv/bin/uvicorn" main:app --port 8000
