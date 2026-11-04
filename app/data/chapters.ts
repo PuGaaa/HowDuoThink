@@ -145,10 +145,11 @@ function challengeSolved(chapterId: string): boolean {
 
 /** 章全部通关（每关都已破案） */
 export function chapterCompleted(chapterId: string): boolean {
-  const list = casesInChapter(chapterId)
-  if (list.length === 0) return false
-  for (let i = 0; i < list.length; i++) {
-    const p = getCaseProgress(list[i].id)
+  const list = casesInChapter(chapterId).filter((c) => MAINLINE_CASE_IDS.indexOf(c.id as (typeof MAINLINE_CASE_IDS)[number]) >= 0)
+  const required = list.length > 0 ? list : casesInChapter(chapterId)
+  if (required.length === 0) return false
+  for (let i = 0; i < required.length; i++) {
+    const p = getCaseProgress(required[i].id)
     if (p == null || !p.solved) return false
   }
   return true
@@ -166,7 +167,8 @@ export function isChapterUnlocked(chapterId: string): boolean {
 
 /** 章的跳级挑战关：order 最小（casesInChapter 已按 order 升序，取首关） */
 export function chapterChallengeCaseId(chapterId: string): string {
-  const list = casesInChapter(chapterId)
+  const mainline = casesInChapter(chapterId).filter((c) => MAINLINE_CASE_IDS.indexOf(c.id as (typeof MAINLINE_CASE_IDS)[number]) >= 0)
+  const list = mainline.length > 0 ? mainline : casesInChapter(chapterId)
   return list.length > 0 ? list[0].id : ''
 }
 

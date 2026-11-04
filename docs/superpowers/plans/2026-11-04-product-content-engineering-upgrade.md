@@ -672,7 +672,7 @@ A批适用A01至A16、A22、A24至A25，按该批实际交付边界验收；A15�
 | T01 | 已实现，待批次独立评审 | 主实施会话 | `716d8bd` | 独立 MySQL 8 测试容器与全套后端复验通过（127 passed）；CI 增加 MySQL 8 service；Ruff 通过 | 当前开发环境 `hdx` 账号无创建 `hdt_test_<pid>` 库权限；复验使用受控一次性 MySQL 8 容器 |
 | T02 | 代码已实现，真实验收未完成 | 主实施会话 | `2a43ef0`、`c4554a8` | 账号/短信定向测试通过；阿里云 SDK provider 路径已隔离测试；Web 登录默认手机验证码，保留账密切换；Playwright 桌面与 393×852 截图已检查 | 资质、签名、模板、真实测试号码和配置未具备；真实短信未宣称通过 |
 | T04A | 已实现，待批次独立评审 | 主实施会话 | `531cb18` | 四题 validate、基线、目录测试通过；first-npe/caused-by 已按专家路径完成校准并冻结 `calibratedHash`；log-correlation/async-swallow 明确保持 `uncalibrated` | 后两题仍需人工事实/双路径/评分走验；未校准题不得扩量 |
-| T05 | 最小目录配置已实现 | 主实施会话 | `2a43ef0` | 目录门禁与目录测试通过；试玩顺序固定 | 仍需接入 T03 的历史解锁资格迁移 |
+| T05 | 固定主线门槛第一阶段已实现 | 主实施会话 | 工作区 | 试玩目录固定；章节完成/挑战关优先使用显式 `MAINLINE_CASE_IDS`，避免首批主线被同章选做题扩张 | 仍需接入 T03 历史解锁资格迁移，并核定其余章节的冻结必修集合 |
 | T09A | 最小版本与发布分发已实现，待批次独立评审 | 主实施会话 | `531cb18` | `content_revision/source_*` 新迁移、发布幂等与 stale baseRevision 冲突、文章投影、索引任务均在同一事务；固定 head 同步；MySQL8 定向 38 passed | 仍需补齐 App 真实有效版本读取与开局快照验收；完整内容维护归 T09B |
 | T03 | 操作账本与账号空间第一阶段已实现，待继续补齐历史迁移 | 主实施会话 | `faf6bfc` + 工作区 | `progress_ops` + revision、`session_end/checklist_use/bootstrap` 幂等同步、用户维度去重、首次登录游客基线、切号清理本地空间、旧全量 POST 426；MySQL8 全套后端 127 passed | 仍需把 streak/tasks/daily 完整拆成事实操作并补服务端投影；客户端版本快照依赖 T09A 收口；App 需在 HBuilderX 做最终编译验收 |
 | T06、T07、T08A、T04B、T09B、T10、T11、T12、T13、T14、T15 | 未开始或待前置 | 主实施会话 | — | — | 按 A 批依赖链继续推进 |
