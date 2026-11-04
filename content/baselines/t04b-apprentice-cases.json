@@ -1,0 +1,345 @@
+{
+  "schemaVersion": 1,
+  "kind": "t04b-apprentice-calibration",
+  "frozenAt": "2026-11-04",
+  "sourceCommit": "38d3b2409fa0bcfc446f4955a89b74ad5a6fe911",
+  "count": 23,
+  "cases": [
+    {
+      "id": "dns-hijack",
+      "file": "app/data/cases/dns-hijack.ts",
+      "chapter": "access",
+      "order": 1,
+      "originalHash": "34a618bf6f7b1e6ff90a43b221d5fbb4241a5beede0885c9d6cdb885b10d728d",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "ssl-chain-missing",
+      "file": "app/data/cases/ssl-chain.ts",
+      "chapter": "access",
+      "order": 2,
+      "originalHash": "285359c0b503e26b5bdcf19bcf2f121b05d9f0b28378d0bf01648ae10c835f59",
+      "originalDifficulty": 2,
+      "originalExpertCost": 7,
+      "status": "pending"
+    },
+    {
+      "id": "cors-101",
+      "file": "app/data/cases/cors-101.ts",
+      "chapter": "access",
+      "order": 3,
+      "originalHash": "4f4a2e24b0238738cc78e4bcc403aed4a8ebdbf34d776a9f79f3bf0a60d2b91e",
+      "originalDifficulty": 1,
+      "originalExpertCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "nginx-trap",
+      "file": "app/data/cases/nginx-trap.ts",
+      "chapter": "access",
+      "order": 4,
+      "originalHash": "f8cebc7120cd67c9e4556afbf1fe9c93e4e70dc9172d1fc42afac62fecaf6418",
+      "originalDifficulty": 2,
+      "originalExpertCost": 6,
+      "status": "pending"
+    },
+    {
+      "id": "gateway-review",
+      "file": "app/data/cases/gateway-review.ts",
+      "chapter": "access",
+      "order": 5,
+      "originalHash": "54b7ef085e10d7e56cdad33c1d879803e5fbcbdb7503844b4c3b2c283bb146fe",
+      "originalDifficulty": 2,
+      "originalExpertCost": 7,
+      "status": "pending"
+    },
+    {
+      "id": "ws-upgrade",
+      "file": "app/data/cases/ws-upgrade.ts",
+      "chapter": "access",
+      "order": 6,
+      "originalHash": "92273584c0d35c33a96372e71958a5e9300a5c67fa4b9a462bf8b23efe37e347",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "cert-sni",
+      "file": "app/data/cases/cert-sni.ts",
+      "chapter": "access",
+      "order": 7,
+      "originalHash": "f827e4a4850e6b8a4ae29d6bb5b7a04b7e193690e9a27d2bbd491d6919356f0b",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "canary-decision",
+      "file": "app/data/cases/canary-decision.ts",
+      "chapter": "access",
+      "order": 8,
+      "originalHash": "170a65f4cf6f472cb8893ba18f673c4d4f3465b0c5d38273de0d67584ce642cb",
+      "originalDifficulty": 3,
+      "originalExpertCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "white-screen",
+      "file": "app/data/cases/white-screen.ts",
+      "chapter": "build",
+      "order": 1,
+      "originalHash": "ccc41b5fd598be0aa95096afcf744e09fb41e956a8b522fa4a4a6c18d4f73df9",
+      "originalDifficulty": 1,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "dep-hell",
+      "file": "app/data/cases/dep-hell.ts",
+      "chapter": "build",
+      "order": 2,
+      "originalHash": "1e10af51c558b80eaee4b1c722f1cfdb5a0dd5a590c29e1cf24b4918cea2f2bc",
+      "originalDifficulty": 1,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "ci-cache-pollution",
+      "file": "app/data/cases/ci-cache-pollution.ts",
+      "chapter": "build",
+      "order": 3,
+      "originalHash": "096145373061d0c89252ea26cfd429790919e6c7f5cdc16eb1d9b6de8efb1d5d",
+      "originalDifficulty": 2,
+      "originalExpertCost": 7,
+      "status": "pending"
+    },
+    {
+      "id": "image-tag-drift",
+      "file": "app/data/cases/image-tag-drift.ts",
+      "chapter": "build",
+      "order": 5,
+      "originalHash": "eea1afb74fdce4cec1fcee31e1f5fa1802c658307e2ac25b8d4ef07aa256ba8c",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "buildtime-inject",
+      "file": "app/data/cases/buildtime-inject.ts",
+      "chapter": "build",
+      "order": 6,
+      "originalHash": "0bbcb4bd2f2e3b8c4431159ac416a29112e5a9fc876fbb188c32c5293e040490",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "chunk-overlap",
+      "file": "app/data/cases/chunk-overlap.ts",
+      "chapter": "build",
+      "order": 7,
+      "originalHash": "0154a6f27ba6acf830fa6ceac01b4ee0968c6b5ce51a184fe15a0dbdd199103d",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "pipeline-review",
+      "file": "app/data/cases/pipeline-review.ts",
+      "chapter": "build",
+      "order": 8,
+      "originalHash": "9b85c86c73e9e8d11d2587e588a5c79b4f25418d3bc6c1c4000492ebd9155bf6",
+      "originalDifficulty": 2,
+      "originalExpertCost": 7,
+      "status": "pending"
+    },
+    {
+      "id": "symptom-cluster",
+      "file": "app/data/cases/symptom-cluster.ts",
+      "chapter": "error-reading",
+      "order": 5,
+      "originalHash": "ecb99791d779a8b0dc2a7525dd0283c7739f48bfa298add66927f271ef70b8b0",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "status": "calibrated",
+      "calibratedHash": "d3a0f95ac50db5327e346b0ba8dcc3d014e49192ee9acd8b2d85754473c27f22",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        1
+      ],
+      "dimensionEvidence": [
+        "需将共享键与三种消费路径对照，a-originstamp",
+        "相同输入与只补键的对照，a-cointoss",
+        "null解引用、整数解析与配置契约",
+        "同秒只作线索，需撤键复现",
+        "配置到三个独立服务",
+        "重启缺键不恢复"
+      ],
+      "goal": "用共享输入与对照验证多症状归一",
+      "changes": [
+        "移除无依据的十亿分之一概率",
+        "修复布尔键被当整数解析的语义",
+        "去掉返回后的配置函数仍必在栈底、三个不同jar哈希应相同等错误",
+        "标准链保留对照动作，不把防线计划当定位证据"
+      ],
+      "sources": [
+        "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Integer.html#parseInt(java.lang.String)",
+        "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/lang/Throwable.html#getStackTrace()"
+      ],
+      "stop": "同一缺失值、三条代码路径、只补该键的对照闭合。",
+      "expectedConfirmed": [
+        "h-onecause"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-originstamp",
+            "a-cointoss"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-cointoss",
+            "a-originstamp"
+          ],
+          "cost": 4
+        }
+      ]
+    },
+    {
+      "id": "first-domino",
+      "file": "app/data/cases/first-domino.ts",
+      "chapter": "error-reading",
+      "order": 6,
+      "originalHash": "0c56e4f295c1113cb70f0140b9ada92680900ce6b26538d87974868231ab0cef",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "status": "calibrated",
+      "calibratedHash": "39be7fa36b9f790f52148e8a46f935fcbe110f80b4b5be28e2d858a4b6c4b595",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "需回查超时前30秒等待及SQL变更",
+        "分阶段与全量trace/retryOf对照",
+        "连接等待、查询计划与重试机制",
+        "第一条异常不等于首因",
+        "订单、数据库与下游两跳",
+        "重启扩容反而加数据库负载"
+      ],
+      "goal": "用事前事件和请求传播恢复错误风暴",
+      "changes": [
+        "改正SQL执行超时与借连接超时混称",
+        "补齐错误与调用传播方向",
+        "移除抽查100条证明全量的结论",
+        "六维中位数为2，不因结业皮肤维持L3"
+      ],
+      "sources": [
+        "https://github.com/brettwooldridge/HikariCP/blob/HikariCP-5.1.0/src/main/java/com/zaxxer/hikari/pool/HikariPool.java",
+        "https://dev.mysql.com/doc/refman/8.0/en/explain.html"
+      ],
+      "stop": "先行变更、资源占用、同请求传播和受控回放支持共同触发，独立磁盘告警另行核查。",
+      "expectedConfirmed": [
+        "h-firstdomino"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-firsterror",
+            "a-independence"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-independence",
+            "a-firsterror"
+          ],
+          "cost": 4
+        }
+      ]
+    },
+    {
+      "id": "field-mismatch",
+      "file": "app/data/cases/field-mismatch.ts",
+      "chapter": "integration",
+      "order": 1,
+      "originalHash": "c03ba1ef2e8fc3544ee1922ecb7bf080eb24e02ec84b7c89033dba9f4127d7c1",
+      "originalDifficulty": 1,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "cookie-lost",
+      "file": "app/data/cases/cookie-lost.ts",
+      "chapter": "integration",
+      "order": 2,
+      "originalHash": "4aef012c8efd75d1a6649a59543832124cc7fb0ce27e81e58bce0f384ae64865",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "waterfall-read",
+      "file": "app/data/cases/waterfall-read.ts",
+      "chapter": "integration",
+      "order": 3,
+      "originalHash": "2fd4c1b63123585e14afa4699be04fe4f78492f56744af62000cd5bae6221453",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "poll-storm",
+      "file": "app/data/cases/poll-storm.ts",
+      "chapter": "integration",
+      "order": 4,
+      "originalHash": "ef0df2f429e1b741a096504b07d466af98b3a62f174ed2a0b24a4e3c8c42f666",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "mock-canyon",
+      "file": "app/data/cases/mock-canyon.ts",
+      "chapter": "integration",
+      "order": 5,
+      "originalHash": "fbdfc0eee58b6dd4be70560b424df74922f2b0e61bea0e35b45e565f1cad771a",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "tri-platform",
+      "file": "app/data/cases/tri-platform.ts",
+      "chapter": "integration",
+      "order": 6,
+      "originalHash": "467c70a878f802168db05c1d0c45322e13cef5d8593f5faa0159c8260198ce9c",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "status": "pending"
+    }
+  ]
+}

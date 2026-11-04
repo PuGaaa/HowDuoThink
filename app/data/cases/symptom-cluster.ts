@@ -1,50 +1,40 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 读懂报错 第五批（多症状归一 L2）
- * 教学点：假设思维——多模块同时报不同异常，先找公共依赖与起始时刻：同一块骨牌的三声回响；
- * 配置读取 fail-fast 让"缺配置"在启动时尖叫。
- * 专家路径：impact(1) + originstamp(2) + cointoss(1) = 4⚡︎
+ * 学徒篇校准：用共享输入与对照验证多症状归一。
+ * 原型：配置缺失与JDK字符串消费机制；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/2/1，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-originstamp → a-cointoss；替代顺序：a-impact → a-cointoss → a-originstamp。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const symptomClusterCase: DiagnosisCase = {
   id: 'symptom-cluster',
-  title: '三种报错，三夜排查，其实是同一块骨牌',
-  intro: '推荐模块 NPE、积分模块类型转换异常、通知模块空列表——三个值班员查了三夜。同一秒开始，同一个根因。',
+  title: '三种报错，一份缺失的配置',
+  intro: '三个模块同时出现不同症状。先对齐请求与配置版本，再用一处变更的对照记录检验公共原因。',
   domain: 'runtime',
-  layer: '多症状归一：同时同源的多异常，先找公共依赖的第一块骨牌',
+  layer: '同一时刻只是线索；共享输入、代码路径与单变量对照才支持共同原因',
   part: 'apprentice',
   chapterId: 'error-reading',
   order: 5,
   typeTags: ['config', 'observability'],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」会员平台的值班后端，三个模块的告警在同一分钟把你淹没。',
     architecture: '会员平台三模块(推荐/积分/通知，各自独立服务) → 共享配置中心 → 各自 DB',
-    tag: '故障现场',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '三个告警（同分钟）',
-        text: '推荐服务：NullPointerException（tier 分层逻辑）\n积分服务：NumberFormatException: "null"\n通知服务：推送列表为空（零发送）\n三个值班员各自拉群排查，三夜无果。',
-      },
-      {
-        type: 'text',
-        title: '共同点（没人注意到）',
-        text: '三个异常的起始时刻：10:02:41（同一分钟）。\n三个模块互不调用、各有各的 DB——"独立的三个服务"为什么同时出事？',
-      },
+      { type: 'error', title: '三个模块的告警', text: '推荐：NullPointerException；积分：NumberFormatException；通知：收件列表为空。\n三名值班员各查自己的模块，尚未把证据放到一起。' },
+      { type: 'log', title: '邻近告警', text: '10:02:42 推荐服务磁盘使用72%预警；它是否有关还需要核实。' },
     ],
-    timeline: '昨天 10:02 起三模块同时异常 ｜ 昨天上午有一次"会员分层功能"发布（新增配置键 member.tier.isEnabled）｜ 三模块共用一个配置中心命名空间',
-    impactHint: '三个独立服务、三种异常、同一秒开始——"独立"的三个服务共享着什么？',
+    timeline: '今天10:02发布会员分层代码 ｜ 新增member.tier.defaultLevel ｜ 三模块读取同一配置版本，但分别处理该值',
+    impactHint: '同秒不是共同原因的证明。先检查这些模块到底共享了什么输入。',
   },
-
   hypotheses: [
-    { id: 'h-onecause', text: '三症状同根因：新增配置键缺失，三模块各自读到 null 走进各自的异常路径——同一块骨牌', excludeActionId: 'a-originstamp' },
+    { id: 'h-onecause', text: '新增分层配置缺失，三模块对同一个null分别走入不同失败分支', excludeActionId: 'a-originstamp' },
     { id: 'h-three', text: '三个独立故障巧合同时发生（各修各的）', excludeActionId: 'a-cointoss' },
     { id: 'h-jar', text: '发布包损坏，class 文件缺失导致三服务连锁', excludeActionId: 'a-jarcompare' },
     { id: 'h-upstream', text: '上游用户服务变更导致三模块连锁失败', excludeActionId: 'a-upstreamcheck' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -56,11 +46,7 @@ export const symptomClusterCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'code',
-        title: '三异常对时',
-        text: '推荐 NPE：          10:02:41.003\n积分 NumberFormat： 10:02:41.011\n通知 空列表：        10:02:41.020（首个告警触发）\n调用栈尾部：三者的栈底都有一帧 ConfigService.get(…)\n→ 同秒开始 + 栈底同源——"三个独立故障"的叙事开始动摇。',
-      },
+      result: { type: 'code', title: '对时与共享输入', text: '推荐10:02:41.003、积分10:02:41.011、通知10:02:41.020开始异常。\n配置读取审计均为版本r18、键member.tier.defaultLevel；模块之间没有互相调用。\nConfigService.get已经返回，后续才抛错，异常栈不必仍包含该调用帧。' },
     },
     {
       id: 'a-originstamp',
@@ -70,29 +56,28 @@ export const symptomClusterCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-onecause'],
-      hypotheses: [{ id: 'h-onecause', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '首因定位',
-        text: '10:02:41.001  ConfigService WARN: key "member.tier.isEnabled" not found, return null\n（此后 3ms 内三模块连锁异常）\n考古：昨天"会员分层"发布新增此键——功能代码读它，配置中心从未录入。\n三模块的读法各不相同：推荐 if(tier==null)NPE / 积分 Integer.parseInt(null) / 通知 null→空列表。\n实锤：同一块骨牌（配置键缺失）的三声回响——每个模块用自己的方式摔倒。',
-      },
+      tests: ['h-jar', 'h-upstream', 'h-onecause'],
+      hypotheses: [
+        { id: 'h-jar', status: 'excluded' },
+        { id: 'h-upstream', status: 'excluded' },
+        { id: 'h-onecause', status: 'up' },
+      ],
+      result: { type: 'code', title: '输入与代码对照', text: 'r18缺member.tier.defaultLevel，三模块读取结果均为null。\n只读代码：推荐对raw调用trim()；积分Integer.parseInt(raw)；通知发现raw==null后返回空收件列表。\n每个jar均与各自签名制品哈希匹配，类加载正常；同请求的用户服务响应成功且内容未变。\n同一个缺失值可以解释三种表现，但仍需对照排除独立故障。' },
     },
     {
       id: 'a-cointoss',
-      name: '算"巧合"的概率',
-      desc: '三个独立故障同秒发生的可能性',
+      name: '核对只补配置的三模块对照',
+      desc: '不用未经证明的巧合概率代替验证',
       cost: 1,
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-three'],
-      hypotheses: [{ id: 'h-three', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '概率反证',
-        text: '三模块月均各 1 次故障 → 同秒相遇概率 ≈ 十亿分之一；\n且三异常栈底同源（ConfigService）——巧合论出局。',
-      },
+      tests: ['h-onecause', 'h-three'],
+      hypotheses: [
+        { id: 'h-onecause', status: 'confirmed' },
+        { id: 'h-three', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '单变量对照', text: '已留存的同构核验记录：使用相同制品、同一批请求和同一上游数据，只把缺失键设为字符串1。\n推荐、积分、通知三个异常同时消失；删去该键又能重现。\n这支持当前样本的共同触发条件；没有“月均一次就能算出十亿分之一”的独立性假设。' },
     },
     {
       id: 'a-jarcompare',
@@ -103,12 +88,10 @@ export const symptomClusterCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-jar'],
-      hypotheses: [{ id: 'h-jar', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '包核对',
-        text: '三服务 jar 校验和一致、类加载正常。\n→ 排除包损坏：丢的不是 class，是配置。',
-      },
+      hypotheses: [
+        { id: 'h-jar', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '制品与磁盘收线', text: '三个服务分别对照各自发布清单，哈希匹配且类加载无错误；不同服务的jar不要求互相有相同哈希。\n推荐磁盘72%仅触发70%预警，仍有空间且无I/O错误，补配置的对照没有改变磁盘状态。' },
     },
     {
       id: 'a-upstreamcheck',
@@ -119,132 +102,77 @@ export const symptomClusterCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-upstream'],
-      hypotheses: [{ id: 'h-upstream', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '上游核对',
-        text: '用户服务零变更零异常。\n→ 排除上游：唯一的公共依赖是配置中心——它"少了一个键"。',
-      },
+      hypotheses: [
+        { id: 'h-upstream', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '上游核对', text: '同一请求对应的用户服务响应成功，内容与发布前一致；三模块尚未处理该响应前已读取到缺失配置。\n结合代码和对照记录，排除本案的上游输入变更。' },
     },
     {
       id: 'a-danger',
       name: '紧急重启三模块期望配置重载',
       desc: '【状态变更】三模块滚动重启',
-      cost: 1,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '重启结果（陷阱动作）',
-        text: '重启后键依然缺失——异常照旧，还叠加了重启期间的容量抖动。\n→ 复盘点评：重启解决"状态坏了"，解决不了"东西没了"——缺配置的重启等于把坑再挖一遍。',
-      },
+      result: { type: 'text', title: '重启结果（陷阱动作）', text: '重启后键依然缺失——异常照旧，还叠加了重启期间的容量抖动。\n→ 复盘点评：重启解决"状态坏了"，解决不了"东西没了"——缺配置的重启等于把坑再挖一遍。' },
     },
     {
       id: 'a-fixconfig',
       name: '修复：配置键补录 + 语义确认',
-      desc: '【状态变更】member.tier.isEnabled 补录 true；缺失语义修正为"关闭分支"',
+      desc: '【状态变更】补录经确认的默认等级，必填缺失则拒绝启动',
       cost: 1,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复结果',
-        text: '① 键补录 true（分层功能开启）\n② 三模块的缺失语义统一为 false（关闭分支）——未来再缺键，走关闭而不是崩溃\n三模块 10 分钟内全部恢复——一块骨牌立起来，三声回响同时消失。',
-      },
+      result: { type: 'text', title: '配置契约修复', text: '先确认分层等级的业务值，再补member.tier.defaultLevel=1。\n对必填配置执行启动校验；若设计为可选配置，要显式定义缺失语义。不能同时声称“必填缺失即失败”和“缺失一律关闭”。' },
     },
     {
       id: 'a-failfast',
       name: '沉淀：必填配置 fail-fast',
       desc: '【状态变更】新增配置键必须"先录后发"：代码引用的键在配置中心缺失 → 启动失败',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '门禁上线',
-        text: '配置引用扫描进 CI：代码里引用的键必须在配置中心存在（或声明默认值）——\n"先发代码后补配置"的发布顺序被禁止。呼应 config-typo 的绑定校验：缺键要在启动时尖叫。',
-      },
+      result: { type: 'text', title: '发布门禁', text: '发布前核对代码所需键与目标配置版本；必填键缺失时阻止启动或发布。\n默认值必须经过业务确认，不能为消除异常临时猜一个值。' },
     },
     {
       id: 'a-fixcluster',
       name: '沉淀：多症状归一排错法',
       desc: '【状态变更】值班 SOP：多模块同时异常 → 先对时找首因 → 再找公共依赖 → 禁止各修各的',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: 'SOP 条目',
-        text: '多症状归一三步：①同一条时间线对时（同秒=同因嫌疑大）\n②找公共依赖（配置/网络/共享服务）\n③验证"修一检全"（修骨牌一，回响全消才算真修好）。\n三个值班员三夜，不如一个值班员半小时——前提是知道这套方法。',
-      },
+      result: { type: 'text', title: 'SOP 条目', text: '多症状归一三步：①同一条时间线对时（同秒=同因嫌疑大）\n②找公共依赖（配置/网络/共享服务）\n③验证"修一检全"（修骨牌一，回响全消才算真修好）。\n三个值班员三夜，不如一个值班员半小时——前提是知道这套方法。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-onecause', text: '"会员分层"发布新增配置键 member.tier.isEnabled 未在配置中心录入：三模块读到 null 各自走进异常路径（NPE/NumberFormat/空列表）——同一秒、同一根因、三种表象', correct: true },
+    { id: 'rc-onecause', text: 'member.tier.defaultLevel未录入，三模块读到null后分别解引用、整数解析或返回空列表；补同一配置可同时消除三症状', correct: true },
     { id: 'rc-three', text: '三个独立故障巧合同时发生', correct: false },
     { id: 'rc-jar', text: '发布包损坏 class 缺失', correct: false },
     { id: 'rc-upstream', text: '上游用户服务变更连锁', correct: false },
   ],
-
   expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
-    {
-      thought: '三个独立服务同一秒出事——第一动作不是分头排查，是上同一条时间线对时。',
-      update: '同秒开始 + 栈底同源（ConfigService）——"三个独立故障"叙事动摇。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 对时是最便宜的归一动作：同秒同源这两个特征值十亿分之一的巧合概率——时间线一拉，独立叙事自动瓦解。',
-      conclusion: '归一假设升权（h-onecause）。',
-    },
-    {
-      thought: '倒序找第一块骨牌：时间线上第一条记录之前发生了什么。',
-      update: '实锤：配置键缺失 WARN 领先 3ms，三个异常是它的三种摔法——骨牌一，回响三。',
-      actionId: 'a-originstamp',
-      why: '2⚡︎ 倒序找首因是多症状归一的核心技术：日志按时间倒着读，第一条异常之前的那行（往往是 WARN/INFO）才是真正的起点——"读报错"的最高阶形态：读没有"报错"二字的行。',
-      conclusion: '根因实锤：配置键缺失。',
-    },
-    {
-      thought: '巧合论用概率反证——三个独立故障的同秒相遇，数字上不可能。',
-      update: '十亿分之一 + 栈底同源——独立叙事正式出局。',
-      actionId: 'a-cointoss',
-      why: '1⚡︎ 概率反证是归一的最后一道论证：即使机制已经清楚，也要关掉"就是巧合"的心理退路——值班群里的争论才会停止。',
-      conclusion: '独立叙事出局。',
-    },
-    {
-      thought: '包与上游各 1⚡︎ 排除；止血陷阱（重启不解决缺失）；修复+门禁+SOP。停止收集。',
-      update: '停止。',
-      actionId: '',
-      why: '【停止规则】机制（键缺失）✓ 归一（概率反证）✓ 防线（fail-fast+归一 SOP）✓——个案、机制、流程三层闭合。',
-      conclusion: '沉淀：多症状归一——同时同源的多异常是同一块骨牌的回响；修一检全，回响全消才算真修好。',
-    },
+    { actionId: 'a-impact', thought: '先对时并核对共享输入，而不是分头认领异常。', update: '同配置版本同缺失键，公共原因升权。', why: '1⚡用请求与配置身份把材料对齐，时间相近本身不能证明同因。', conclusion: '检查缺失值如何进入不同模块。' },
+    { actionId: 'a-originstamp', thought: '同一null分别进入trim、整数解析和空列表分支。', update: '包完整与上游稳定，机制能解释三种表现。', why: '2⚡把相同输入与各自消费代码对照，避免把返回后的ConfigService误当栈底帧。', conclusion: '需要单变量对照验证共同触发条件。' },
+    { actionId: 'a-cointoss', thought: '相同制品和输入只补键，三个模块一起恢复；撤键又重现。', update: '共同触发条件成立，独立故障解释失去支持。', why: '1⚡可复验的对照比没有统计前提的巧合概率更有证据价值。', conclusion: '定位完成，确认配置语义再修复。' },
+    { actionId: '', thought: '共享输入、三条消费路径与单变量对照已经闭合；修一处后仍要逐模块复验，不把同秒自动等同同因。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '共享输入、三条消费路径与单变量对照已经闭合；修一处后仍要逐模块复验，不把同秒自动等同同因。' },
   ],
-
   lessons: [
-    {
-      text: '多模块同时报不同异常 = 同一块骨牌的多声回响：先对时找首因，再找公共依赖——禁止各修各的。',
-      principle: '假设思维：多症状归一三步——时间线对时（同秒嫌疑）、公共依赖盘点（配置/网络/共享服务）、修一检全。三个独立故障同秒发生的概率在数学上近乎为零——"巧合"是排查中最贵的心理退路。',
-    },
-    {
-      text: '倒序读日志：第一条异常之前的那行（往往是 WARN/INFO）才是真正的起点——"报错"只是回响，源头常在"不报错"的行里。',
-      principle: '验证思维：读报错的最高阶形态是读没有报错二字的行。配置缺失、依赖降级、静默重试——这些 WARN/INFO 才是多米诺的第一推。三模块的"各自摔法"不同，恰好暴露它们共享同一块地。',
-    },
-    {
-      text: '缺配置的重启等于把坑再挖一遍：重启解决"状态坏了"，解决不了"东西没了"——先判断丢的是什么类型。',
-      principle: '程序设计：状态类故障（内存脏/连接死）重启有效；缺失类故障（配置键/文件/依赖）重启无效。止血前的第一问：我们丢的是"状态"还是"存在"？——两者的止血动作完全相反。',
-    },
+    { text: '同秒异常先查共享输入；不要用未建立独立性前提的概率排除巧合。', principle: '时间关系负责提出假设，输入身份、消费代码和单变量对照负责检验假设。多个模块可能有共同触发条件，也可能存在独立故障。' },
+    { text: '配置读取已返回后才发生的异常，调用栈不必包含配置读取函数。', principle: '堆栈记录当时仍在执行的调用链。结合读取审计与使用位置理解数据来源，不能为了故事完整捏造已经返回的调用帧。' },
+    { text: '必填配置与可选默认值要有明确契约，不能临时猜默认值消除异常。', principle: '必填缺失应在启动或发布时暴露；可选项的默认语义需业务确认。修复一个键后逐模块复验，验证影响范围而不只看一条告警消失。' },
   ],
 }

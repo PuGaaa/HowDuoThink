@@ -1,49 +1,39 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 读懂报错 结业（错误风暴找首因 L3）
- * 教学点：假设思维——错误风暴中找"第一块骨牌"：时间排序 + 依赖拓扑 + 传播路径验证；
- * 多数派异常不是首因，修一检全才是真修好；同源告警聚合不让 5000 条刷屏。
- * 专家路径：impact(1) + firsterror(2) + independence(1) = 4⚡︎
+ * 学徒篇校准：用事前事件和请求传播恢复错误风暴。
+ * 原型：Hikari借连接超时与SQL执行计划退化；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/2/2，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-firsterror → a-independence；替代顺序：a-impact → a-independence → a-firsterror。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const firstDominoCase: DiagnosisCase = {
   id: 'first-domino',
   title: '五千条异常里，凶手只有一个',
-  intro: '凌晨 10 分钟 5000 条异常刷屏：SQL 超时、NPE、下游 5xx——真正的凶手只有 1 个，其余 4999 条是涟漪。',
+  intro: '五千条错误里，最早报错也未必是最早原因。用失败阶段、请求关联和变更前后的证据恢复传播链。',
   domain: 'runtime',
-  layer: '错误风暴找首因：时间排序 + 拓扑验证 + 修一检全',
+  layer: '错误风暴先定位失败阶段，再用请求关联与事前事件验证传播，不把最早告警当根因',
   part: 'apprentice',
   chapterId: 'error-reading',
   order: 6,
   typeTags: ['observability', 'dependency', 'capacity'],
-  difficulty: 3,
-
+  difficulty: 2,
   scene: {
     role: '你是「鲜到家」订单域的值班负责人，凌晨的告警群已经刷了 5000 条——这是你读报错课的期末考。',
-    architecture: '订单域依赖拓扑：网关 → 订单服务 → DB + 库存服务 + 优惠券服务 ｜ 每个服务都向 ELK 吐异常',
-    tag: '故障现场',
+    architecture: '网关调用订单 → 查询DB并调用库存/优惠券；调用方遇订单5xx会重试整条流程',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '异常风暴（10 分钟）',
-        text: 'SQL timeout（HikariPool）：3,000 条\n订单服务 NPE（优惠券字段）：1,200 条\n下游 5xx（库存/优惠券重试）：800 条\n值班按"最新异常"处理了两轮，都没止血。',
-      },
-      {
-        type: 'text',
-        title: '值班群乱局',
-        text: 'DBA 说"我这边 SQL 慢查询爆发"，订单 owner 说"NPE 是优惠券返回空"，优惠券说"我收到的是 5xx 重试风暴"——三人各查各的，互相甩锅。',
-      },
+      { type: 'error', title: '10分钟业务错误分布', text: '借连接超时3000条；订单错误处理中的NPE1200条；整条流程重试引出的库存/优惠券5xx800条。\n最新一条不说明最早原因，数量最多也不说明原因深度。' },
+      { type: 'log', title: '另外一条告警', text: '01:14:04 归档服务磁盘预警；它不在下单调用链中。' },
     ],
-    timeline: '01:14 起异常风暴 ｜ 01:20 第一轮处置（重启订单服务）无效 ｜ 01:24 第二轮（重启优惠券）无效 ｜ 你 01:26 接手',
+    timeline: '01:13上线新SQL ｜ 01:14起错误风暴 ｜ 01:20重启订单、01:24重启优惠券均未稳定恢复',
     impactHint: '5000 条异常有 3 种类型、3 个服务——按量处理？按最新处理？还是找第一块倒下的骨牌？',
   },
-
   hypotheses: [
-    { id: 'h-firstdomino', text: '首因定位：时间排序第一条是 DB 连接获取超时（01:14:03）——其余异常全是它在依赖拓扑上的涟漪', excludeActionId: 'a-firsterror' },
-    { id: 'h-majority', text: '多数派优先：SQL timeout 3000 条量最大，先修它', excludeActionId: 'a-countcheck' },
-    { id: 'h-independent', text: '多根因同时爆发：不止一块骨牌，需分头处理', excludeActionId: 'a-independence' },
+    { id: 'h-firstdomino', text: '新SQL长占用连接先触发借连接超时，再经错误处理与整链重试放大', excludeActionId: 'a-firsterror' },
+    { id: 'h-majority', text: '优惠券字段NPE先发生，重试才把数据库拖垮', excludeActionId: 'a-countcheck' },
+    { id: 'h-independent', text: '数据库超时和下游5xx是互不相关的多起事故', excludeActionId: 'a-independence' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -55,11 +45,7 @@ export const firstDominoCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'code',
-        title: '风暴全景',
-        text: '类型分布：SQL timeout 3000 / NPE 1200 / 5xx 800\n时刻分布：全部始于 01:14:03 之后的 10 分钟\n服务分布：订单(3000+NPE1200) 库存(500) 优惠券(300)\n已知处置：重启订单/优惠券均无效（01:20/01:24）\n→ 两次无效处置是免费情报：不是"单服务状态坏了"——全网同起，指向公共层。',
-      },
+      result: { type: 'code', title: '风暴分类', text: '按失败阶段和traceId分组：借连接超时3000、随后错误处理NPE1200、带retryOf的下游5xx800。\n所有业务错误都在01:14:03之后；两次重启无效只说明重启未修好，不能据此排除所有单服务问题。' },
     },
     {
       id: 'a-firsterror',
@@ -69,29 +55,26 @@ export const firstDominoCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-firstdomino'],
-      hypotheses: [{ id: 'h-firstdomino', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '首因定位 + 传播验证',
-        text: '时间排序第一条：01:14:03.120 订单服务 "HikariPool-1 Connection is not available"\n（此刻其余服务零异常——涟漪尚未扩散）\n传播回放：DB 连接耗尽（慢查询占满）→ 订单查询失败 → 优惠券字段未赋值 NPE ×1200\n→ 订单 5xx → 库存/优惠券收到重试风暴 5xx\n依赖拓扑逐边核对：全部 5000 条可沿"订单→DB"这条边解释 ✓\n实锤：骨牌一 = DB 连接耗尽（慢查询占满连接池）。',
-      },
+      tests: ['h-majority', 'h-firstdomino'],
+      hypotheses: [
+        { id: 'h-majority', status: 'excluded' },
+        { id: 'h-firstdomino', status: 'up' },
+      ],
+      result: { type: 'code', title: '事前事件与传播链', text: '最早异常：01:14:03.120 HikariPool借连接等待30秒超时。它意味着等待约在01:13:33开始，并不等于故障刚在01:14发生。\n再向前核对：01:13:20新SQL上线，随后20个连接长时间执行该查询。执行计划从索引访问退化为大范围扫描。\n同一trace族：借连接失败→业务catch后继续使用未赋值优惠券对象→NPE；外层收到5xx后按retryOf重试整条创建流程，增加库存/优惠券调用。\n顺序与调用方向都能对账，不把下游5xx反着传播给未调用的服务。' },
     },
     {
       id: 'a-countcheck',
-      name: '验证"多数派优先"的陷阱',
-      desc: '量最大的 SQL timeout 也是涟漪——按量处理会先修表现',
+      name: '核对NPE是否先于借连接失败',
+      desc: '区分错误数量与调用先后',
       cost: 1,
       gain: 'mid',
       danger: false,
       effects: [],
       tests: ['h-majority'],
-      hypotheses: [{ id: 'h-majority', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '多数派陷阱',
-        text: 'SQL timeout 3000 条量最大——但它们与首因同池（同一连接池耗尽）：\n按量处理 = 给同一块骨牌的回响加固——骨牌还在，回响换个姿势再来。\n→ 排除多数派优先：数量是"传播广度"的度量，不是"根因深度"的度量。',
-      },
+      hypotheses: [
+        { id: 'h-majority', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '先后关系核对', text: 'NPE样本都带同trace的先行借连接失败，业务catch继续执行的分支能重现该NPE。\n没有证据表明NPE先触发数据库等待。数量用于估计影响，不负责证明谁先发生。' },
     },
     {
       id: 'a-independence',
@@ -101,148 +84,90 @@ export const firstDominoCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-independent'],
-      hypotheses: [{ id: 'h-independent', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '完备性检查',
-        text: '逐服务抽查 100 条异常回放传播路径：100% 可沿"订单→DB"解释，零例外。\n→ 排除多根因：单一骨牌成立——修复可以聚焦，资源不分散。',
-      },
+      tests: ['h-firstdomino', 'h-independent'],
+      hypotheses: [
+        { id: 'h-firstdomino', status: 'confirmed' },
+        { id: 'h-independent', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '覆盖核对与对照', text: '全量业务错误按traceId/retryOf可覆盖3000+1200+800=5000条；每组都能追到同一新SQL及借连接失败阶段。\n修正SQL的受控回放中，其他制品和输入不变，三类业务错误均消失。\n归档磁盘告警另有实例/trace，回放中保持存在，不属于该传播链。' },
     },
     {
       id: 'a-danger',
-      name: '按多数派优先：紧急扩容订单服务实例',
-      desc: '【状态变更】订单服务扩容 10 实例稀释 NPE',
-      cost: 1,
+      name: '立即重启并扩容订单服务',
+      desc: '【状态变更】增开实例却不检查数据库总连接与查询负载',
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '扩容结果（陷阱动作）',
-        text: 'NPE 被摊薄（单实例异常密度下降），但 10 个新实例带来 200 个新连接请求——\nDB 连接竞争雪上加霜，SQL timeout 反而恶化。\n→ 复盘点评：按多数派修 = 给回响加音箱，骨牌的声浪更大了。',
-      },
+      result: { type: 'text', title: '变更陷阱', text: '新实例仍执行同一慢SQL，并增加数据库连接竞争；重启会丢失旧现场。\n单实例错误密度下降不代表总错误减少，应观察系统总量与数据库负载。' },
     },
     {
       id: 'a-fixroot',
       name: '修复：治骨牌一——慢查询 + 池治理',
       desc: '【状态变更】kill 慢查询 + 索引修正 + 池等待上限（耗尽快速失败）',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复结果',
-        text: '① kill 占满连接的慢查询 + 补索引（元凶 SQL 从 11s → 80ms）\n② 池等待上限 30s→5s：耗尽时快速失败（不挂 30s 让涟漪堆积）\n涟漪消失率验证：首因修复后 3 分钟——NPE 归零、5xx 归零、SQL timeout 归零。骨牌一倒，全链安静。',
-      },
+      result: { type: 'text', title: '根因与放大器分别修复', text: '先限制导出/订单相关并发，按处置权限处理已确认的慢查询，修正SQL并用相同负载复测。\n同时修正catch后继续使用无效对象的分支，避免一种失败再制造第二种异常；重试要有明确边界和退避。' },
     },
     {
       id: 'a-fixverify',
       name: '验证：涟漪归零确认',
       desc: '修一检全：骨牌修复后全链异常归零才算真修好',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修一检全',
-        text: '修复后观察窗 15 分钟：5000 条/10min → 3 条/10min（基线波动）。\n"修一检全"是首因修复的验收标准——只看"主要异常降了"不算，要看"全部涟漪归零"。',
-      },
+      result: { type: 'text', title: '复验范围', text: '修复后对照相同负载、同样本验证借连接等待、错误处理和整链重试都恢复到基线；归档磁盘预警另立任务。\n不要求整个系统所有无关日志归零，也不能只检查最多的一类错误下降。' },
     },
     {
       id: 'a-fixsop',
       name: '沉淀：错误风暴 SOP',
       desc: '【状态变更】值班 SOP：风暴三步——时间排序找首因 / 依赖拓扑验证传播 / 修一检全',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: 'SOP 三步',
-        text: '① 时间排序：第一条异常 = 第一嫌疑人（多数派只是传播广度）\n② 拓扑验证：异常能否沿依赖边全部解释（完备性检查）\n③ 修一检全：修首因后验证全部涟漪归零。\n两轮无效处置（按最新/重启）在 SOP 面前不会发生。',
-      },
+      result: { type: 'text', title: '风暴排查清单', text: '第一条可见异常只是首个线索。先定位失败阶段，再回查先行变更与资源事件，按请求身份验证传播。\n若有无法解释的错误，应保留独立假设并继续核查。' },
     },
     {
       id: 'a-fixalert',
       name: '沉淀：同源告警聚合',
       desc: '【状态变更】告警平台按传播拓扑聚合成"一个事件"：首因 + 涟漪计数，拒绝 5000 条刷屏',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '告警聚合',
-        text: '告警平台升级：同源异常聚合成事件卡（首因 1 条 + 涟漪 4999 条折叠计数）。\n刷屏的价值是零——聚合后的首因卡片才是值班员需要的。风暴不可怕，不可读才可怕。',
-      },
+      result: { type: 'text', title: '聚合边界', text: '按已验证的trace、依赖和事件聚合相关告警，保留原始证据与独立噪声。\n不能只按时间相近就把所有告警折叠成一个根因。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-firstdomino', text: '首因 = DB 连接耗尽（慢查询占满连接池，01:14:03 第一条异常）：涟漪沿依赖拓扑传播——订单 NPE 1200、下游重试 5xx 800、SQL timeout 3000 同池回响；两次按最新/重启处置无效', correct: true },
-    { id: 'rc-majority', text: '多数派（SQL timeout）优先处理（它是涟漪非首因）', correct: false },
-    { id: 'rc-independent', text: '多根因同时爆发需分头处理（完备性检查排除）', correct: false },
+    { id: 'rc-firstdomino', text: '新SQL退化长占用连接，借连接超时后错误处理继续使用空对象，整链重试再放大下游流量；同请求证据与回放闭合', correct: true },
+    { id: 'rc-majority', text: '优惠券NPE先发生，随后才拖垮数据库', correct: false },
+    { id: 'rc-independent', text: '数据库超时与下游错误是多起独立事故', correct: false },
   ],
-
   expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
-    {
-      thought: '5000 条异常三种类型三个服务——先建三维档案（类型×时刻×服务），两次无效处置是免费情报。',
-      update: '全网同起 + 两次单服务处置无效——排除"单服务状态坏了"，指向公共层。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 风暴的第一课是"先看全景再下手"：三维分布与无效处置史，把假设空间从"哪个服务坏了"压缩到"哪个公共层坏了"。',
-      conclusion: '排查框架确立：找首因（h-firstdomino 升权）。',
-    },
-    {
-      thought: '时间倒序找第一条异常——它是风暴的第一张多米诺；再沿依赖拓扑验证它如何变成 5000 条。',
-      update: '实锤：01:14:03 连接耗尽为骨牌一；5000 条全部沿"订单→DB"边可解释——传播路径完备。',
-      actionId: 'a-firsterror',
-      why: '2⚡︎ 首因定位 = 时间排序 × 拓扑验证双保险：时间给出"谁先倒"，拓扑给出"怎么传导"——两者吻合才能确认"一块骨牌"而不是"多块同时倒"。',
-      conclusion: '首因实锤：DB 连接耗尽。',
-    },
-    {
-      thought: '多数派陷阱单独验证：量最大的 SQL timeout 是涟漪不是首因——数量是广度不是深度。',
-      update: '同池回响确认——按量处理 = 给回响加音箱（扩容陷阱即将演示这一点）。',
-      actionId: 'a-countcheck',
-      why: '1⚡︎ "按量优先"是错误风暴最直觉的陷阱：3000 条的 SQL timeout 看起来最痛——但它是同一池的回响。数量度量传播广度，不度量根因深度。',
-      conclusion: '多数派排除 → 完备性检查。',
-    },
-    {
-      thought: '单根因完备性检查 + 扩容陷阱演示 + 治骨牌 + 修一检全 + SOP + 告警聚合。停止收集。',
-      update: '停止。',
-      actionId: '',
-      why: '【停止规则】首因（连接耗尽）✓ 传播（拓扑完备）✓ 防线（SOP+聚合）✓——首因、涟漪、防线三层闭合。',
-      conclusion: '沉淀：错误风暴找首因——时间排序、拓扑验证、修一检全；5000 条里凶手只有一个，数骨牌不如找骨牌一。',
-    },
+    { actionId: 'a-impact', thought: '先按阶段和请求身份分类。', update: '量最大与时间最新都只是分布。', why: '1⚡建立全景与请求分组，避免按噪声数量决定修复顺序。', conclusion: '向前核对真正的先行事件。' },
+    { actionId: 'a-firsterror', thought: '最早借连接超时之前已有等待和新SQL长占用。', update: '找到先行变更、失败阶段与明确传播方向。', why: '2⚡超时是在等待之后报出，必须回查事前事件并按同一trace验证每一跳。', conclusion: '新SQL触发、NPE与整链重试放大。' },
+    { actionId: 'a-independence', thought: '全量5000条可按关联族覆盖，同输入只修SQL的回放消除三类业务错误。', update: '共同触发条件得到支持，归档告警独立。', why: '1⚡检查覆盖范围和对照结果，不能用抽查100条就宣称全部零例外。', conclusion: '主案与噪声边界明确。' },
+    { actionId: '', thought: '先行SQL、资源等待、调用传播与受控回放已经闭合；同时修正异常处理和重试放大器，独立告警另行处理。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '先行SQL、资源等待、调用传播与受控回放已经闭合；同时修正异常处理和重试放大器，独立告警另行处理。' },
   ],
-
   lessons: [
-    {
-      text: '错误风暴找首因：时间排序的第一条异常是第一嫌疑人——多数派只是传播广度，不是根因深度。',
-      principle: '假设思维：风暴三步——时间排序（谁先倒）、依赖拓扑验证（怎么传导）、修一检全（修首因后全部涟漪归零）。按量优先是最直觉的陷阱：给回响加音箱，骨牌的声浪更大。',
-    },
-    {
-      text: '单根因的完备性检查：全部异常能沿一条传播路径解释时，修复可以聚焦——零例外的拓扑回放是聚焦的许可证。',
-      principle: '验证思维：确认"单骨牌"与"找骨牌"同样重要——完备性检查（逐服务抽查回放）排除多根因，让资源聚焦。若发现不可归因的异常，才升级为多骨牌分头处理。',
-    },
-    {
-      text: '5000 条刷屏的告警没有价值：同源异常聚合成"首因 + 涟漪计数"的事件卡——风暴不可怕，不可读才可怕。',
-      principle: '可观测性设计：告警的价值密度 = 事件数 / 消息数。按传播拓扑聚合（首因卡 + 折叠涟漪）让值班员看到结构而非噪声——读报错的最高境界，是平台替你把 5000 条读成 1 条。',
-    },
+    { text: '最早可见异常不是最早原因：等待超时报出之前，资源可能早已被占满。', principle: '时间线要包含变更、调用开始、等待和异常报出。按同一请求与调用方向恢复传播链，避免把一个30秒超时当成故障刚刚开始。' },
+    { text: '全量覆盖与受控对照支持共同触发条件；抽查没有例外不能直接证明全库没有例外。', principle: '声明证据覆盖的范围，保留无法归因的样本。只有已核对的传播关系才能用于告警聚合，不把同时出现自动等同同一事故。' },
+    { text: '共同触发条件与放大器要分别处置，无关告警不必强行归零。', principle: '慢SQL触发、错误处理制造NPE、重试放大请求可以同时存在。修触发条件后仍要治理放大器，并验证相关指标回到基线。' },
   ],
 }
