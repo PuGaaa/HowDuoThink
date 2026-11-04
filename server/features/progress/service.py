@@ -62,6 +62,18 @@ def sync_operations(uid: str, operations: list[ProgressOperation]) -> dict:
                 "INSERT INTO progress_ops(user_id, op_id, kind, payload, occurred_at) VALUES(?,?,?,?,?)",
                 (uid, operation.op_id, operation.kind, db.jdump(operation.payload), operation.occurred_at),
             )
+            if operation.kind == "session_end":
+                conn.execute(
+                    "INSERT INTO learning_events(id, user_id, anonymous_id, kind, occurred_at, payload) VALUES(?,?,?,?,?,?)",
+                    (
+                        "session_end:" + uid + ":" + operation.op_id,
+                        uid,
+                        operation.payload.get("anonymousId"),
+                        "session_end",
+                        operation.occurred_at,
+                        db.jdump(operation.payload),
+                    ),
+                )
             revision += 1
             confirmed.append(operation.op_id)
         conn.execute(

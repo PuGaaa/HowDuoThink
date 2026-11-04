@@ -94,3 +94,13 @@ def overview(days: int = 30) -> dict:
             else None,
         },
     }
+
+
+def event_details(kind: str | None = None, limit: int = 100) -> list[dict]:
+    where = "kind=?" if kind else "1=1"
+    params = (kind,) if kind else ()
+    rows = db.q(
+        f"SELECT id, user_id, anonymous_id, kind, occurred_at, payload FROM learning_events WHERE {where} ORDER BY occurred_at DESC LIMIT {int(limit)}",
+        params,
+    )
+    return [dict(row) for row in rows]

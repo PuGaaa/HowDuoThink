@@ -77,3 +77,21 @@ def test_progress_sync_projects_tasks_by_operation_time():
         assert response.status_code == 200
         assert response.json()["tasks"]["daily"]["win"] == 1
         assert response.json()["dailyDone"] == "2026-11-04"
+
+
+def test_session_sync_creates_one_learning_event():
+    with make_client() as client:
+        login_admin(client)
+        op = {
+            "opId": "event-session-1",
+            "kind": "session_end",
+            "occurredAt": "2026-11-04T15:00:00.000Z",
+            "payload": {"caseId": "dns-hijack", "solved": True, "grade": "A", "playerCost": 4},
+        }
+        first = client.post("/api/me/progress/sync", json={"operations": [op]})
+        second = client.post("/api/me/progress/sync", json={"operations": [op]})
+        assert first.status_code == second.status_code == 200
+        import db
+
+        rows = db.q("SELECT COUNT(*) AS n FROM learning_events WHERE id=?", ("session_end:pw-admin:event-session-1",))
+        assert rows[0]["n"] == 1
