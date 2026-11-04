@@ -49,7 +49,9 @@ def calculate(rows: list[dict], as_of: str | None = None) -> dict:
                 ends[sid] = event
         verifications = [event for event in events if event["kind"] == "verification"]
         effective = [
-            end for sid, end in ends.items() if any(
+            end
+            for sid, end in ends.items()
+            if any(
                 v.get("sessionId") == sid and v.get("caseId") == end.get("caseId") and v["at"] <= end["at"]
                 for v in verifications
             )
@@ -77,6 +79,21 @@ def calculate(rows: list[dict], as_of: str | None = None) -> dict:
                 )
             else:
                 immature["continue7d"] += 1
+        trial_entries = [
+            event for event in events if event["kind"] == "trial_enter" and event.get("caseId") in TRIAL_CASE_IDS
+        ]
+        if trial_entries:
+            trial_start = trial_entries[0]
+            if (today - trial_start["day"]).days >= 6:
+                three["eligibleUsers"] += 1
+                cases = {
+                    end.get("caseId")
+                    for end in effective
+                    if end.get("caseId") in TRIAL_CASE_IDS and 0 <= (end["day"] - trial_start["day"]).days <= 6
+                }
+                three["completedUsers"] += TRIAL_CASE_IDS.issubset(cases)
+            else:
+                immature["threeCase7d"] += 1
         if not starts:
             continue
         first = starts[0]
@@ -101,20 +118,30 @@ def calculate(rows: list[dict], as_of: str | None = None) -> dict:
             if days == 7:
                 d7_solved["eligibleUsers"] += 1
                 d7_solved["retainedUsers"] += any(end.get("solved") is True for end in retained)
-        if age >= 6:
-            three["eligibleUsers"] += 1
-            cases = {end.get("caseId") for end in effective if 0 <= (end["day"] - first["day"]).days <= 6}
-            three["completedUsers"] += TRIAL_CASE_IDS.issubset(cases)
-        else:
-            immature["threeCase7d"] += 1
     return {
-        "asOf": today.isoformat(), "timezone": "Asia/Shanghai",
-        "window": {"firstDay": min(cohorts) if cohorts else None, "lastDay": today.isoformat(), "sevenDayOffsets": [0, 6]},
-        "sampleUsers": len(by_user), "immatureUsers": immature,
+        "asOf": today.isoformat(),
+        "timezone": "Asia/Shanghai",
+        "window": {
+            "firstDay": min(cohorts) if cohorts else None,
+            "lastDay": today.isoformat(),
+            "sevenDayOffsets": [0, 6],
+        },
+        "sampleUsers": len(by_user),
+        "immatureUsers": immature,
         "funnel": {"startedUsers": started, "finishedUsers": finished, "solvedUsers": solved},
-        "firstSession": {"startedUsers": started, "solvedUsers": first_solved, "failedUsers": first_failed, "unfinishedUsers": first_unfinished},
-        "d1": d1, "d7": d7, "d7Solved": d7_solved, "threeCase7d": three,
-        "saveConversion7d": save, "continue7d": continued, "weeklySolvedUsers": weekly_solved,
+        "firstSession": {
+            "startedUsers": started,
+            "solvedUsers": first_solved,
+            "failedUsers": first_failed,
+            "unfinishedUsers": first_unfinished,
+        },
+        "d1": d1,
+        "d7": d7,
+        "d7Solved": d7_solved,
+        "threeCase7d": three,
+        "saveConversion7d": save,
+        "continue7d": continued,
+        "weeklySolvedUsers": weekly_solved,
         "cohorts": [{"firstDay": day, **counts} for day, counts in sorted(cohorts.items())],
         "sources": [{"source": source, "startedUsers": len(users)} for source, users in sorted(sources.items())],
     }

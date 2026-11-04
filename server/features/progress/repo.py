@@ -9,7 +9,7 @@ from pydantic import TypeAdapter
 import db
 from features.progress.legacy import unlocked_chapters
 from features.progress.models import ImportOperation, ProgressBlob, ProgressOperation, ProgressState, SessionOperation
-from features.stats.service import SessionEndFact, record_session_fact
+from features.stats.service import record_session_fact
 
 OPERATIONS = TypeAdapter(list[ProgressOperation])
 
@@ -117,10 +117,16 @@ def add_session_event(conn: Any, uid: str, operation: SessionOperation) -> None:
     if operation.payload.test_mode:
         return
     p = operation.payload
-    record_session_fact(conn, uid, SessionEndFact(
-        sessionId=p.session_id, caseId=p.case_id, contentRevision=p.content_revision,
-        anonymousId=p.anonymous_id, occurredAt=operation.occurred_at, solved=p.solved,
-    ))
+    record_session_fact(
+        conn,
+        uid,
+        p.session_id,
+        p.case_id,
+        p.content_revision,
+        p.anonymous_id,
+        operation.occurred_at,
+        p.solved,
+    )
 
 
 def save(conn: Any, uid: str, state: ProgressState, revision: int) -> str:

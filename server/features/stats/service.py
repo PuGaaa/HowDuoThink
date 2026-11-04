@@ -36,11 +36,30 @@ def record_guest_learning_event(body: LearningEventBody) -> None:
 
 def claim_guest_learning_events(uid: str, anonymous_id: str) -> None:
     with db.tx() as conn:
-        repo.claim_identity(conn, anonymous_id, uid)
+        owner = repo.claim_identity(conn, anonymous_id, uid)
+        if owner != uid:
+            raise HTTPException(status_code=409, detail="该学习档案已归入其他账号")
 
 
-def record_session_fact(conn: Any, uid: str, body: SessionEndFact) -> None:
+def record_session_fact(
+    conn: Any,
+    uid: str,
+    session_id: str,
+    case_id: str,
+    content_revision: int,
+    anonymous_id: str | None,
+    occurred_at: datetime.datetime,
+    solved: bool,
+) -> None:
     """供进度域在同一结算事务内补全学习事实，不另建第二个结束事件。"""
+    body = SessionEndFact(
+        sessionId=session_id,
+        caseId=case_id,
+        contentRevision=content_revision,
+        anonymousId=anonymous_id,
+        occurredAt=occurred_at,
+        solved=solved,
+    )
     repo.record_session_fact(conn, uid, body)
 
 

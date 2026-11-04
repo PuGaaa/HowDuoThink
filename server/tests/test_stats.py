@@ -77,7 +77,7 @@ def test_learning_event_requires_login_and_is_idempotent():
     assert db.jload(rows[0]["payload"], {})["contentRevision"] == 2
 
 
-def test_guest_learning_event_claims_once_and_event_id_is_idempotent():
+def test_guest_learning_event_claims_once_and_rejects_a_second_account():
     uid, login = _mkuser(password=_PW)
     other_uid, other_login = _mkuser(password=_PW)
     body = {
@@ -99,7 +99,7 @@ def test_guest_learning_event_claims_once_and_event_id_is_idempotent():
         assert guest.post("/api/learning-events", json=late).status_code == 204
     with make_client() as b:
         assert b.post("/api/auth/login", json={"login": other_login, "password": _PW}).status_code == 200
-        assert b.post("/api/me/learning-events/claim", json={"anonymousId": "anon-guest-1"}).status_code == 204
+        assert b.post("/api/me/learning-events/claim", json={"anonymousId": "anon-guest-1"}).status_code == 409
     import db
 
     rows = db.q("SELECT id, user_id FROM learning_events WHERE id='client:evt-guest-1'")

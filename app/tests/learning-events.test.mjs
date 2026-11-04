@@ -76,6 +76,21 @@ test('登录认领失败保留队列，重试认领成功后再提交原事件',
   assert.equal(h.events.learningEvents().length, 0);
 });
 
+test('跨账号认领409后保留原队列，不用新账号token上传', () => {
+  const h = harness(); h.login('A');
+  h.events.trackLearningEvent('session_start', 'a-session', 'first-npe', 'play'); h.flushClaims();
+  const old = sentEvents(h).at(-1), oldAnonymous = old.data.anonymousId;
+  h.reject(old);
+  h.auth.logout();
+  h.values.set('think_learning_owner_v1_' + oldAnonymous, 'B');
+  h.login('B'); h.events.flushLearningEvents();
+  const conflict = h.requests.find(r => r.url.endsWith('/claim') && r.data.anonymousId === oldAnonymous);
+  assert.ok(conflict);
+  h.respond(conflict, 409);
+  assert.equal(JSON.parse(h.values.get('think_learning_events_v1_' + oldAnonymous)).length, 1);
+  assert.equal(sentEvents(h).some(r => r.header.Authorization === 'Bearer token-B' && r.data.anonymousId === oldAnonymous), false);
+});
+
 test('直接切账号轮换匿名身份，A事件不会随B token上传，A晚回调不删B', () => {
   const h = harness(); h.login('A');
   h.events.trackLearningEvent('session_start', 'a-session', 'first-npe', 'play'); h.flushClaims();
