@@ -51,7 +51,7 @@
       </view>
 
       <!-- 扫码邀请卡 -->
-      <view class="qrcard">
+      <view v-if="shareReady" class="qrcard">
         <view class="qrcard__box">
           <view v-for="(cell, i) in qrCells" :key="'q' + i" :class="cell ? 'qcell qcell--on' : 'qcell'"></view>
         </view>
@@ -82,6 +82,7 @@ import { CHAPTERS, casesInChapter } from '../../data/chapters'
 import { getCaseProgress, getStreak, getChecklistUse, getTotals } from '../../utils/storage'
 import { rankOf } from '../../utils/scoring'
 import { getMascotUrl } from '../../utils/remote-assets'
+import { PUBLIC_WEB_ORIGIN } from '../../config'
 
 const frogUrl = getMascotUrl('frog')
 import navbar from '../../components/navbar/navbar.uvue'
@@ -93,6 +94,7 @@ const lessonCount = ref(0)
 const partSolved = ref(0)
 const qrCells = ref<boolean[]>([])
 const today = ref('')
+const shareReady = PUBLIC_WEB_ORIGIN.length > 0
 
 function refresh() {
   const totals = getTotals(
@@ -119,14 +121,15 @@ function refresh() {
   }
   partSolved.value = lit
 
-  // 二维码占位纹理（与 Figma 画板同款伪码图案）
-  const cells: boolean[] = []
-  for (let i = 0; i < 25; i++) {
-    const x = i % 5
-    const y = Math.floor(i / 5)
-    cells.push((x + y * 3 + x * y) % 3 !== 0)
+  if (shareReady) {
+    const cells: boolean[] = []
+    for (let i = 0; i < 25; i++) {
+      const x = i % 5
+      const y = Math.floor(i / 5)
+      cells.push((x + y * 3 + x * y) % 3 !== 0)
+    }
+    qrCells.value = cells
   }
-  qrCells.value = cells
 
   const d = new Date()
   const mm = d.getMonth() + 1 < 10 ? '0' + (d.getMonth() + 1) : String(d.getMonth() + 1)
@@ -268,6 +271,7 @@ function downloadPoster() {
       ctx.font = 'bold 11px -apple-system, PingFang SC, sans-serif'
       ctx.fillText('章' + (i + 1), x + 25.5, 522)
     }
+    if (shareReady) {
     // 扫码邀请卡
     ctx.beginPath()
     if (ctx.roundRect != null) ctx.roundRect(20, 566, 350, 96, 20)
@@ -298,6 +302,7 @@ function downloadPoster() {
     ctx.fillStyle = '#AFA8BD'
     ctx.font = '9px -apple-system, PingFang SC, sans-serif'
     ctx.fillText(today.value + ' · 侦探 No.0002', 116, 638)
+    }
     ctx.textAlign = 'center'
     ctx.fillStyle = '#AFA8BD'
     ctx.font = '9px -apple-system, PingFang SC, sans-serif'
