@@ -9,6 +9,10 @@ import { DiagnosisCase } from '../../types/case'
  */
 export const logCorrelationCase: DiagnosisCase = {
   id: 'log-correlation',
+  contentRevision: 2,
+  sourceType: 'official',
+  sourceCommit: '6523490',
+  sourceHash: '2998bfa4f0d8caa88c3576ff16b9ccff97cebe6219799215a174b5b1cbe8bfbe',
   title: '日志各说各话：同一次下单去了哪台实例',
   intro: '三段日志时间相近，却未必属于同一请求。先用关联键找到目标实例，再核对那台实例发生了什么。',
   domain: 'runtime',

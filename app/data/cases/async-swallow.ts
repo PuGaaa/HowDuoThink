@@ -9,6 +9,10 @@ import { DiagnosisCase } from '../../types/case'
  */
 export const asyncSwallowCase: DiagnosisCase = {
   id: 'async-swallow',
+  contentRevision: 2,
+  sourceType: 'official',
+  sourceCommit: '6523490',
+  sourceHash: '86f6b3819081aef491d0d27dda3778eaf39c044872bea44abf0f9756ac321f01',
   title: '报表永远生成中：Future里保存了什么',
   intro: '部分异步报表没有终态。任务异常可能被Future保存，线程仍健康；先查谁负责观察结果和写入失败状态。',
   domain: 'runtime',

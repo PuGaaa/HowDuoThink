@@ -9,6 +9,10 @@ import { DiagnosisCase } from '../../types/case'
  */
 export const firstNpeCase: DiagnosisCase = {
   id: 'first-npe',
+  contentRevision: 2,
+  sourceType: 'official',
+  sourceCommit: '6523490',
+  sourceHash: '68f7310e562f0e48d18892dcf9f5727ee0d8accd0974df62df175f271f10e2fa',
   title: '第一份线上堆栈：一屏红字从哪读起',
   intro: '第一份线上堆栈：先找出哪个引用为空，再核对它为什么还没有创建。',
   domain: 'runtime',

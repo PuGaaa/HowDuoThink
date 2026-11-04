@@ -100,11 +100,11 @@ test('旧社区首关挑战资格在覆盖缓存前捕获，以后只增加', ()
 test('同ID采用更高contentRevision，修订比较不受发布游标影响', () => {
   const h = harness()
   const local = h.catalog.getCaseById('first-npe')
-  h.remote.push({ ...local, contentRevision: 2, title: '修订后的标题', lessons: [{ text: '新版检查单' }], version: 1 })
+  h.remote.push({ ...local, contentRevision: 3, title: '修订后的标题', lessons: [{ text: '新版检查单' }], version: 1 })
   assert.equal(h.catalog.getCaseById('first-npe').title, '修订后的标题')
   assert.equal(h.chapters.casesInChapter('error-reading')[0].title, '修订后的标题')
   h.progress.set('first-npe', { solved: true })
   assert.equal(h.catalog.getCollectedLessons('').filter(item => item.text === '新版检查单').length, 1)
-  h.remote[0] = { ...local, contentRevision: 1, title: '相同修订不覆盖包内题', version: 9999 }
+  h.remote[0] = { ...local, contentRevision: 2, title: '相同修订不覆盖包内题', version: 9999 }
   assert.equal(h.catalog.getCaseById('first-npe').title, local.title)
 })

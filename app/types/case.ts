@@ -142,4 +142,5 @@ export interface DiagnosisCase {
   contentRevision?: number
   sourceType?: string
   sourceCommit?: string
+  sourceHash?: string
 }

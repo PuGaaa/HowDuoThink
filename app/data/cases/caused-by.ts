@@ -9,6 +9,10 @@ import { DiagnosisCase } from '../../types/case'
  */
 export const causedByCase: DiagnosisCase = {
   id: 'caused-by',
+  contentRevision: 2,
+  sourceType: 'official',
+  sourceCommit: '6523490',
+  sourceHash: 'bea41e263b8b0b72407535ab910726ba0908dffa0fbfde735e45d499b69dc46c',
   title: '导出失败的包装异常：借连接卡在哪里',
   intro: '表层只写报表生成失败。读完整异常链，再用资源指标确认是借连接超时，还是数据库失联。',
   domain: 'runtime',
