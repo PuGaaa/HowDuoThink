@@ -1,7 +1,7 @@
-# server · 社区后端（FastAPI + MySQL 8）
+# server · API 后端（FastAPI + MySQL 8）
 
-好多星的唯一后端：为管理端（`admin/`）、社区站（`web/`）、App（`app/`）提供全部 API——
-账号、案例库、投稿、进度云同步、AI 排错对话、管理端用户/统计/监控接口，并托管管理端静态产物（`/admin/`）。
+好多星的 API 服务：为 Admin、社区站和 App 提供账号、案例库、投稿、进度云同步、AI 排错对话、用户/统计/监控等 HTTP API。
+前端源码与静态资源不进入 API 镜像；各客户端通过版本化 API 路径通信。
 
 ## 技术栈与分层
 
@@ -34,8 +34,6 @@ tests/                pytest；通过 MySQL 8 隔离测试库执行
 | ai | 案例库 RAG 检索/对话 + 投稿 AI 起草管线（DeepSeek + 本地 BGE）+ ai_usage 用量审计 |
 | sync | App casepack 增量同步（公开接口，`?since=version`） |
 
-管理端静态托管：`admin/` 构建产物由本服务挂 `/admin/`（`ADMIN_DIST_DIR`，默认 `admin_dist/`）。
-
 ## 本地启动
 
 前置：Python 3.12+、本地 MySQL 8（Docker，与生产同引擎——禁止本地 SQLite/线上 MySQL 双方案）。
@@ -60,8 +58,8 @@ cp .env.example .env.dev.local && vi .env.dev.local
 **初始管理员**：库中无管理员时自动种子 `admin / HaoDuo@2026`（启动日志有提示；
 `ADMIN_PASSWORD` 可覆盖默认密码）。上线前务必登录修改密码——管理端侧栏「修改密码」。
 
-**官方案例内容（132 关）**：`server/seed/*.json` 是不入 git 的构建产物（镜像构建期从
-`app/data/cases` 自动生成）。本地灌库先导出再入库（幂等，可重复跑）：
+**官方案例内容（132 关）**：`server/seed/*.json` 是不入 git 的构建产物，由 CI 从唯一内容源
+`app/data/cases` 导出并装入 API 镜像。服务器运行镜像时不需要 App 源码。本地灌库先导出再入库（幂等，可重复跑）：
 
 ```bash
 node ../content/tools/export-case.mjs && .venv/bin/python seed.py
@@ -71,7 +69,7 @@ node ../content/tools/export-case.mjs && .venv/bin/python seed.py
 
 | 组 | 变量 |
 |---|---|
-| 会话/来源 | `JWT_SECRET`（必须写入 gitignored 配置，dev.sh 缺失即停止）、`ENV`（dev 开启绕行登录）、`WEB_ORIGIN`、`ADMIN_WEB_ORIGIN`（管理端独立域名时 CORS）、`COOKIE_SECURE=1`（HTTPS） |
+| 会话/来源 | `JWT_SECRET`（必须写入 gitignored 配置，dev.sh 缺失即停止）、`ENV`（dev 开启绕行登录）、`WEB_ORIGIN`、`ADMIN_WEB_ORIGIN`（Admin 独立托管时 CORS）、`APP_H5_ORIGIN`、`COOKIE_SECURE=1`（HTTPS） |
 | 管理员 | `ADMIN_PASSWORD`（覆盖初始密码）、`GITHUB_CLIENT_ID/SECRET`、`GITHUB_ADMIN_LOGINS` |
 | 数据库 | `MYSQL_HOST/PORT/USER/PASSWORD/DATABASE`（所有环境统一 MySQL 8） |
 | MySQL连接池 | `MYSQL_POOL_SIZE`（默认5，须≥1）、`MYSQL_POOL_MAX_OVERFLOW`（默认5，须≥0）、`MYSQL_POOL_TIMEOUT`（默认5秒，须>0） |
@@ -98,9 +96,9 @@ MySQL连接池按进程创建，默认最多同时使用10个连接；`close()`�
 
 ## 部署与运维
 
-见 `部署与运维说明文档.md`：docker compose 多阶段构建（node 阶段构建 `admin/` 产物进镜像）、
-api 容器 healthcheck、Sentry / UptimeRobot 接入步骤。管理端托管与本服务同生命周期，
-`docker compose up -d --build` 一条命令拉起整套。
+见 `部署与运维说明文档.md`：CI 从 server 源码构建纯 API 镜像并发布到 GHCR，服务器只需检出
+`server/` 并 `docker compose pull && docker compose up -d`。Admin 是独立镜像、独立部署；
+API 镜像中的官方案例种子由 CI 从已审阅内容产物生成，不需在服务器检出 App 源码。
 
 ## 关联文档
 

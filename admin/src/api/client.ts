@@ -1,6 +1,10 @@
 // 统一 API 客户端：Bearer 鉴权 + 401 自动清 token。
-// dev 走 vite 代理、生产与 api 同源，故一律用相对路径。
 const TOKEN_KEY = 'hdt_admin_token'
+const API_BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
+
+export function apiUrl(path: string): string {
+  return API_BASE + path
+}
 
 export function getToken(): string {
   return localStorage.getItem(TOKEN_KEY) || ''
@@ -29,7 +33,7 @@ async function request(method: string, path: string, body?: unknown): Promise<an
   const token = getToken()
   if (token) headers['Authorization'] = 'Bearer ' + token
   if (body !== undefined) headers['Content-Type'] = 'application/json'
-  const resp = await fetch(path, {
+  const resp = await fetch(apiUrl(path), {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,

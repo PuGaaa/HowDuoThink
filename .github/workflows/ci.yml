@@ -92,3 +92,94 @@ jobs:
           THINK_REVIEW_TYPESCRIPT: ${{ runner.temp }}/think-source-tests/node_modules/typescript
         run: node --test app/tests/*.test.mjs content/pipeline/*.test.mjs content/baselines/*.test.mjs
       - run: node content/pipeline/validate.mjs app/data/cases/first-npe.ts app/data/cases/caused-by.ts app/data/cases/log-correlation.ts app/data/cases/async-swallow.ts
+
+  image-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      api: ${{ steps.changes.outputs.api }}
+      admin: ${{ steps.changes.outputs.admin }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Detect independently deployable changes
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          echo "api=false" >> "$GITHUB_OUTPUT"
+          echo "admin=false" >> "$GITHUB_OUTPUT"
+          if [[ "$EVENT_NAME" != "push" || "$REF_NAME" != "refs/heads/main" ]]; then
+            exit 0
+          fi
+          if [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            BEFORE_SHA=$(git rev-list --max-parents=0 "$HEAD_SHA")
+          fi
+          changed=$(git diff --name-only "$BEFORE_SHA" "$HEAD_SHA")
+          if grep -Eq '^(server/|app/data/cases/|content/tools/export-case\.mjs)' <<< "$changed"; then
+            echo "api=true" >> "$GITHUB_OUTPUT"
+          fi
+          if grep -q '^admin/' <<< "$changed"; then
+            echo "admin=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish-api:
+    if: needs.image-changes.outputs.api == 'true'
+    needs: [image-changes, server, security, app-content]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Export reviewed official cases for the API image
+        run: node content/tools/export-case.mjs
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and publish API image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/pugaaa/howduothink-api:main
+            ghcr.io/pugaaa/howduothink-api:sha-${{ github.sha }}
+
+  publish-admin:
+    if: needs.image-changes.outputs.admin == 'true'
+    needs: [image-changes, security, admin]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and publish Admin image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./admin
+          file: ./admin/Dockerfile
+          push: true
+          build-args: |
+            VITE_SENTRY_DSN=${{ secrets.ADMIN_SENTRY_DSN }}
+            VITE_SENTRY_ENV=prod
+          tags: |
+            ghcr.io/pugaaa/howduothink-admin:main
+            ghcr.io/pugaaa/howduothink-admin:sha-${{ github.sha }}

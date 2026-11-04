@@ -1,5 +1,5 @@
 // 素材域 API：上传走 multipart（独立 fetch），鉴权与 401 处理对齐 client.ts。
-import { clearToken, getToken } from './client'
+import { apiUrl, clearToken, getToken } from './client'
 
 export interface AssetItem {
   id: number
@@ -18,7 +18,7 @@ async function request(method: string, path: string, body?: FormData): Promise<a
   const headers: Record<string, string> = {}
   const token = getToken()
   if (token) headers['Authorization'] = 'Bearer ' + token
-  const resp = await fetch(path, { method, headers, body })
+  const resp = await fetch(apiUrl(path), { method, headers, body })
   let data: any = null
   try {
     data = await resp.json()
@@ -60,7 +60,7 @@ const jsonRequest = async (method: string, path: string, body?: unknown): Promis
   const token = getToken()
   if (token) headers['Authorization'] = 'Bearer ' + token
   if (body !== undefined) headers['Content-Type'] = 'application/json'
-  const resp = await fetch(path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined })
+  const resp = await fetch(apiUrl(path), { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined })
   let data: any = null
   try {
     data = await resp.json()

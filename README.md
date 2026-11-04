@@ -27,7 +27,7 @@
 
 ## 快速启动（本地把整套跑起来）
 
-前置：Python 3.12+、Node 20+、Docker（本地 MySQL）。**后端必须先起**，其余端都依赖它。
+前置：Python 3.12+、Node 20+、Docker（本地 MySQL）。各端可独立安装、构建和启动；联调时前端通过 HTTP API 连接后端。
 
 ```bash
 # 1. 社区后端（:8000）—— venv、本地 MySQL 建库建号、.env.dev.local 详见 server/README.md
@@ -36,18 +36,14 @@ rm -rf .venv && uv venv .venv --python 3.12 --seed && .venv/bin/pip install -r r
 ./dev.sh
 
 # 2. 管理端（:5174）。初始账号 admin / HaoDuo@2026（dev 环境登录页与启动日志有提示，登录后请在侧栏修改密码）
-cd admin && npm install && npm run dev    # → http://localhost:5174/admin/
+cd admin && npm install && npm run dev    # → http://localhost:5174/
 
 # 3. Web 社区站（:3000，可选）
 cd web && npm install && npm run dev
 ```
 
-不起管理端 dev server？构建一次由后端托管（与生产同款链路）：
-`cd admin && npm run build && cd ../server && ADMIN_DIST_DIR=../admin/dist ./dev.sh`
-→ 访问 `http://localhost:8000/admin/`。
-
-App 走 HBuilderX（见 app/README.md）。生产部署：`server/部署与运维说明文档.md`
-（docker compose 一条命令拉起 MySQL + api，管理端产物随镜像托管）。
+App 走 HBuilderX（见 app/README.md）。App、Admin、API 分开构建部署，通过 API 域名和 HTTP 接口连接。
+生产部署见 `server/部署与运维说明文档.md`；API 镜像由 CI 构建，服务器只需检出 `server/` 并拉取镜像。
 
 ## 内容流向（生死管线）
 

@@ -19,9 +19,7 @@ services:
       - "127.0.0.1:${MYSQL_PORT:-13306}:3306"
 
   api:
-    build:
-      context: ..
-      dockerfile: server/Dockerfile
+    image: ghcr.io/pugaaa/howduothink-api:${HDX_IMAGE_TAG:-main}
     restart: unless-stopped
     env_file: .env
     depends_on:
