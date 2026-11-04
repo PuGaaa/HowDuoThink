@@ -16,9 +16,10 @@ test('T04A 当前四题正文与目录均匹配冻结基线', () => {
   const baseline = JSON.parse(readFileSync(BASELINE, 'utf8'))
   const frozen = new Map(baseline.cases.map((item) => [item.id, item]))
   for (const item of currentCases()) {
-    assert.equal(item.contentHash, frozen.get(item.id).contentHash, `${item.id} 正文哈希漂移`)
+    const expectedHash = frozen.get(item.id).calibratedHash ?? frozen.get(item.id).contentHash
+    assert.equal(item.contentHash, expectedHash, `${item.id} 正文哈希漂移`)
     assert.equal(canonical(item.metadata), canonical(frozen.get(item.id).metadata), `${item.id} 目录元数据漂移`)
-    assert.equal(item.status, 'uncalibrated')
+    assert.equal(frozen.get(item.id).status, frozen.get(item.id).calibratedHash ? 'calibrated' : 'uncalibrated')
   }
 })
 

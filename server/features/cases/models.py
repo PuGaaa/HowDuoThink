@@ -101,6 +101,10 @@ class CasePayload(BaseModel):
     restart_action_id: str = Field(default="", alias="restartActionId")
     expert_chain: list[ExpertStepIn] = Field(min_length=4, alias="expertChain")
     lessons: list[LessonIn] = Field(min_length=2, max_length=4)
+    base_revision: int | None = Field(default=None, alias="baseRevision")
+    content_revision: int | None = Field(default=None, alias="contentRevision")
+    source_type: str | None = Field(default=None, alias="sourceType")
+    source_commit: str | None = Field(default=None, alias="sourceCommit")
 
     @model_validator(mode="after")
     def _cross(self) -> "CasePayload":

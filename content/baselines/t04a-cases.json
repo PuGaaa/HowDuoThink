@@ -30,6 +30,7 @@
       "id": "first-npe",
       "file": "app/data/cases/first-npe.ts",
       "contentHash": "8180a42e497b6f84351e82f0ba02d86fad5265059288547f63c43fd602d13ea7",
+      "calibratedHash": "a73539a75cd765d9fe7838554e84feb7951b2dee74ca280d91a6549f17f7aa95",
       "metadata": {
         "part": "apprentice",
         "chapterId": "error-reading",
@@ -42,16 +43,17 @@
       },
       "expertCost": 4,
       "expertPathCost": 5,
-      "status": "uncalibrated",
+      "status": "calibrated",
       "reasons": [
-        "核实 user/account 假设效应与老用户偶发的异步延迟机制",
-        "标准专家链成本需人工确认"
+        "已核定 userPoint 存在、getAccount 返回 null；异步建档窗口解释新用户必现与老用户偶发",
+        "标准路径动作成本 1+2+1+1=5，停止条件为断点、机制、影响面三层证据闭合"
       ]
     },
     {
       "id": "caused-by",
       "file": "app/data/cases/caused-by.ts",
       "contentHash": "5de242edb5421c08b5806a6363e218693a402f54e3791ae7d4398d452d1878df",
+      "calibratedHash": "3dfabc0715c97205f5b8e803d90a0d1a051edb08b4bfd189e10e5070e0c11446",
       "metadata": {
         "part": "apprentice",
         "chapterId": "error-reading",
@@ -64,10 +66,10 @@
       },
       "expertCost": 4,
       "expertPathCost": 5,
-      "status": "uncalibrated",
+      "status": "calibrated",
       "reasons": [
-        "核实异常包装、连接池资源机制，避免把最底层异常等同业务根因",
-        "标准专家链成本需人工确认"
+        "已核定连接池等待超时是最底层异常，表层 reset 仅为包装结果；重试与高峰分布不足以支持网络根因",
+        "标准路径动作成本 1+1+2+1=5，停止条件为异常链、池水位与防线证据闭合"
       ]
     },
     {

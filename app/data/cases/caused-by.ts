@@ -4,7 +4,7 @@ import { DiagnosisCase } from '../../types/case'
  * 第 1 章 · 读懂报错 第二批（Caused by 异常链阅读 L2）
  * 教学点：假设思维——异常链从上往下读：最上层是症状，最底层的 Caused by 才是根因；
  * 按表层异常修（加重试）是安慰剂；池水位监控让"耗尽"提前可见。
- * 专家路径：impact(1) + chaindeep(2) + poolmetrics(1) = 4⚡︎
+ * 专家路径：impact(1) + chainread(1) + chaindeep(2) + poolmetrics(1) = 5⚡︎
  */
 export const causedByCase: DiagnosisCase = {
   id: 'caused-by',
@@ -59,7 +59,7 @@ export const causedByCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '重试无效性分析',
-        text: '失败分布：100% 集中在月结周高峰（并发 30+）；\n重试后再失败率：仍 60%——重试等 30s 还是等不到连接。\n如果真是网络抖动：重试成功率应接近 100%（抖动是瞬时的）。\n→ "重试无效"本身就是证据：问题不是瞬时的，是"资源持续不够"。',
+        text: '失败分布：100% 集中在月结周高峰（并发 30+）；\n重试后再失败率：仍 60%——重试等 30s 还是等不到连接。\n瞬时网络抖动通常会让一部分重试成功；这里重试后仍有 60% 失败，且失败只在高峰出现。\n→ "重试无效"与高峰分布共同支持资源持续不足，不足以单凭表层异常断定网络故障。',
       },
     },
     {
@@ -215,7 +215,7 @@ export const causedByCase: DiagnosisCase = {
     { id: 'rc-size', text: '大报表数据量触发链路限制', correct: false },
   ],
 
-  expertCost: 4,
+  expertCost: 5,
   restartActionId: 'a-danger',
 
   expertChain: [

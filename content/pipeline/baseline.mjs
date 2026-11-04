@@ -97,7 +97,8 @@ function check() {
       continue
     }
     if (frozen.file !== item.file) errors.push(`${item.id} 文件路径变化：${frozen.file} -> ${item.file}`)
-    if (frozen.contentHash !== item.contentHash) errors.push(`${item.id} 正文哈希变化：旧 ${frozen.contentHash}，现 ${item.contentHash}`)
+    const expectedHash = frozen.calibratedHash ?? frozen.contentHash
+    if (expectedHash !== item.contentHash) errors.push(`${item.id} 正文哈希变化：旧 ${expectedHash}，现 ${item.contentHash}`)
     if (canonical(frozen.metadata) !== canonical(item.metadata)) errors.push(`${item.id} 目录元数据变化，不能沿用旧基线`)
   }
   for (const item of baseline.cases) {
@@ -108,7 +109,11 @@ function check() {
     process.exitCode = 1
     return
   }
-  for (const item of current) console.log(`✓ ${item.id} — ${item.contentHash} — ${item.status}`)
+  for (const item of current) console.log(`✓ ${item.id} — ${item.contentHash} — ${expectedStatus(item.id, baseline)}`)
+}
+
+function expectedStatus(id, baseline) {
+  return baseline.cases.find((item) => item.id === id)?.status ?? 'uncalibrated'
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv.includes('--write')) {

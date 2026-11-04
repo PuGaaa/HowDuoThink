@@ -4,7 +4,7 @@ import { DiagnosisCase } from '../../types/case'
  * 第 1 章 · 读懂报错 首批（堆栈阅读入门 L1）
  * 教学点：全栈视野——堆栈阅读四步：读异常类型与消息、找第一行自己的代码帧、
  * 行号定位解引用、Caused by 链（本关只练前三步）。
- * 专家路径：impact(1) + frameread(2) + logcheck(1) = 4⚡︎
+ * 专家路径：impact(1) + frameread(2) + logcheck(1) + rpctime(1) = 5⚡︎
  */
 export const firstNpeCase: DiagnosisCase = {
   id: 'first-npe',
@@ -199,7 +199,7 @@ export const firstNpeCase: DiagnosisCase = {
     { id: 'rc-dataloss', text: '用户数据被误删形成脏数据', correct: false },
   ],
 
-  expertCost: 4,
+  expertCost: 5,
   restartActionId: 'a-fixnull',
 
   expertChain: [

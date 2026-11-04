@@ -28,7 +28,10 @@ BUSINESS_TABLES = {
     "settings",
     "assets",
     "resource_slots",
+    "index_tasks",
 }
+
+REVISION_TABLES = {"index_tasks"}
 
 
 def _use_db(monkeypatch, path: Path) -> None:
@@ -63,14 +66,14 @@ def test_replay_sqlite(monkeypatch, tmp_path):
     _use_db(monkeypatch, path)
 
     migrate.upgrade_head()
-    assert migrate.current_version() == "0001_baseline"
+    assert migrate.current_version() == "0002_case_revisions"
 
     alembic_command.downgrade(migrate._cfg(), "base")
     remaining = {n for _, n, _ in _master_rows(path)}
     assert not (remaining & BUSINESS_TABLES), remaining
 
     migrate.upgrade_head()
-    assert migrate.current_version() == "0001_baseline"
+    assert migrate.current_version() == "0002_case_revisions"
 
 
 def test_downgrade_to_base_sqlite(monkeypatch, tmp_path):
@@ -80,7 +83,7 @@ def test_downgrade_to_base_sqlite(monkeypatch, tmp_path):
     _use_db(monkeypatch, path)
 
     migrate.upgrade_head()
-    assert migrate.current_version() == "0001_baseline"
+    assert migrate.current_version() == "0002_case_revisions"
 
     migrate.downgrade_to_base()
     remaining = {n for _, n, _ in _master_rows(path)}
@@ -108,7 +111,7 @@ def test_upgrade_uses_current_config(monkeypatch, tmp_path):
     assert names_first >= BUSINESS_TABLES
     conn = sqlite3.connect(first)
     try:
-        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0001_baseline"
+        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0002_case_revisions"
     finally:
         conn.close()
 
@@ -137,21 +140,38 @@ def test_baseline_matches_fixture(monkeypatch, tmp_path):
     tests/fixtures/schema_baseline.sql 内容（剔除 alembic_version）。"""
     path = tmp_path / "snapshot.db"
     _use_db(monkeypatch, path)
-    migrate.upgrade_head()
+    alembic_command.upgrade(migrate._cfg(), "0001_baseline")
 
     rows = sorted(_master_rows(path))
     rendered = "".join(repr(row) + "\n" for row in rows)
     assert rendered == FIXTURE.read_text()
 
 
+def test_case_revision_schema(monkeypatch, tmp_path):
+    path = tmp_path / "revision.db"
+    _use_db(monkeypatch, path)
+    migrate.upgrade_head()
+    conn = sqlite3.connect(path)
+    try:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(cases)")}
+        assert {"content_revision", "source_type", "source_commit"} <= columns
+        assert "index_tasks" in {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        unique_indexes = [row for row in conn.execute("PRAGMA index_list(index_tasks)") if row[2]]
+        assert unique_indexes
+        unique_columns = {row[2] for index in unique_indexes for row in conn.execute(f"PRAGMA index_info({index[1]})")}
+        assert {"case_id", "content_revision"} <= unique_columns
+    finally:
+        conn.close()
+
+
 def test_head_and_stamp(monkeypatch, tmp_path):
     """head_version 报基线链头；stamp_head 只打版本戳不建业务表（存量库收编入口）。"""
-    assert migrate.head_version() == "0001_baseline"
+    assert migrate.head_version() == "0002_case_revisions"
 
     path = tmp_path / "stamped.db"
     _use_db(monkeypatch, path)
     migrate.stamp_head()
-    assert migrate.current_version() == "0001_baseline"
+    assert migrate.current_version() == "0002_case_revisions"
     # stamp 只写 alembic_version，不执行 DDL：业务表不应出现
     names = {n for _, n, _ in _master_rows(path, exclude_alembic=False)}
     assert "alembic_version" in names
@@ -167,5 +187,5 @@ def test_upgrade_head_cwd_independent(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     migrate.upgrade_head()
-    assert migrate.current_version() == "0001_baseline"
+    assert migrate.current_version() == "0002_case_revisions"
     assert {n for _, n, _ in _master_rows(path)} >= BUSINESS_TABLES

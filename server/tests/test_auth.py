@@ -1,5 +1,7 @@
 """auth 域：健康检查、账密鉴权、哈希升级、dev 旁路关闭。"""
 
+import pytest
+
 from tests.conftest import login_admin, make_client
 
 
@@ -67,6 +69,14 @@ def _restore_pw_admin(password="test-admin-pw"):
         "ON CONFLICT(id) DO UPDATE SET password_hash=excluded.password_hash, role='admin'",
         (security.hash_password(password),),
     )
+
+
+@pytest.fixture(autouse=True)
+def reset_admin_between_auth_cases():
+    """每个鉴权用例从固定管理员凭据开始，避免启动种子测试污染后续登录断言。"""
+    _restore_pw_admin()
+    yield
+    _restore_pw_admin()
 
 
 def test_new_database_requires_admin_password(monkeypatch):

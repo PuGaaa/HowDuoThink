@@ -8,6 +8,8 @@ import db
 from features.cases import gate
 from features.cases.models import CaseDraftBody, CaseMetaBody, CasePayload
 
+_CONTROL_FIELDS = {"baseRevision", "contentRevision", "sourceType", "sourceCommit"}
+
 
 def _int_or(v, default: int) -> int:
     try:
@@ -130,10 +132,41 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
         if srow and (srow[0]["name"] or srow[0]["login"]):
             author_name = srow[0]["name"] or ("@" + srow[0]["login"])
     d = payload.model_dump(by_alias=True)
+    requested_base = d.pop("baseRevision", None)
+    requested_revision = d.pop("contentRevision", None)
+    source_type = d.pop("sourceType", None) or "official"
+    source_commit = d.pop("sourceCommit", None)
     d["submissionId"] = sub_id
     d["authorName"] = author_name
-    exists = db.q("SELECT id FROM cases WHERE id=?", (payload.id,))
     with db.tx() as conn:
+        exists = conn.execute(
+            "SELECT id, status, content_revision, payload, source_type, source_commit FROM cases WHERE id=?",
+            (payload.id,),
+        ).fetchone()
+        if exists and exists["status"] == "published":
+            current_revision = int(exists["content_revision"] or 1)
+            if requested_base is not None and requested_base != current_revision:
+                raise HTTPException(409, "案例修订已变化，请重新载入后发布")
+            current_payload = _content_payload(db.jload(exists["payload"], {}))
+            if current_payload == _content_payload(d):
+                return {
+                    "id": payload.id,
+                    "version": int(
+                        conn.execute("SELECT value FROM meta WHERE meta_key='casepack_version'").fetchone()["value"]
+                    ),
+                    "contentRevision": current_revision,
+                    "articleId": "a-" + payload.id,
+                    "unchanged": True,
+                }
+            if requested_revision is not None and requested_revision <= current_revision:
+                raise HTTPException(409, "contentRevision 必须高于当前修订")
+            next_revision = requested_revision or current_revision + 1
+        else:
+            if requested_base not in (None, 0):
+                raise HTTPException(409, "案例不存在对应的 baseRevision")
+            next_revision = requested_revision or 1
+            if next_revision < 1:
+                raise HTTPException(409, "contentRevision 必须从 1 开始")
         version_row = conn.execute("SELECT value FROM meta WHERE meta_key='casepack_version'").fetchone()
         version = (int(version_row["value"]) if version_row else 0) + 1
         conn.execute(
@@ -142,13 +175,24 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
         )
         if exists:
             conn.execute(
-                "UPDATE cases SET payload=?, title=?, domain=?, layer=?, difficulty=?, version=?, status='published', published_at=datetime('now') WHERE id=?",
-                (db.jdump(d), payload.title, payload.domain, payload.layer, payload.difficulty, version, payload.id),
+                "UPDATE cases SET payload=?, title=?, domain=?, layer=?, difficulty=?, version=?, content_revision=?, source_type=?, source_commit=?, status='published', published_at=datetime('now') WHERE id=?",
+                (
+                    db.jdump(d),
+                    payload.title,
+                    payload.domain,
+                    payload.layer,
+                    payload.difficulty,
+                    version,
+                    next_revision,
+                    source_type,
+                    source_commit,
+                    payload.id,
+                ),
             )
         else:
             conn.execute(
-                "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload, published_at) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?,datetime('now'))",
+                "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, content_revision, source_type, source_commit, status, payload, published_at) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))",
                 (
                     payload.id,
                     sub_id,
@@ -158,21 +202,25 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
                     payload.layer,
                     payload.difficulty,
                     version,
+                    next_revision,
+                    source_type,
+                    source_commit,
                     "published",
                     db.jdump(d),
                 ),
             )
         article_id = _upsert_article(conn, payload, author_name)
-    # 发布成功 → 增量索引到 AI 案例库（失败不阻塞发布）
-    try:
-        from features.ai import service as ai_service
+        conn.execute(
+            "INSERT INTO index_tasks(id, case_id, content_revision, payload) VALUES(?,?,?,?) "
+            "ON CONFLICT(case_id, content_revision) DO UPDATE SET payload=excluded.payload, status='pending', last_error=NULL, updated_at=datetime('now')",
+            (f"case:{payload.id}:{next_revision}", payload.id, next_revision, db.jdump(d)),
+        )
+    return {"id": payload.id, "version": version, "contentRevision": next_revision, "articleId": article_id}
 
-        ai_service.index_case(payload.id)
-    except Exception:  # noqa: BLE001 — AI 索引失败只记日志
-        import logging
 
-        logging.getLogger("uvicorn.error").warning("AI index failed for %s", payload.id)
-    return {"id": payload.id, "version": version, "articleId": article_id}
+def _content_payload(payload: dict) -> dict:
+    """去掉发布控制/追溯字段，比较实际案例正文与教学元数据。"""
+    return {k: v for k, v in payload.items() if k not in _CONTROL_FIELDS | {"submissionId", "authorName"}}
 
 
 def _upsert_article(conn, payload: CasePayload, author: str) -> str:
@@ -216,8 +264,8 @@ def published_after(since: int) -> tuple[int, list[dict]]:
         head_row = conn.execute("SELECT value FROM meta WHERE meta_key='casepack_version'").fetchone()
         head = int(head_row["value"]) if head_row else 0
         rows = conn.execute(
-            "SELECT id, version, payload FROM cases "
+            "SELECT id, version, content_revision, payload FROM cases "
             "WHERE status='published' AND version>? AND version<=? ORDER BY version",
             (since, head),
         ).fetchall()
-    return head, [db.jload(r["payload"], {}) for r in rows]
+    return head, [dict(db.jload(r["payload"], {}), contentRevision=r["content_revision"] or 1) for r in rows]

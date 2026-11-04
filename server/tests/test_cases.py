@@ -38,10 +38,12 @@ def test_publish_roundtrip_and_idempotent():
         r1 = client.post("/api/cases", json=payload)
         assert r1.status_code == 200, r1.text
         v1 = r1.json()["version"]
-        # 幂等重发：再次发布应成功且版本递增
+        # 幂等重发：正文不变，不新增修订或 cursor
         r2 = client.post("/api/cases", json=payload)
         assert r2.status_code == 200
-        assert r2.json()["version"] == v1 + 1
+        assert r2.json()["version"] == v1
+        assert r2.json()["unchanged"] is True
+        assert r2.json()["contentRevision"] == 1
         # article 投影存在
         assert client.get("/api/solutions/a-" + payload["id"]).status_code == 200
 
@@ -68,6 +70,27 @@ def test_admin_cases_list_and_detail():
         d = client.get("/api/admin/cases/" + payload["id"])
         assert d.status_code == 200
         assert d.json()["payload"]["id"] == payload["id"]
+
+
+def test_publish_revision_conflict_and_index_task():
+    import db
+
+    with make_client() as client:
+        login_admin(client)
+        payload = load_seed()
+        first = client.post("/api/cases", json=payload)
+        assert first.status_code == 200
+        changed = {**payload, "title": "修订后的标题", "baseRevision": 1}
+        second = client.post("/api/cases", json=changed)
+        assert second.status_code == 200, second.text
+        assert second.json()["contentRevision"] == 2
+        stale = {**payload, "title": "陈旧覆盖", "baseRevision": 1}
+        assert client.post("/api/cases", json=stale).status_code == 409
+        task = db.q("SELECT case_id, content_revision, status FROM index_tasks WHERE case_id=?", (payload["id"],))
+        assert [(r["case_id"], r["content_revision"], r["status"]) for r in task] == [
+            (payload["id"], 1, "pending"),
+            (payload["id"], 2, "pending"),
+        ]
 
 
 def test_admin_cases_list_filters_by_status():
