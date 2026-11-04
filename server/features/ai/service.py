@@ -88,18 +88,28 @@ def _embed(texts: list[str]) -> list[list[float]]:
     return vectors
 
 
-def index_case(case_id: str) -> bool:
-    """增量索引单个已发布案例（向量供应商未就绪时返回 False）。"""
+def index_case(case_id: str, expected_revision: int | None = None) -> str:
+    """索引单个已发布案例：嵌入前后都校验修订，返回 done/stale/unavailable。"""
     if not client.embed_available():
-        return False
-    rows = db.q("SELECT payload FROM cases WHERE id=? AND status='published'", (case_id,))
+        return "unavailable"
+    rows = db.q(
+        "SELECT payload, content_revision FROM cases WHERE id=? AND status='published'", (case_id,)
+    )
     if not rows:
-        return False
+        return "stale"
+    revision = int(rows[0]["content_revision"] or 1)
+    if expected_revision is not None and revision != expected_revision:
+        return "stale"
     payload = db.jload(rows[0]["payload"], {})
     chunks = _case_chunks(payload)
     vectors = _embed([c[1] for c in chunks])
     model = client.embeddings_model_name()
     with db.tx() as conn:
+        current = conn.execute(
+            "SELECT status, content_revision FROM cases WHERE id=? /* FOR UPDATE */", (case_id,)
+        ).fetchone()
+        if not current or current["status"] != "published" or int(current["content_revision"] or 1) != revision:
+            return "stale"
         for (kind, content), vec in zip(chunks, vectors):
             conn.execute(
                 "INSERT INTO ai_index(source_type, source_id, chunk_kind, content, embedding, model, updated_at) "
@@ -108,7 +118,7 @@ def index_case(case_id: str) -> bool:
                 "content=excluded.content, embedding=excluded.embedding, model=excluded.model, updated_at=datetime('now')",
                 (case_id, kind, content, json.dumps(vec), model),
             )
-    return True
+    return "done"
 
 
 def reindex_all() -> dict:
@@ -119,7 +129,7 @@ def reindex_all() -> dict:
     rows = db.q("SELECT id FROM cases WHERE status='published'")
     done = 0
     for r in rows:
-        if index_case(r["id"]):
+        if index_case(r["id"]) == "done":
             done += 1
     return {"ok": True, "indexed": done, "total": len(rows)}
 
@@ -127,7 +137,10 @@ def reindex_all() -> dict:
 def process_index_tasks(limit: int = 20) -> dict:
     """消费发布事务产生的索引任务；旧修订只收敛为 stale，不覆盖新索引。"""
     rows = db.q(
-        "SELECT id, case_id, content_revision FROM index_tasks WHERE status='pending' ORDER BY created_at, id LIMIT ?",
+        "SELECT id, case_id, content_revision FROM index_tasks WHERE status='pending' "
+        "OR (status='failed' AND attempts < 3) "
+        "OR (status='processing' AND updated_at < datetime('now', '-10 minutes')) "
+        "ORDER BY created_at, id LIMIT ?",
         (limit,),
     )
     done = stale = failed = 0
@@ -135,7 +148,8 @@ def process_index_tasks(limit: int = 20) -> dict:
         with db.tx() as conn:
             claimed = conn.execute(
                 "UPDATE index_tasks SET status='processing', attempts=attempts+1, updated_at=datetime('now') "
-                "WHERE id=? AND status='pending'",
+                "WHERE id=? AND (status='pending' OR (status='failed' AND attempts < 3) "
+                "OR (status='processing' AND updated_at < datetime('now', '-10 minutes')))",
                 (row["id"],),
             ).rowcount
         if claimed == 0:
@@ -149,12 +163,19 @@ def process_index_tasks(limit: int = 20) -> dict:
             stale += 1
             continue
         try:
-            if index_case(row["case_id"]):
+            result = index_case(row["case_id"], int(row["content_revision"]))
+            if result == "done":
                 db.ex(
                     "UPDATE index_tasks SET status='done', last_error=NULL, updated_at=datetime('now') WHERE id=?",
                     (row["id"],),
                 )
                 done += 1
+            elif result == "stale":
+                db.ex(
+                    "UPDATE index_tasks SET status='stale', last_error=?, updated_at=datetime('now') WHERE id=?",
+                    ("案例已有更高修订", row["id"]),
+                )
+                stale += 1
             else:
                 db.ex(
                     "UPDATE index_tasks SET status='failed', last_error=?, updated_at=datetime('now') WHERE id=?",

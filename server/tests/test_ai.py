@@ -2,6 +2,7 @@
 遵循 conftest：临时库 + 无 dev 绕行；LangChain 调用在 service 层被 monkeypatch（不触网）。"""
 
 import json
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
@@ -155,6 +156,33 @@ def test_reindex_embed_unavailable(monkeypatch):
         from features.ai import client as ai_client
 
         ai_client.embeddings_model.cache_clear()
+
+
+def test_index_case_does_not_overwrite_newer_revision(monkeypatch):
+    """慢嵌入完成后案例已修订时，旧向量不能覆盖新版本。"""
+    import db
+    from features.ai import service
+
+    case_id = "cas-" + uuid4().hex[:12]
+    db.ex(
+        "INSERT INTO cases(id,title,domain,layer,difficulty,version,content_revision,status,payload) "
+        "VALUES(?,?,?,?,?,?,?,?,?)",
+        (case_id, "竞态测试", "runtime", "运行时", 1, 1, 1, "published", db.jdump({"title": "竞态测试"})),
+    )
+    monkeypatch.setattr("features.ai.client.embed_available", lambda: True)
+    monkeypatch.setattr("features.ai.client.embeddings_model_name", lambda: "fake")
+
+    def late_embed(texts):
+        db.ex("UPDATE cases SET content_revision=2 WHERE id=?", (case_id,))
+        return [[1.0] for _ in texts]
+
+    monkeypatch.setattr(service, "_embed", late_embed)
+    try:
+        assert service.index_case(case_id, 1) == "stale"
+        assert db.q("SELECT id FROM ai_index WHERE source_id=?", (case_id,)) == []
+    finally:
+        db.ex("DELETE FROM ai_index WHERE source_id=?", (case_id,))
+        db.ex("DELETE FROM cases WHERE id=?", (case_id,))
 
 
 def test_cosine_ranking(monkeypatch):

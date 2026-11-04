@@ -279,8 +279,16 @@ def published_after(since: int) -> tuple[int, list[dict]]:
         head_row = conn.execute("SELECT value FROM meta WHERE meta_key='casepack_version'").fetchone()
         head = int(head_row["value"]) if head_row else 0
         rows = conn.execute(
-            "SELECT id, version, content_revision, payload FROM cases "
+            "SELECT id, version, content_revision, source_type, source_commit, payload FROM cases "
             "WHERE status='published' AND version>? AND version<=? ORDER BY version",
             (since, head),
         ).fetchall()
-    return head, [dict(db.jload(r["payload"], {}), contentRevision=r["content_revision"] or 1) for r in rows]
+    return head, [
+        dict(
+            db.jload(r["payload"], {}),
+            contentRevision=r["content_revision"] or 1,
+            sourceType=r["source_type"] or "official",
+            sourceCommit=r["source_commit"],
+        )
+        for r in rows
+    ]
