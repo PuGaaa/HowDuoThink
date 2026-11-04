@@ -1,0 +1,987 @@
+{
+  "method": {
+    "source_before": "a7b7000",
+    "after_applied_changes": [
+      "server/core/db.py connection pooling",
+      "server/core/config.py three MYSQL_POOL_* defaults",
+      "server/features/assets/router.py sync upload boundary"
+    ],
+    "host_cpu_count": 10,
+    "host_ram_mb": 16384,
+    "business_concurrency": 8,
+    "business_interval_ms": 150,
+    "business_window_seconds": 8,
+    "mysql": "dedicated MySQL8 container; same host and fixture, recreated hdt_perf only",
+    "cases": 131,
+    "embedding_chunks": 262,
+    "pool_size": 5,
+    "pool_max_overflow": 5,
+    "pool_timeout_seconds": 5,
+    "new_deepseek_calls_in_after_run": 2
+  },
+  "before": {
+    "prepare": {
+      "publish": {
+        "n": 131,
+        "mean_ms": 34.14,
+        "p50_ms": 31.95,
+        "p95_ms": 49.74,
+        "p99_ms": 67.84,
+        "max_ms": 82.66
+      },
+      "publish_errors": [],
+      "published_cases": 131,
+      "queued_index_tasks": 131,
+      "new_connection_select1": {
+        "n": 100,
+        "mean_ms": 13.75,
+        "p50_ms": 13.39,
+        "p95_ms": 15.42,
+        "p99_ms": 20.37,
+        "max_ms": 21.35
+      },
+      "one_connection_select1": {
+        "n": 100,
+        "mean_ms": 0.22,
+        "p50_ms": 0.17,
+        "p95_ms": 0.51,
+        "p99_ms": 0.94,
+        "max_ms": 1.15
+      }
+    },
+    "cold": {
+      "backend": "FastEmbedEmbeddings",
+      "vector_dimension": 512,
+      "model_init_ms": 517.18,
+      "first_query_ms": 11.05,
+      "warm_queries": {
+        "n": 8,
+        "mean_ms": 1.82,
+        "p50_ms": 1.65,
+        "p95_ms": 2.46,
+        "p99_ms": 2.46,
+        "max_ms": 2.46
+      },
+      "cpu_seconds": 0.371,
+      "rss_before_model_mb": 107.55,
+      "rss_after_queries_mb": 306.91
+    },
+    "http": {
+      "baseline_commit": "a7b7000",
+      "host_cpu_count": 10,
+      "host_ram_mb": 16384,
+      "stages": {
+        "pure_business": {
+          "wall_seconds": 8.214,
+          "steady_business_window_seconds": 8,
+          "cpu_seconds": 27.196,
+          "cpu_percent_one_core": 331.1,
+          "peak_rss_mb": 141.56,
+          "requests": {
+            "business": {
+              "n": 202,
+              "mean_ms": 169.09,
+              "p50_ms": 100.24,
+              "p95_ms": 532.33,
+              "p99_ms": 610.22,
+              "max_ms": 641.43,
+              "errors": 0,
+              "error_rate": 0.0
+            }
+          },
+          "segments": {
+            "mysql_connect": {
+              "n": 337,
+              "mean_ms": 96.51,
+              "p50_ms": 43.96,
+              "p95_ms": 337.68,
+              "p99_ms": 393.45,
+              "max_ms": 430.24
+            }
+          }
+        },
+        "mixed_three_real_ai_calls": {
+          "wall_seconds": 8.533,
+          "steady_business_window_seconds": 8,
+          "cpu_seconds": 45.243,
+          "cpu_percent_one_core": 530.2,
+          "peak_rss_mb": 353.3,
+          "requests": {
+            "ai": {
+              "n": 3,
+              "mean_ms": 4743.95,
+              "p50_ms": 4676.97,
+              "p95_ms": 4890.92,
+              "p99_ms": 4890.92,
+              "max_ms": 4890.92,
+              "errors": 0,
+              "error_rate": 0.0,
+              "calls": [
+                {
+                  "label": "ai",
+                  "ms": 4890.923665952869,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 223,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "ai",
+                  "ms": 4676.971333043184,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 227,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "ai",
+                  "ms": 4663.948250003159,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 257,
+                  "sources": 0,
+                  "indexed": null
+                }
+              ]
+            },
+            "business": {
+              "n": 134,
+              "mean_ms": 352.88,
+              "p50_ms": 297.58,
+              "p95_ms": 1061.06,
+              "p99_ms": 1290.29,
+              "max_ms": 1297.05,
+              "errors": 0,
+              "error_rate": 0.0
+            }
+          },
+          "segments": {
+            "mysql_connect": {
+              "n": 239,
+              "mean_ms": 221.89,
+              "p50_ms": 171.59,
+              "p95_ms": 630.35,
+              "p99_ms": 645.9,
+              "max_ms": 648.84
+            },
+            "retrieve_with_embedding": {
+              "n": 3,
+              "mean_ms": 439.91,
+              "p50_ms": 426.39,
+              "p95_ms": 517.34,
+              "p99_ms": 517.34,
+              "max_ms": 517.34
+            },
+            "deepseek_and_audit": {
+              "n": 3,
+              "mean_ms": 2796.13,
+              "p50_ms": 2762.11,
+              "p95_ms": 2905.81,
+              "p99_ms": 2905.81,
+              "max_ms": 2905.81
+            }
+          }
+        },
+        "full_131_case_reindex": {
+          "wall_seconds": 19.395,
+          "steady_business_window_seconds": 8,
+          "cpu_seconds": 79.93,
+          "cpu_percent_one_core": 412.1,
+          "peak_rss_mb": 258.66,
+          "requests": {
+            "business": {
+              "n": 115,
+              "mean_ms": 417.98,
+              "p50_ms": 449.13,
+              "p95_ms": 753.67,
+              "p99_ms": 845.42,
+              "max_ms": 854.52,
+              "errors": 0,
+              "error_rate": 0.0
+            },
+            "index": {
+              "n": 1,
+              "mean_ms": 19357.91,
+              "p50_ms": 19357.91,
+              "p95_ms": 19357.91,
+              "p99_ms": 19357.91,
+              "max_ms": 19357.91,
+              "errors": 0,
+              "error_rate": 0.0,
+              "calls": [
+                {
+                  "label": "index",
+                  "ms": 19357.91349998908,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": 131
+                }
+              ]
+            }
+          },
+          "segments": {
+            "mysql_connect": {
+              "n": 589,
+              "mean_ms": 100.76,
+              "p50_ms": 17.68,
+              "p95_ms": 472.37,
+              "p99_ms": 528.59,
+              "max_ms": 555.2
+            },
+            "index_embedding": {
+              "n": 131,
+              "mean_ms": 73.32,
+              "p50_ms": 58.42,
+              "p95_ms": 161.92,
+              "p99_ms": 403.75,
+              "max_ms": 407.35
+            }
+          }
+        },
+        "warm_search_mix": {
+          "wall_seconds": 8.2,
+          "steady_business_window_seconds": 8,
+          "cpu_seconds": 33.002,
+          "cpu_percent_one_core": 402.5,
+          "peak_rss_mb": 317.42,
+          "requests": {
+            "business": {
+              "n": 160,
+              "mean_ms": 253.52,
+              "p50_ms": 89.86,
+              "p95_ms": 848.56,
+              "p99_ms": 1994.07,
+              "max_ms": 1994.18,
+              "errors": 0,
+              "error_rate": 0.0
+            },
+            "search": {
+              "n": 12,
+              "mean_ms": 2061.66,
+              "p50_ms": 2117.7,
+              "p95_ms": 2279.36,
+              "p99_ms": 2279.36,
+              "max_ms": 2279.36,
+              "errors": 0,
+              "error_rate": 0.0,
+              "calls": [
+                {
+                  "label": "search",
+                  "ms": 1559.498500020709,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 1995.1416249969043,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 1950.6872920319438,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 1914.879292016849,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 1946.9156250124797,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 2118.307249969803,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 2278.7520410493016,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 2181.020707997959,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 2117.7002919721417,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 2181.6516669932753,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 2216.044917004183,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 2279.362833010964,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                }
+              ]
+            }
+          },
+          "segments": {
+            "mysql_connect": {
+              "n": 290,
+              "mean_ms": 199.08,
+              "p50_ms": 50.12,
+              "p95_ms": 1044.59,
+              "p99_ms": 1145.19,
+              "max_ms": 1206.22
+            },
+            "retrieve_with_embedding": {
+              "n": 12,
+              "mean_ms": 839.73,
+              "p50_ms": 817.53,
+              "p95_ms": 1031.52,
+              "p99_ms": 1031.52,
+              "max_ms": 1031.52
+            }
+          }
+        },
+        "pure_business_repeat_after_index": {
+          "wall_seconds": 8.259,
+          "steady_business_window_seconds": 8,
+          "cpu_seconds": 33.696,
+          "cpu_percent_one_core": 408.0,
+          "peak_rss_mb": 143.38,
+          "requests": {
+            "business": {
+              "n": 171,
+              "mean_ms": 227.8,
+              "p50_ms": 215.83,
+              "p95_ms": 476.22,
+              "p99_ms": 536.15,
+              "max_ms": 536.18,
+              "errors": 0,
+              "error_rate": 0.0
+            }
+          },
+          "segments": {
+            "mysql_connect": {
+              "n": 287,
+              "mean_ms": 130.51,
+              "p50_ms": 60.9,
+              "p95_ms": 367.47,
+              "p99_ms": 464.92,
+              "max_ms": 466.26
+            }
+          }
+        },
+        "mixed_two_real_rag_calls": {
+          "wall_seconds": 8.209,
+          "steady_business_window_seconds": 8,
+          "cpu_seconds": 38.656,
+          "cpu_percent_one_core": 470.9,
+          "peak_rss_mb": 335.89,
+          "requests": {
+            "ai": {
+              "n": 2,
+              "mean_ms": 5178.05,
+              "p50_ms": 4880.5,
+              "p95_ms": 5475.59,
+              "p99_ms": 5475.59,
+              "max_ms": 5475.59,
+              "errors": 0,
+              "error_rate": 0.0,
+              "calls": [
+                {
+                  "label": "ai",
+                  "ms": 5475.591375026852,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 583,
+                  "sources": 4,
+                  "indexed": null
+                },
+                {
+                  "label": "ai",
+                  "ms": 4880.504917004146,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 478,
+                  "sources": 4,
+                  "indexed": null
+                }
+              ]
+            },
+            "business": {
+              "n": 158,
+              "mean_ms": 258.75,
+              "p50_ms": 144.09,
+              "p95_ms": 698.45,
+              "p99_ms": 1127.21,
+              "max_ms": 1132.29,
+              "errors": 0,
+              "error_rate": 0.0
+            }
+          },
+          "segments": {
+            "mysql_connect": {
+              "n": 283,
+              "mean_ms": 154.19,
+              "p50_ms": 56.18,
+              "p95_ms": 484.09,
+              "p99_ms": 629.77,
+              "max_ms": 631.02
+            },
+            "retrieve_with_embedding": {
+              "n": 2,
+              "mean_ms": 547.37,
+              "p50_ms": 528.35,
+              "p95_ms": 566.39,
+              "p99_ms": 566.39,
+              "max_ms": 566.39
+            },
+            "deepseek_and_audit": {
+              "n": 2,
+              "mean_ms": 3076.33,
+              "p50_ms": 3006.56,
+              "p95_ms": 3146.1,
+              "p99_ms": 3146.1,
+              "max_ms": 3146.1
+            }
+          }
+        }
+      },
+      "server_first_search": {
+        "label": "search",
+        "ms": 235.54833402158692,
+        "ok": true,
+        "status": 200,
+        "answer_chars": 0,
+        "sources": 0,
+        "indexed": null,
+        "rss_after_mb": 348.48
+      },
+      "supplement_first_search": {
+        "label": "search",
+        "ms": 462.22445799503475,
+        "ok": true,
+        "status": 200,
+        "answer_chars": 0,
+        "sources": 0,
+        "indexed": null,
+        "rss_after_mb": 335.05
+      },
+      "ai_usage": [
+        {
+          "kind": "chat",
+          "calls": 5,
+          "input_tokens": 4321.0,
+          "output_tokens": 1075.0,
+          "successful": 5.0
+        },
+        {
+          "kind": "embed",
+          "calls": 131,
+          "input_tokens": 0.0,
+          "output_tokens": 0.0,
+          "successful": 131.0
+        }
+      ],
+      "indexed_chunks": 262
+    }
+  },
+  "after": {
+    "prepare": {
+      "publish": {
+        "n": 131,
+        "mean_ms": 6.82,
+        "p50_ms": 5.93,
+        "p95_ms": 11.56,
+        "p99_ms": 27.97,
+        "max_ms": 32.64
+      },
+      "publish_errors": [],
+      "published_cases": 131,
+      "queued_index_tasks": 131,
+      "checkout_select1": {
+        "n": 100,
+        "mean_ms": 0.82,
+        "p50_ms": 0.66,
+        "p95_ms": 1.6,
+        "p99_ms": 2.37,
+        "max_ms": 4.65
+      },
+      "one_connection_select1": {
+        "n": 100,
+        "mean_ms": 0.25,
+        "p50_ms": 0.21,
+        "p95_ms": 0.57,
+        "p99_ms": 0.75,
+        "max_ms": 1.05
+      }
+    },
+    "cold": {
+      "backend": "FastEmbedEmbeddings",
+      "vector_dimension": 512,
+      "model_init_ms": 889.86,
+      "first_query_ms": 18.89,
+      "warm_queries": {
+        "n": 8,
+        "mean_ms": 2.07,
+        "p50_ms": 2.08,
+        "p95_ms": 2.6,
+        "p99_ms": 2.6,
+        "max_ms": 2.6
+      },
+      "cpu_seconds": 0.447,
+      "rss_before_model_mb": 107.39,
+      "rss_after_queries_mb": 305.17
+    },
+    "http": {
+      "source_root": "/tmp/think-perf-20261104/after-source",
+      "host_cpu_count": 10,
+      "host_ram_mb": 16384,
+      "stages": {
+        "pure_business": {
+          "wall_seconds": 8.175,
+          "steady_business_window_seconds": 8,
+          "cpu_seconds": 2.45,
+          "cpu_percent_one_core": 30.0,
+          "peak_rss_mb": 142.56,
+          "requests": {
+            "business": {
+              "n": 380,
+              "mean_ms": 19.35,
+              "p50_ms": 12.08,
+              "p95_ms": 52.11,
+              "p99_ms": 216.01,
+              "max_ms": 221.77,
+              "errors": 0,
+              "error_rate": 0.0
+            }
+          },
+          "segments": {
+            "db_checkout": {
+              "n": 634,
+              "mean_ms": 4.43,
+              "p50_ms": 0.79,
+              "p95_ms": 18.55,
+              "p99_ms": 72.28,
+              "max_ms": 206.3
+            },
+            "mysql_connect": {
+              "n": 28,
+              "mean_ms": 74.37,
+              "p50_ms": 35.2,
+              "p95_ms": 205.85,
+              "p99_ms": 206.28,
+              "max_ms": 206.28
+            }
+          }
+        },
+        "full_131_case_reindex": {
+          "wall_seconds": 8.184,
+          "steady_business_window_seconds": 8,
+          "cpu_seconds": 30.822,
+          "cpu_percent_one_core": 376.6,
+          "peak_rss_mb": 339.05,
+          "requests": {
+            "business": {
+              "n": 401,
+              "mean_ms": 11.25,
+              "p50_ms": 9.61,
+              "p95_ms": 21.77,
+              "p99_ms": 35.0,
+              "max_ms": 85.58,
+              "errors": 0,
+              "error_rate": 0.0
+            },
+            "index": {
+              "n": 1,
+              "mean_ms": 6574.82,
+              "p50_ms": 6574.82,
+              "p95_ms": 6574.82,
+              "p99_ms": 6574.82,
+              "max_ms": 6574.82,
+              "errors": 0,
+              "error_rate": 0.0,
+              "calls": [
+                {
+                  "label": "index",
+                  "ms": 6574.815041967668,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": 131
+                }
+              ]
+            }
+          },
+          "segments": {
+            "db_checkout": {
+              "n": 1066,
+              "mean_ms": 0.98,
+              "p50_ms": 0.58,
+              "p95_ms": 1.57,
+              "p99_ms": 3.11,
+              "max_ms": 72.61
+            },
+            "mysql_connect": {
+              "n": 5,
+              "mean_ms": 61.79,
+              "p50_ms": 71.54,
+              "p95_ms": 72.58,
+              "p99_ms": 72.58,
+              "max_ms": 72.58
+            },
+            "index_embedding": {
+              "n": 131,
+              "mean_ms": 42.66,
+              "p50_ms": 40.98,
+              "p95_ms": 52.56,
+              "p99_ms": 60.24,
+              "max_ms": 67.89
+            }
+          }
+        },
+        "mixed_two_real_rag_calls": {
+          "wall_seconds": 8.095,
+          "steady_business_window_seconds": 8,
+          "cpu_seconds": 2.21,
+          "cpu_percent_one_core": 27.3,
+          "peak_rss_mb": 351.39,
+          "requests": {
+            "ai": {
+              "n": 2,
+              "mean_ms": 2971.86,
+              "p50_ms": 2928.67,
+              "p95_ms": 3015.06,
+              "p99_ms": 3015.06,
+              "max_ms": 3015.06,
+              "errors": 0,
+              "error_rate": 0.0,
+              "calls": [
+                {
+                  "label": "ai",
+                  "ms": 3015.0576670421287,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 613,
+                  "sources": 4,
+                  "indexed": null
+                },
+                {
+                  "label": "ai",
+                  "ms": 2928.6722500110045,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 455,
+                  "sources": 4,
+                  "indexed": null
+                }
+              ]
+            },
+            "business": {
+              "n": 376,
+              "mean_ms": 20.17,
+              "p50_ms": 16.63,
+              "p95_ms": 51.33,
+              "p99_ms": 97.17,
+              "max_ms": 102.04,
+              "errors": 0,
+              "error_rate": 0.0
+            }
+          },
+          "segments": {
+            "db_checkout": {
+              "n": 644,
+              "mean_ms": 2.94,
+              "p50_ms": 0.87,
+              "p95_ms": 9.15,
+              "p99_ms": 60.25,
+              "max_ms": 85.78
+            },
+            "retrieve_with_embedding": {
+              "n": 2,
+              "mean_ms": 57.88,
+              "p50_ms": 51.45,
+              "p95_ms": 64.31,
+              "p99_ms": 64.31,
+              "max_ms": 64.31
+            },
+            "mysql_connect": {
+              "n": 28,
+              "mean_ms": 40.12,
+              "p50_ms": 28.95,
+              "p95_ms": 83.85,
+              "p99_ms": 85.73,
+              "max_ms": 85.73
+            },
+            "deepseek_and_audit": {
+              "n": 2,
+              "mean_ms": 2842.0,
+              "p50_ms": 2830.94,
+              "p95_ms": 2853.06,
+              "p99_ms": 2853.06,
+              "max_ms": 2853.06
+            }
+          }
+        },
+        "warm_search_mix": {
+          "wall_seconds": 8.096,
+          "steady_business_window_seconds": 8,
+          "cpu_seconds": 2.355,
+          "cpu_percent_one_core": 29.1,
+          "peak_rss_mb": 357.44,
+          "requests": {
+            "business": {
+              "n": 375,
+              "mean_ms": 20.98,
+              "p50_ms": 14.69,
+              "p95_ms": 60.05,
+              "p99_ms": 169.87,
+              "max_ms": 253.48,
+              "errors": 0,
+              "error_rate": 0.0
+            },
+            "search": {
+              "n": 12,
+              "mean_ms": 394.5,
+              "p50_ms": 403.31,
+              "p95_ms": 558.9,
+              "p99_ms": 558.9,
+              "max_ms": 558.9,
+              "errors": 0,
+              "error_rate": 0.0,
+              "calls": [
+                {
+                  "label": "search",
+                  "ms": 207.32099999440834,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 502.3037919891067,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 206.6133749904111,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 258.1862920196727,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 446.06124999700114,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 501.1743750073947,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 531.1982500134036,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 403.9426249801181,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 558.9030829723924,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 403.309540997725,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 312.2113330173306,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                },
+                {
+                  "label": "search",
+                  "ms": 402.78187504736707,
+                  "ok": true,
+                  "status": 200,
+                  "answer_chars": 0,
+                  "sources": 0,
+                  "indexed": null
+                }
+              ]
+            }
+          },
+          "segments": {
+            "db_checkout": {
+              "n": 649,
+              "mean_ms": 4.74,
+              "p50_ms": 0.99,
+              "p95_ms": 11.72,
+              "p99_ms": 114.68,
+              "max_ms": 232.75
+            },
+            "retrieve_with_embedding": {
+              "n": 12,
+              "mean_ms": 250.56,
+              "p50_ms": 241.92,
+              "p95_ms": 373.89,
+              "p99_ms": 373.89,
+              "max_ms": 373.89
+            },
+            "mysql_connect": {
+              "n": 7,
+              "mean_ms": 157.3,
+              "p50_ms": 193.19,
+              "p95_ms": 232.72,
+              "p99_ms": 232.72,
+              "max_ms": 232.72
+            }
+          }
+        }
+      },
+      "server_first_search": {
+        "label": "search",
+        "ms": 369.12745801964775,
+        "ok": true,
+        "status": 200,
+        "answer_chars": 0,
+        "sources": 0,
+        "indexed": null,
+        "rss_after_mb": 296.98
+      },
+      "ai_usage": [
+        {
+          "kind": "embed",
+          "calls": 131,
+          "input_tokens": 0.0,
+          "output_tokens": 0.0,
+          "successful": 131.0
+        },
+        {
+          "kind": "chat",
+          "calls": 2,
+          "input_tokens": 3933.0,
+          "output_tokens": 657.0,
+          "successful": 2.0
+        }
+      ],
+      "indexed_chunks": 262
+    }
+  },
+  "limitations": [
+    "shared development machine, not production capacity",
+    "closed-loop load, not fixed RPS",
+    "real RAG sample count two per side; p95/p99 are maxima",
+    "cold process with disk model cache, not first download",
+    "real OSS upload was not exercised; synthetic SDK only in scheduling test",
+    "before first three AI calls had empty index and are excluded from complete-RAG comparison"
+  ]
+}
