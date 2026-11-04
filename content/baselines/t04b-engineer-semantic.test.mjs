@@ -98,3 +98,9 @@ test('监听器泄漏的字节和回调次数可对账，once不能代替关联�
 test('OOM结合Reason和cgroup事件，事件循环题使用真实zlib同步API',()=>{
  const oom=load('app/data/cases/oom-leak.ts');assert.match(oom.actions.find(a=>a.id==='a-k8sevent').result.text,/137只代表SIGKILL/);assert.ok(Math.abs((2048-400)/45-36.6)<.1);const loop=load('app/data/cases/event-loop-blocked.ts');assert.match(loop.actions.find(a=>a.id==='a-code').result.text,/zlib.gzipSync/);assert.match(loop.actions.find(a=>a.id==='a-fix').result.text,/async\/Promise本身不会移出主线程/)
 })
+test('端口题同元组不超过范围，HPA按requests且readiness不直接重启',()=>{
+ assert.equal(60999-32768+1,28232);assert.equal(468*60,28080);assert.ok(28080+100<28232);const tw=load('app/data/cases/timewait-exhausted.ts');assert.match(tw.actions.find(a=>a.id==='a-code').result.text,/agent:false/);assert.match(tw.actions.find(a=>a.id==='a-rollback').result.text,/只重启Node进程不会清除/);const h=load('app/data/cases/container-review.ts');assert.match(h.actions.find(a=>a.id==='a-hpa').result.text,/相对CPU request/);assert.match(h.actions.find(a=>a.id==='a-probe').result.text,/不直接重启/)
+})
+test('级联超时等待重叠，不把四层30秒相加；正则不承诺线程中断',()=>{
+ assert.equal(1000*.05*5,250);const c=load('app/data/cases/cascade-timeout.ts');assert.match(c.scene.symptoms[1].text,/不能.*相加.*120s/);const regex=load('app/data/cases/regex-catastrophe.ts');assert.match(regex.actions.find(a=>a.id==='a-flamegraph').result.text,/\^\(a\+\)\+\$/);assert.match(regex.actions.find(a=>a.id==='a-fixregex').result.text,/Future.get超时也不代表匹配线程停下/)
+})

@@ -1480,7 +1480,62 @@
       "originalDifficulty": 2,
       "originalExpertCost": 6,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "e86d09dee521307e4187cbd4be34837946cb1046b0a0c122a1fca92c36eeb342",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "阶段→元组→配置",
+        "抓包/端口/速率",
+        "TCP状态与Agent",
+        "对端正常本机失败",
+        "进程到内核与网络",
+        "进程重启不能清TIME_WAIT"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-netstat",
+            "a-code",
+            "a-qps",
+            "a-down",
+            "a-dns",
+            "a-podcheck"
+          ],
+          "cost": 9
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-down",
+            "a-dns",
+            "a-podcheck",
+            "a-netstat",
+            "a-qps",
+            "a-code"
+          ],
+          "cost": 9
+        }
+      ],
+      "expectedConfirmed": [
+        "h-tw"
+      ],
+      "review": "人工裁定9⚡（原6、旧链5遗漏速率及三项反证）。重写不可能的31284/28232与3000QPS×60但仅3%失败；区分Node版本、globalAgent与进程重启。",
+      "sources": [
+        "https://nodejs.org/api/http.html#class-httpagent",
+        "https://man7.org/linux/man-pages/man2/connect.2.html",
+        "https://www.kernel.org/doc/html/latest/networking/ip-sysctl.html"
+      ]
     },
     {
       "id": "container-review",
@@ -1491,7 +1546,58 @@
       "originalDifficulty": 2,
       "originalExpertCost": 7,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "2fb0ed98f0f3f2fcbfdcbc6958b131b7c762462f0d094a2fc9e4166b8378f89a",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "草案→画像→约束",
+        "资源峰值与分母复算",
+        "K8s资源/HPA/探针",
+        "统一管理仍可不合适",
+        "调度到业务吞吐",
+        "全量推行跳过峰值验证"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-uniform",
+            "a-profile",
+            "a-hpa",
+            "a-probe",
+            "a-oomhist"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-uniform",
+            "a-oomhist",
+            "a-probe",
+            "a-hpa",
+            "a-profile"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-uniform"
+      ],
+      "review": "7⚡保留，改为完整5动作不再旧链5⚡冒称探针/历史/成本全查。纠正单核需要2核以上、HPA按limit、readiness重启及40Gi无清单。",
+      "sources": [
+        "https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/",
+        "https://kubernetes.io/docs/concepts/workloads/pods/probes/",
+        "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+      ]
     },
     {
       "id": "cascade-timeout",
@@ -1502,7 +1608,57 @@
       "originalDifficulty": 3,
       "originalExpertCost": 6,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "cf4f42b7d98f7cd531b2f97d9c8cba4e22c75ca35b7181fd1abc001849b33910",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "资源占比→等待栈",
+        "容量/隔离/恢复曲线",
+        "共享池与剩余预算",
+        "5%流量挤占共享池",
+        "评论到订单及网关",
+        "扩池放大下游压力"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-timeout",
+            "a-threadpool",
+            "a-independent",
+            "a-gw"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-gw",
+            "a-independent",
+            "a-threadpool",
+            "a-timeout"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-cascade"
+      ],
+      "review": "6⚡保留，补齐原旧链4⚡遗漏的网关/独立故障反证；修正30×4、5秒响应仍等满30、熔断唯一解药及22点/凌晨2点矛盾。L3→L2。",
+      "sources": [
+        "https://sre.google/sre-book/addressing-cascading-failures/",
+        "https://grpc.io/docs/guides/deadlines/"
+      ]
     },
     {
       "id": "regex-catastrophe",
@@ -1513,7 +1669,59 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "f12b40a110f8df79b9bfb331ec8526b06ded70af5811fcd197449099078d6c24",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        3,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "输入形状→模式→对照",
+        "热点与受限长度实验",
+        "回溯及引擎语义",
+        "合法类型仍高成本",
+        "校验到业务线程",
+        "关闭校验改变接受范围"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-flamegraph",
+            "a-repro",
+            "a-qpscmp",
+            "a-esstat",
+            "a-gcstat"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-esstat",
+            "a-gcstat",
+            "a-qpscmp",
+            "a-flamegraph",
+            "a-repro"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-backtrack"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5漏ES/GC且未复现实例）。本机Java25实际0.910/2.902/18.056/45.139ms，仅少样本复核，旧中文+\\w输入开头失败；不再虚构指数阶或Java线程可中断保证。",
+      "sources": [
+        "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/regex/Pattern.html",
+        "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Future.html"
+      ]
     }
   ]
 }

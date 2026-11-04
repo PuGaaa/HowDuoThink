@@ -1,50 +1,63 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 4 章 · 运行时暗面 第二批（正则灾难性回溯 L2）
- * 教学点：程序设计——嵌套量词触发指数级回溯，一行代码吃掉整台机器；
- * 正则也是输入敏感的算法，必须做复杂度验证；可中断 + 长度上限是兜底防线。
- * 专家路径：impact(1) + flamegraph(2) + repro(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const regexCatastropheCase: DiagnosisCase = {
   id: 'regex-catastrophe',
-  title: '一行正则吃掉整台机器的 CPU',
-  intro: '一次大促文案里的连续特殊字符，把搜索服务 CPU 从 20% 打到 100%——一行正则在指数级回溯。',
+  title: '一串重复字符，让正则校验占满CPU',
+  intro: '搜索前置标识校验在特定输入下消耗大量CPU。先复现实际正则和输入，再区分回溯、流量、下游与GC。',
   domain: 'runtime',
-  layer: '正则也是算法——它的复杂度由输入形状决定',
+  layer: '回溯性能依赖实际模式、输入和引擎；用失败后缀及受限复现核对，不凭嵌套量词直接宣布指数级',
   part: 'engineer',
   chapterId: 'runtime',
   order: 7,
-  typeTags: ['resource', 'capacity', 'security'],
+  typeTags: [
+    'resource',
+    'capacity',
+    'security',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」商品搜索服务的后端，大促开始两小时后服务半瘫。',
-    architecture: '商家后台(商品描述) → 搜索服务(入参校验: 敏感词/格式正则) → Elasticsearch',
+    architecture: '商家批量导入ASCII活动标识→Java搜索服务Pattern校验→Elasticsearch；本地语义复核使用Java25.0.2。',
     tag: '故障现场',
     symptoms: [
       {
         type: 'error',
         title: '监控与火焰图',
-        text: 'CPU：20% → 100% 持续飙满；P99 从 80ms 飙到 9s。\n火焰图：89% 的 CPU 集中在 java.util.regex.Pattern$Curly.match0 单一调用栈。',
+        text: '教学故障窗口CPU接近一核满、接口P99升高；CPU profile热点集中在java.util.regex匹配调用。下游ES延迟正常。具体复杂度还要以当前引擎复核。',
       },
       {
         type: 'text',
         title: '触发请求特征',
-        text: '慢请求全部是"新更新的商品描述"——商家按大促模板填了『限时！！！%¥#……疯抢』类连续标点。\n老商品（无连续标点）零影响；ES 查询本身 P99 正常。',
+        text: '慢输入是大量连续ASCII字母a后接非法叹号，例如a重复4096次再加!；同长度且全为a的合法输入快速完成。原来的“限时！！！...”在默认Java \\w开头就失败，不能用来证明深回溯。',
       },
     ],
-    timeline: '大促文案模板今天上线（商家开始批量套用）｜ 格式校验正则两年未改过 ｜ 流量仅上涨 40%',
-    impactHint: '火焰图把 89% 的 CPU 指向一个正则——什么形状的输入，会让"一行代码"吃掉整台机器？',
+    timeline: '批量导入新活动标识后暴露，校验模式长期未改；故障流量上涨40%；下列毫秒数据是本机受限复核，不是生产耗时保证。',
+    impactHint: '模式、字符集和失败位置必须对上：开头就失败与长前缀后失败，回溯行为完全不同。',
   },
-
   hypotheses: [
-    { id: 'h-backtrack', text: '灾难性回溯：校验正则含嵌套量词，特殊字符输入触发指数级匹配路径', excludeActionId: 'a-flamegraph' },
-    { id: 'h-volume', text: '大促流量放大导致 CPU 打满（正常容量问题）', excludeActionId: 'a-qpscmp' },
-    { id: 'h-es', text: 'ES 慢查询拖慢响应，线程堆积推高 CPU', excludeActionId: 'a-esstat' },
-    { id: 'h-gc', text: '大促内存压力下 GC 频繁，GC 线程吃满 CPU', excludeActionId: 'a-gcstat' },
+    {
+      id: 'h-backtrack',
+      text: '嵌套可变重复在长合法前缀后失败，产生大量回溯；具体增长阶取决于引擎与模式',
+      excludeActionId: 'a-flamegraph',
+    },
+    {
+      id: 'h-volume',
+      text: '大促流量放大导致 CPU 打满（正常容量问题）',
+      excludeActionId: 'a-qpscmp',
+    },
+    {
+      id: 'h-es',
+      text: 'ES 慢查询拖慢响应，线程堆积推高 CPU',
+      excludeActionId: 'a-esstat',
+    },
+    {
+      id: 'h-gc',
+      text: '大促内存压力下 GC 频繁，GC 线程吃满 CPU',
+      excludeActionId: 'a-gcstat',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +72,7 @@ export const regexCatastropheCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '慢请求画像',
-        text: '触发请求：100% 含连续特殊字符描述（连续标点 ≥ 10 个）\n耗时对比：正常描述 40ms；触发请求 2s ~ 9s+（相同长度！）\n流量：仅 +40%——容量放大解释不了单请求 200 倍的耗时。\n→ 慢的不是"量"，是"形状"：输入的形状决定了一个正则的运行时间。',
+        text: '同长度对照：纯a重复串校验通过；a长串末尾加!失败，CPU开销明显高。生产场景profile热点在正则，不在ES或GC。\n输入长度相同仍可有形状差异；不能仅靠流量+40%就排除容量问题，需控制输入速率复验。',
       },
     },
     {
@@ -70,12 +83,19 @@ export const regexCatastropheCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-backtrack'],
-      hypotheses: [{ id: 'h-backtrack', status: 'confirmed' }],
+      tests: [
+        'h-backtrack',
+      ],
+      hypotheses: [
+        {
+          id: 'h-backtrack',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '正则解剖',
-        text: '校验正则：^(\\w+\\s*[!@#%…]*)+$\n                    ↑ 嵌套量词：组外 + 包着组内 *，双重复指\n输入 "限时！！！%¥#…"（30 字符）时：\n匹配失败 → 引擎回溯重试 → 路径数 ≈ 2^15 → 指数爆炸\n火焰图 89% CPU 实锤。嵌套量词 = 回溯灾难的经典结构。',
+        text: '实际Java模式为^(a+)+$，输入a重复n次再接!。末尾失败使重复分组反复尝试切分，profile热点对应Pattern匹配。\n本地Java25复核与简化线性模式^a+$比较，前者随n增加显著变慢；现代引擎可能优化部分回溯，不能从嵌套量词就断言n=30必8秒或必为2^n。',
       },
     },
     {
@@ -91,7 +111,7 @@ export const regexCatastropheCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '长度扫描实验',
-        text: '连续标点长度 10 → 96ms\n长度 15 → 780ms\n长度 20 → 3.1s\n长度 25 → 12s+（超时中断）\n同长度普通文本：< 2ms\n每 +5 字符耗时 ×4——指数曲线实锤，回溯假设闭合。',
+        text: '本地Java25.0.2、预热后单次样本：n=512约0.910ms，1024约2.902ms，2048约18.056ms，4096约45.139ms，均返回false；只是少量样本，不能据此严格拟合指数阶或生产P99。\n同源可重复脚本在content/baselines/t04b-engineer-regex-repro.java。默认Java \\w对“限时”首字符不匹配，旧输入不成立。',
       },
     },
     {
@@ -102,12 +122,19 @@ export const regexCatastropheCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-volume'],
-      hypotheses: [{ id: 'h-volume', status: 'excluded' }],
+      tests: [
+        'h-volume',
+      ],
+      hypotheses: [
+        {
+          id: 'h-volume',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '容量核对',
-        text: 'QPS +40%（远未到压测容量 3 倍红线）；单请求耗时 ×200。\n→ 排除流量：这是"单请求病"，不是"总量病"。',
+        text: '保持请求速率与长度分布相同，仅把失败后缀输入换成纯a合法输入，CPU开销显著下降；模式改为等价^a+$也恢复。排除仅流量增长、与输入形状无关的纯容量解释。',
       },
     },
     {
@@ -118,12 +145,19 @@ export const regexCatastropheCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-es'],
-      hypotheses: [{ id: 'h-es', status: 'excluded' }],
+      tests: [
+        'h-es',
+      ],
+      hypotheses: [
+        {
+          id: 'h-es',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'ES 指标',
-        text: 'ES 查询 P99 35ms 正常；trace 显示慢请求根本没走到 ES——卡在更早的入参校验。\n→ 排除 ES。',
+        text: '同trace慢请求尚未发起ES调用，时间已耗在校验；独立ES查询P99约35ms。排除ES作为本次先行慢源。',
       },
     },
     {
@@ -134,19 +168,26 @@ export const regexCatastropheCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-gc'],
-      hypotheses: [{ id: 'h-gc', status: 'excluded' }],
+      tests: [
+        'h-gc',
+      ],
+      hypotheses: [
+        {
+          id: 'h-gc',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'GC 核对',
-        text: 'GC 频率与停顿正常；CPU 是用户态计算（火焰图可见），不是 GC 线程。\n→ 排除 GC。',
+        text: '同窗GC停顿短且GC线程CPU占比低，业务线程profile在Pattern；不能只凭用户态CPU排除GC（GC也消耗用户态CPU）。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急下线涉事校验正则',
       desc: '【状态变更】移除格式校验，敏感词校验保留',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -155,7 +196,7 @@ export const regexCatastropheCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '止血结果',
-        text: '正则下线，CPU 回落 20%，服务恢复。\n格式校验暂时裸奔（脏数据风险可控，事后补扫）。\n→ 止血优先：正则还能改，大促流量不等人。',
+        text: '紧急绕过此格式校验降低CPU，但会改变输入接受规则，需要业务确认并限制影响范围。跳过校验不是无代价的长期修复，也不说明所有校验都可以随意关闭。',
       },
     },
     {
@@ -171,7 +212,7 @@ export const regexCatastropheCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 重写：去除嵌套量词，改线性扫描校验（耗时与长度线性）\n② 兜底：入参长度上限 + 正则执行放独立线程，超时 50ms 可中断\n③ 回归：30 连续标点输入耗时 0.9ms（原 8s+），三重防线兜住同类输入。',
+        text: '本案语言就是非空ASCII字母a序列，改为等价^a+$或线性扫描；设置业务合法长度上限，并在实际JDK上用失败后缀做回归。\nJava Pattern/Matcher没有内置保证可被Thread.interrupt中止的超时接口；Future.get超时也不代表匹配线程停下。必要时使用可终止隔离进程或经语义验证的线性引擎，不能声称独立线程50ms必可中断。',
       },
     },
     {
@@ -187,7 +228,7 @@ export const regexCatastropheCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '扫描结果',
-        text: '全仓 340 个正则扫描：12 个含嵌套量词风险模式，7 个确认危险已重写。\nlint 规则上线：新正则含嵌套量词直接拦截合并。',
+        text: '扫描嵌套量词作为候选线索，再逐模式检查语言重叠、失败位置、引擎优化与输入长度；不是所有嵌套量词都必然指数爆炸。没有逐条复核时不宣称340个中7个已确认危险。',
       },
     },
     {
@@ -203,71 +244,97 @@ export const regexCatastropheCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '模糊测试',
-        text: 'CI 每次合并对正则注入随机对抗输入（连续标点/超长重复），耗时断言 P99 < 10ms。\n→ 正则从"看起来能跑"变成"被对抗输入打过"——性能问题在合并前现形。',
+        text: '在相同JDK与受控隔离执行对抗输入：长合法前缀、失败后缀、边界长度及合法样例。记录版本、输入长度和执行次数；少量样本不报P99，外部超时后确认子进程已终止。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-backtrack', text: '格式校验正则含嵌套量词 ([\\w+\\s*[!@#%…]*)+，连续特殊字符输入触发指数级回溯：单请求耗时随输入长度指数增长（30 字符 8s+），大促批量文案引爆 CPU', correct: true },
-    { id: 'rc-volume', text: '大促流量放大导致 CPU 容量不足', correct: false },
-    { id: 'rc-es', text: 'ES 慢查询拖慢响应导致线程堆积', correct: false },
-    { id: 'rc-gc', text: 'GC 频繁导致 CPU 飙升', correct: false },
+    {
+      id: 'rc-backtrack',
+      text: '实际校验^(a+)+$遇到长a前缀加非法!后缀产生大量回溯；同速率输入对照及等价线性模式复验支持正则为CPU热点，不夸称当前JDK必指数级',
+      correct: true,
+    },
+    {
+      id: 'rc-volume',
+      text: '大促流量放大导致 CPU 容量不足',
+      correct: false,
+    },
+    {
+      id: 'rc-es',
+      text: 'ES 慢查询拖慢响应导致线程堆积',
+      correct: false,
+    },
+    {
+      id: 'rc-gc',
+      text: 'GC 频繁导致 CPU 飙升',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 7,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: 'CPU 飙满但流量只涨 40%——先看慢请求的共同输入特征：是"量"的病还是"形"的病。',
-      update: '慢请求 100% 含连续特殊字符、同长度耗时 ×200——输入形状病，不是容量病。',
+      thought: '核对实际触发字符与失败位置。',
+      update: '长a前缀后!失败，中文开头样例不成立。',
       actionId: 'a-impact',
-      why: '1⚡︎ "同长度不同耗时"是最锋利的对比：排除数据量因素后，耗时必须由输入形状解释——而形状敏感的算法第一个想到正则。',
-      conclusion: '嫌疑锁定：正则回溯（h-backtrack 升权）。',
+      why: '1⚡先确认输入能进入目标模式的回溯路径。',
+      conclusion: '核对具体模式与热点。',
     },
     {
-      thought: '火焰图给调用栈，代码给正则本体——解剖它：有没有嵌套量词。',
-      update: '实锤：嵌套量词 ([…]*)+ ，失败匹配触发指数回溯，火焰图 89% CPU 吻合。',
+      thought: '比较匹配栈和模式。',
+      update: '^(a+)+$与失败后缀触发重复切分。',
       actionId: 'a-flamegraph',
-      why: '2⚡︎ 火焰图+代码解剖组合把"CPU 高"精确定位到"一行正则的一个结构"——程序设计视角：嵌套量词是可被静态识别的确定性风险，不是玄学。',
-      conclusion: '根因实锤 → 用长度扫描验证指数特征。',
+      why: '2⚡热点与机制提供方向，增长阶仍需实际引擎复核。',
+      conclusion: '确认回溯候选。',
     },
     {
-      thought: '画耗时-长度曲线：指数回溯的曲线形状（每 +N 字符 ×k）与线性算法截然不同。',
-      update: '每 +5 字符耗时 ×4——指数曲线实锤，与回溯理论完全一致。',
+      thought: '在受限进程中复核输入长度。',
+      update: 'Java25少量样本512→4096明显变慢。',
       actionId: 'a-repro',
-      why: '1⚡︎ 曲线形状是复杂度的指纹：线性/平方/指数各有其形——确认指数意味着"增加机器"无效（涨一点流量输入长一点就再爆），修复必须换算法。',
-      conclusion: '修复方向确定：重写匹配器，而非扩容。',
+      why: '1⚡只陈述实际样本，不从四点夸称精确指数或生产P99。',
+      conclusion: '性能机制成立。',
     },
     {
-      thought: '容量/ES/GC 三个经典嫌疑各 1⚡︎ 排除——尤其 GC，是 CPU 飙升最常见的误判方向。',
-      update: '流量远未到红线、ES 正常且未到达、GC 干净——三个假设有证据排除。',
+      thought: '保持速率只替换输入形状。',
+      update: '纯合法输入/等价线性模式显著降低CPU。',
       actionId: 'a-qpscmp',
-      why: '1⚡︎ CPU 飙升的鉴别诊断要有顺序纪律：先看用户态火焰图定性质（计算/GC/IO），再逐层排除——火焰图已经在手，排除只是留证。',
-      conclusion: '嫌疑收敛单点。',
+      why: '1⚡控制变量反证单纯流量增长解释。',
+      conclusion: '排除纯容量。',
     },
     {
-      thought: '止血（下线正则）、修复（线性重写+双重兜底）、沉淀（lint+模糊测试）。停止收集。',
-      update: '停止。',
+      thought: '核对慢trace是否调用ES。',
+      update: '校验阶段已慢，尚未到ES。',
+      actionId: 'a-esstat',
+      why: '1⚡调用先后证据反证下游先行慢。',
+      conclusion: '排除ES。',
+    },
+    {
+      thought: '对照GC与业务线程CPU。',
+      update: '热点Pattern，GC不足解释。',
+      actionId: 'a-gcstat',
+      why: '1⚡GC也是用户态工作，需明确线程与停顿证据。',
+      conclusion: '其余候选排除。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】结构（嵌套量词）✓ 形状（指数曲线）✓ 防线（长度+超时+扫描）✓——机制与防线两层闭合。',
-      conclusion: '沉淀：正则是输入敏感的算法——它的最坏情况由输入形状决定。校验类正则必须过对抗输入测试，正如加密必须过碰撞测试。',
+      why: '【停止规则】实际模式、失败后缀和同引擎受限复核成立；流量单因、ES和GC均排除，修复及发布尚未执行。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '实际校验^(a+)+$遇到长a前缀加非法!后缀产生大量回溯；同速率输入对照及等价线性模式复验支持正则为CPU热点，不夸称当前JDK必指数级',
     },
   ],
-
   lessons: [
     {
-      text: '嵌套量词 (…*)+ 是回溯灾难的经典结构：匹配失败时路径数指数爆炸，30 个字符就能吃掉一颗核。',
-      principle: '程序设计：写正则时先问最坏情况——输入什么形状会触发大量回溯？防御三板斧：去除嵌套量词（或改占有量词/原子组）、限制输入长度、独立线程执行超时可中断。三者缺一，正则就是 DoS 入口。',
+      text: '正则、输入和引擎必须一起复核；默认Java的\\w不匹配开头中文，旧“限时”样例不能证明嵌套回溯。',
+      principle: '使失败发生在长可匹配前缀之后，记录实际JDK及模式。嵌套量词是风险线索，复杂度还受引擎优化、重叠语言和失败位置影响。',
     },
     {
-      text: '耗时-长度曲线是复杂度的指纹：线性 ×1、平方 ×N、指数 ×k 每段——确认指数意味着扩容无效，只能换算法。',
-      principle: '验证思维：性能排查要用曲线形状定复杂度，再用复杂度定修复方向。指数问题加机器是填海——输入长度涨一点就重新爆掉，修复必须落在算法结构上。',
+      text: '几组耗时样本支持超线性风险，不能单独严格证明指数阶，也不能把本机一次45ms当生产P99。',
+      principle: '用相同速率、长度和输入形状对照；本案可等价改为^a+$，先消除重叠路径，再复验语言接受范围与性能。',
     },
     {
-      text: '一行代码也能吃掉整台机器：热点定位（火焰图）比全链路猜测快得多——89% 的 CPU 集中在一个方法时，答案已经写在图上。',
-      principle: '可观测性：CPU 类问题第一动作是采火焰图定性质（业务计算/GC/内核），再谈其他。"哪个方法最热"永远比"可能是什么原因"信息量大。',
+      text: 'Future超时与Thread.interrupt不保证Java正则停止。独立线程只能隔离调用位置，未必隔离CPU耗尽。',
+      principle: '选择实际可停止的执行边界并验证终止。校验性能测试必须限制输入规模与运行时长，同时保留正常样例，不能以静态风险模式扫描替代执行。',
     },
   ],
 }

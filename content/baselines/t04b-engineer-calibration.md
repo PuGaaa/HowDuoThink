@@ -579,3 +579,95 @@
 
 技术机制依据：[官方资料1](https://nodejs.org/api/events.html)、[官方资料2](https://nodejs.org/api/process.html#processmemoryusage)。
 
+## timewait-exhausted（runtime/4）
+
+学习目标：TCP 连接是有状态的：每个挥手道别的连接，会在 TIME_WAIT 里停留 60 秒。
+
+编审：人工裁定9⚡（原6、旧链5遗漏速率及三项反证）。重写不可能的31284/28232与3000QPS×60但仅3%失败；区分Node版本、globalAgent与进程重启。
+
+难度：L2→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 阶段→元组→配置
+2. 抓包/端口/速率
+3. TCP状态与Agent
+4. 对端正常本机失败
+5. 进程到内核与网络
+6. 进程重启不能清TIME_WAIT
+
+标准路径：a-impact → a-netstat → a-code → a-qps → a-down → a-dns → a-podcheck，9⚡，零错S；终态确认h-tw，其余全部excluded。
+
+替代路径：a-impact → a-down → a-dns → a-podcheck → a-netstat → a-qps → a-code，9⚡，零错S；终态确认h-tw，其余全部excluded。
+
+停止点：【停止规则】固定元组端口压力、显式短连接及速率算术吻合，远端拒绝、DNS和路由/地址异常均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://nodejs.org/api/http.html#class-httpagent)、[官方资料2](https://man7.org/linux/man-pages/man2/connect.2.html)、[官方资料3](https://www.kernel.org/doc/html/latest/networking/ip-sysctl.html)。
+
+## container-review（runtime/5）
+
+学习目标：资源限额是服务画像的一部分：统一数字是管理的简化，却是运行的灾难。
+
+编审：7⚡保留，改为完整5动作不再旧链5⚡冒称探针/历史/成本全查。纠正单核需要2核以上、HPA按limit、readiness重启及40Gi无清单。
+
+难度：L2→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 草案→画像→约束
+2. 资源峰值与分母复算
+3. K8s资源/HPA/探针
+4. 统一管理仍可不合适
+5. 调度到业务吞吐
+6. 全量推行跳过峰值验证
+
+标准路径：a-uniform → a-profile → a-hpa → a-probe → a-oomhist，7⚡，零错S；终态确认h-uniform，其余全部excluded。
+
+替代路径：a-uniform → a-oomhist → a-probe → a-hpa → a-profile，7⚡，零错S；终态确认h-uniform，其余全部excluded。
+
+停止点：【停止规则】目标负载与统一参数冲突成立，HPA分母、readiness重启和未发布历史事故三个解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/)、[官方资料2](https://kubernetes.io/docs/concepts/workloads/pods/probes/)、[官方资料3](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)。
+
+## cascade-timeout（runtime/6）
+
+学习目标：级联雪崩：一个依赖的超时传递为全链路故障——没有熔断、没有背压、超时值形同虚设。
+
+编审：6⚡保留，补齐原旧链4⚡遗漏的网关/独立故障反证；修正30×4、5秒响应仍等满30、熔断唯一解药及22点/凌晨2点矛盾。L3→L2。
+
+难度：L3→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 资源占比→等待栈
+2. 容量/隔离/恢复曲线
+3. 共享池与剩余预算
+4. 5%流量挤占共享池
+5. 评论到订单及网关
+6. 扩池放大下游压力
+
+标准路径：a-impact → a-timeout → a-threadpool → a-independent → a-gw，6⚡，零错S；终态确认h-cascade，其余全部excluded。
+
+替代路径：a-impact → a-gw → a-independent → a-threadpool → a-timeout，6⚡，零错S；终态确认h-cascade，其余全部excluded。
+
+停止点：【停止规则】共享线程持有量及隔离对照成立，正常池不足、独立故障和网关起因均排除；恢复曲线说明残留排队而非固定等待。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://sre.google/sre-book/addressing-cascading-failures/)、[官方资料2](https://grpc.io/docs/guides/deadlines/)。
+
+## regex-catastrophe（runtime/7）
+
+学习目标：回溯性能依赖实际模式、输入和引擎；用失败后缀及受限复现核对，不凭嵌套量词直接宣布指数级。
+
+编审：人工裁定7⚡（原4、旧链5漏ES/GC且未复现实例）。本机Java25实际0.910/2.902/18.056/45.139ms，仅少样本复核，旧中文+\w输入开头失败；不再虚构指数阶或Java线程可中断保证。
+
+难度：L2→L2；六维[2, 3, 2, 3, 2, 2]。
+
+1. 输入形状→模式→对照
+2. 热点与受限长度实验
+3. 回溯及引擎语义
+4. 合法类型仍高成本
+5. 校验到业务线程
+6. 关闭校验改变接受范围
+
+标准路径：a-impact → a-flamegraph → a-repro → a-qpscmp → a-esstat → a-gcstat，7⚡，零错S；终态确认h-backtrack，其余全部excluded。
+
+替代路径：a-impact → a-esstat → a-gcstat → a-qpscmp → a-flamegraph → a-repro，7⚡，零错S；终态确认h-backtrack，其余全部excluded。
+
+停止点：【停止规则】实际模式、失败后缀和同引擎受限复核成立；流量单因、ES和GC均排除，修复及发布尚未执行。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/regex/Pattern.html)、[官方资料2](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Future.html)。
+
