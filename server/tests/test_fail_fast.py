@@ -64,3 +64,25 @@ def test_refuse_when_schema_behind(monkeypatch):
     monkeypatch.setattr(migrate, "current_version", lambda: None)
     with pytest.raises(RuntimeError, match="schema"):
         main.create_app()
+
+
+def test_unhandled_exception_counts_one_500_and_returns_request_id():
+    from fastapi.testclient import TestClient
+
+    from features.ops import metrics
+
+    def explode():
+        raise RuntimeError("boom")
+
+    main.app.add_api_route("/api/test-unhandled", explode)
+    with metrics._lock:
+        metrics._requests = 0
+        metrics._errors = 0
+        metrics._latency_ms_sum = 0.0
+
+    response = TestClient(main.app, raise_server_exceptions=False).get("/api/test-unhandled")
+
+    assert response.status_code == 500
+    assert response.headers["X-Request-Id"]
+    assert metrics.current()["requests"] == 1
+    assert metrics.current()["errors"] == 1

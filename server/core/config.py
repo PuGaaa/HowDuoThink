@@ -4,6 +4,8 @@ JWT_SECRET 未设置时使用进程内随机密钥（重启后所有会话失效
 import os
 import secrets
 
+from sqlalchemy.engine import URL
+
 _jwt_secret_env = os.environ.get("JWT_SECRET", "")
 JWT_SECRET = _jwt_secret_env or secrets.token_hex(32)
 JWT_SECRET_EPHEMERAL = not bool(_jwt_secret_env)
@@ -13,8 +15,6 @@ ADMIN_WEB_ORIGIN = os.environ.get("ADMIN_WEB_ORIGIN", "")
 # 管理端 SPA 构建产物目录（绝对路径，或相对 server/ 目录）；未构建时 /admin 返回 404
 ADMIN_DIST_DIR = os.environ.get("ADMIN_DIST_DIR", "admin_dist")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
-# 初始管理员默认密码（未配 ADMIN_PASSWORD 时的种子账号 admin / HaoDuo@2026；上线前必须改密）
-DEFAULT_ADMIN_PASSWORD = "HaoDuo@2026"
 # 登录防爆破与 AI 单价已迁至 core/settings（运行时经管理端「系统设置」调整，
 # env 变量 LOGIN_MAX_FAILURES / LOGIN_LOCK_SECONDS / DEEPSEEK_PRICE_IN / DEEPSEEK_PRICE_OUT 仍作部署默认值）。
 # 显式开发模式开关：/api/dev/login 与 admin* 提权捷径只在 ENV=dev 下可用
@@ -28,7 +28,7 @@ AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.deepseek.com")
 AI_CHAT_MODEL = os.environ.get("AI_CHAT_MODEL", "deepseek-chat")
 
 # 数据库：sqlite（默认，零部署）/ mysql（生产多用户，配 MYSQL_* 五项）
-DB_PROVIDER = os.environ.get("DB_PROVIDER", "sqlite")
+DB_PROVIDER = os.environ.get("DB_PROVIDER", "mysql")
 MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
 MYSQL_PORT = int(os.environ.get("MYSQL_PORT", "3306"))
 MYSQL_USER = os.environ.get("MYSQL_USER", "hdt")
@@ -66,6 +66,19 @@ OSS_MAX_UPLOAD_MB = int(os.environ.get("OSS_MAX_UPLOAD_MB", "10"))
 
 # 全局请求体上限（MB）：无上限 body 是内存 DoS 面（声明式 Content-Length 超限即 413）
 BODY_LIMIT_MB = int(os.environ.get("BODY_LIMIT_MB", "64"))
+
+
+def mysql_database_url() -> URL:
+    """使用结构化字段构造 MySQL URL，凭据中的特殊字符不参与 URL 语法解析。"""
+    return URL.create(
+        "mysql+pymysql",
+        username=MYSQL_USER,
+        password=MYSQL_PASSWORD,
+        host=MYSQL_HOST,
+        port=MYSQL_PORT,
+        database=MYSQL_DATABASE,
+        query={"charset": "utf8mb4"},
+    )
 
 
 def oss_configured() -> bool:

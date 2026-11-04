@@ -27,11 +27,7 @@ target_metadata = None
 def database_url() -> str:
     """运行时组装（每次命令执行时现读，绝不缓存）。"""
     if core_config.DB_PROVIDER == "mysql":
-        return (
-            f"mysql+pymysql://{core_config.MYSQL_USER}:{core_config.MYSQL_PASSWORD}"
-            f"@{core_config.MYSQL_HOST}:{core_config.MYSQL_PORT}/{core_config.MYSQL_DATABASE}"
-            "?charset=utf8mb4"
-        )
+        return core_config.mysql_database_url()
     return f"sqlite:///{coredb.DB_PATH.resolve()}"
 
 
