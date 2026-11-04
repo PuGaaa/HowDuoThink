@@ -25,7 +25,7 @@ def login(c, login_name: str) -> None:
     assert r.status_code == 200, r.text
 
 
-def add_submission(sub_id: str, title: str) -> None:
+def add_submission(sub_id: str, title: str, uid: str) -> None:
     import db
 
     db.ex(
@@ -33,7 +33,7 @@ def add_submission(sub_id: str, title: str) -> None:
         "VALUES(?,?,?,?,?,?,?,?,?,?)",
         (
             sub_id,
-            "pw-editor",
+            uid,
             title,
             "素材症状描述足够长，供骨架引用",
             "解决过程第一行。解决过程第二行",
@@ -42,6 +42,36 @@ def add_submission(sub_id: str, title: str) -> None:
             db.jdump(["素材教训"]),
             db.jdump(["mysql"]),
             "network",
+        ),
+    )
+
+    from features.submissions import service as submissions
+    from features.submissions.models import ConsentBody, MaterialBody, ReviewBody
+
+    db.ex("INSERT INTO submission_reviews(submission_id,candidate_ids) VALUES(?,'[]')", (sub_id,))
+    material = {
+        "title": title,
+        "symptom": "素材症状描述足够长，供骨架引用",
+        "resolution": "解决过程第一行。解决过程第二行",
+        "keyError": "ERR-1",
+        "timeline": "tl",
+        "lessons": ["素材教训"],
+        "stackTags": ["mysql"],
+        "domainHint": "network",
+    }
+    version = submissions.save_material(uid, sub_id, MaterialBody.model_validate({"material": material}))["version"]
+    submissions.confirm_material(uid, sub_id, ConsentBody(version=version))
+    submissions.save_review(
+        uid,
+        sub_id,
+        ReviewBody.model_validate(
+            {
+                "decision": "distinct",
+                "mechanism": "与候选机制不同",
+                "evidence": "已有独立验证证据",
+                "reasoning": "新增可验证推理步骤",
+                "candidateIds": [item["key"] for item in submissions.editor_candidates(sub_id)],
+            }
         ),
     )
 
@@ -205,7 +235,7 @@ def test_ai_draft_merges_generated(monkeypatch):
     c = _client()
     make_user(c, "editor3", role="editor")
     login(c, "editor3")
-    add_submission("s-testai01", "素材标题")
+    add_submission("s-testai01", "素材标题", "pw-editor3")
 
     r = service.ai_draft_from_submission("pw-editor3", "s-testai01")
     assert r["aiGenerated"] is True
@@ -233,7 +263,7 @@ def test_ai_draft_falls_back_without_json(monkeypatch):
     c = _client()
     make_user(c, "editor4", role="editor")
     login(c, "editor4")
-    add_submission("s-testai02", "另一个素材标题")
+    add_submission("s-testai02", "另一个素材标题", "pw-editor4")
 
     r = service.ai_draft_from_submission("pw-editor4", "s-testai02")
     assert r["aiGenerated"] is False

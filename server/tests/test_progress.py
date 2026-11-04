@@ -338,7 +338,7 @@ def test_mysql_upgrade_freezes_existing_data_and_replays(monkeypatch):
         assert {"error-reading", "contract", "concurrency"} <= set(migrated["unlockedChapterIds"])
         assert row["revision"] == 8
         assert db.q("SELECT protocol_version FROM progress_ops")[0]["protocol_version"] == 1
-        assert migrate.current_version() == "0005_progress_integrity"
+        assert migrate.current_version() == migrate.head_version()
         command.downgrade(migrate._cfg(), "0004_learning_events")
         migrate.upgrade_head()
         assert (
