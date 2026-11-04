@@ -54,6 +54,29 @@ def test_login_and_progress_touch_activity():
         assert rows[0]["hits"] >= 2
 
 
+def test_learning_event_requires_login_and_is_idempotent():
+    uid, login = _mkuser(password=_PW)
+    body = {
+        "kind": "verification",
+        "sessionId": "session-stat-1",
+        "caseId": "first-npe",
+        "source": "play",
+        "contentRevision": 2,
+        "anonymousId": "anon-stat-1",
+        "occurredAt": "2026-11-04T10:00:00+08:00",
+    }
+    with make_client() as c:
+        assert c.post("/api/me/learning-events", json=body).status_code == 401
+        assert c.post("/api/auth/login", json={"login": login, "password": _PW}).status_code == 200
+        assert c.post("/api/me/learning-events", json=body).status_code == 204
+        assert c.post("/api/me/learning-events", json=body).status_code == 204
+    import db
+
+    rows = db.q("SELECT * FROM learning_events WHERE user_id=? AND kind='verification'", (uid,))
+    assert len(rows) == 1
+    assert db.jload(rows[0]["payload"], {})["contentRevision"] == 2
+
+
 def test_overview_endpoint():
     import db
 

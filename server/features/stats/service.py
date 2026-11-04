@@ -17,7 +17,7 @@ logger = logging.getLogger("server")
 
 def record_learning_event(uid: str, body: LearningEventBody) -> None:
     event_id = f"client:{uid}:{body.session_id}:{body.kind}:{body.source}"
-    payload = body.model_dump(by_alias=True)
+    payload = body.model_dump(mode="json", by_alias=True)
     db.ex(
         "INSERT INTO learning_events(id,user_id,anonymous_id,kind,occurred_at,payload) VALUES(?,?,?,?,?,?) "
         "ON CONFLICT(id) DO NOTHING",
