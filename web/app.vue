@@ -140,7 +140,10 @@ async function savePassword() {
 <template>
   <div class="shell">
     <header class="topbar">
-      <NuxtLink to="/" class="topbar__brand">好多星 HowDuoThink · 社区</NuxtLink>
+      <NuxtLink to="/" class="topbar__brand">
+        <span class="topbar__brand-full">好多星 HowDuoThink · 社区</span>
+        <span class="topbar__brand-short">好多星 · 社区</span>
+      </NuxtLink>
       <nav class="topbar__nav">
         <NuxtLink to="/ai" class="topbar__link topbar__link--ai">AI 排错</NuxtLink>
         <NuxtLink to="/solutions" class="topbar__link">解决逻辑</NuxtLink>

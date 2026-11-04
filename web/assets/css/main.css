@@ -21,6 +21,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-
   font-weight: 700;
 }
 .topbar__link:hover { color: var(--coral); }
+.topbar__brand-short { display: none; }
 .main { padding: 26px 0; }
 .footer { color: var(--ink3); font-size: 12px; text-align: center; padding: 30px 0; }
 .card { background: var(--card); border-radius: 16px; box-shadow: 0 5px 0 var(--edge-cream); padding: 20px; margin-bottom: 18px; }
@@ -42,3 +43,13 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-
 .step { border-left: 4px solid var(--coral-soft); padding: 8px 0 8px 16px; margin-bottom: 14px; }
 .step__no { display: inline-block; width: 24px; height: 24px; border-radius: 50%; background: var(--coral); color: #fff; text-align: center; line-height: 24px; font-size: 13px; font-weight: 700; }
 .lesson { background: var(--mint-soft); color: var(--mint-deep); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin: 8px 0; }
+@media (max-width: 600px) {
+  .shell { padding-left: 16px; padding-right: 16px; }
+  .topbar { gap: 12px; }
+  .topbar__brand { min-width: 0; font-size: 13px; white-space: nowrap; }
+  .topbar__brand-full { display: none; }
+  .topbar__brand-short { display: inline; }
+  .topbar__nav { flex-shrink: 0; gap: 10px; }
+  .topbar__link { white-space: nowrap; font-size: 12px; }
+  .topbar__loginbtn { padding: 6px 12px; }
+}

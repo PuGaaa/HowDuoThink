@@ -16,8 +16,8 @@ from features.submissions.review import (  # 跨feature只使用本模块公开�
     require_publication_review,
     save_material,
     save_review,
-    validate_publication as _validate_publication,
 )
+from features.submissions.review import validate_publication as _validate_publication
 
 SUBMISSION_DAILY_LIMIT = 20
 __all__ = [
