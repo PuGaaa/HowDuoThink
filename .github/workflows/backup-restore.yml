@@ -59,9 +59,32 @@ jobs:
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}
         run: |
           mkdir -p backup-reports
-          docker cp "$MYSQL_CONTAINER:/tmp/drills/." backup-reports/
-      - uses: actions/upload-artifact@v4
+          if docker exec "$MYSQL_CONTAINER" test -d /tmp/drills; then
+            while IFS= read -r source; do
+              relative=${source#/tmp/drills/}
+              mkdir -p "backup-reports/${relative%/*}"
+              docker cp "$MYSQL_CONTAINER:$source" "backup-reports/$relative"
+            done < <(docker exec "$MYSQL_CONTAINER" find /tmp/drills -type f \( -name result.tsv -o -name business.tsv \))
+          fi
+      - name: Allowlist uploaded reports and reject leaked dumps
+        id: report_allowlist
         if: always()
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+        run: |
+          if find backup-reports -type f ! -name result.tsv ! -name business.tsv -print -quit | grep -q .; then
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            echo "Unexpected file found in the CI report allowlist."
+            exit 1
+          fi
+          if docker exec "$MYSQL_CONTAINER" test -d /tmp/drills && docker exec "$MYSQL_CONTAINER" find /tmp/drills -type f \( -iname '*.sql' -o -iname '*.sql.gz' -o -name database.sql -o -name SHA256SUMS \) -print -quit | grep -q .; then
+            echo "safe=false" >> "$GITHUB_OUTPUT"
+            echo "A dump or checksum file remains in the drill report directory."
+            exit 1
+          fi
+          echo "safe=true" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.report_allowlist.outputs.safe == 'true'
         with:
           name: mysql8-backup-restore-reports
           path: backup-reports

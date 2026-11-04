@@ -5,14 +5,15 @@
 
 ## 技术栈与分层
 
-FastAPI + PyMySQL（MySQL 8）/ SQLite（仅测试兜底），无 ORM：feature 层写 SQLite 方言 SQL
-（`?` 占位、`datetime('now')`、`ON CONFLICT`），由 `core/db.py::_translate` 在 MySQL 引擎前统一翻译。
+FastAPI + PyMySQL（MySQL 8），无 ORM：feature 层使用项目约定的 SQLite 风格 SQL
+（`?` 占位、`datetime('now')`、`ON CONFLICT`），由 `core/db.py::_translate` 在执行前翻译为 MySQL 语法。
+dev、测试、预发和生产均使用 MySQL 8，只有连接配置和容量不同。
 
 ```
 core/                 横切：config（唯一读 os.environ 处）/ db / security / deps / sms
 features/<域>/        router（参数→响应）→ service（业务，只抛 HTTPException）→ SQL 只在此层
 main.py               app 工厂：中间件（rid/计数）、异常兜底、Sentry、路由挂载、startup 种子
-tests/                pytest；SQLite 与 MySQL 双引擎都必须全绿
+tests/                pytest；通过 MySQL 8 隔离测试库执行
 ```
 
 依赖规则：feature → core 允许；跨 feature 只走对方 service 公开接口；禁止本地/线上实现双方案
@@ -72,7 +73,7 @@ node ../content/tools/export-case.mjs && .venv/bin/python seed.py
 |---|---|
 | 会话/来源 | `JWT_SECRET`（必须写入 gitignored 配置，dev.sh 缺失即停止）、`ENV`（dev 开启绕行登录）、`WEB_ORIGIN`、`ADMIN_WEB_ORIGIN`（管理端独立域名时 CORS）、`COOKIE_SECURE=1`（HTTPS） |
 | 管理员 | `ADMIN_PASSWORD`（覆盖初始密码）、`GITHUB_CLIENT_ID/SECRET`、`GITHUB_ADMIN_LOGINS` |
-| 数据库 | `DB_PROVIDER`（mysql/sqlite）、`MYSQL_HOST/PORT/USER/PASSWORD/DATABASE` |
+| 数据库 | `MYSQL_HOST/PORT/USER/PASSWORD/DATABASE`（所有环境统一 MySQL 8） |
 | MySQL连接池 | `MYSQL_POOL_SIZE`（默认5，须≥1）、`MYSQL_POOL_MAX_OVERFLOW`（默认5，须≥0）、`MYSQL_POOL_TIMEOUT`（默认5秒，须>0） |
 | AI | `DEEPSEEK_API_KEY`、`AI_BASE_URL`、`AI_CHAT_MODEL`、`EMBED_PROVIDER`（fastembed/zhipu/local）、`EMBED_MODEL`、`FASTEMBED_CACHE_DIR`、`ZHIPU_API_KEY`、`DEEPSEEK_PRICE_IN/OUT`（成本估算单价，元/百万 tokens） |
 | 监控 | `SENTRY_DSN`（空=关闭）、`SENTRY_ENV`、`OPS_SNAPSHOT_INTERVAL`（默认 300s）、`OPS_RETENTION_DAYS`（默认 30） |
@@ -86,13 +87,13 @@ MySQL连接池按进程创建，默认最多同时使用10个连接；`close()`�
 
 ## 测试
 
+运行前先设置指向隔离 MySQL 8 测试实例的 `MYSQL_HOST/PORT/USER/PASSWORD`；测试账号需要创建和删除测试库的权限，不要把它们指向生产数据库。
+
 ```bash
-.venv/bin/python -m pytest tests/ -q                              # SQLite 引擎
-DB_PROVIDER=mysql MYSQL_PORT=3306 MYSQL_USER=root \
-MYSQL_PASSWORD=... .venv/bin/python -m pytest tests/ -q           # MySQL 引擎（同样必须全绿）
+.venv/bin/python -m pytest tests/ -q
 ```
 
-测试用隔离库自动建/回收（conftest），外部依赖（LLM/短信）mock。
+测试会在指定 MySQL 实例中创建并回收独立的 `hdt_test_<pid>` 数据库；测试账号需有创建和删除数据库的权限。外部依赖（LLM/短信）mock。
 
 ## 部署与运维
 
@@ -104,5 +105,6 @@ api 容器 healthcheck、Sentry / UptimeRobot 接入步骤。管理端托管与�
 
 - 出题与难度规范：`../docs/案例写作规范.md`
 - 内容规划：`../docs/出题总纲.md`
+- 备份与恢复：`../docs/备份与恢复.md`
 - 管理端与监控决策：`../docs/decisions/006-独立管理端与监控.md`
 - 工程约束：`../AGENTS.md`（环境一致性铁律 / feature 依赖规则）

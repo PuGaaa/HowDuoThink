@@ -1,5 +1,6 @@
-"""CI 专属合成业务样本；只用于全新 hdt_backup_ci，不调用外部服务。"""
+"""CI 专属合成业务样本；只用于全新的 hdt_backup_ci 测试库，不调用外部服务。"""
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -8,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from core import config, db, migrate  # noqa: E402
 
-assert config.MYSQL_DATABASE == "hdt_backup_ci" or config.MYSQL_DATABASE.startswith("hdt_restore_")
+assert config.MYSQL_DATABASE == "hdt_backup_ci" or config.MYSQL_DATABASE.startswith("hdt_backup_ci_t15_")
 assert migrate.current_version() == migrate.head_version()
 assert db.q("SELECT COUNT(*) AS n FROM users")[0]["n"] == 0
 
@@ -60,7 +61,7 @@ statements = [
             "submission:backup-submission:material:3",
         ),
     ),
-    ("INSERT INTO meta(meta_key,value) VALUES(?,?)", ("casepack_version", "7")),
+    ("UPDATE meta SET value=? WHERE meta_key=?", ("7", "casepack_version")),
     (
         "INSERT INTO articles(id,source_type,source_id,title,layer,domain,steps,lessons,author) VALUES(?,?,?,?,?,?,?,?,?)",
         ("backup-article", "case", "backup-fixture", "恢复文章", "运行", "other", "[]", "[]", "合成作者"),
@@ -90,4 +91,35 @@ try:
     conn.commit()
 finally:
     conn.close()
+assert db.q("SHOW TABLES LIKE 'case_revisions'")
+controls = {
+    "baseRevision",
+    "contentRevision",
+    "sourceType",
+    "sourceCommit",
+    "sourceHash",
+    "submissionId",
+    "authorName",
+}
+body = {key: value for key, value in json.loads(payload).items() if key not in controls}
+content_hash = hashlib.sha256(
+    json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+).hexdigest()
+db.ex(
+    "INSERT INTO case_revisions(case_id,content_revision,content_hash,payload,source_type,source_commit,published_by,published_at,legacy_snapshot) "
+    "VALUES(?,?,?,?,?,?,?,datetime('now'),?)",
+    (
+        "backup-fixture",
+        3,
+        content_hash,
+        payload,
+        "community",
+        "submission:backup-submission:material:3",
+        "backup-user",
+        0,
+    ),
+)
+assert db.q("SELECT content_revision FROM case_revisions WHERE case_id=?", ("backup-fixture",))[0][
+    "content_revision"
+] == 3
 print("Synthetic backup fixture ready at migration head; no external service invoked.")
