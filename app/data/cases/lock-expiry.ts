@@ -1,26 +1,25 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 1 章 · 并发迷宫 第二批（分布式锁过期双跑 L3）
- * 教学点：假设思维——锁的保护窗口必须覆盖任务全生命周期；锁过期后发生的事代码要"有感知"；
- * 锁是最好防线但不是唯一防线（任务自身幂等是最后防线）；token 校验防止误删他人的锁。
- * 专家路径：impact(1) + ttlmath(2) + watchdog(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const lockExpiryCase: DiagnosisCase = {
   id: 'lock-expiry',
   title: '分布式锁明明加了，任务还是双跑了',
-  intro: '每小时的结算任务偶发双跑：两个实例同时执行，重复入账 2,131 笔。分布式锁明明加了——有效期 30 秒。',
+  intro: '同一结算周期偶发两个实例执行。核对租约生命线、完成标记和第一笔重复入账，区分首次触发与后续锁释放缺陷。',
   domain: 'concurrency',
   layer: '锁保护的是窗口，不是任务——窗口必须覆盖任务全生命周期',
   part: 'master',
   chapterId: 'concurrency',
   order: 6,
-  typeTags: ['race', 'capacity', 'data'],
-  difficulty: 3,
-
+  typeTags: [
+    'race',
+    'capacity',
+    'data',
+  ],
+  difficulty: 2,
   scene: {
     role: '你是「票到手」结算平台的后端，财务对账差异工单把你叫进了会议室。',
-    architecture: '调度器(每小时触发) → 3 实例抢 Redis 锁(SETNX, TTL 30s) → 结算任务(20s ~ 6min) → 账务系统',
+    architecture: '每小时同周期任务投递3实例；抢锁失败者每5s重试，获锁后检查周期完成标记；Redis租约；账务外部写入。',
     tag: '故障现场',
     symptoms: [
       {
@@ -33,18 +32,37 @@ export const lockExpiryCase: DiagnosisCase = {
         title: '锁日志',
         text: '实例 A：T+0 获取锁成功，开始执行结算（该时段任务耗时 4~6 分钟）\n实例 B：T+35s 获取锁成功，也开始执行结算\n两实例各自认为"我持有锁，轮到我了"。',
       },
+      {
+        type: 'log',
+        title: '财务附件重试',
+        text: '[WARN] settlement PDF archive upload retry。',
+      },
     ],
-    timeline: '业务量上月增长：结算任务从平均 2 分钟涨到 5 分钟 ｜ 锁 TTL 上线时定死 30 秒，从未调整 ｜ 双跑自两周前开始出现',
+    timeline: '此前常见20秒完成，少数2分钟未覆盖压力场景；近两周大账户4~6分钟更常见；固定租约从未复核，不能称30秒一直覆盖2分钟。',
     impactHint: '锁 30 秒就到期，任务要跑 5 分钟——第 31 秒到第 5 分钟之间，保护还在吗？代码知道吗？',
   },
-
   hypotheses: [
-    { id: 'h-ttl', text: '锁 TTL(30s) 远小于任务耗时(5min)：锁过期后另一实例正常抢到，双跑', excludeActionId: 'a-ttlmath' },
-    { id: 'h-renew', text: '有看门狗续期机制但失效了（续期线程异常退出）', excludeActionId: 'a-watchdog' },
-    { id: 'h-release', text: '实例 A 提前 DEL 了锁且不校验持有者，把别人的锁删了引发连环抢锁', excludeActionId: 'a-releasecheck' },
-    { id: 'h-clock', text: '实例间时钟漂移，过期判断不一致', excludeActionId: 'a-clockcheck' },
+    {
+      id: 'h-ttl',
+      text: '锁 TTL(30s) 远小于任务耗时(5min)：锁过期后另一实例正常抢到，双跑',
+      excludeActionId: 'a-ttlmath',
+    },
+    {
+      id: 'h-renew',
+      text: '有看门狗续期机制但失效了（续期线程异常退出）',
+      excludeActionId: 'a-watchdog',
+    },
+    {
+      id: 'h-release',
+      text: 'A在首个30秒内提前DEL，导致B第一次重入；租约本身没有到期',
+      excludeActionId: 'a-releasecheck',
+    },
+    {
+      id: 'h-clock',
+      text: '实例间时钟漂移，过期判断不一致',
+      excludeActionId: 'a-clockcheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -70,12 +88,24 @@ export const lockExpiryCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-ttl'],
-      hypotheses: [{ id: 'h-ttl', status: 'confirmed' }],
+      tests: [
+        'h-ttl',
+        'h-renew',
+      ],
+      hypotheses: [
+        {
+          id: 'h-ttl',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-renew',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '锁实现审计',
-        text: '加锁：SET lock:hourly-settle <instanceId> NX EX 30\n续期：无（全代码无 renew/watchdog）\n过期后：锁静默消失——实例 A 的任务毫无感知，继续执行\n任务耗时分布：P50 2min、P95 4.8min（上月增长后）\n实锤：保护窗口 30s << 任务耗时 5min。锁过期 = 保护结束，但"正在执行"这件事没人通知。',
+        text: '锁命令SET key unique-token NX EX30，无续期；Redis服务端审计同周期A获锁、30秒后过期、35秒B获锁。A任务仍执行且周期未标DONE，B检查未完成继续执行。\n此前20秒完成可先写DONE；2分钟长尾本就有风险，不是增长后30秒才突然变成短于2分钟。',
       },
     },
     {
@@ -86,12 +116,19 @@ export const lockExpiryCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-renew'],
-      hypotheses: [{ id: 'h-renew', status: 'excluded' }],
+      tests: [
+        'h-renew',
+      ],
+      hypotheses: [
+        {
+          id: 'h-renew',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '续期审计',
-        text: '全仓搜 renew / watchdog / refresh / expire 续期相关：零实现。\n→ 排除"续期失效"：不是坏了，是从未有过——上线时任务只要 20s~2min，30s TTL 一直"够用"，直到业务量增长撕开窗口。',
+        text: '实现没有任何续期逻辑，不能归因“已有看门狗线程失效”。扫描只是辅助，关键是实际锁命令和期间无续期记录。',
       },
     },
     {
@@ -102,12 +139,19 @@ export const lockExpiryCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-release'],
-      hypotheses: [{ id: 'h-release', status: 'excluded' }],
+      tests: [
+        'h-release',
+      ],
+      hypotheses: [
+        {
+          id: 'h-release',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '释放审计',
-        text: '释放代码：DEL lock:hourly-settle——无 token 校验，谁都能删。\n推演：A 在 T+5min 完成时 DEL，删掉的是 B 在 T+35s 持有的锁 → C 在下一秒还能再抢到。\n→ 真实存在的第二缺陷！但它发生在"双跑已经发生之后"，是本次事故的放大器而非触发器。两处一起修。',
+        text: 'A第一次DEL在T+300秒，不在首个30秒内；B在T+35已因过期进入，故提前释放不是首次触发。\nDEL未校验token确实是额外缺陷，但B在35秒获30秒租约到65秒已过期；A在300秒不能无条件“删B当年那把锁”。若C在295秒新获锁，300秒DEL才可能误删C，应另有该记录才确认。',
       },
     },
     {
@@ -118,12 +162,19 @@ export const lockExpiryCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-clock'],
-      hypotheses: [{ id: 'h-clock', status: 'excluded' }],
+      tests: [
+        'h-clock',
+      ],
+      hypotheses: [
+        {
+          id: 'h-clock',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '时钟审计',
-        text: '三实例 NTP 偏差 < 40ms；Redis key 过期由 Redis 服务端判定，与客户端时钟无关。\n→ 排除时钟问题。',
+        text: '所有TTL和获锁操作由同一Redis主实例判定，并以服务端操作序关联；不依赖客户端墙钟比较TTL。NTP偏差40ms不足解释30秒窗口，但不能据此概括所有分布锁都不受时钟影响。\n噪声收线：附件任务不修改Redis锁或账务业务键；服务端租约命令在上传重试期间仍有完整记录。',
       },
     },
     {
@@ -139,14 +190,14 @@ export const lockExpiryCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '事故重放（逐秒）',
-        text: 'T+0    A SETNX 成功（TTL 30s）→ 开始结算\nT+30   Redis 服务端令锁过期——A 无感知，继续跑\nT+35   B SETNX 成功 → 开始结算（双跑开始）\nT+5min A 完成 → DEL（误删 B 的锁，第二缺陷）\nT+7min B 完成 → 重复入账 2,131 笔\n→ 触发器（TTL 过短）+ 放大器（DEL 无校验）+ 根本缺陷（任务自身不幂等）三层机制闭合。',
+        text: 'T0 A租约至30；T30过期；T35 B获租约至65、看到周期未完成，于是与A并行；A/B账务记录未使用同周期业务唯一键，产生重复。T300 A的DEL另有误删新持有者风险，不是首次35秒重入的原因。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急冻结结算调度',
       desc: '【状态变更】暂停每小时结算任务，账务入账冻结',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -171,7 +222,7 @@ export const lockExpiryCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 看门狗：任务运行中每 10s（TTL/3）续期到 30s，任务结束停止续期\n② token 释放：加锁时生成唯一 token，DEL 用 Lua 脚本"值相等才删"\n③ 压测：5min 长任务 + 3 实例并发抢锁 1000 轮：零双跑、零误删。',
+        text: '续期须原子校验token再延长，释放也须原子比token删除；仅有看门狗仍可能在长GC/网络暂停时失去租约，不能保证永远单执行。\n账务写入应接受业务唯一键，或支持单调fencing token拒绝失去租约的旧持有者；是否能中止正在执行的外部写必须由下游协议保证。',
       },
     },
     {
@@ -187,7 +238,7 @@ export const lockExpiryCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '最后防线',
-        text: '账务表对 (settle_period, account_id) 建唯一约束：同一周期同一账户只能入账一次。\n→ 锁失效、续期失效、任何意外——双跑的账也写不进去。防线从"一把锁"变成"锁 + 幂等"两层。',
+        text: '按真实账务唯一性定义键，例如本题每周期/账户只有一笔汇总则(period,account)可唯一；若有币种、分录类型或多笔明细，键必须包含对应业务维度。同事务约束只保护该存储，不能自动扩展到所有外部副作用。',
       },
     },
     {
@@ -207,67 +258,79 @@ export const lockExpiryCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-ttl', text: '锁 TTL(30s) 固定不变而任务耗时增长至 P95 4.8min：锁过期后保护窗口关闭，第二实例正常获锁双跑——无续期机制、锁过期后执行方无感知', correct: true },
-    { id: 'rc-renew', text: '看门狗续期机制存在但异常失效', correct: false },
-    { id: 'rc-release', text: '锁释放无 token 校验，实例误删他人持有的锁', correct: false },
-    { id: 'rc-clock', text: '实例时钟漂移导致过期判断不一致', correct: false },
+    {
+      id: 'rc-ttl',
+      text: '30秒租约无续期，A未完成时到期；B重试获新租约且周期未完成便再次执行，外部入账缺业务唯一键导致重复',
+      correct: true,
+    },
+    {
+      id: 'rc-renew',
+      text: '看门狗续期机制存在但异常失效',
+      correct: false,
+    },
+    {
+      id: 'rc-release',
+      text: 'A在首个30秒内提前释放且租约未到期，触发B首次进入',
+      correct: false,
+    },
+    {
+      id: 'rc-clock',
+      text: '实例时钟漂移导致过期判断不一致',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 5,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '双跑的时刻有什么规律？——把 6 次事故的 B 获锁时刻排成一列，和锁的生命线对齐。',
-      update: 'B 全部在 T+30~36s 获锁，与 TTL 30s 精确吻合；双跑时段任务耗时全部 > 4min。',
+      thought: '按同周期关联两次执行。',
+      update: 'B约35秒进入，A仍未完成。',
       actionId: 'a-impact',
-      why: '1⚡︎ 时间对齐是最便宜的实锤路径：获锁时刻 ≈ TTL 这个"巧合"出现 6 次，就不再是巧合——它直接指认保护窗口的关闭时刻。',
-      conclusion: '嫌疑锁定：TTL 与耗时的剪刀差（h-ttl 升权）。',
+      why: '1⚡时间相关只是线索，需Redis操作与完成标记。',
+      conclusion: '核对实际租约。',
     },
     {
-      thought: '核对锁实现的三个参数：TTL 多少、有没有续期、过期后执行方知不知道。',
-      update: '实锤：TTL 30s 固定、零续期、过期静默——锁保护的是"前 30 秒"，任务的后 4 分半在裸奔。',
+      thought: '读取服务端锁命令与重试条件。',
+      update: '30秒过期、无续期、35秒B获锁且未DONE。',
       actionId: 'a-ttlmath',
-      why: '2⚡︎ 锁的正确性是三个参数的合取：窗口、续期、过期感知——缺任何一个，"加了锁"都是心理安慰。参数对账一次把三问全答了。',
-      conclusion: '根因实锤：保护窗口 << 任务生命周期。',
+      why: '2⚡同一主实例的租约操作比跨机墙钟更直接。',
+      conclusion: '确认过期重入并排除已有续期失效。',
     },
     {
-      thought: '"续期失效"假设单查一下——如果曾经有续期，修复方向会是"修 bug"而不是"建机制"。',
-      update: '全仓零续期实现——从未有过，不是坏了。上线时"够用"是因为任务当时只要 2 分钟。',
-      actionId: 'a-watchdog',
-      why: '1⚡︎ 区分"机制缺失"与"机制失效"决定修复层级：缺失要建机制（大改），失效要修 bug（小改）——证据决定方案规格。',
-      conclusion: '缺失确认 → 修复为"建看门狗"而非"查 bug"。',
-    },
-    {
-      thought: '审计释放逻辑——顺藤摸瓜检查锁的完整生命周期，别放过"过期之后"和"释放之时"。',
-      update: 'DEL 无 token 校验是真实的第二缺陷：A 会误删 B 的锁造成保护真空——它是放大器，不是本次触发器。两处一起修。',
+      thought: '核对第一次DEL的有效区间。',
+      update: '300秒DEL晚于首次重入；B租约65秒已结束。',
       actionId: 'a-releasecheck',
-      why: '1⚡︎ 排查的副产品经常是第二缺陷：明确它的"贡献度"（放大器 vs 触发器）才能排出正确的修复优先级——两个都要修，但因果叙事不能混。',
-      conclusion: '触发器 + 放大器分层确认。',
+      why: '1⚡不能用后发缺陷倒因果解释先前重复。',
+      conclusion: '排除提前释放触发。',
     },
     {
-      thought: '完整重放闭合机制 → 三层防线修复（看门狗 + token + 任务幂等）→ 联动告警防"增长撕开窗口"。停止收集。',
-      update: '停止。',
+      thought: '核对TTL决策方和偏差。',
+      update: '过期由同Redis判定，不由应用各自墙钟。',
+      actionId: 'a-clockcheck',
+      why: '1⚡限定本案锁实现，不能泛化分布式时钟。',
+      conclusion: '其余候选排除。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】触发器（TTL 剪刀差）✓ 放大器（误删锁）✓ 根本面（任务不幂等）✓——三层机制与三层防线一一对应。',
-      conclusion: '沉淀：锁保护的是窗口不是任务。分布式互斥的正确姿势 = 续期锁（防线一）+ 任务幂等（防线二）——锁会失效，幂等不会。',
+      why: '【停止规则】Redis租约区间和周期未完成记录解释首次重入，已有续期失效、提前DEL和客户端过期判断解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '30秒租约无续期，A未完成时到期；B重试获新租约且周期未完成便再次执行，外部入账缺业务唯一键导致重复',
     },
   ],
-
   lessons: [
     {
-      text: '锁保护的是窗口，不是任务：TTL 固定而任务变长，保护窗口之外的执行就是"裸奔"，且执行方对锁过期毫无感知。',
-      principle: '并发设计：互斥锁的正确姿势 = 看门狗续期（窗口跟随任务生命周期）+ 过期感知（发现锁丢失立即中止）。任何"固定 TTL"的锁都要回答：任务耗时的 P95 是 TTL 的几倍？',
+      text: '租约过期不等于旧持有者已经停止。续期、原子token释放与旧持有者写权限是不同问题。',
+      principle: '看门狗也可能暂停或与Redis隔离；用下游认可的fencing或业务唯一约束保护写入，不能只凭仍在运行就假设仍持锁。',
     },
     {
-      text: '锁是最好防线但不是唯一防线：任务自身幂等（周期+账户唯一约束）才是兜底——锁失效、网络分区、时钟异常时，幂等依然成立。',
-      principle: '纵深防御：分布式互斥的正确分层 = 锁（尽量不重复）+ 幂等（重复了也无害）。资损类任务必须两层都建——防线的选择标准不是"哪个更强"，是"哪个失效时另一个还在"。',
+      text: '区分首次触发与后续缺陷：B在35秒进入来自30秒过期，A在300秒DEL不可能触发35秒首次重入。',
+      principle: 'B的30秒租约65秒就过期，不能在300秒仍称它为B当前锁。每次获取要分token和有效区间。',
     },
     {
-      text: '增长会撕开静态配置的安全边际：任务从 2 分钟涨到 5 分钟，30 秒的锁就从中性配置变成了事故——配置要与它保护的量联动。',
-      principle: '运维视角：静态配置（TTL/超时/限额）与动态负载（耗时/流量/数据量）之间的剪刀差要用告警盯住（耗时 P95 > TTL×0.7 即告警）。"够用"是有前提的，前提变了配置必须重估。',
+      text: '业务幂等必须按合法交易维度设计；唯一约束也只保证它所在事务和存储的效果。',
+      principle: '周期/账户只有一笔的前提要明确。外部账务与任务完成标记若不原子，仍需重试与对账，不宣称“幂等不会失效”。',
     },
   ],
 }

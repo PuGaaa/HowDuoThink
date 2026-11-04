@@ -1,10 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 1 章 · 并发迷宫（幂等失效 L2）
- * 教学点：支付回调重试机制 + 无幂等键 = 重复发货；重试不是异常而是 MQ/支付系统的设计行为。
- * 专家路径：impact(1) + orderlist(1) + paylog(2) + code(2) = 6⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const idempotentFailCase: DiagnosisCase = {
   id: 'idempotent-fail',
   title: '用户付一笔钱，收到了两件货',
@@ -14,12 +11,14 @@ export const idempotentFailCase: DiagnosisCase = {
   part: 'master',
   chapterId: 'concurrency',
   order: 2,
-  typeTags: ['race', 'timing'],
+  typeTags: [
+    'race',
+    'timing',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是交易系统后端，仓库同事反馈：23 个订单被重复拣货发货，用户拒收第二件。',
-    architecture: '支付网关 → MQ(支付成功事件) → 履约服务 → 仓库 WMS',
+    architecture: '支付网关→我方回调处理器→履约WMS；MQ仅发送已支付审计事件，WMS创建本案不由MQ消费触发。',
     symptoms: [
       {
         type: 'error',
@@ -31,17 +30,32 @@ export const idempotentFailCase: DiagnosisCase = {
         title: '用户侧',
         text: '用户支付金额正确（只扣一次款），拒收第二个包裹后系统产生"拒收回退"工单。',
       },
+      {
+        type: 'log',
+        title: '发票归档重试',
+        text: '[WARN] invoice archive retry=1；订单同期日志有此条。',
+      },
     ],
     timeline: '今天零星出现 ｜ 上周支付网关升级：回调超时重试策略从 1 次改为 3 次',
     impactHint: '重复发货的时间与支付回调的时间，有没有对应关系？',
   },
-
   hypotheses: [
-    { id: 'h-retry', text: '支付回调超时重试，履约接口无幂等导致重复发货', excludeActionId: 'a-paylog' },
-    { id: 'h-mq', text: 'MQ 消息重复投递触发两次履约', excludeActionId: 'a-mqlist' },
-    { id: 'h-manual', text: '运营/仓库手工重复创建了拣货单', excludeActionId: 'a-wms' },
+    {
+      id: 'h-retry',
+      text: '支付回调超时重试，履约接口无幂等导致重复发货',
+      excludeActionId: 'a-paylog',
+    },
+    {
+      id: 'h-mq',
+      text: 'MQ 消息重复投递触发两次履约',
+      excludeActionId: 'a-mqlist',
+    },
+    {
+      id: 'h-manual',
+      text: '运营/仓库手工重复创建了拣货单',
+      excludeActionId: 'a-wms',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -56,7 +70,7 @@ export const idempotentFailCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '订单对比',
-        text: '23 单均为：支付 1 次、发货 2 次；两次发货间隔 15~90 秒不等。\n重复发货全部发生在支付成功之后——不存在未支付就发货的情况。',
+        text: '23笔业务订单各支付一次、WMS各有两张拣货单，两次触发间隔15~90秒。这提示重复输入，但不能凭“有间隔”排除跨请求并发或处理重叠。',
       },
     },
     {
@@ -67,12 +81,24 @@ export const idempotentFailCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
+      tests: [
+        'h-mq',
+        'h-manual',
+      ],
+      hypotheses: [
+        {
+          id: 'h-mq',
+          status: 'excluded',
+        },
+        {
+          id: 'h-manual',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'log',
         title: '履约流水（节选）',
-        text: '订单 O-8811：\n10:32:11 履约触发 source=pay_callback\n10:32:52 履约触发 source=pay_callback\n→ 两次都由支付回调触发，间隔 41 秒',
+        text: 'O-8811两张WMS单的调用父trace均为pay_callback请求C1/C2，actor=system；同一支付业务键P1，没有人工操作或MQ消费父trace。MQ审计消息另有ID A1，不参与这两次WMS API。\n噪声收线：归档是另一trace的离线附件任务，不创建WMS拣货单；两单父trace均为明确支付回调。',
       },
     },
     {
@@ -83,12 +109,19 @@ export const idempotentFailCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-retry'],
-      hypotheses: [{ id: 'h-retry', status: 'confirmed' }],
+      tests: [
+        'h-retry',
+      ],
+      hypotheses: [
+        {
+          id: 'h-retry',
+          status: 'up',
+        },
+      ],
       result: {
         type: 'log',
         title: '支付网关日志',
-        text: '第一次回调：10:32:11，我方返回 200 ✓\n第二次回调：10:32:52，网关标注"重试：上次响应超时"\n→ 网关侧显示第一次我方响应超时（>10s），触发重试策略（上周从 1 次改为 3 次）',
+        text: 'C1在10:32:11开始，WMS慢使处理11.4秒，应用10:32:22.4才尝试回200；网关等待10秒在10:32:21已超时，未确认该响应。C2在10:32:52以同一支付业务键P1重试。\n应用打印200与对方超时并不矛盾，但必须写清200生成时点与是否被对方收到。',
       },
     },
     {
@@ -99,12 +132,19 @@ export const idempotentFailCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-retry'],
-      hypotheses: [{ id: 'h-retry', status: 'up' }],
+      tests: [
+        'h-retry',
+      ],
+      hypotheses: [
+        {
+          id: 'h-retry',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '履约代码',
-        text: "async def on_pay_callback(event):\n    order = get_order(event.order_id)\n    if order.status == 'PAID':\n        create_delivery(order)   ← 无幂等键检查、无唯一约束\n→ 同一支付事件第二次到达，仍会再发一次货",
+        text: 'on_callback按order.status==PAID就调用create_delivery，无唯一履约业务键。对同一P1回放两次，产生两次WMS创建；付款状态PAID不能表示已完成履约。\n修复应使用稳定业务键（订单+履约阶段/版本）创建唯一履约意图，再可靠投递，并让WMS以同键幂等。仅先插已处理再外呼会在崩溃时丢任务，外呼后才标记又可能重复。',
       },
     },
     {
@@ -115,12 +155,19 @@ export const idempotentFailCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-mq'],
-      hypotheses: [{ id: 'h-mq', status: 'down' }],
+      tests: [
+        'h-mq',
+      ],
+      hypotheses: [
+        {
+          id: 'h-mq',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'MQ 记录',
-        text: '支付事件 MQ 投递均只有 1 次——重复不在 MQ 层，在回调重试层。',
+        text: 'MQ审计事件A1只投递一次；更关键的是两次WMS调用父trace都不属于MQ消费者。投递次数与调用来源一起排除MQ重复触发。',
       },
     },
     {
@@ -131,8 +178,15 @@ export const idempotentFailCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-manual'],
-      hypotheses: [{ id: 'h-manual', status: 'excluded' }],
+      tests: [
+        'h-manual',
+      ],
+      hypotheses: [
+        {
+          id: 'h-manual',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'WMS 记录',
@@ -147,7 +201,9 @@ export const idempotentFailCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-retry'],
+      tests: [
+        'h-retry',
+      ],
       hypotheses: [],
       result: {
         type: 'text',
@@ -159,7 +215,7 @@ export const idempotentFailCase: DiagnosisCase = {
       id: 'a-void',
       name: '作废重复发货单并拦截',
       desc: '【状态变更】WMS 拦截第二件包裹 + 作废工单',
-      cost: 5,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -172,66 +228,74 @@ export const idempotentFailCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-retry', text: '支付网关超时重试 + 履约接口无幂等键：第一次回调处理慢导致网关重试，重试再次发货', correct: true },
-    { id: 'rc-mq', text: 'MQ 消息重复投递触发重复履约', correct: false },
-    { id: 'rc-manual', text: '仓库侧手工重复创建拣货单', correct: false },
+    {
+      id: 'rc-retry',
+      text: '支付网关超时重试 + 履约接口无幂等键：第一次回调处理慢导致网关重试，重试再次发货',
+      correct: true,
+    },
+    {
+      id: 'rc-mq',
+      text: 'MQ 消息重复投递触发重复履约',
+      correct: false,
+    },
+    {
+      id: 'rc-manual',
+      text: '仓库侧手工重复创建拣货单',
+      correct: false,
+    },
   ],
-
   expertCost: 6,
   restartActionId: 'a-void',
-
   expertChain: [
     {
-      thought: '先确认"重复"的性质：付一次发两次，且间隔 15~90 秒——不是并发同时发生，是间隔性的二次触发。',
-      update: '排除并发写冲突类假设，指向"第二次触发源"。',
+      thought: '确认付款与履约基数。',
+      update: '付1发2，间隔提示重复输入。',
       actionId: 'a-impact',
-      why: '1⚡︎ 买形状：同时发生是并发写，间隔发生是有第二次触发源——方向完全不同。',
-      conclusion: '间隔性重复 → 找第二次触发的来源。',
+      why: '1⚡间隔不能单独排除并发，继续追踪触发源。',
+      conclusion: '查两单来源。',
     },
     {
-      thought: '履约流水直接标注了触发来源：两次都是 pay_callback。来源锁定支付回调。',
-      update: '回调重复触发实锤，接下来查"为什么回调会来两次"。',
+      thought: '关联两张WMS单的父trace。',
+      update: '均来自C1/C2回调，无人工或MQ父调用。',
       actionId: 'a-orderlist',
-      why: '1⚡︎ 的流水带 source 字段，直接把嫌疑范围从"任意环节"收缩到"支付回调"。',
-      conclusion: '两次触发均来自支付回调 → 查网关重试日志。',
+      why: '1⚡调用归属比仅看消息投递次数更有决定性。',
+      conclusion: '排除MQ与人工。',
     },
     {
-      thought: '网关日志给出完整机制：第一次我方响应超时，网关按策略重试。上周重试次数刚改过。',
-      update: '重试是网关的设计行为（不是异常）——问题转向我方：为什么慢 + 为什么重试会造成重复。',
+      thought: '对齐两侧超时和响应时间。',
+      update: 'C1业务11.4s，网关10s超时后C2重试。',
       actionId: 'a-paylog',
-      why: '2⚡︎ 网关日志同时回答了"来几次"和"为什么"两个问题，是本案最有信息量的动作。',
-      conclusion: '实锤：回调超时（>10s）触发网关重试（3 次）。',
+      why: '2⚡应用200与对方未收到可以同时成立。',
+      conclusion: '重试输入成立。',
     },
     {
-      thought: '重试本身无害，有害的是我方接口无幂等：同一事件第二次到达仍会发货。读代码确认。',
-      update: '实锤：履约无幂等键、无唯一约束。',
+      thought: '回放相同业务键并审查唯一边界。',
+      update: '相同P1两次创建，PAID不代表已履约。',
       actionId: 'a-code',
-      why: '2⚡︎ 确认修复点：加幂等键（支付事件 ID 唯一约束）就能让重试变成无害操作。',
-      conclusion: '实锤：无幂等。修复：幂等键 + 状态机检查，网关重试策略保留（它是可靠性设计）。',
+      why: '2⚡代码和同键回放确认外部副作用未幂等。',
+      conclusion: '确认重复履约原因。',
     },
     {
-      thought: '证据链闭合：重试（网关日志）+ 无幂等（代码）+ 23 单完美对应。停止收集，先止损再修复。',
-      update: '停止收集。止损：拦截重复包裹；修复：幂等键。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '拦截止损与代码修复并行不冲突；继续查 MQ 等环节不改变任何行动。',
-      conclusion: 'WMS 拦截 23 单 → 履约接口加幂等键 → 网关重试策略保留。',
+      why: '【停止规则】重试输入与两次外部创建因果吻合，人工和MQ来源均排除；修复设计不冒充已经跨系统原子。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '支付网关超时重试 + 履约接口无幂等键：第一次回调处理慢导致网关重试，重试再次发货',
     },
   ],
-
   lessons: [
     {
-      text: '凡是处理外部事件的接口（回调/MQ/轮询），必须默认"事件会重复到达"并做幂等。',
-      principle: 'At-least-once 是支付回调与 MQ 的标准投递语义：重试不是故障而是可靠性设计。接口无幂等时，对方的可靠性就是你的事故。',
+      text: '支付通知重试是可能发生的可靠性行为；应用写200日志不证明网关及时收到该响应。',
+      principle: '以同一业务键和关联trace对齐开始、业务完成、响应生成及网关超时，跨系统墙钟只作线索，不能只看某一侧最先日志。',
     },
     {
-      text: '幂等键 = 事件的唯一 ID + 唯一约束，让"重复到达"变成"重复但无害"。',
-      principle: '幂等实现优先用存储层唯一约束（支付事件 ID 唯一索引），配合状态机检查——比应用层去重表更可靠。',
+      text: '幂等要覆盖外部副作用：唯一创建履约意图，可靠执行，WMS按稳定业务键拒绝重复。',
+      principle: 'DB唯一约束与WMS不在同一普通事务。先标已处理后外呼可能丢任务，外呼后标记可能重做；需明确待处理、重试与对账边界。',
     },
     {
-      text: '对方系统的"重试策略变更"是你的上游风险：变更通报必须覆盖重试/超时参数。',
-      principle: '依赖方的超时、重试、投递参数变更会改变你接口的流量形态——跨团队变更通知清单里必须包含这类参数。',
+      text: 'PAID是付款状态，不等于已履约；通知的eventId也未必跨重试稳定。',
+      principle: '采用业务认可的稳定键，并保留必要事件审计；状态检查不应替代并发下的唯一性约束。',
     },
   ],
 }

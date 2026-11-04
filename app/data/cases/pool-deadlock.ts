@@ -1,12 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 1 章 · 并发迷宫 第二批（线程池自等待死锁 L2）
- * 教学点：假设思维——"全部线程在等结果，却没有线程在算结果"；
- * 父任务占满线程池等待子任务（子任务排在同一队列）= 线程池死锁；
- * 父子任务必须隔离（独立池）或不阻塞等待。
- * 专家路径：impact(1) + stacktrace(2) + repro(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const poolDeadlockCase: DiagnosisCase = {
   id: 'pool-deadlock',
   title: '每天随机卡死几次：任务在等它自己',
@@ -16,9 +11,12 @@ export const poolDeadlockCase: DiagnosisCase = {
   part: 'master',
   chapterId: 'concurrency',
   order: 5,
-  typeTags: ['race', 'resource', 'capacity'],
+  typeTags: [
+    'race',
+    'resource',
+    'capacity',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」报表平台的后端，定时聚合任务每天随机"假死"由你排查。',
     architecture: '报表调度器 → 线程池(8 workers, 无界队列) → 聚合任务(可拆分子任务并行) → DB',
@@ -27,25 +25,44 @@ export const poolDeadlockCase: DiagnosisCase = {
       {
         type: 'error',
         title: '卡死时刻的 jstack',
-        text: '8 个 worker 线程状态：全部 WAITING on Future.get()\n队列长度：31 个任务排队——但没有一个线程在 RUNNING。',
+        text: '8个worker均WAITING在Future.get；队列32个子任务未运行。尚需关联各Future归属，不能仅凭WAITING判数据库死锁。',
       },
       {
         type: 'text',
         title: '运维视角',
         text: '卡死时间随机，凌晨聚合任务并发时高发；重启立即恢复。\n无法稳定复现——开发跑了十遍压测脚本都是绿的。',
       },
+      {
+        type: 'log',
+        title: '报表缩略图失败',
+        text: '[WARN] report thumbnail fetch 404。',
+      },
     ],
-    timeline: '上月新增"汇总任务可拆分子任务并行加速"功能 ｜ 卡死自此每周 2~3 次 ｜ 线程池参数从未调整',
+    timeline: '上月新增父任务拆子任务到同池；此后每周2~3次假死，集中于凌晨12个父任务并发调度。',
     impactHint: '8 个线程都在等结果，队列里有 31 个待算的任务——结果应该由谁来算？',
   },
-
   hypotheses: [
-    { id: 'h-selfwait', text: '父任务提交子任务到同一个池并阻塞等待：父占着线程等，子排在队列里永远轮不到', excludeActionId: 'a-stacktrace' },
-    { id: 'h-dblock', text: '数据库行锁/死锁，任务全部阻塞在 SQL 上', excludeActionId: 'a-dbshow' },
-    { id: 'h-queue', text: '队列无界导致任务堆积，内存/OOM 前兆表现为假死', excludeActionId: 'a-queuecfg' },
-    { id: 'h-conn', text: '数据库连接池耗尽，任务在等连接', excludeActionId: 'a-connpool' },
+    {
+      id: 'h-selfwait',
+      text: '父任务提交子任务到同一个池并阻塞等待：父占着线程等，子排在队列里永远轮不到',
+      excludeActionId: 'a-stacktrace',
+    },
+    {
+      id: 'h-dblock',
+      text: '数据库行锁/死锁，任务全部阻塞在 SQL 上',
+      excludeActionId: 'a-dbshow',
+    },
+    {
+      id: 'h-queue',
+      text: '队列无界导致任务堆积，内存/OOM 前兆表现为假死',
+      excludeActionId: 'a-queuecfg',
+    },
+    {
+      id: 'h-conn',
+      text: '数据库连接池耗尽，任务在等连接',
+      excludeActionId: 'a-connpool',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -60,7 +77,7 @@ export const poolDeadlockCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '卡死现场任务盘点',
-        text: '8 个 worker：全部是"汇总任务"（A/B/C…H）\n队列 31 个任务：全部是"子任务"（A1/A2/B1/B2…）\n规律：卡死只发生在多个汇总任务并发时；单个汇总任务从不卡。\n→ 父任务在线程上、子任务在队列里——两代人被同一个池隔开了。',
+        text: '8个运行worker均为父任务A~H；32个排队任务均为它们等待的子任务。资源归属提示池饥饿，单父正常是线索，不保证少于8在所有代码结构都不死锁。',
       },
     },
     {
@@ -71,12 +88,29 @@ export const poolDeadlockCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-selfwait'],
-      hypotheses: [{ id: 'h-selfwait', status: 'confirmed' }],
+      tests: [
+        'h-selfwait',
+        'h-dblock',
+        'h-conn',
+      ],
+      hypotheses: [
+        {
+          id: 'h-selfwait',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-dblock',
+          status: 'excluded',
+        },
+        {
+          id: 'h-conn',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '线程栈与队列对照',
-        text: 'worker#1: 汇总任务A → submit(A1..A4) → Future.get() WAITING\nworker#2: 汇总任务B → submit(B1..B4) → Future.get() WAITING\n……8 个 worker 同构\n队列: [A1, A2, B1, C3, ……] 31 个子任务等待空闲 worker\n→ 闭环：子任务等线程，线程等子任务的结果。线程池死锁——不是锁，是"排队等自己"。',
+        text: '全量关联：8个父worker各submit4个子任务到同一固定8线程池，再Future.get；32子任务在队列。父任务等待的位置还未调用DB/借连接，排除SQL锁或借连接等待。\n形成资源等待环：父占全部worker→等子结果→子等worker；不是Java monitor锁的循环。',
       },
     },
     {
@@ -92,7 +126,7 @@ export const poolDeadlockCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '并发阈值实验',
-        text: '提交 1 个汇总任务：正常（它占 1 线程，其余 7 线程能跑它的子任务）\n提交 4 个：正常（8 线程 > 4 父 + 部分子任务能插空）\n提交 8 个：100% 卡死——8 线程全被父任务占满，子任务全军覆没在队列\n→ 复现条件 = 并发父任务数 ≥ 线程数。凌晨高发的原因：定时调度把 12 个汇总任务同时放进来。',
+        text: '确定性复现先用barrier让8个父全部开始并占住worker，再同时允许各自submit4子并get，32子排队且无进展；解除父的同步等待后子可运行。\n仅提交8个父并不无条件100%卡死，子可能抢在剩余父之前完成；必须控制交错。本题1父/4父对照可完成，不推广为所有<8都安全。',
       },
     },
     {
@@ -103,8 +137,15 @@ export const poolDeadlockCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-dblock'],
-      hypotheses: [{ id: 'h-dblock', status: 'excluded' }],
+      tests: [
+        'h-dblock',
+      ],
+      hypotheses: [
+        {
+          id: 'h-dblock',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'DB 锁检查',
@@ -119,12 +160,19 @@ export const poolDeadlockCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-conn'],
-      hypotheses: [{ id: 'h-conn', status: 'excluded' }],
+      tests: [
+        'h-conn',
+      ],
+      hypotheses: [
+        {
+          id: 'h-conn',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '连接池',
-        text: '活跃连接 8/20、等待队列 0——连接充足。\n→ 排除连接问题。',
+        text: '故障父任务未进入DB路径，连接池0等待、活动0/20。排除借连接阻塞，与Future.get的调用位置一致。',
       },
     },
     {
@@ -135,19 +183,26 @@ export const poolDeadlockCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-queue'],
-      hypotheses: [{ id: 'h-queue', status: 'excluded' }],
+      tests: [
+        'h-queue',
+      ],
+      hypotheses: [
+        {
+          id: 'h-queue',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '队列评估',
-        text: '无界队列（LinkedBlockingQueue）确实是隐患（极端时内存膨胀）。\n但本次卡死的本质是"队列里的任务永远轮不到"——不是队列太长，是调度死结。\n→ 排除队列作为根因；无界队列列为整改项。',
+        text: '32任务队列体积稳定、完整GC后heap基线无上升；父/子依赖环存在且无执行进展，非内存压力假死。无界队列是容量风险，但改成大有界队列不自动解除同池等待。\n噪声收线：缩略图由独立任务访问，32个等待子任务未到该步骤；内存稳定和Future归属说明不是该图像请求占满执行器。',
       },
     },
     {
       id: 'a-danger',
       name: '回滚"子任务并行"功能',
       desc: '【状态变更】汇总任务退回串行执行版本',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -172,7 +227,7 @@ export const poolDeadlockCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 子任务专用池（16 线程，与父池物理隔离）\n② 父任务改 CompletableFuture.allOf 异步聚合，不再占着线程空等\n③ 并发 8 父任务 × 全量子任务压测 100 轮：零卡死，报表耗时稳定 2.2 分钟——并行收益保住。',
+        text: '最短选择之一：父不在子worker池占线程同步等待，使用非阻塞组合/回调；调用CompletableFuture.allOf后仍在同池join/get不会解决。另一个选择是预算明确的独立子池。\n无需机械同时增加16线程和异步改造，先用控制交错复验进度及取消/失败行为。',
       },
     },
     {
@@ -188,7 +243,7 @@ export const poolDeadlockCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '监控 v2',
-        text: '① 池指标三件套：活跃线程 / 队列深度 / "WAITING on Future.get 的 worker 数"\n② 最后一项 > 0 即告警——线程池死锁的特异性指纹\n③ 所有池任务强制 deadline，超时转储现场。',
+        text: '观测活跃worker、父子任务归属、队列进度与等待时长。Future.get等待>0很常见，不是死锁特异指纹；需要全池被父占、等同池子任务且持续无进展的组合。deadline能限制等待，不等于消除资源环。',
       },
     },
     {
@@ -208,67 +263,79 @@ export const poolDeadlockCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-selfwait', text: '汇总任务（父）把子任务提交到同一个 8 线程池并 Future.get() 阻塞等待：并发父任务 ≥ 线程数时，线程全被父占用、子任务滞留队列——线程池自等待死锁（凌晨定时调度并发 12 个汇总任务时高发）', correct: true },
-    { id: 'rc-dblock', text: '数据库死锁/行锁导致任务阻塞在 SQL', correct: false },
-    { id: 'rc-queue', text: '无界队列堆积导致内存压力假死', correct: false },
-    { id: 'rc-conn', text: '连接池耗尽，任务等待连接', correct: false },
+    {
+      id: 'rc-selfwait',
+      text: '汇总任务（父）把子任务提交到同一个 8 线程池并 Future.get() 阻塞等待：并发父任务 ≥ 线程数时，线程全被父占用、子任务滞留队列——线程池自等待死锁（凌晨定时调度并发 12 个汇总任务时高发）',
+      correct: true,
+    },
+    {
+      id: 'rc-dblock',
+      text: '数据库死锁/行锁导致任务阻塞在 SQL',
+      correct: false,
+    },
+    {
+      id: 'rc-queue',
+      text: '无界队列堆积导致内存压力假死',
+      correct: false,
+    },
+    {
+      id: 'rc-conn',
+      text: '连接池耗尽，任务等待连接',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 5,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '8 个线程全在等结果、队列里 31 个待算任务——先盘点"谁在线程上、谁在队列里"。',
-      update: '线程上全是父任务、队列里全是子任务——两代人被同一个池隔开，"等自己"的闭环浮现。',
+      thought: '盘点线程与排队任务身份。',
+      update: '8父占线程，32子排队。',
       actionId: 'a-impact',
-      why: '1⚡︎ 现场盘点的价值在于身份对照：WAITING 的不是"任务慢"而是"任务在等队列里的自己人"——结构问题一目了然。',
-      conclusion: '嫌疑锁定：父子任务同池的死锁结构（h-selfwait 升权）。',
+      why: '1⚡任务归属比WAITING标签更接近资源图。',
+      conclusion: '核对等待关系。',
     },
     {
-      thought: '线程栈与队列做全量对照，把闭环钉死：每个线程等谁、每个队列任务等谁。',
-      update: '实锤：8×(父占线程等子) + 31×(子排队等线程)——自等待死锁完整闭环。',
+      thought: '关联Future和执行器。',
+      update: '所有父等同池子，尚未进入DB/连接池。',
       actionId: 'a-stacktrace',
-      why: '2⚡︎ 全量对照是死锁排查的铁律：死锁是结构不是性能，必须看到"互相等待的环"才能下结论——这里环的两半分别是线程侧和队列侧。',
-      conclusion: '根因实锤：线程池自等待死锁。',
+      why: '2⚡完整资源环确认饥饿，并反证两个数据库候选。',
+      conclusion: '确认同池自等待。',
     },
     {
-      thought: '解释"为什么随机、为什么压测复现不了"：构造并发阈值实验——死锁有确定的触发条件。',
-      update: '并发父任务 ≥ 8 必死、< 8 不死；凌晨调度并发 12 个——"随机"其实是确定性的并发条件。',
+      thought: 'barrier固定并发交错。',
+      update: '先占8父再投32子，稳定停滞。',
       actionId: 'a-repro',
-      why: '1⚡︎ 阈值实验同时完成两件事：解释"随机性"（条件未满足而已）和给出压测脚本怎么写（并发 ≥ 线程数）——此前压测绿是因为永远只提交 1 个任务。',
-      conclusion: '触发条件明确 → 验证修复的验收标准也有了。',
+      why: '1⚡可控制交错才是确定性复现，不以8次submit保证调度。',
+      conclusion: '阈值条件明确。',
     },
     {
-      thought: 'DB 锁、连接池、队列三个经典嫌疑各用 1⚡︎ 排除——尤其 DB 死锁，是这类 jstack 最常被误判的方向。',
-      update: '栈上还没到 SQL、连接充足、队列不是死结——三个假设有证据排除。',
-      actionId: 'a-dbshow',
-      why: '1⚡︎ 死锁排查的第一陷阱是"看到 WAITING 就想到数据库锁"——线程栈上"卡在哪一行"比任何猜测都可靠，排除证据要跟到栈帧。',
-      conclusion: '嫌疑收敛单点。',
+      thought: '核对队列与堆进度。',
+      update: '32任务稳定，无内存增长。',
+      actionId: 'a-queuecfg',
+      why: '1⚡反证容量压力，不把无界队列背景风险当已证根因。',
+      conclusion: '其余候选排除。',
     },
     {
-      thought: '止血（回滚并行）、修复（父子隔离+异步聚合）、沉淀（监控指纹+静态检查）。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】结构（同池自等待）✓ 触发条件（并发 ≥ 线程数）✓ 复发防线（工具守门）✓——机制、条件、防复发三层闭合。',
-      conclusion: '沉淀：线程池死锁不需要锁——只需要"占着资源等排在资源后面的自己"。父子任务要么分池，要么不阻塞等待。',
+      why: '【停止规则】Future归属、全池资源环和受控交错一致，SQL锁、借连接与内存压力均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '汇总任务（父）把子任务提交到同一个 8 线程池并 Future.get() 阻塞等待：并发父任务 ≥ 线程数时，线程全被父占用、子任务滞留队列——线程池自等待死锁（凌晨定时调度并发 12 个汇总任务时高发）',
     },
   ],
-
   lessons: [
     {
-      text: '线程池死锁不需要任何锁：父任务占着线程等待子任务，子任务排在同一个池的队列里——"等自己"就是死锁。',
-      principle: '程序设计：同池嵌套提交 + 同步等待是结构性死锁。两条出路：父子任务物理隔离（子任务专用池），或父任务异步聚合（CompletableFuture 回调，不占线程等待）。',
+      text: '线程池饥饿死锁可以没有monitor锁：全部worker被父占用，同池子任务永远得不到执行资源。',
+      principle: '关联等待Future的任务ID与执行器归属，比仅看WAITING更有效。资源图闭环才能支撑结构性结论。',
     },
     {
-      text: '"无法复现"经常是"并发条件没到"：单个任务复现不了，并发数 ≥ 线程数时 100% 复现——先找触发阈值再谈随机。',
-      principle: '假设思维：偶发问题先把它翻译成"条件表达式"（什么条件下必然发生）。阈值实验（从 1 个提交逐级加到 N 个）把随机问题变成确定性复现——复现条件本身就是验收标准。',
+      text: '复现要控制父占满worker后再提交子任务；父任务数等于池大小只是风险条件，不是任意调度下都必死。',
+      principle: '用barrier固定交错并验证进展，避免把偶发绿测解释为没有问题，也不要把提交次数当确定调度。',
     },
     {
-      text: '线程池要有自己的监控指纹：活跃线程、队列深度、"WAITING 在 Future.get 的线程数"——最后一项 > 0 就是死锁前兆。',
-      principle: '可观测性设计：线程池死锁在业务指标上表现为"任务停止"（不可区分于低流量），在池指标上却有特异性指纹。把结构性风险的指纹做成告警，比每次靠 jstack 人肉抓快一个量级。',
+      text: 'allOf不是魔法；同一worker上再join/get仍可能占着子任务所需资源。',
+      principle: '选择真正非阻塞组合或独立执行器，并分别预算并发。单个Future等待不是告警充分条件，应结合归属与进度。',
     },
   ],
 }

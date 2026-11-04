@@ -1,26 +1,25 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 1 章 · 并发迷宫 第三批（ThreadLocal 残留串数据 L2）
- * 教学点：假设思维——"偶发串数据"的经典结构：线程池复用 + 上下文未清理 + 绕过写入路径的读取；
- * ThreadLocal 必须有确定性清理（finally remove）与 fail-fast 读取。
- * 专家路径：impact(1) + tlexamine(2) + threadreplay(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const threadlocalLeakCase: DiagnosisCase = {
   id: 'threadlocal-leak',
   title: '用户偶尔看到别人的收货地址',
-  intro: '客服转来诡异工单：用户 A 偶尔看到用户 B 的收货地址。低频、随机、无法复现——数据像在池子里"串了"。',
+  intro: '“我的地址”偶发返回他人数据。先关联当前请求身份、执行worker和此前请求，再核对上下文写入及清理覆盖面。',
   domain: 'concurrency',
   layer: '线程池复用线程——ThreadLocal 不清理，上下文就会穿越请求',
   part: 'master',
   chapterId: 'concurrency',
   order: 7,
-  typeTags: ['race', 'data', 'security'],
+  typeTags: [
+    'race',
+    'data',
+    'security',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」用户中心服务的后端，三张"串数据"工单让你脊背发凉。',
-    architecture: '网关(透传 X-User-Id) → 用户服务(Tomcat 线程池 200) → 上下文过滤器(写 ThreadLocal) → 业务代码(读 UserContext)',
+    architecture: '已认证网关把/my/address转到用户服务/internal/address-query；Tomcat复用worker；该内部路径被身份ThreadLocal过滤器排除，却仍调用UserContext读取身份。',
     tag: '故障现场',
     symptoms: [
       {
@@ -33,18 +32,37 @@ export const threadlocalLeakCase: DiagnosisCase = {
         title: '排查困境',
         text: '无法复现：回归测试全绿、压测两小时零复现、本地开发从没见过。\n三例分散在三天，无机型无区域聚集——像骰子随机掷中了谁。',
       },
+      {
+        type: 'log',
+        title: '头像CDN失败',
+        text: '[WARN] profile avatar CDN 404；客服截图里还有此条。',
+      },
     ],
     timeline: '上月引入上下文过滤器（ThreadLocal 传递用户身份，替代逐层传参）｜ 串数据工单自此出现 ｜ 业务代码三个月未改',
     impactHint: '偶发、无痕、无法复现——数据在一个请求里没换过手，那它是从哪"继承"来的？',
   },
-
   hypotheses: [
-    { id: 'h-threadlocal', text: 'ThreadLocal 残留：异常请求路径漏清理，线程带着上一个用户的上下文回池，被下一个请求读到', excludeActionId: 'a-tlexamine' },
-    { id: 'h-cachekey', text: '地址缓存键冲突：缓存键未带用户维度，不同用户互相覆盖', excludeActionId: 'a-cachekey' },
-    { id: 'h-gateway', text: '网关透传错乱：连接复用时把 A 的请求头写给了 B 的请求', excludeActionId: 'a-gatewaylog' },
-    { id: 'h-race', text: '异步任务共享上下文对象，两个用户的并行任务互相覆盖', excludeActionId: 'a-asyncshare' },
+    {
+      id: 'h-threadlocal',
+      text: 'ThreadLocal 残留：异常请求路径漏清理，线程带着上一个用户的上下文回池，被下一个请求读到',
+      excludeActionId: 'a-tlexamine',
+    },
+    {
+      id: 'h-cachekey',
+      text: '地址缓存键冲突：缓存键未带用户维度，不同用户互相覆盖',
+      excludeActionId: 'a-cachekey',
+    },
+    {
+      id: 'h-gateway',
+      text: '网关透传错乱：连接复用时把 A 的请求头写给了 B 的请求',
+      excludeActionId: 'a-gatewaylog',
+    },
+    {
+      id: 'h-race',
+      text: '异步任务共享上下文对象，两个用户的并行任务互相覆盖',
+      excludeActionId: 'a-asyncshare',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -70,12 +88,19 @@ export const threadlocalLeakCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-threadlocal'],
-      hypotheses: [{ id: 'h-threadlocal', status: 'confirmed' }],
+      tests: [
+        'h-threadlocal',
+      ],
+      hypotheses: [
+        {
+          id: 'h-threadlocal',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '过滤器代码审计',
-        text: 'try {\n  UserContext.set(userId)          ← set 有\n  chain.doFilter(...)\n} catch (Exception e) {\n  log.error("unhandled", e)        ← 异常被吞，不 rethrow\n}\nfinally remove：没有！afterCompletion 只覆盖正常返回路径。\n另发现：拦截器注册排除了 /actuator/* 与 /internal/*——\n这些路径不执行 set，但公共组件照样读 UserContext。\n实锤：异常残留 × 绕过写入的读取 = 串数据。',
+        text: '实际过滤器：UserContext.set(userId); chain.doFilter(...); UserContext.remove(); // remove只在正常返回时执行，未放finally\n前请求B抛异常由外层错误处理映射，remove被跳过；后请求A转到/internal/address-query，因排除规则不执行set，但公共组件读取旧B。\n若A正常执行set(A)，旧B会被覆盖，单有漏remove不足以串本请求。Spring afterCompletion并非天然只覆盖正常请求，本案不靠这种错误框架说法。',
       },
     },
     {
@@ -91,7 +116,7 @@ export const threadlocalLeakCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '定向复现（100% 命中）',
-        text: '步骤 1：向 tomcat-042 线程发一个会抛异常的请求（带用户 B 上下文）\n步骤 2：紧接着发 /internal/address-query（带用户 A，绕过过滤器）\n结果：响应包含 B 的地址——100% 复现，需同时满足两个条件：\n① 上一个请求异常路径漏清理 ② 当前请求绕过拦截器但读上下文。\n"无法复现"的真相：压测只打了正常请求，两个条件从未同时出现。',
+        text: '使用可控单worker执行器调用实际过滤器/handler：先处理B并让chain抛异常，再让同一worker处理被排除内部路径A，读到B。控制为finally清理后同序列不再读B。\n普通HTTP连接复用不保证命中同Tomcat线程，不能声称向tomcat-042发HTTP就100%指定线程。',
       },
     },
     {
@@ -102,12 +127,19 @@ export const threadlocalLeakCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-cachekey'],
-      hypotheses: [{ id: 'h-cachekey', status: 'excluded' }],
+      tests: [
+        'h-cachekey',
+      ],
+      hypotheses: [
+        {
+          id: 'h-cachekey',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '缓存键核对',
-        text: '键结构 addr:{userId}，用户维度齐全，无覆盖痕迹。\n→ 排除缓存串键。',
+        text: '故障trace的地址查找使用UserContext返回的B构造addr:B；缓存键含用户且存储内容与B一致。错在取用户标识前，不是缓存把addr:A覆盖成B。\n噪声收线：头像资源与地址数据JSON是独立请求；地址缓存实际按B主体查addr:B，不能由图片404解释。',
       },
     },
     {
@@ -118,12 +150,19 @@ export const threadlocalLeakCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-gateway'],
-      hypotheses: [{ id: 'h-gateway', status: 'excluded' }],
+      tests: [
+        'h-gateway',
+      ],
+      hypotheses: [
+        {
+          id: 'h-gateway',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '请求头比对',
-        text: '三例工单：网关出站 X-User-Id 与服务端入站完全一致，无误传。\n→ 排除网关。',
+        text: '网关认证主体A、出站标识及服务入站主体均为A；错误发生在被排除路径读取ThreadLocal时，排除透传混用户。此处身份来自已验证网关主体，不以任意用户自填头直接授权。',
       },
     },
     {
@@ -134,19 +173,26 @@ export const threadlocalLeakCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-race'],
-      hypotheses: [{ id: 'h-race', status: 'excluded' }],
+      tests: [
+        'h-race',
+      ],
+      hypotheses: [
+        {
+          id: 'h-race',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '异步任务审计',
-        text: '异步地址任务显式传 userId 快照，不共享上下文对象——主路径排除。\n但顺带发现：任务的兜底逻辑里也读 UserContext.get()——\n它在异步线程上永远读不到正确值，属于同源隐患，列入整改。',
+        text: '三条故障调用链都在当前Tomcat worker同步查地址，没有进入异步任务或共享异步上下文；其他异步路径需单独验证，不能靠“ThreadLocal在异步线程永远没值”概括所有传播方式。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急下线 ThreadLocal 上下文机制',
       desc: '【状态变更】回退为显式参数传递，Filter 整体摘除',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -171,7 +217,7 @@ export const threadlocalLeakCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① Filter 改为 try/finally remove——任何路径（含异常）必然清理\n② 拦截器覆盖全路径：/actuator 与 /internal 不再是"不写只读"的盲区\n③ UserContext.get() 改 fail-fast：无值直接抛异常，杜绝"读到别人的"这种静默错误\n定向复现序列重放 1000 次：零串数据。',
+        text: '身份上下文的set与finally remove在同一作用域；该已认证内部路径改为显式传当前请求主体，或纳入需要身份的上下文作用域。健康检查等无用户接口不应强行设置用户。\n仅让get在null时抛错不能识别非null旧B；清理、写入覆盖与主体归属必须一起验证。',
       },
     },
     {
@@ -207,67 +253,93 @@ export const threadlocalLeakCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-threadlocal', text: 'ThreadLocal 上下文机制缺陷叠加：异常路径无 finally remove（线程带残留回池）+ 拦截器排除路径"不写但读"——上一个用户的上下文被后续请求静默继承，偶发串数据', correct: true },
-    { id: 'rc-cachekey', text: '地址缓存键缺少用户维度，不同用户互相覆盖', correct: false },
-    { id: 'rc-gateway', text: '网关连接复用时请求头透传错乱', correct: false },
-    { id: 'rc-race', text: '异步任务共享上下文对象互相覆盖', correct: false },
+    {
+      id: 'rc-threadlocal',
+      text: 'ThreadLocal 上下文机制缺陷叠加：异常路径无 finally remove（线程带残留回池）+ 拦截器排除路径"不写但读"——上一个用户的上下文被后续请求静默继承，偶发串数据',
+      correct: true,
+    },
+    {
+      id: 'rc-cachekey',
+      text: '地址缓存键缺少用户维度，不同用户互相覆盖',
+      correct: false,
+    },
+    {
+      id: 'rc-gateway',
+      text: '网关连接复用时请求头透传错乱',
+      correct: false,
+    },
+    {
+      id: 'rc-race',
+      text: '异步任务共享上下文对象互相覆盖',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 7,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '三例工单的共同点藏在"看不见的前情"里——考古串数据时刻同线程的上一笔请求。',
-      update: '三例前一秒同线程都有异常请求；读取路径都是"间接读上下文"——偶发骰子的两个面浮出。',
+      thought: '关联当前请求与同worker前情。',
+      update: '前B异常、后A读取身份路径被排除。',
       actionId: 'a-impact',
-      why: '1⚡︎ 线程池串数据类问题的第一证据是"线程的前情"：数据不会凭空串，它是被某个线程"随身带过来"的。',
-      conclusion: '嫌疑锁定：ThreadLocal 残留 × 绕过写入的读取（h-threadlocal 升权）。',
+      why: '1⚡线程身份与请求主体比时间邻近更直接。',
+      conclusion: '核对写清作用域。',
     },
     {
-      thought: '审计 set 与 remove 是否成对——上下文机制的全部正确性就在这一对操作里。',
-      update: '实锤：异常路径无 finally remove + 拦截器盲区路径"不写只读"——残留通道完整。',
+      thought: '读取过滤器和路由覆盖。',
+      update: 'remove在正常返回尾部，后A未set。',
       actionId: 'a-tlexamine',
-      why: '2⚡︎ 机制审计一查一个准：ThreadLocal 的正确性 = 写与清的严格配对，任何一条路径漏掉 remove，整个池都被污染——这不是概率问题，是结构问题。',
-      conclusion: '根因实锤 → 定向复现钉死因果。',
+      why: '2⚡两个条件缺一不成立，不能单靠漏remove解释A覆盖后的值。',
+      conclusion: '确认残留通道。',
     },
     {
-      thought: '把两个条件人工凑齐做定向复现——"无法复现"往往只是"条件没凑齐"。',
-      update: '100% 复现：异常残留 + 绕过路径读取，缺一不串。压测不复现的原因也解开了：压测全是正常请求。',
+      thought: '控制同worker的两请求序列。',
+      update: '异常B→绕过A读B，finally版本不串。',
       actionId: 'a-threadreplay',
-      why: '1⚡︎ 定向复现是"假设思维"的收官动作：条件凑齐即必现，证明这不是玄学而是确定性机制——修复的验收标准（重放 1000 次）也同时产出。',
-      conclusion: '因果钉死 → 修复三件套（清理/覆盖/fail-fast）。',
+      why: '1⚡以确定执行器复验，不假装HTTP能指定Tomcat线程。',
+      conclusion: '因果对照成立。',
     },
     {
-      thought: '缓存、网关、异步三个常规嫌疑各 1⚡︎ 排除留证；异步审计顺带揪出同源隐患。',
-      update: '三个假设有证据排除；异步任务的兜底读取列入同源整改。',
+      thought: '读取实际缓存键和身份。',
+      update: '实际查addr:B，存储内容正确。',
+      actionId: 'a-cachekey',
+      why: '1⚡先定位键是怎样生成，不能仅看键模板。',
+      conclusion: '排除缓存串键。',
+    },
+    {
+      thought: '关联网关与服务已验证主体。',
+      update: '当前都为A，ThreadLocal却B。',
+      actionId: 'a-gatewaylog',
+      why: '1⚡逐跳身份对照排除头透传错。',
+      conclusion: '排除网关。',
+    },
+    {
+      thought: '核对是否执行异步路径。',
+      update: '故障trace同步查地址。',
       actionId: 'a-asyncshare',
-      why: '1⚡︎ 排除动作的副产品价值：审计"是否共享上下文"时发现它也在读 ThreadLocal——同一根因的第二暴露面，不修则修复后仍留残根。',
-      conclusion: '整改清单扩充 → 全量治理。',
+      why: '1⚡实际调用路径排除异步共享覆盖。',
+      conclusion: '候选全部收敛。',
     },
     {
-      thought: '止血（下线机制）、修复（确定性清理+fail-fast）、沉淀（lint+探针）。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】结构（残留×盲区读取）✓ 复现（定向 100%）✓ 制度（工具守门）✓——机制、因果、防复发三层闭合。',
-      conclusion: '沉淀：线程池里的 ThreadLocal 是"跨请求的隐形行李"——set 与 remove 必须在同一双手里完成，读取必须有值可读，否则宁可炸不可串。',
+      why: '【停止规则】受控同worker复现与过滤器边界吻合，缓存键、网关主体和异步共享解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: 'ThreadLocal 上下文机制缺陷叠加：异常路径无 finally remove（线程带残留回池）+ 拦截器排除路径"不写但读"——上一个用户的上下文被后续请求静默继承，偶发串数据',
     },
   ],
-
   lessons: [
     {
-      text: '线程池复用线程，ThreadLocal 不清理 = 上下文穿越请求：上一个用户的身份、事务、追踪信息都可能被下一个请求静默继承。',
-      principle: '程序设计：ThreadLocal 的正确性 = set 与 remove 严格配对，且 remove 必须在 finally（异常路径也要清）。上下文组件收敛为公共库统一管理，禁止业务自建——"必须成对"靠人的记忆不如靠工具拦截。',
+      text: '漏remove并非单独足以串用户：本案还需要后请求绕过set却读取旧值。',
+      principle: 'ThreadLocal随worker存活，HTTP连接不等于线程。正常路径remove、异常路径缺finally与内部路径排除共同构成可复现条件。',
     },
     {
-      text: '串数据类故障的复现条件是复合的：残留（漏清理）× 读取（绕过写入路径）——压测不复现只说明两个条件没同时出现。',
-      principle: '假设思维：把"偶发"翻译成条件表达式，再定向凑齐条件做复现实验。100% 复现的"偶发"是确定性机制——复现实验同时给出修复的验收标准。',
+      text: '清理放在finally，并按接口是否需要用户建立明确上下文边界；不把所有actuator接口都变成必须有用户。',
+      principle: '身份应来自已验证主体。非null检查拦不住旧身份，因此不能把“缺值失败”当成残留修复。',
     },
     {
-      text: '读取端要 fail-fast：UserContext.get() 读不到值时，宁可抛异常也不能返回"别人留下的值"——静默错误比崩溃可怕得多。',
-      principle: '防御式设计：上下文类读取必须有明确的"缺失即失败"语义。串数据的代价是隐私事故与信任崩塌——让错误在第一跳爆炸，而不是在第三跳变成别人的数据。',
+      text: '复现通过受控同worker执行序列，不凭HTTP连接复用假定同一Tomcat线程。',
+      principle: '异步上下文需显式传播和释放；主故障同步路径与异步隐患分开，不把未观察的共享写列为已证原因。',
     },
   ],
 }
