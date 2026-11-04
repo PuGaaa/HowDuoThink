@@ -349,3 +349,118 @@
 
 技术机制依据：[官方资料1](https://kafka.apache.org/41/documentation/#basic_ops_modify_topic)、[官方资料2](https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html)。
 
+## mq-bus-review（messaging/6）
+
+学习目标：事件总线把一次调用变成一份承诺——发出去的每个事件都要到、要对、要有序。
+
+编审：人工裁定7⚡（原8、旧链6却漏两类审查），把多个真缺陷误标false改成核心契约错配及三个可证伪误区；明确Kafka而非混合queue/group语义，保留L3。
+
+难度：L3→L3；六维[3, 3, 2, 3, 3, 3]。
+
+1. 合同基数→拓扑→顺序/恢复；原文依据（a-orderproof）：“同group的assignment按分区分摊：库存只领部分，分析领另一部分，双方各缺事件。另因null key，同订单事件可分散分区，独立处理不提供实体顺序。”
+2. 1600与100交付模型；原文依据（a-orderproof）：“同group的assignment按分区分摊：库存只领部分，分析领另一部分，双方各缺事件。另因null key，同订单事件可分散分区，独立处理不提供实体顺序。”
+3. Kafka组/offset领域机制；原文依据（a-orderproof）：“用独立group满足各业务交付，按需key=orderId并定义生产、分区内处理和重试顺序；一个key本身不保证消费者任意并发也有序。”
+4. 总线化反而让业务漏订阅；原文依据（a-impact）：“合同要求每个订阅方各处理同100事件，即1600份交付；草案相同group实际每条记录分给组内一个消费者，合计约100份而非1600。”
+5. 发布/16业务/Broker进度；原文依据（scene.architecture）：“Kafka order-events（16分区、无key）；16个不同业务下游都要独立订阅，但草案统一group.id=order-subscribers；失败3次后commit offset丢弃。”
+6. 同group省管理及先commit看似便利；原文依据（a-approve）：“原稿直接发布会违反已知交付份数和恢复承诺；具体事故数量与发生日未验证，不能写成双11预演已发生。”
+
+标准路径：a-impact → a-orderproof → a-slowprobe → a-schemaprobe → a-dropprobe，7⚡，零错S；终态确认h-ordering，其余全部excluded。
+
+替代路径：a-impact → a-dropprobe → a-schemaprobe → a-slowprobe → a-orderproof，7⚡，零错S；终态确认h-ordering，其余全部excluded。
+
+停止点：【停止规则】交付基数与组语义错配成立，独立组必共享、编码万能及commit自动重试三个命题均被反例排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html)。
+
+## rebalance-storm（messaging/7）
+
+学习目标：留在消费者组里有两个时钟——心跳之外，还有拉取间隔的死线。
+
+编审：人工裁定7⚡（原4、旧链5漏两项反证），固定classic动态协议；纠正10分钟周期与300秒、6×40=8%、N×P95硬预算及心跳绝不受GC影响。四维L3升L3。
+
+难度：L2→L3；六维[3, 3, 2, 3, 3, 2]。
+
+1. 心跳/进度两时钟→成员协议→旧任务；原文依据（a-pollaudit）：“动态classic Java消费者在max.poll.interval内未继续poll，会因进度超时失去组成员资格；旧处理线程不会自动停止，迟到提交可能失败或副作用重复。”
+2. 批时长与期限矩阵；原文依据（a-pollaudit）：“动态classic Java消费者在max.poll.interval内未继续poll，会因进度超时失去组成员资格；旧处理线程不会自动停止，迟到提交可能失败或副作用重复。”
+3. Kafka组进度领域机制；原文依据（a-pollaudit）：“本题慢批500条含2个160秒审核，加普通处理约40秒，总360秒>300。未提交记录可由新成员再取，不能把这叫Broker根据积压主动搬分区。”
+4. 仍有心跳却失去所有权；原文依据（a-impact）：“慢实例处理批期间，心跳在max.poll期限前仍有记录；最后poll到超期约300秒，客户端报告poll timeout并离组。其余实例poll<60秒。不是“仍有心跳所以必不能被移出”。”
+5. worker/客户端/coordinator/副作用；原文依据（scene.architecture）：“Kafka Java classic协议，动态成员（无group.instance.id），eager RangeAssignor；24分区/6实例；max.poll.interval=300s、session.timeout=600s，Broker允许该范围。”
+6. 放宽期限延长停滞窗口；原文依据（a-danger）：“将max.poll放宽30分钟可能使当前6分钟批不再触发进度超时，但没有修复慢批或副作用重复；真正进程心跳消失仍按session检测，不能说它关闭了所有故障转移。放宽后的进度停滞窗口需明确承担。”
+
+标准路径：a-impact → a-pollaudit → a-repro → a-sessioncfg → a-brokermove → a-deploylog，7⚡，零错S；终态确认h-polltimeout，其余全部excluded。
+
+替代路径：a-impact → a-deploylog → a-brokermove → a-sessioncfg → a-repro → a-pollaudit，7⚡，零错S；终态确认h-polltimeout，其余全部excluded。
+
+停止点：【停止规则】协议、批时长与coordinator原因一致，session失联、Broker积压迁移和部署扰动均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://kafka.apache.org/41/configuration/consumer-configs/#max.poll.interval.ms)、[官方资料2](https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html)。
+
+## replay-surge（messaging/7）
+
+学习目标：重放是全量负载注入——幂等窗口、下游容量、时效语义都要在重放前对表。
+
+编审：人工裁定6⚡（原4、旧链4漏资格/修复反证）；统一11000实际执行、9900重复29700积分，81000只潜在；删除全预插已处理导致漏任务的错误修复，保留L3。
+
+难度：L3→L3；六维[3, 3, 2, 3, 3, 3]。
+
+1. 候选/执行→业务权益→负载；原文依据（a-idemaudit）：“去重以msgId保留7天，候选92%超过7天；这只表示可能超出去重窗口，不等于92%都应处理或都重复。按稳定积分权益业务键关联人工和自动流水，确认27000已兑现；人工补发的不同msgId也必须归到同权益。”
+2. 账本基数与单位换算；原文依据（a-idemaudit）：“去重以msgId保留7天，候选92%超过7天；这只表示可能超出去重窗口，不等于92%都应处理或都重复。按稳定积分权益业务键关联人工和自动流水，确认27000已兑现；人工补发的不同msgId也必须归到同权益。”
+3. 幂等与任务恢复领域机制；原文依据（a-idemaudit）：“实际重复9900个业务键都有历史兑现记录，短期消息记录已无或不能关联人工补发，重放把历史当新任务。”
+4. 修复性重放引发二次事故；原文依据（a-impact）：“候选30000，已兑现27000；实际执行11000中重复9900×3=29700积分，81000是若全部重复候选再执行的潜在量。样本200条90%不能单独证明全量27000；本题该数来自兑付账本全量关联。”
+5. 消息/人工账本/权益/共享DB；原文依据（scene.architecture）：“积分平台：死信队列(3 万条积分发放失败消息) → 重放工具(批量推送) → 积分服务 → 积分 DB ｜ 同机群: 下单主链路”
+6. 全预插去重看似安全实则漏任务；原文依据（a-danger）：“中止后按实际11000执行ID对账，再评估29700重复积分的冲正/已用部分；没有依据声称回收72000。暂停减轻新增负载，恢复速度由当前队列与DB状态决定，不预先保证P99为300ms。”
+
+标准路径：a-impact → a-idemaudit → a-dbnorm → a-stalecheck → a-fixverify，6⚡，零错S；终态确认h-idemwindow，其余全部excluded。
+
+替代路径：a-impact → a-fixverify → a-stalecheck → a-dbnorm → a-idemaudit，6⚡，零错S；终态确认h-idemwindow，其余全部excluded。
+
+停止点：【停止规则】实际兑付账本、资格与资源预算共同解释后果，天然安全速率、永久资格和全部未执行三个命题均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html)、[官方资料2](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)。
+
+## mq-disk（messaging/8）
+
+学习目标：TTL 是标记，清理是执行——两个机制缺一不可。
+
+编审：人工裁定7⚡（原4、旧链5漏硬件/窗口）。重建12TB内10.92TB现场，纠正默认无限、TTL通用机制、page cache推断及删除后百分比；四维L3升L3。
+
+难度：L2→L3；六维[3, 3, 2, 3, 3, 2]。
+
+1. 物理账→配置层→扫描资格；原文依据（a-retentioncfg）：“应用expiresAt=3d只决定业务是否接受旧事件，不是Kafka原生TTL。Broker保留72h被topic显式retention.ms=-1覆盖，retention.bytes=-1，cleanup.policy=delete。”
+2. 空间/副本/净增/窗口对账；原文依据（a-retentioncfg）：“应用expiresAt=3d只决定业务是否接受旧事件，不是Kafka原生TTL。Broker保留72h被topic显式retention.ms=-1覆盖，retention.bytes=-1，cleanup.policy=delete。”
+3. Kafka段保留领域机制；原文依据（a-retentioncfg）：“清理扫描正常运行，但没有满足保留条件的段被删除；不是Kafka默认保留无限，也不是必须另开自研删除任务。恢复保留后仍按segment/检查周期异步清理，不保证瞬时精确释放。”
+4. 配过业务TTL但日志保留无限；原文依据（a-impact）：“按全部副本物理空间同一口径：order-events约3.5TB，测试死信归档topic约3.2TB，其他约3.78TB，总日志约10.48；加系统/备份0.44约10.92TB。”
+5. 应用/Broker配置/物理存储；原文依据（scene.architecture）：“Kafka3 broker×4TB SSD（合计12TB）；消息业务expiresAt=3d；Broker默认保留72h，但topic模板显式retention.ms=-1/retention.bytes=-1。”
+6. 手删段可能损恢复；原文依据（a-danger）：“经业务owner确认后删除可废弃测试归档topic的3.2TB物理数据，理论占用10.92−3.2=7.72TB，即64.3%，不是62%。”
+
+标准路径：a-impact → a-retentioncfg → a-volumetrend → a-dirusage → a-diskhealth → a-riskmodel，7⚡，零错S；终态确认h-retention，其余全部excluded。
+
+替代路径：a-impact → a-diskhealth → a-dirusage → a-volumetrend → a-riskmodel → a-retentioncfg，7⚡，零错S；终态确认h-retention，其余全部excluded。
+
+停止点：【停止规则】物理账与有效topic覆盖解释增长，流量暴涨、其他文件和硬件劣化均排除，风险窗口口径明确。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://kafka.apache.org/41/configuration/topic-configs/#retention.ms)、[官方资料2](https://kafka.apache.org/41/configuration/topic-configs/#cleanup.policy)。
+
+## mq-dualwrite（messaging/9）
+
+学习目标：两次写入之间没有原子性——消息要和业务数据同生共死。
+
+编审：人工裁定6⚡（原4、旧链5漏消费者反证）。删重启频率×3ms伪概率，区分GC暂停与期限分支；纠正同步零漏、失败后补表无间隙和outbox跨系统exactly-once。
+
+难度：L2→L2；六维[2, 3, 2, 2, 3, 3]。
+
+1. 提交→控制流→恢复意图；原文依据（a-codeseq）：“代码：tx.commit(order);”
+2. 同键分支审计与定点复放；原文依据（a-codeseq）：“代码：tx.commit(order);”
+3. outbox事务边界；原文依据（a-codeseq）：“if (requestDeadlineExpired()) return;”
+4. GC不等于线程被杀；原文依据（a-impact）：“固定30个业务键：22进程退出、2OOM在commit后且send前；6个长GC后执行明确的deadline过期return分支。GC只是暂停诱因，直接跳过发送来自应用分支。受控故障注入可重现无消息意图状态。”
+5. 请求/DB/Broker/积分；原文依据（scene.architecture）：“下单服务：① DB 事务(订单落库) ② 发送 MQ(积分消息) → 积分消费者(幂等入账)”
+6. 同步外呼看似修一致性仍有双写窗；原文依据（a-danger）：“改同步积分调用不会自动原子：若仍先commit再调用，进程在二者之间退出照样漏；若先外呼后commit，又有外部完成而订单回滚风险。同步还耦合期限/容量，不能宣称漏发归零。”
+
+标准路径：a-impact → a-codeseq → a-sendlog → a-brokercheck → a-consumerside，6⚡，零错S；终态确认h-gap，其余全部excluded。
+
+替代路径：a-impact → a-consumerside → a-brokercheck → a-sendlog → a-codeseq，6⚡，零错S；终态确认h-gap，其余全部excluded。
+
+停止点：【停止规则】提交与发送前终止/分支复现吻合，send异常、Broker后丢和消费提交失败均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)、[官方资料2](https://www.rabbitmq.com/docs/confirms)。
+

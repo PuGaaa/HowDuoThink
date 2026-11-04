@@ -1109,7 +1109,76 @@
       "originalDifficulty": 3,
       "originalExpertCost": 8,
       "originalPathCost": 6,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "3ab986f91e0473e4d89824e60d41c8f4d72fa9cca9f6d1ef798cab4394c3fbd5",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "合同基数→拓扑→顺序/恢复；原文依据（a-orderproof）：“同group的assignment按分区分摊：库存只领部分，分析领另一部分，双方各缺事件。另因null key，同订单事件可分散分区，独立处理不提供实体顺序。”",
+        "1600与100交付模型；原文依据（a-orderproof）：“同group的assignment按分区分摊：库存只领部分，分析领另一部分，双方各缺事件。另因null key，同订单事件可分散分区，独立处理不提供实体顺序。”",
+        "Kafka组/offset领域机制；原文依据（a-orderproof）：“用独立group满足各业务交付，按需key=orderId并定义生产、分区内处理和重试顺序；一个key本身不保证消费者任意并发也有序。”",
+        "总线化反而让业务漏订阅；原文依据（a-impact）：“合同要求每个订阅方各处理同100事件，即1600份交付；草案相同group实际每条记录分给组内一个消费者，合计约100份而非1600。”",
+        "发布/16业务/Broker进度；原文依据（scene.architecture）：“Kafka order-events（16分区、无key）；16个不同业务下游都要独立订阅，但草案统一group.id=order-subscribers；失败3次后commit offset丢弃。”",
+        "同group省管理及先commit看似便利；原文依据（a-approve）：“原稿直接发布会违反已知交付份数和恢复承诺；具体事故数量与发生日未验证，不能写成双11预演已发生。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-orderproof",
+            "a-slowprobe",
+            "a-schemaprobe",
+            "a-dropprobe"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-dropprobe",
+            "a-schemaprobe",
+            "a-slowprobe",
+            "a-orderproof"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-ordering"
+      ],
+      "review": "人工裁定7⚡（原8、旧链6却漏两类审查），把多个真缺陷误标false改成核心契约错配及三个可证伪误区；明确Kafka而非混合queue/group语义，保留L3。",
+      "sources": [
+        "https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html"
+      ],
+      "noise": [
+        {
+          "title": "评审图标失败",
+          "text": "[WARN] event bus diagram icon 404。",
+          "closeActionId": "a-impact",
+          "closure": "图标不是合同或Kafka元数据，100事件1600份需求已由业务原文确认。"
+        },
+        {
+          "title": "schema编辑器预览失败",
+          "text": "[WARN] schema editor preview font unavailable。",
+          "closeActionId": "a-schemaprobe",
+          "closure": "字体不改变schema字段/语义，二进制与JSON兼容规则仍按实际契约核验。"
+        },
+        {
+          "title": "审计外送延期",
+          "text": "[WARN] bus audit attachment upload retry。",
+          "closeActionId": "a-dropprobe",
+          "closure": "附件外送不回退已提交offset，失败恢复承诺不能依赖它自动重投。"
+        }
+      ]
     },
     {
       "id": "rebalance-storm",
@@ -1120,7 +1189,79 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "69a89bf97df11b0672535de853460d49e03314505720385c94ace9fc224c5dac",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "心跳/进度两时钟→成员协议→旧任务；原文依据（a-pollaudit）：“动态classic Java消费者在max.poll.interval内未继续poll，会因进度超时失去组成员资格；旧处理线程不会自动停止，迟到提交可能失败或副作用重复。”",
+        "批时长与期限矩阵；原文依据（a-pollaudit）：“动态classic Java消费者在max.poll.interval内未继续poll，会因进度超时失去组成员资格；旧处理线程不会自动停止，迟到提交可能失败或副作用重复。”",
+        "Kafka组进度领域机制；原文依据（a-pollaudit）：“本题慢批500条含2个160秒审核，加普通处理约40秒，总360秒>300。未提交记录可由新成员再取，不能把这叫Broker根据积压主动搬分区。”",
+        "仍有心跳却失去所有权；原文依据（a-impact）：“慢实例处理批期间，心跳在max.poll期限前仍有记录；最后poll到超期约300秒，客户端报告poll timeout并离组。其余实例poll<60秒。不是“仍有心跳所以必不能被移出”。”",
+        "worker/客户端/coordinator/副作用；原文依据（scene.architecture）：“Kafka Java classic协议，动态成员（无group.instance.id），eager RangeAssignor；24分区/6实例；max.poll.interval=300s、session.timeout=600s，Broker允许该范围。”",
+        "放宽期限延长停滞窗口；原文依据（a-danger）：“将max.poll放宽30分钟可能使当前6分钟批不再触发进度超时，但没有修复慢批或副作用重复；真正进程心跳消失仍按session检测，不能说它关闭了所有故障转移。放宽后的进度停滞窗口需明确承担。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-pollaudit",
+            "a-repro",
+            "a-sessioncfg",
+            "a-brokermove",
+            "a-deploylog"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-deploylog",
+            "a-brokermove",
+            "a-sessioncfg",
+            "a-repro",
+            "a-pollaudit"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-polltimeout"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5漏两项反证），固定classic动态协议；纠正10分钟周期与300秒、6×40=8%、N×P95硬预算及心跳绝不受GC影响。四维L3升L3。",
+      "sources": [
+        "https://kafka.apache.org/41/configuration/consumer-configs/#max.poll.interval.ms",
+        "https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html"
+      ],
+      "noise": [
+        {
+          "title": "监控推送告警",
+          "text": "[WARN] member metrics exporter retry。",
+          "closeActionId": "a-sessioncfg",
+          "closure": "指标上送失败不等于Kafka心跳失联，coordinator已有真实心跳和poll超期原因。"
+        },
+        {
+          "title": "旧日志格式提示",
+          "text": "[WARN] broker audit log format deprecated。",
+          "closeActionId": "a-brokermove",
+          "closure": "成员离组原因和topic元数据仍完整，日志格式提示不等于分区副本迁移。"
+        },
+        {
+          "title": "镜像报告重试",
+          "text": "[WARN] image scan report upload retry。",
+          "closeActionId": "a-deploylog",
+          "closure": "扫描附件上传不是Pod发布，窗口成员/进程记录没有滚动变更。"
+        }
+      ]
     },
     {
       "id": "replay-surge",
@@ -1131,7 +1272,77 @@
       "originalDifficulty": 3,
       "originalExpertCost": 4,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "28cd3118f8a132cbeb2d8afe6995072fd7ec4eb8b72650b1fea62d753ddcefda",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "候选/执行→业务权益→负载；原文依据（a-idemaudit）：“去重以msgId保留7天，候选92%超过7天；这只表示可能超出去重窗口，不等于92%都应处理或都重复。按稳定积分权益业务键关联人工和自动流水，确认27000已兑现；人工补发的不同msgId也必须归到同权益。”",
+        "账本基数与单位换算；原文依据（a-idemaudit）：“去重以msgId保留7天，候选92%超过7天；这只表示可能超出去重窗口，不等于92%都应处理或都重复。按稳定积分权益业务键关联人工和自动流水，确认27000已兑现；人工补发的不同msgId也必须归到同权益。”",
+        "幂等与任务恢复领域机制；原文依据（a-idemaudit）：“实际重复9900个业务键都有历史兑现记录，短期消息记录已无或不能关联人工补发，重放把历史当新任务。”",
+        "修复性重放引发二次事故；原文依据（a-impact）：“候选30000，已兑现27000；实际执行11000中重复9900×3=29700积分，81000是若全部重复候选再执行的潜在量。样本200条90%不能单独证明全量27000；本题该数来自兑付账本全量关联。”",
+        "消息/人工账本/权益/共享DB；原文依据（scene.architecture）：“积分平台：死信队列(3 万条积分发放失败消息) → 重放工具(批量推送) → 积分服务 → 积分 DB ｜ 同机群: 下单主链路”",
+        "全预插去重看似安全实则漏任务；原文依据（a-danger）：“中止后按实际11000执行ID对账，再评估29700重复积分的冲正/已用部分；没有依据声称回收72000。暂停减轻新增负载，恢复速度由当前队列与DB状态决定，不预先保证P99为300ms。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-idemaudit",
+            "a-dbnorm",
+            "a-stalecheck",
+            "a-fixverify"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-fixverify",
+            "a-stalecheck",
+            "a-dbnorm",
+            "a-idemaudit"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-idemwindow"
+      ],
+      "review": "人工裁定6⚡（原4、旧链4漏资格/修复反证）；统一11000实际执行、9900重复29700积分，81000只潜在；删除全预插已处理导致漏任务的错误修复，保留L3。",
+      "sources": [
+        "https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html",
+        "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+      ],
+      "noise": [
+        {
+          "title": "账单附件重试",
+          "text": "[WARN] points statement attachment upload retry。",
+          "closeActionId": "a-fixverify",
+          "closure": "附件失败不撤销已提交积分，本次11000执行与重复流水已独立核实。"
+        },
+        {
+          "title": "注销头像失败",
+          "text": "[WARN] user avatar tombstone image 404。",
+          "closeActionId": "a-stalecheck",
+          "closure": "图片404不自动决定权益失效，资格依据退款/账户与业务规则。"
+        },
+        {
+          "title": "查询指标外送延期",
+          "text": "[WARN] DB metrics archive delayed。",
+          "closeActionId": "a-dbnorm",
+          "closure": "给定预算与本地查询计数不依赖异步归档，消息速率仍需换算目标操作数。"
+        }
+      ]
     },
     {
       "id": "mq-disk",
@@ -1142,7 +1353,79 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "33c190fc34e903b33e3b94378b7282c3b54b6ee6948f4c1e1b0f355c9f36fd3d",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "物理账→配置层→扫描资格；原文依据（a-retentioncfg）：“应用expiresAt=3d只决定业务是否接受旧事件，不是Kafka原生TTL。Broker保留72h被topic显式retention.ms=-1覆盖，retention.bytes=-1，cleanup.policy=delete。”",
+        "空间/副本/净增/窗口对账；原文依据（a-retentioncfg）：“应用expiresAt=3d只决定业务是否接受旧事件，不是Kafka原生TTL。Broker保留72h被topic显式retention.ms=-1覆盖，retention.bytes=-1，cleanup.policy=delete。”",
+        "Kafka段保留领域机制；原文依据（a-retentioncfg）：“清理扫描正常运行，但没有满足保留条件的段被删除；不是Kafka默认保留无限，也不是必须另开自研删除任务。恢复保留后仍按segment/检查周期异步清理，不保证瞬时精确释放。”",
+        "配过业务TTL但日志保留无限；原文依据（a-impact）：“按全部副本物理空间同一口径：order-events约3.5TB，测试死信归档topic约3.2TB，其他约3.78TB，总日志约10.48；加系统/备份0.44约10.92TB。”",
+        "应用/Broker配置/物理存储；原文依据（scene.architecture）：“Kafka3 broker×4TB SSD（合计12TB）；消息业务expiresAt=3d；Broker默认保留72h，但topic模板显式retention.ms=-1/retention.bytes=-1。”",
+        "手删段可能损恢复；原文依据（a-danger）：“经业务owner确认后删除可废弃测试归档topic的3.2TB物理数据，理论占用10.92−3.2=7.72TB，即64.3%，不是62%。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-retentioncfg",
+            "a-volumetrend",
+            "a-dirusage",
+            "a-diskhealth",
+            "a-riskmodel"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-diskhealth",
+            "a-dirusage",
+            "a-volumetrend",
+            "a-riskmodel",
+            "a-retentioncfg"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-retention"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5漏硬件/窗口）。重建12TB内10.92TB现场，纠正默认无限、TTL通用机制、page cache推断及删除后百分比；四维L3升L3。",
+      "sources": [
+        "https://kafka.apache.org/41/configuration/topic-configs/#retention.ms",
+        "https://kafka.apache.org/41/configuration/topic-configs/#cleanup.policy"
+      ],
+      "noise": [
+        {
+          "title": "备份通知重试",
+          "text": "[WARN] backup notifier webhook retry。",
+          "closeActionId": "a-dirusage",
+          "closure": "告警只是通知重试，实际目录中备份/其他仅0.44TB，不能替代10.48TB日志归属。"
+        },
+        {
+          "title": "标签弃用告警",
+          "text": "[WARN] topic metrics TTL label deprecated。",
+          "closeActionId": "a-volumetrend",
+          "closure": "旧指标标签不参与Kafka保留，写入/净增长按实际文件计数核对。"
+        },
+        {
+          "title": "监控面板资源失败",
+          "text": "[WARN] disk dashboard icon 404。",
+          "closeActionId": "a-diskhealth",
+          "closure": "图标404不是设备I/O故障，设备计数与平台限速原因可独立取得。"
+        }
+      ]
     },
     {
       "id": "mq-dualwrite",
@@ -1153,7 +1436,65 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "ca3f844d6021c4636d7d2176215674316556bdc19ecb35749da0887ed3321b8b",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "提交→控制流→恢复意图；原文依据（a-codeseq）：“代码：tx.commit(order);”",
+        "同键分支审计与定点复放；原文依据（a-codeseq）：“代码：tx.commit(order);”",
+        "outbox事务边界；原文依据（a-codeseq）：“if (requestDeadlineExpired()) return;”",
+        "GC不等于线程被杀；原文依据（a-impact）：“固定30个业务键：22进程退出、2OOM在commit后且send前；6个长GC后执行明确的deadline过期return分支。GC只是暂停诱因，直接跳过发送来自应用分支。受控故障注入可重现无消息意图状态。”",
+        "请求/DB/Broker/积分；原文依据（scene.architecture）：“下单服务：① DB 事务(订单落库) ② 发送 MQ(积分消息) → 积分消费者(幂等入账)”",
+        "同步外呼看似修一致性仍有双写窗；原文依据（a-danger）：“改同步积分调用不会自动原子：若仍先commit再调用，进程在二者之间退出照样漏；若先外呼后commit，又有外部完成而订单回滚风险。同步还耦合期限/容量，不能宣称漏发归零。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-codeseq",
+            "a-sendlog",
+            "a-brokercheck",
+            "a-consumerside"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-consumerside",
+            "a-brokercheck",
+            "a-sendlog",
+            "a-codeseq"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-gap"
+      ],
+      "review": "人工裁定6⚡（原4、旧链5漏消费者反证）。删重启频率×3ms伪概率，区分GC暂停与期限分支；纠正同步零漏、失败后补表无间隙和outbox跨系统exactly-once。",
+      "sources": [
+        "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html",
+        "https://www.rabbitmq.com/docs/confirms"
+      ],
+      "noise": [
+        {
+          "title": "积分图标失败",
+          "text": "[WARN] loyalty badge icon 404。",
+          "closeActionId": "a-sendlog",
+          "closure": "图标在独立展示路径，不创建outbox也不调用send，该30样本控制流在发送前终止。"
+        }
+      ]
     },
     {
       "id": "tcp-retrans",

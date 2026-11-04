@@ -94,3 +94,9 @@ test('消费局部吞吐与全局权重、DLQ抽样和Kafka分区数学可对账
 test('消息确认与持久化各有边界，不把DLQ或消费ack当端到端确认',()=>{
  const c=load('app/data/cases/mq-lost.ts');assert.match(c.actions.find(a=>a.id==='a-confirmcheck').result.text,/createConfirmChannel/);assert.match(c.actions.find(a=>a.id==='a-fixconfirm').result.text,/不能补回从未到达Broker/);assert.match(load('app/data/cases/mq-duplicate.ts').actions.find(a=>a.id==='a-logcheck').result.text,/单向方法/)
 })
+test('重放候选与实际积分分开，预插已处理不能吞待处理；物理磁盘容量不超总量',()=>{
+ assert.equal(27000*3,81000);assert.equal(9900*3,29700);assert.equal(100*5,500);assert.ok(800+500>1000);const replay=load('app/data/cases/replay-surge.ts');assert.match(replay.actions.find(a=>a.id==='a-fixidem').result.text,/造成新漏发/);assert.equal(3*4,12);assert.equal(10.92/12,.91);assert.ok(Math.abs((10.92-3.2)/12*100-64.3333)<.001);const disk=load('app/data/cases/mq-disk.ts');assert.match(disk.actions.find(a=>a.id==='a-retentioncfg').result.text,/清理扫描正常运行/)
+})
+test('Kafka组内分摊与独立订阅不同，consumer进度与心跳期限分开',()=>{
+ assert.equal(100*16,1600);assert.ok(2*160+40>300);assert.ok(160+8<300);assert.ok(Math.abs(6*40/3600*100-6.6667)<.001);const c=load('app/data/cases/rebalance-storm.ts');assert.match(c.scene.architecture,/classic/);assert.match(c.actions.find(a=>a.id==='a-pollaudit').result.text,/旧处理线程不会自动停止/);const outbox=load('app/data/cases/mq-dualwrite.ts');assert.match(outbox.actions.find(a=>a.id==='a-impact').result.text,/GC只是暂停诱因/);assert.match(outbox.actions.find(a=>a.id==='a-fixcatch').result.text,/写表前进程退出/)
+})
