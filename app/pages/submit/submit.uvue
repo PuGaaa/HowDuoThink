@@ -171,13 +171,14 @@ function doSubmit() {
       if (res.statusCode === 200) {
         const receipt = res.data as any
         uni.showToast({ title: receipt.duplicate ? '已关联原投稿，没有重复建单' : '已收到，可在我的投稿查看进度', icon: 'none' })
-        setTimeout(() => { uni.redirectTo({ url: '/pages/mysubmissions/mysubmissions' }) }, 900)
+        setTimeout(() => { if (token === getToken()) uni.redirectTo({ url: '/pages/mysubmissions/mysubmissions' }) }, 900)
         return
       }
       errMsg.value = '提交失败（' + res.statusCode + '）'
       toast(errMsg.value)
     },
     fail: () => {
+      if (token !== getToken()) return
       busy.value = false
       errMsg.value = '无法连接社区服务'
       toast(errMsg.value)
