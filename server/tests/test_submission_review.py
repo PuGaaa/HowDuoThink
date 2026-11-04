@@ -211,7 +211,7 @@ def test_human_difference_review_is_required_for_manual_draft(people):
 
 def test_publish_path_requires_review_and_records_community_source(people):
     sid = submit(people[0][1])
-    payload = load_seed()
+    payload = load_seed("first-npe")
     payload["id"] = "publish-guard-" + uuid4().hex[:10]
     draft = people[1][1].post("/api/admin/cases", json={"id": payload["id"], "payload": payload, "submissionId": sid})
     assert draft.status_code == 200

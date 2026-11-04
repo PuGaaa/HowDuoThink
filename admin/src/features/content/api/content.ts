@@ -24,18 +24,30 @@ export interface CaseRow {
   difficulty: number
   version: number
   status: string
+  contentRevision: number | null
+  sourceType: string
+  sourceCommit: string | null
+  readOnly: boolean
   part?: string
   chapterId?: string
   typeTags?: string
   submissionId?: string
 }
 
-export interface CaseDetail {
-  id: string
-  title: string
-  version: number
-  status: string
+export interface CaseDetail extends CaseRow {
   payload: Record<string, any>
+}
+
+export interface CaseRevision {
+  contentRevision: number
+  contentHash: string
+  sourceType: string | null
+  sourceCommit: string | null
+  publishedBy: string | null
+  publishedAt: string | null
+  recordedAt: string
+  legacySnapshot: boolean
+  payload: Record<string,any>
 }
 
 export interface DraftResult {
@@ -71,10 +83,11 @@ export const contentApi = {
   cases: (status?: string): Promise<CaseRow[]> =>
     api.get('/api/admin/cases' + (status ? '?status=' + encodeURIComponent(status) : '')),
   caseDetail: (cid: string): Promise<CaseDetail> => api.get(`/api/admin/cases/${cid}`),
+  revisions: (cid: string): Promise<{items:CaseRevision[]}> => api.get(`/api/admin/cases/${cid}/revisions`),
   saveDraft: (id: string, payload: unknown) => api.post('/api/admin/cases', { id, payload }),
   updateMeta: (cid: string, body: { part: string; chapterId: string; order: number; typeTags: string[] }) =>
     api.patch(`/api/admin/cases/${cid}/meta`, body),
-  publish: (payload: unknown): Promise<{ version: number; articleId: string }> => api.post('/api/cases', payload),
+  publish: (payload: unknown): Promise<{ version: number; contentRevision: number; articleId: string; unchanged: boolean }> => api.post('/api/cases', payload),
   preview: (cid: string, payload: unknown): Promise<PreviewResult> => api.post(`/api/admin/cases/${cid}/preview`, { payload }),
   reindex: (): Promise<ReindexResult> => api.post('/api/admin/ai/reindex', {}),
 }

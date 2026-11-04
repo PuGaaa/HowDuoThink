@@ -4,7 +4,7 @@
 from features.cases.models import CasePayload
 
 
-def check_case(payload: CasePayload) -> list[str]:
+def check_case(payload: CasePayload, *, require_calibrated_cost: bool = False) -> list[str]:
     errors: list[str] = []
     acts = payload.actions
     act_ids = {a.id for a in acts}
@@ -48,4 +48,9 @@ def check_case(payload: CasePayload) -> list[str]:
     if payload.domain not in {"network", "deploy", "data", "runtime", "build", "concurrency"}:
         errors.append(f"domain 非法：{payload.domain}")
 
+    if require_calibrated_cost:
+        costs = {action.id: action.cost for action in acts}
+        standard_cost = sum(costs[step.action_id] for step in payload.expert_chain if step.action_id)
+        if payload.expert_cost != standard_cost:
+            errors.append(f"expertCost={payload.expert_cost} 与标准专家路径成本 {standard_cost} 不一致")
     return errors
