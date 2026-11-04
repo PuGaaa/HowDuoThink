@@ -2,7 +2,7 @@
 import { ALL_CASES } from '../data/cases'
 import { DiagnosisCase } from '../types/case'
 
-import { notifyProgressDirty } from './storage'
+import { notifyProgressDirty, progressStorageGet, progressStorageSet } from './storage'
 
 const KEY_DONE = 'think_daily_done_v1'
 
@@ -35,18 +35,18 @@ export function isDailyCase(caseId: string): boolean {
 
 /** 今日题是否已完成（storage 记最近完成日期） */
 export function dailyDone(): boolean {
-  const raw = uni.getStorageSync(KEY_DONE)
+  const raw = progressStorageGet(KEY_DONE)
   return raw != null && (raw as string) === todayKey()
 }
 
-export function markDailyDone() {
+export function markDailyDone(sessionId: string, caseId: string) {
   if (dailyDone()) return
   const day = todayKey()
-  uni.setStorageSync(KEY_DONE, day)
-  const raw = uni.getStorageSync('think_progress_ops_v1')
+  progressStorageSet(KEY_DONE, day)
+  const raw = progressStorageGet('think_progress_ops_v1')
   const ops = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as any[]
-  ops.push({ opId: 'daily-' + day, kind: 'daily_done', occurredAt: new Date().toISOString(), payload: { day: day } })
-  uni.setStorageSync('think_progress_ops_v1', JSON.stringify(ops))
+  ops.push({ opId: 'daily-' + day, kind: 'daily_done', occurredAt: new Date().toISOString(), payload: { day: day, sessionId: sessionId, caseId: caseId } })
+  progressStorageSet('think_progress_ops_v1', JSON.stringify(ops))
   notifyProgressDirty()
 }
 

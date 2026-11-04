@@ -4,28 +4,27 @@
  *  手动同步 = 先推后拉。未登录（游客态）全部为本地，无网络行为。 */
 import { API_BASE } from '../config'
 import { getToken, isLoggedIn } from './auth'
-import { clearProgressLocal, confirmProgressOperations, exportProgressBundle, pendingProgressOperations, setProgressListener } from './storage'
+import { confirmProgressOperations, exportProgressBundle, pendingProgressOperations, progressIdentity, progressStorageGet, progressStorageSet, setProgressIdentity, setProgressListener } from './storage'
 
 const KEY_LAST_SYNC = 'think_last_sync'
-const KEY_PROGRESS_UID = 'think_progress_uid'
 
 export function prepareProgressIdentity(uid: string): void {
-  const previous = uni.getStorageSync(KEY_PROGRESS_UID)
-  if (previous != null && (previous as string).length > 0 && previous !== uid) {
-    clearProgressLocal()
-  }
-  if (previous == null || (previous as string).length === 0) {
+  const previous = progressIdentity()
+  if (previous === 'guest') {
     const bundle = exportProgressBundle()
-    uni.setStorageSync('think_progress_ops_v1', JSON.stringify([
-      { opId: 'bootstrap-' + String(Date.now()) + '-' + String(Math.random()), kind: 'bootstrap', occurredAt: new Date().toISOString(), payload: { bundle: bundle },
+    setProgressIdentity(uid)
+    const archiveId = 'archive-' + String(Date.now()) + '-' + String(Math.random())
+    progressStorageSet('think_progress_ops_v1', JSON.stringify([
+      { opId: 'bootstrap-' + archiveId, kind: 'bootstrap', occurredAt: new Date().toISOString(), payload: { archiveId: archiveId, bundle: bundle },
       },
     ]))
+    return
   }
-  uni.setStorageSync(KEY_PROGRESS_UID, uid)
+  setProgressIdentity(uid)
 }
 
 export function lastSyncLabel(): string {
-  const v = uni.getStorageSync(KEY_LAST_SYNC)
+  const v = progressStorageGet(KEY_LAST_SYNC)
   return v == null || (v as string).length === 0 ? '' : v as string
 }
 
@@ -33,7 +32,7 @@ function markSynced() {
   const d = new Date()
   const hh = d.getHours() < 10 ? '0' + d.getHours() : String(d.getHours())
   const mm = d.getMinutes() < 10 ? '0' + d.getMinutes() : String(d.getMinutes())
-  uni.setStorageSync(KEY_LAST_SYNC, '今天 ' + hh + ':' + mm)
+  progressStorageSet(KEY_LAST_SYNC, '今天 ' + hh + ':' + mm)
 }
 
 /** 操作同步（登录态；游客态为空操作） */
@@ -42,6 +41,8 @@ export function pushProgress(cb?: (r: { error: string }) => void) {
     if (cb != null) cb({ error: '登录后可用' })
     return
   }
+  const requestUid = progressIdentity()
+  const requestToken = getToken()
   uni.request({
     url: API_BASE + '/api/me/progress/sync',
     method: 'POST',
@@ -49,6 +50,7 @@ export function pushProgress(cb?: (r: { error: string }) => void) {
     data: { operations: pendingProgressOperations() } as any,
     timeout: 8000,
     success: (res) => {
+      if (requestUid !== progressIdentity() || requestToken !== getToken()) return
       if (res.statusCode === 200) {
         const d = res.data as any
         confirmProgressOperations(d.confirmedOperationIds as string[])
@@ -71,12 +73,15 @@ export function pullServerProgress(cb?: (r: { error: string }) => void) {
     if (cb != null) cb({ error: '' })
     return
   }
+  const requestUid = progressIdentity()
+  const requestToken = getToken()
   uni.request({
     url: API_BASE + '/api/me/progress',
     method: 'GET',
     header: { Authorization: 'Bearer ' + getToken() } as any,
     timeout: 8000,
     success: (res) => {
+      if (requestUid !== progressIdentity() || requestToken !== getToken()) return
       if (res.statusCode !== 200) {
         if (cb != null) cb({ error: '拉取失败' })
         return
@@ -86,9 +91,9 @@ export function pullServerProgress(cb?: (r: { error: string }) => void) {
       let merged = 0
       for (const id in remoteCases) {
         const rp = remoteCases[id]
-        const raw = uni.getStorageSync('think_case_' + id)
+        const raw = progressStorageGet('think_case_' + id)
         if (raw == null || (raw as string).length === 0) {
-          uni.setStorageSync('think_case_' + id, JSON.stringify(rp))
+          progressStorageSet('think_case_' + id, JSON.stringify(rp))
           merged++
           continue
         }
@@ -98,21 +103,21 @@ export function pullServerProgress(cb?: (r: { error: string }) => void) {
           if (!lp.solved && rp.solved) lp.solved = true
           if (rp.bestGrade === 'S' || (lp.bestGrade !== 'S' && rp.bestGrade !== '' && (lp.bestGrade === '' || rp.bestGrade < lp.bestGrade))) lp.bestGrade = rp.bestGrade
           if (rp.bestGrade === 'S' && lp.bestGrade !== 'S') lp.bestGrade = 'S'
-          if ((rp.bestCost ?? 0) > (lp.bestCost ?? 0)) lp.bestCost = rp.bestCost
+          if ((rp.bestCost ?? 0) > 0 && ((lp.bestCost ?? 0) === 0 || rp.bestCost < lp.bestCost)) lp.bestCost = rp.bestCost
           lp.plays = Math.max(lp.plays ?? 0, rp.plays ?? 0)
           lp.fails = Math.max(lp.fails ?? 0, rp.fails ?? 0)
           if (JSON.stringify(lp) !== before) {
-            uni.setStorageSync('think_case_' + id, JSON.stringify(lp))
+            progressStorageSet('think_case_' + id, JSON.stringify(lp))
             merged++
           }
         } catch (e) {}
       }
-      const ls = uni.getStorageSync('think_streak_v1')
+      const ls = progressStorageGet('think_streak_v1')
       let lsj: any = {}
       try { lsj = ls == null || (ls as string).length === 0 ? {} : JSON.parse(ls as string) } catch (e) { lsj = {} }
       const rs = d.streak ?? {}
-      if ((rs.count ?? 0) > (lsj.count ?? 0)) uni.setStorageSync('think_streak_v1', JSON.stringify(rs))
-      const lm = uni.getStorageSync('think_mascots_v1')
+      if ((rs.count ?? 0) > (lsj.count ?? 0)) progressStorageSet('think_streak_v1', JSON.stringify(rs))
+      const lm = progressStorageGet('think_mascots_v1')
       let lmj: any = {}
       try { lmj = lm == null || (lm as string).length === 0 ? {} : JSON.parse(lm as string) } catch (e) { lmj = {} }
       const rm = d.mascots ?? {}
@@ -122,8 +127,8 @@ export function pullServerProgress(cb?: (r: { error: string }) => void) {
         mm[k] = Math.max(lmj[k] ?? 0, rm[k] ?? 0)
         if (mm[k] !== (lmj[k] ?? 0)) mDirty = true
       }
-      if (mDirty) uni.setStorageSync('think_mascots_v1', JSON.stringify(mm))
-      const lt = uni.getStorageSync('think_tasks_v1')
+      if (mDirty) progressStorageSet('think_mascots_v1', JSON.stringify(mm))
+      const lt = progressStorageGet('think_tasks_v1')
       let ltj: any = {}
       try { ltj = lt == null || (lt as string).length === 0 ? {} : JSON.parse(lt as string) } catch (e) { ltj = {} }
       const rt = d.tasks ?? {}
@@ -138,14 +143,14 @@ export function pullServerProgress(cb?: (r: { error: string }) => void) {
         }
         for (const k in lb) if (tt[bucket][k] == null) tt[bucket][k] = lb[k]
       }
-      if (tDirty) uni.setStorageSync('think_tasks_v1', JSON.stringify(tt))
-      const ld = uni.getStorageSync('think_daily_done_v1')
+      if (tDirty) progressStorageSet('think_tasks_v1', JSON.stringify(tt))
+      const ld = progressStorageGet('think_daily_done_v1')
       if ((ld == null || (ld as string).length === 0) && (d.dailyDone ?? '').length > 0) {
-        uni.setStorageSync('think_daily_done_v1', d.dailyDone)
+        progressStorageSet('think_daily_done_v1', d.dailyDone)
       }
       const rcu = d.checkuse ?? 0
-      const lcu = Number(uni.getStorageSync('think_checkuse_v1')) || 0
-      if (rcu > lcu) uni.setStorageSync('think_checkuse_v1', String(rcu))
+      const lcu = Number(progressStorageGet('think_checkuse_v1')) || 0
+      if (rcu > lcu) progressStorageSet('think_checkuse_v1', String(rcu))
       markSynced()
       if (cb != null) cb({ error: '' })
     },

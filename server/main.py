@@ -94,7 +94,7 @@ def create_app() -> FastAPI:
     _init_sentry()
 
     app = FastAPI(title="好多星 HowDuoThink · 社区后端", version="0.2.0")
-    origins = [config.WEB_ORIGIN, "http://localhost:3000", "http://localhost:5173"]
+    origins = [config.WEB_ORIGIN, "http://localhost:3000", "http://localhost:5173", config.APP_H5_ORIGIN]
     if config.ADMIN_WEB_ORIGIN:
         origins.append(config.ADMIN_WEB_ORIGIN)
     app.add_middleware(

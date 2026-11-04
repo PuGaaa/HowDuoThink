@@ -596,8 +596,9 @@ function finishAndSave() {
   const rec: SessionRecord = {
     sessionId: String(Date.now()) + '-' + String(Math.random()),
     caseId: caseId.value,
+    chapterId: currentCase != null ? currentCase.chapterId : '',
     contentRevision: currentCase != null && currentCase.contentRevision != null ? currentCase.contentRevision : 1,
-    scoringVersion: 'v1',
+    scoringVersion: 1,
     occurredAt: new Date().toISOString(),
     solved: solved.value,
     playerCost: playerCost.value,
@@ -614,7 +615,7 @@ function finishAndSave() {
   }
   // 每日一题：今日题通关 → 标记完成 + 任务计数
   if (solved.value && isDailyCase(caseId.value)) {
-    markDailyDone()
+    markDailyDone(rec.sessionId, rec.caseId)
     bumpTask('dailycase', 1)
   }
   // 云同步：防抖上传最新进度

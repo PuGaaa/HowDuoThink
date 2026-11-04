@@ -6,6 +6,8 @@
 
 import datetime
 import logging
+from collections import defaultdict
+from zoneinfo import ZoneInfo
 
 import db
 
@@ -104,3 +106,47 @@ def event_details(kind: str | None = None, limit: int = 100) -> list[dict]:
         params,
     )
     return [dict(row) for row in rows]
+
+
+def learning_metrics(as_of: str | None = None) -> dict:
+    today = as_of or today_str()
+    rows = db.q("SELECT user_id, kind, occurred_at, payload FROM learning_events")
+    by_user: dict[str, list[dict]] = defaultdict(list)
+    for row in rows:
+        by_user[row["user_id"]].append(row)
+    started = finished = solved = d1_eligible = d1_retained = d7_eligible = d7_retained = 0
+    for events in by_user.values():
+        session_events = [event for event in events if event["kind"] == "session_end"]
+        if not session_events:
+            continue
+        started += 1
+        finished += 1
+        if any(db.jload(event["payload"], {}).get("solved") for event in session_events):
+            solved += 1
+        days = {_event_day(event["occurred_at"]) for event in events}
+        first = min(days)
+        d1 = (datetime.date.fromisoformat(first) + datetime.timedelta(days=1)).isoformat()
+        d7 = (datetime.date.fromisoformat(first) + datetime.timedelta(days=7)).isoformat()
+        if first <= (datetime.date.fromisoformat(today) - datetime.timedelta(days=1)).isoformat():
+            d1_eligible += 1
+            if d1 in days:
+                d1_retained += 1
+        if first <= (datetime.date.fromisoformat(today) - datetime.timedelta(days=7)).isoformat():
+            d7_eligible += 1
+            if d7 in days:
+                d7_retained += 1
+    return {
+        "asOf": today,
+        "funnel": {"startedUsers": started, "finishedUsers": finished, "solvedUsers": solved},
+        "d1": {"eligibleUsers": d1_eligible, "retainedUsers": d1_retained},
+        "d7": {"eligibleUsers": d7_eligible, "retainedUsers": d7_retained},
+    }
+
+
+def _event_day(value: str) -> str:
+    return (
+        datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+        .astimezone(ZoneInfo("Asia/Shanghai"))
+        .date()
+        .isoformat()
+    )

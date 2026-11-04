@@ -49,8 +49,9 @@ export interface HypothesisStateRec {
 export interface SessionRecord {
   sessionId: string
   caseId: string
+  chapterId: string
   contentRevision: number
-  scoringVersion: string
+  scoringVersion: number
   occurredAt: string
   solved: boolean
   playerCost: number
@@ -73,30 +74,55 @@ const KEY_SESSION = 'think_session_v1'
 const KEY_MASCOTS = 'think_mascots_v1'
 const KEY_CASE = 'think_case_'
 const KEY_OPS = 'think_progress_ops_v1'
+const KEY_PROGRESS_UID = 'think_progress_uid'
+
+export function progressIdentity(): string {
+  const value = uni.getStorageSync(KEY_PROGRESS_UID)
+  return value == null || (value as string).length === 0 ? 'guest' : value as string
+}
+
+export function setProgressIdentity(uid: string): void {
+  uni.setStorageSync(KEY_PROGRESS_UID, uid)
+}
+
+export function progressStorageKey(key: string): string {
+  return 'think_progress_' + progressIdentity() + '_' + key
+}
+
+export function progressStorageGet(key: string): any {
+  const scoped = uni.getStorageSync(progressStorageKey(key))
+  if (scoped == null && progressIdentity() === 'guest') return uni.getStorageSync(key)
+  return scoped
+}
+
+export function progressStorageSet(key: string, value: any): void {
+  uni.setStorageSync(progressStorageKey(key), value)
+}
 
 function enqueueOperation(kind: string, payload: any, occurredAt?: string): void {
-  const raw = uni.getStorageSync(KEY_OPS)
+  const raw = progressStorageGet(KEY_OPS)
   const ops: ProgressOperation[] = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as ProgressOperation[]
   ops.push({ opId: String(Date.now()) + '-' + String(Math.random()), kind: kind, occurredAt: occurredAt ?? new Date().toISOString(), payload: payload })
-  uni.setStorageSync(KEY_OPS, JSON.stringify(ops))
+  progressStorageSet(KEY_OPS, JSON.stringify(ops))
 }
 
 export function pendingProgressOperations(): ProgressOperation[] {
-  const raw = uni.getStorageSync(KEY_OPS)
+  const raw = progressStorageGet(KEY_OPS)
   return raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as ProgressOperation[]
 }
 
 export function confirmProgressOperations(ids: string[]): void {
   const done = new Set(ids)
   const left = pendingProgressOperations().filter((op) => !done.has(op.opId))
-  uni.setStorageSync(KEY_OPS, JSON.stringify(left))
+  progressStorageSet(KEY_OPS, JSON.stringify(left))
 }
 
 export function clearProgressLocal(): void {
   const info = uni.getStorageInfoSync()
+  const prefix = 'think_progress_' + progressIdentity() + '_'
   for (let i = 0; i < info.keys.length; i++) {
     const key = info.keys[i]
-    if (key.indexOf('think_case_') === 0 || key === 'think_session_v1' || key === 'think_mascots_v1' || key === 'think_streak_v1' || key === 'think_tasks_v1' || key === 'think_solved_layers_v1' || key === 'think_daily_done_v1' || key === 'think_checkuse_v1' || key === 'think_progress_ops_v1') {
+    if (key.indexOf(prefix) === 0) {
       uni.removeStorageSync(key)
     }
   }
@@ -135,11 +161,13 @@ export function exportProgressBundle(): ProgressBundle {
   const info = uni.getStorageInfoSync()
   for (let i = 0; i < info.keys.length; i++) {
     const k = info.keys[i]
-    if (k.indexOf('think_case_') !== 0) continue
+    const prefix = 'think_progress_' + progressIdentity() + '_' + KEY_CASE
+    const legacyGuest = progressIdentity() === 'guest' && k.indexOf(KEY_CASE) === 0
+    if (k.indexOf(prefix) !== 0 && !legacyGuest) continue
     const raw = uni.getStorageSync(k)
     if (raw == null || (raw as string).length === 0) continue
     try {
-      cases[k.replace('think_case_', '')] = JSON.parse(raw as string)
+      cases[legacyGuest ? k.replace(KEY_CASE, '') : k.replace(prefix, '')] = JSON.parse(raw as string)
     } catch (e) {}
   }
   const b: ProgressBundle = {
@@ -147,9 +175,9 @@ export function exportProgressBundle(): ProgressBundle {
     streak: getStreak(),
     mascots: getMascotStats(),
     tasks: loadTasks(),
-    dailyDone: uni.getStorageSync('think_daily_done_v1') as string ?? '',
+    dailyDone: progressStorageGet('think_daily_done_v1') as string ?? '',
     checkuse: getChecklistUse(),
-    solvedLayers: uni.getStorageSync(KEY_SOLVED_LAYERS) == null ? [] : JSON.parse(uni.getStorageSync(KEY_SOLVED_LAYERS) as string) as string[],
+    solvedLayers: progressStorageGet(KEY_SOLVED_LAYERS) == null ? [] : JSON.parse(progressStorageGet(KEY_SOLVED_LAYERS) as string) as string[],
   }
   return b
 }
@@ -157,18 +185,18 @@ export function exportProgressBundle(): ProgressBundle {
 /** 导入后端全量进度（登录态拉取用，覆盖本地——后端为唯一事实源） */
 export function importProgressBundle(b: ProgressBundle) {
   for (const id in b.cases) {
-    uni.setStorageSync('think_case_' + id, JSON.stringify(b.cases[id]))
+    progressStorageSet(KEY_CASE + id, JSON.stringify(b.cases[id]))
   }
-  if (b.streak != null) uni.setStorageSync('think_streak_v1', JSON.stringify(b.streak))
-  if (b.mascots != null) uni.setStorageSync('think_mascots_v1', JSON.stringify(b.mascots))
-  if (b.tasks != null) uni.setStorageSync('think_tasks_v1', JSON.stringify(b.tasks))
-  uni.setStorageSync('think_daily_done_v1', b.dailyDone ?? '')
-  uni.setStorageSync('think_checkuse_v1', String(b.checkuse ?? 0))
-  uni.setStorageSync(KEY_SOLVED_LAYERS, JSON.stringify(b.solvedLayers ?? []))
+  if (b.streak != null) progressStorageSet('think_streak_v1', JSON.stringify(b.streak))
+  if (b.mascots != null) progressStorageSet('think_mascots_v1', JSON.stringify(b.mascots))
+  if (b.tasks != null) progressStorageSet('think_tasks_v1', JSON.stringify(b.tasks))
+  progressStorageSet('think_daily_done_v1', b.dailyDone ?? '')
+  progressStorageSet('think_checkuse_v1', String(b.checkuse ?? 0))
+  progressStorageSet(KEY_SOLVED_LAYERS, JSON.stringify(b.solvedLayers ?? []))
 }
 
 export function getCaseProgress(caseId: string): CaseProgress | null {
-  const raw = uni.getStorageSync(KEY_CASE + caseId)
+  const raw = progressStorageGet(KEY_CASE + caseId)
   if (raw == null) {
     return null
   }
@@ -184,11 +212,10 @@ export function getCaseProgress(caseId: string): CaseProgress | null {
 }
 
 export function saveSession(record: SessionRecord): void {
-  uni.setStorageSync(KEY_SESSION, JSON.stringify(record))
+  progressStorageSet(KEY_SESSION, JSON.stringify(record))
   // 连续天数只认破案：失败局不再续活跃
   if (record.solved) {
-    const streak = touchStreak()
-    enqueueOperation('streak_touch', { day: streak.last })
+    touchStreak()
     bumpTask('win', 1)
     bumpTask('casewin7', 1)
   }
@@ -202,7 +229,7 @@ export function saveSession(record: SessionRecord): void {
     if (prev.bestGrade === 'S' || (record.grade !== 'S' && gradeRank(prev.bestGrade) <= gradeRank(record.grade))) {
       bestGrade = prev.bestGrade
     }
-    if (prev.bestCost < bestCost) {
+    if (prev.bestCost > 0 && (bestCost === 0 || prev.bestCost < bestCost)) {
       bestCost = prev.bestCost
     }
   }
@@ -214,7 +241,7 @@ export function saveSession(record: SessionRecord): void {
     plays: prev != null ? prev.plays + 1 : 1,
     fails: prevFails + (record.solved ? 0 : 1),
   }
-  uni.setStorageSync(key, JSON.stringify(progress))
+  progressStorageSet(key, JSON.stringify(progress))
 
   // 错案重练：曾失败的关本次破案 → 任务计数
   if (record.solved && prevFails > 0) {
@@ -237,16 +264,18 @@ export function saveSession(record: SessionRecord): void {
       stats.dino++
     }
   }
-  uni.setStorageSync(KEY_MASCOTS, JSON.stringify(stats))
+  progressStorageSet(KEY_MASCOTS, JSON.stringify(stats))
   enqueueOperation('session_end', {
     sessionId: record.sessionId,
     caseId: record.caseId,
+    chapterId: record.chapterId,
     contentRevision: record.contentRevision,
     scoringVersion: record.scoringVersion,
     occurredAt: record.occurredAt,
     solved: record.solved,
     grade: record.grade,
     playerCost: record.playerCost,
+    expertCost: record.expertCost,
     mascotEvents: record.mascotEvents,
   }, record.occurredAt)
   notifyProgressDirty()
@@ -260,7 +289,7 @@ function gradeRank(grade: string): number {
 }
 
 export function getLastSession(): SessionRecord | null {
-  const raw = uni.getStorageSync(KEY_SESSION)
+  const raw = progressStorageGet(KEY_SESSION)
   if (raw == null) {
     return null
   }
@@ -276,7 +305,7 @@ export function getLastSession(): SessionRecord | null {
 }
 
 export function getMascotStats(): MascotStats {
-  const raw = uni.getStorageSync(KEY_MASCOTS)
+  const raw = progressStorageGet(KEY_MASCOTS)
   if (raw == null) {
     return emptyMascotStats()
   }
@@ -296,14 +325,14 @@ const KEY_CHECKUSE = 'think_checkuse_v1'
 
 export function bumpChecklistUse(): number {
   const n = getChecklistUse() + 1
-  uni.setStorageSync(KEY_CHECKUSE, String(n))
+  progressStorageSet(KEY_CHECKUSE, String(n))
   enqueueOperation('checklist_use', {})
   notifyProgressDirty()
   return n
 }
 
 export function getChecklistUse(): number {
-  const v = uni.getStorageSync(KEY_CHECKUSE)
+  const v = progressStorageGet(KEY_CHECKUSE)
   return Number(v) || 0
 }
 
@@ -323,7 +352,7 @@ function dateStr(d: Date): string {
 }
 
 export function getStreak(): StreakData {
-  const raw = uni.getStorageSync(KEY_STREAK)
+  const raw = progressStorageGet(KEY_STREAK)
   if (raw == null) {
     const empty: StreakData = { last: '', count: 0 }
     return empty
@@ -349,16 +378,16 @@ function touchStreak(): StreakData {
   }
   const yest = new Date(Date.now() - 86400000)
   const next: StreakData = { last: today, count: s.last === dateStr(yest) ? s.count + 1 : 1 }
-  uni.setStorageSync(KEY_STREAK, JSON.stringify(next))
+  progressStorageSet(KEY_STREAK, JSON.stringify(next))
   return next
 }
 
 /** 首次使用至今的天数（个人中心"第 N 天"） */
 export function useDay(): number {
-  let first = uni.getStorageSync(KEY_FIRST) as string
+  let first = progressStorageGet(KEY_FIRST) as string
   if (first == null || first.length === 0) {
     first = dateStr(new Date())
-    uni.setStorageSync(KEY_FIRST, first)
+    progressStorageSet(KEY_FIRST, first)
   }
   const parts = first.split('-')
   if (parts.length !== 3) return 1
@@ -429,7 +458,7 @@ function emptyProgress(): TaskProgress {
 }
 
 function loadTasks(): TaskProgress {
-  const raw = uni.getStorageSync(KEY_TASKS)
+  const raw = progressStorageGet(KEY_TASKS)
   if (raw == null || (raw as string).length === 0) {
     return emptyProgress()
   }
@@ -456,17 +485,17 @@ export function bumpTask(metric: string, n: number): void {
   t.daily[metric] = t.daily[metric] + n
   if (t.weekly[metric] == null) t.weekly[metric] = 0
   t.weekly[metric] = t.weekly[metric] + n
-  uni.setStorageSync(KEY_TASKS, JSON.stringify(t))
-  enqueueOperation('task_increment', { metric: metric, amount: n })
+  progressStorageSet(KEY_TASKS, JSON.stringify(t))
+  if (metric === 'hypo') enqueueOperation('task_increment', { metric: metric, amount: n })
   notifyProgressDirty()
 }
 
 export function recordSolvedLayer(layer: string): boolean {
-  const raw = uni.getStorageSync(KEY_SOLVED_LAYERS)
+  const raw = progressStorageGet(KEY_SOLVED_LAYERS)
   const layers: string[] = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as string[]
   if (layers.indexOf(layer) >= 0) return false
   layers.push(layer)
-  uni.setStorageSync(KEY_SOLVED_LAYERS, JSON.stringify(layers))
+  progressStorageSet(KEY_SOLVED_LAYERS, JSON.stringify(layers))
   return true
 }
 
