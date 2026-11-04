@@ -59,7 +59,7 @@ def list_assets(category: str | None = None, uid: str = Depends(current_user)):
 
 
 @router.post("/api/assets")
-async def upload_asset(
+def upload_asset(
     file: UploadFile = File(...),
     category: str = Form("misc"),
     note: str = Form(""),
@@ -73,7 +73,8 @@ async def upload_asset(
     max_bytes = config.OSS_MAX_UPLOAD_MB * 1024 * 1024
     if file.size is not None and file.size > max_bytes:
         raise HTTPException(413, f"文件超过上限 {config.OSS_MAX_UPLOAD_MB}MB")
-    data = await file.read()
+    # 整条同步路由在线程池执行：鉴权DB、读文件、OSS SDK和落库都不占事件循环。
+    data = file.file.read()
     try:
         return service.upload(data, file.filename or "", category, note, uid)
     except service.NotConfiguredError:

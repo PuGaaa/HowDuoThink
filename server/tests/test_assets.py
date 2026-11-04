@@ -242,3 +242,46 @@ def test_upload_rejects_oversize_filename_and_note(client, fake_oss):
     )
     assert r2.status_code == 400, r2.text
     assert "备注" in r2.json()["detail"]
+
+
+def test_blocked_upload_does_not_block_health_or_run_db_on_event_loop(client, fake_oss, monkeypatch):
+    """OSS单测替身只隔离外部写入：真实鉴权DB和HTTP调度仍运行。"""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from features.assets import oss, router
+
+    entered = threading.Event()
+    release = threading.Event()
+    loop_thread = client.portal.call(threading.get_ident)
+    original_require_editor = router.require_editor
+    editor_threads = []
+    sdk_threads = []
+
+    def require_editor(uid):
+        editor_threads.append(threading.get_ident())
+        original_require_editor(uid)
+
+    def put_bytes(key, data, content_type):
+        sdk_threads.append(threading.get_ident())
+        entered.set()
+        release.wait(timeout=5)
+
+    monkeypatch.setattr(router, "require_editor", require_editor)
+    monkeypatch.setattr(oss, "put_bytes", put_bytes)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        upload = executor.submit(
+            client.post,
+            "/api/assets",
+            files={"file": ("thread-boundary.png", PNG + b"event-loop-probe", "image/png")},
+            data={"category": "misc"},
+        )
+        try:
+            assert entered.wait(timeout=2)
+            health = executor.submit(client.get, "/api/health").result(timeout=1)
+            assert health.status_code == 200
+            assert editor_threads and all(thread != loop_thread for thread in editor_threads)
+            assert sdk_threads and all(thread != loop_thread for thread in sdk_threads)
+        finally:
+            release.set()
+        assert upload.result(timeout=2).status_code == 200

@@ -42,6 +42,9 @@ MYSQL_PORT = int(os.environ.get("MYSQL_PORT", "3306"))
 MYSQL_USER = os.environ.get("MYSQL_USER", "hdt")
 MYSQL_PASSWORD = os.environ.get("MYSQL_PASSWORD", "")
 MYSQL_DATABASE = os.environ.get("MYSQL_DATABASE", "hdt")
+MYSQL_POOL_SIZE = int(os.environ.get("MYSQL_POOL_SIZE", "5"))
+MYSQL_POOL_MAX_OVERFLOW = int(os.environ.get("MYSQL_POOL_MAX_OVERFLOW", "5"))
+MYSQL_POOL_TIMEOUT = float(os.environ.get("MYSQL_POOL_TIMEOUT", "5"))
 
 # 向量化：fastembed = 本地 BGE-M3（默认，ONNX CPU 推理，模型首用下载到 FASTEMBED_CACHE_DIR）；
 #         zhipu = 智谱 embedding-3（需 ZHIPU_API_KEY）；local = 内置字符 bigram（零资源兜底）
