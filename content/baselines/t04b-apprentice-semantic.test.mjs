@@ -126,3 +126,74 @@ test('构建与发布题保留关键协议和部署边界', () => {
   assert.equal(pipeline.expertCost, 7)
   assert.deepEqual(pipeline.expertChain.filter(s => s.actionId).map(s => s.actionId), ['a-supply', 'a-botpath', 'a-cache', 'a-parallel', 'a-keyfix'])
 })
+
+test('本批23题全部完成，学徒L3仅允许章尾且每章最多一题', () => {
+  assert.ok(baseline.cases.every(c => c.status === 'calibrated'))
+  for (const chapter of new Set(baseline.cases.map(c => c.chapter))) {
+    const cases = baseline.cases.filter(c => c.chapter === chapter)
+    const l3 = cases.filter(c => c.difficulty === 3)
+    assert.ok(l3.length <= 1)
+    if (l3.length) assert.equal(l3[0].order, Math.max(...cases.map(c => c.order)))
+  }
+})
+
+test('DNS保留主机名隔离解析，错误IP不冒充无法解析或广告定责', () => {
+  const c = load('app/data/cases/dns-hijack.ts')
+  assert.match(c.actions.find(a => a.id === 'a-compare').result.text, /--resolve cdn\.example\.com:443:192\.0\.2\.10/)
+  assert.match(c.actions.find(a => a.id === 'a-applog').result.text, /解析API成功/)
+  assert.match(c.actions.find(a => a.id === 'a-whois').result.text, /不能证明/)
+})
+
+test('证书题验证方向和触发时间一致，不按操作系统泛化补链', () => {
+  const c = load('app/data/cases/ssl-chain.ts')
+  assert.match(c.scene.architecture, /四层TCP负载均衡\(不终止TLS\)/)
+  assert.match(c.actions.find(a => a.id === 'a-errorlog').result.text, /mTLS未启用/)
+  assert.match(c.actions.find(a => a.id === 'a-expiry').result.text, /受影响受控设备的时间/)
+  assert.match(c.actions.find(a => a.id === 'a-chain').result.text, /22:45把leaf\.pem误作fullchain/)
+  assert.match(c.actions.find(a => a.id === 'a-lib').result.text, /成功样本的本地缓存/)
+})
+
+test('CORS普通GET不虚构预检，Nginx阈值针对完整body和已加载配置', () => {
+  const cors = load('app/data/cases/cors-101.ts')
+  assert.match(cors.actions.find(a => a.id === 'a-console').result.text, /无需预检/)
+  assert.match(cors.actions.find(a => a.id === 'a-options').result.text, /同一个GET请求：200/)
+  const upload = load('app/data/cases/nginx-trap.ts')
+  assert.match(upload.actions.find(a => a.id === 'a-impact').result.text, /1048576字节/)
+  assert.match(upload.actions.find(a => a.id === 'a-impact').result.text, /multipart/)
+  assert.match(upload.actions.find(a => a.id === 'a-nginxconf').result.text, /成功reload归档哈希一致/)
+  assert.match(upload.actions.find(a => a.id === 'a-sizecorr').result.text, /upstream_addr与upstream_status均为-/)
+})
+
+test('网关完整评审与WebSocket单根因不把真实风险判为错因', () => {
+  const review = load('app/data/cases/gateway-review.ts')
+  assert.equal(8000 * .4, 3200)
+  assert.match(review.actions.find(a => a.id === 'a-capacity').result.text, /3200>2000/)
+  assert.match(review.rootCauses.find(r => r.correct).text, /路由容量、公平身份配额、续期可观测与内部令牌加密四项/)
+  const ws = load('app/data/cases/ws-upgrade.ts')
+  assert.match(ws.actions.find(a => a.id === 'a-nginxdump').result.text, /实际均HTTP\/1\.1/)
+  assert.match(ws.actions.find(a => a.id === 'a-repro').result.text, /只为\/ws\/v2补Upgrade与Connection/)
+  assert.match(ws.hypotheses.find(h => h.id === 'h-httpver').text, /实际.*HTTP\/1\.0/)
+})
+
+test('SNI命令有效且独立验证目标名，不以换默认站点搬走故障', () => {
+  const c = load('app/data/cases/cert-sni.ts')
+  const repro = c.actions.find(a => a.id === 'a-repro').result.text
+  assert.match(repro, /-noservername/)
+  assert.doesNotMatch(repro, /-nosni\b/)
+  assert.match(repro, /-verify_hostname new\.example\.com/)
+  assert.match(c.actions.find(a => a.id === 'a-fixsni').result.text, /独立兼容IP/)
+  assert.match(c.actions.find(a => a.id === 'a-fixmon').result.text, /失败前没有HTTP请求/)
+})
+
+test('灰度数值可复核，当前完整决策不扩量且保留终局停止条件', () => {
+  const c = load('app/data/cases/canary-decision.ts')
+  const p1 = 460 / 5000, p2 = 9500 / 95000
+  const se = Math.sqrt(p1 * (1 - p1) / 5000 + p2 * (1 - p2) / 95000)
+  assert.equal(Math.round((p1 / p2 - 1) * 100), -8)
+  assert.equal((se * 100).toFixed(3), '0.420')
+  assert.ok(p1 - p2 - 1.96 * se < 0 && p1 - p2 + 1.96 * se > 0)
+  assert.equal(c.difficulty, 3)
+  assert.match(c.rootCauses.find(r => r.correct).text, /^不扩量/)
+  assert.match(c.rootCauses.find(r => r.correct).text, /仍不确定就回退/)
+  assert.match(c.scene.timeline, /D0批准/)
+})

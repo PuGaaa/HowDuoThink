@@ -1,4 +1,4 @@
-"""core/db 双引擎基础：MySQL 连接参数固定 UTC 会话时区（时间基线统一）。"""
+"""core/db MySQL基础：MySQL 连接参数固定 UTC 会话时区（时间基线统一）。"""
 
 
 def test_mysql_connect_kwargs_pin_utc_timezone():
@@ -15,11 +15,10 @@ def test_mysql_connect_kwargs_pin_utc_timezone():
 
 
 def test_current_read_marker_translates_only_at_mysql_boundary():
-    import sqlite3
-
+    from core import db
     from core.db import _translate
 
     sql = "SELECT 1 AS owner WHERE ?=1 /* FOR UPDATE */"
     assert _translate(sql) == "SELECT 1 AS owner WHERE %s=1 FOR UPDATE"
-    with sqlite3.connect(":memory:") as conn:
-        assert conn.execute(sql, (1,)).fetchone() == (1,)
+    with db.tx() as conn:
+        assert conn.execute(sql, (1,)).fetchone()["owner"] == 1

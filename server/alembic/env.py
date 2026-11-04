@@ -1,9 +1,4 @@
-"""Alembic 迁移环境：URL 运行时组装，禁止 import 时缓存（测试会 monkeypatch DB_PATH）。
-
-sqlite 用 core.db.DB_PATH（与 core/db.py 的 connect() 同一读取点，monkeypatch 生效）；
-mysql 用 core.config 的 MYSQL_*。与 core/migrate.py 的 _database_url() 保持一致，
-对拍/重放测试把守两处不漂移。
-"""
+"""Alembic 迁移环境：各环境统一 MySQL 8，连接配置运行时读取。"""
 
 import sys
 from pathlib import Path
@@ -16,7 +11,6 @@ from alembic import context
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import core.config as core_config  # noqa: E402
-from core import db as coredb  # noqa: E402
 
 cfg = context.config
 
@@ -26,9 +20,7 @@ target_metadata = None
 
 def database_url() -> str:
     """运行时组装（每次命令执行时现读，绝不缓存）。"""
-    if core_config.DB_PROVIDER == "mysql":
-        return core_config.mysql_database_url()
-    return f"sqlite:///{coredb.DB_PATH.resolve()}"
+    return core_config.mysql_database_url()
 
 
 def run_migrations_offline() -> None:

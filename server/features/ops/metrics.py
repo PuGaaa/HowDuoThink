@@ -55,7 +55,7 @@ def rss_mb() -> float:
 
 
 def disk_free_mb() -> float:
-    return shutil.disk_usage(os.path.dirname(db.DB_PATH)).free / 1_000_000
+    return shutil.disk_usage(os.path.dirname(__file__)).free / 1_000_000
 
 
 def take_snapshot() -> dict:

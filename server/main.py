@@ -5,7 +5,6 @@ Feature 架构：core/（横切）+ features/<域>/（router/service/models）�
 App 同步：GET /api/casepack?since=version。"""
 
 import logging
-import os
 import time
 import uuid
 from pathlib import Path
@@ -53,40 +52,27 @@ def _init_sentry() -> None:
 
 def create_app() -> FastAPI:
     """app 工厂：无 import 副作用（建库/建表由 Alembic boot-migrate 显式调用）。
-    启动 fail-fast 四道检查按序执行（①JWT ②SMS 通道 ③MySQL 连通 ④schema 版本），
-    带病配置当场拒绝启动；每次调用重复执行（幂等）。"""
+    启动 fail-fast 三道检查按序执行（①JWT ②MySQL 连通 ③schema 版本），
+    带病配置当场拒绝启动；短信缺少真实配置时在请求处返回 503；每次调用重复执行（幂等）。"""
     import db
     from core import db as coredb
     from core import migrate
-    from core import sms as sms_core
 
     # ① 生产（非 dev）禁止进程内随机 JWT_SECRET：重启即全体会话失效
     if config.JWT_SECRET_EPHEMERAL and not config.DEV_MODE:
         raise RuntimeError("生产必须显式配置 JWT_SECRET（重启即全体会话失效）")
 
-    # ② dev 回显短信通道禁止用于非 dev 环境（ENV 缺省视为本地形态，放行）
-    env = os.environ.get("ENV", "")
-    if sms_core.PROVIDER == "dev" and env not in ("", "dev"):
-        raise RuntimeError(f"SMS_PROVIDER=dev 回显通道禁止用于 ENV={env} 环境")
-
-    # ③ MySQL 连通（仅 DB_PROVIDER=mysql）：连不上当场拒绝，不带病进入服务
-    if config.DB_PROVIDER == "mysql":
-        # db 的引擎选择在 import 时固化（coredb._provider），探测必须按当前 config 现场拨号：
-        # 不一致时（仅运行期/测试切配置）临时对齐，探完即还原
-        saved_provider = coredb._provider
-        coredb._provider = "mysql"
+    # ② MySQL 连通：连不上当场拒绝，不带病进入服务
+    try:
+        conn = coredb.connect()
         try:
-            conn = coredb.connect()
-            try:
-                conn.execute("SELECT 1")
-            finally:
-                conn.close()
-        except Exception as e:
-            raise RuntimeError("MySQL 连不通：检查 MYSQL_* 配置与服务状态") from e
+            conn.execute("SELECT 1")
         finally:
-            coredb._provider = saved_provider
+            conn.close()
+    except Exception as e:
+        raise RuntimeError("MySQL 连不通：检查 MYSQL_* 配置与服务状态") from e
 
-    # ④ boot-migrate 到 head 后断言 schema 版本一致：防"入口没跑迁移就服务"的旁路
+    # ③ boot-migrate 到 head 后断言 schema 版本一致：防"入口没跑迁移就服务"的旁路
     migrate.upgrade_head()
     if migrate.current_version() != migrate.head_version():
         raise RuntimeError("schema 版本落后：容器入口未执行迁移，拒绝启动")
