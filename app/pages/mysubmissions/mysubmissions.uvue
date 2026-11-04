@@ -1,25 +1,39 @@
 <template>
   <view class="page">
     <view class="content">
-      <view class="head">
-        <text class="head__title">我的投稿</text>
-        <text class="head__sub">被采纳的投稿将转化为正式关卡并署名</text>
+      <text class="title">我的投稿</text>
+      <text class="muted">采纳表示制作中；正式发布后才会展示可玩和文章入口。原稿与补件都会保留。</text>
+      <view v-if="items.length === 0" class="card">
+        <text>{{ loggedIn ? '还没有投稿' : '登录后查看自己的投稿' }}</text>
+        <view class="button" @click="goAction"><text>{{ loggedIn ? '去投稿' : '去登录' }}</text></view>
       </view>
-
-      <view v-if="items.length === 0" class="empty">
-        <text class="empty__text">{{ loggedIn ? '还没有投稿——你的第一坑值得被所有人踩一遍' : '登录后查看我的投稿' }}</text>
-        <view class="empty__btn" @click="goAction">
-          <text class="empty__btn-text">{{ loggedIn ? '去投稿' : '去登录' }}</text>
+      <view v-for="it in items" :key="it.id" class="card">
+        <view class="row"><text class="card__title">{{ it.title }}</text><text class="status">{{ statusLabel(it.displayStatus) }}</text></view>
+        <text v-if="it.reviewNote != null" class="note">编辑反馈：{{ it.reviewNote }}</text>
+        <text class="muted">{{ it.createdAt }}</text>
+        <view v-if="it.displayStatus === 'published'" class="row">
+          <view class="button" @click="play(it)"><text>去玩正式关卡</text></view>
+          <view v-if="PUBLIC_WEB_ORIGIN.length > 0" class="button button--light" @click="article(it)"><text>复制文章链接</text></view><text v-else class="muted">文章入口待配置公开地址</text>
         </view>
-      </view>
-
-      <view v-for="(it, i) in items" :key="'s' + i" class="card">
-        <view class="card__toprow">
-          <text class="card__title">{{ it.title }}</text>
-          <text :class="'card__status card__status--' + it.status">{{ statusLabel(it.status) }}</text>
+        <view class="button button--light" @click="expand(it)"><text>{{ expandedId === it.id ? '收起详情' : '原稿、反馈与补件' }}</text></view>
+        <view v-if="expandedId === it.id" class="details">
+          <text class="label">原稿（仅自己与编辑可见）</text><text class="body">{{ it.symptom }}</text>
+          <text v-if="it.keyError != null" class="body">关键报错：{{ it.keyError }}</text><text class="body">解决过程：{{ it.resolution }}</text>
+          <view v-for="note in it.messages" :key="note.id" class="message"><text class="label">{{ messageLabel(note.kind) }}</text><text class="body">{{ note.body }}</text><text class="muted">{{ note.created_at }}</text></view>
+          <view v-if="it.material != null" class="material">
+            <text class="label">第 {{ it.materialVersion }} 版脱敏素材 · {{ !it.materialCurrent ? '待编辑更新' : it.materialConfirmed ? '已确认' : '待你核对' }}</text>
+            <text class="body">标题：{{ it.material!.title }}</text><text class="body">现象：{{ it.material!.symptom }}</text>
+            <text class="body">解决过程：{{ it.material!.resolution }}</text><text class="body">可公开报错：{{ it.material!.keyError }}</text>
+            <text class="body">时间线：{{ it.material!.timeline }}</text><text class="body">经验：{{ it.material!.lessons.join(' / ') }}</text>
+            <text class="body">标签：{{ it.material!.stackTags.join(' / ') }} · 领域：{{ domainLabel(it.material!.domainHint) }}</text>
+            <text class="muted">确认只适用于这一版本。补件或编辑修改后，需要重新核对；原稿不会自动交给 AI。</text>
+            <text v-if="!it.materialCurrent" class="muted">补件已使旧素材失效，等待编辑整理新版本后再确认。</text>
+            <view v-if="it.materialCurrent && !it.materialConfirmed" class="button" @click="confirmMaterial(it)"><text>已核对，同意本版公开与 AI 整理</text></view>
+          </view>
+          <text class="label">补充证据 / 反馈事实错误</text>
+          <textarea v-model="supplement" class="input" :maxlength="3000" placeholder="说明新增证据或需要更正的事实（至少4字），不要填写密钥和个人信息" />
+          <view class="button" @click="sendSupplement(it)"><text>{{ busy ? '发送中…' : '发送补件' }}</text></view>
         </view>
-        <text v-if="it.reviewNote.length > 0" class="card__note">编辑备注：{{ it.reviewNote }}</text>
-        <text class="card__date">{{ it.createdAt }}</text>
       </view>
     </view>
   </view>
@@ -29,162 +43,89 @@
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { isLoggedIn, getToken } from '../../utils/auth'
-import { API_BASE } from '../../config'
+import { API_BASE, PUBLIC_WEB_ORIGIN } from '../../config'
 
+interface MessageVM { id: number; kind: string; body: string; created_at: string }
+interface MaterialVM { title: string; symptom: string; resolution: string; keyError: string | null; timeline: string | null; lessons: string[]; stackTags: string[]; domainHint: string }
 interface SubVM {
-  id: string
-  title: string
-  status: string
-  reviewNote: string
-  createdAt: string
+  id: string; title: string; symptom: string; resolution: string; keyError: string | null
+  displayStatus: string; reviewNote: string | null; createdAt: string; playPath: string | null; articlePath: string | null
+  material: MaterialVM | null; materialVersion: number; materialConfirmed: boolean; materialCurrent: boolean; messages: MessageVM[]
 }
 const items = ref<SubVM[]>([])
 const loggedIn = ref(isLoggedIn())
-
-function statusLabel(s: string): string {
-  if (s === 'pending') return '审核中'
-  if (s === 'accepted') return '已采纳'
-  if (s === 'rejected') return '未采纳'
-  if (s === 'archived') return '已归档'
-  return s
+const expandedId = ref('')
+const supplement = ref('')
+const busy = ref(false)
+let loadedToken = ''
+function statusLabel(status: string): string {
+  return new Map<string, string>([['received', '已收到'], ['needs_more', '待补充'], ['producing', '制作中'], ['published', '已发布'], ['rejected', '本次不采用']]).get(status)!
 }
-
-function goAction() {
-  if (loggedIn.value) {
-    uni.navigateTo({ url: '/pages/submit/submit' })
-    return
-  }
-  uni.navigateTo({ url: '/pages/login/login' })
+function domainLabel(domain: string): string { return new Map<string, string>([['network','网络/接入'],['data','数据/缓存'],['build','构建/依赖'],['runtime','运行时'],['deploy','部署'],['concurrency','并发']]).get(domain)! }
+function messageLabel(kind: string): string {
+  return new Map<string, string>([['supplement', '作者补件'], ['feedback', '编辑反馈'], ['consent', '公开范围确认']]).get(kind)!
 }
-
+function expand(item: SubVM) { supplement.value = ''; expandedId.value = expandedId.value === item.id ? '' : item.id }
+function goAction() { uni.navigateTo({ url: loggedIn.value ? '/pages/submit/submit' : '/pages/login/login' }) }
+function play(item: SubVM) { uni.navigateTo({ url: item.playPath! }) }
+function article(item: SubVM) {
+  uni.setClipboardData({ data: PUBLIC_WEB_ORIGIN.replace(/\/$/, '') + item.articlePath!, success: () => uni.showToast({ title: '文章链接已复制', icon: 'none' }) })
+}
 function refresh() {
   loggedIn.value = isLoggedIn()
-  if (!loggedIn.value) {
-    items.value = []
-    return
-  }
+  if (!loggedIn.value) { items.value = []; return }
+  const token = getToken()
+  if (token !== loadedToken) { items.value = []; expandedId.value = ''; supplement.value = ''; busy.value = false; loadedToken = token }
   uni.request({
-    url: API_BASE + '/api/me/submissions',
-    method: 'GET',
-    header: { Authorization: 'Bearer ' + getToken() } as any,
-    timeout: 8000,
+    url: API_BASE + '/api/me/submissions', method: 'GET', header: { Authorization: 'Bearer ' + token } as any,
     success: (res) => {
-      if (res.statusCode !== 200) return
-      const arr = res.data as any[]
-      const out: SubVM[] = []
-      for (let i = 0; i < arr.length; i++) {
-        const it = arr[i]
-        const vm = new SubVM()
-        vm.id = it.id
-        vm.title = it.title
-        vm.status = it.status
-        vm.reviewNote = it.reviewNote ?? ''
-        vm.createdAt = it.createdAt ?? ''
-        out.push(vm)
-      }
-      items.value = out
-    },
+      if (token !== getToken()) return
+      if (res.statusCode !== 200) { toast('加载失败（' + res.statusCode + '）'); return }
+      items.value = res.data as SubVM[]
+    }, fail: () => toast('无法连接社区服务'),
   })
 }
-
-onShow(() => refresh())
+function post(item: SubVM, path: string, payload: any) {
+  if (busy.value) return
+  const token = getToken()
+  busy.value = true
+  uni.request({
+    url: API_BASE + '/api/me/submissions/' + item.id + path, method: 'POST',
+    header: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' } as any, data: payload,
+    success: (res) => {
+      if (token !== getToken()) return
+      if (res.statusCode !== 200) { toast('未保存，请刷新素材后重试（' + res.statusCode + '）'); return }
+      supplement.value = ''
+      refresh()
+      toast('已保存')
+    }, fail: () => toast('无法连接社区服务'), complete: () => { if (token === getToken()) busy.value = false },
+  })
+}
+function confirmMaterial(item: SubVM) {
+  uni.showModal({ title: '确认当前脱敏版本', content: '我已完整阅读第' + item.materialVersion + '版脱敏素材，同意本版内容用于公开关卡、文章与AI辅助整理。原稿与内部编审记录不公开。', success: (res) => { if (res.confirm) post(item, '/consent', { version: item.materialVersion }) } })
+}
+function sendSupplement(item: SubVM) {
+  if (supplement.value.trim().length < 4) { toast('请至少写4字补充事实或证据'); return }
+  post(item, '/supplements', { text: supplement.value })
+}
+function toast(text: string) { uni.showToast({ title: text, icon: 'none' }) }
+onShow(() => { supplement.value = ''; refresh() })
 </script>
 
 <style>
-.page {
-  background-color: #FAF6F0;
-  min-height: 100vh;
-}
-.content {
-  padding: 24rpx 28rpx 60rpx 28rpx;
-}
-.head {
-  margin-bottom: 24rpx;
-}
-.head__title {
-  font-size: 40rpx;
-  font-weight: bold;
-  color: #332C4E;
-}
-.head__sub {
-  display: block;
-  font-size: 22rpx;
-  color: #8F87A3;
-  margin-top: 8rpx;
-}
-.empty {
-  background-color: #FFFFFF;
-  border-radius: 20rpx;
-  padding: 48rpx 32rpx;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.empty__text {
-  font-size: 24rpx;
-  color: #8F87A3;
-  text-align: center;
-}
-.empty__btn {
-  margin-top: 24rpx;
-  background-color: #FF7A50;
-  border-radius: 32rpx;
-  padding: 16rpx 48rpx;
-}
-.empty__btn-text {
-  color: #FFFFFF;
-  font-size: 26rpx;
-  font-weight: bold;
-}
-.card {
-  background-color: #FFFFFF;
-  border-radius: 20rpx;
-  padding: 24rpx;
-  margin-bottom: 16rpx;
-  display: flex;
-  flex-direction: column;
-}
-.card__toprow {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-.card__title {
-  font-size: 28rpx;
-  font-weight: bold;
-  color: #332C4E;
-}
-.card__status {
-  font-size: 20rpx;
-  font-weight: bold;
-  border-radius: 16rpx;
-  padding: 6rpx 16rpx;
-}
-.card__status--pending {
-  color: #B7791F;
-  background-color: #FDF3DC;
-}
-.card__status--accepted {
-  color: #1F7A4D;
-  background-color: #DFF3E7;
-}
-.card__status--rejected {
-  color: #B04A3A;
-  background-color: #F9E2DC;
-}
-.card__status--archived {
-  color: #8F87A3;
-  background-color: #EFEAF4;
-}
-.card__note {
-  font-size: 22rpx;
-  color: #8F87A3;
-  margin-top: 12rpx;
-}
-.card__date {
-  font-size: 20rpx;
-  color: #C3BDD2;
-  margin-top: 10rpx;
-}
+.page { background-color: #FAF6F0; min-height: 100vh; }
+.content { padding: 28rpx; }
+.title { display: block; font-size: 40rpx; font-weight: bold; color: #332C4E; margin-bottom: 12rpx; }
+.muted { display: block; font-size: 23rpx; color: #8F87A3; margin-top: 10rpx; line-height: 1.6; }
+.card { margin-top: 24rpx; padding: 24rpx; background-color: white; border-radius: 20rpx; }
+.row { display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 14rpx; }
+.card__title { flex: 1; font-size: 29rpx; font-weight: bold; color: #332C4E; }
+.status { font-size: 23rpx; color: #7154A0; background-color: #F0EAF8; padding: 6rpx 14rpx; border-radius: 18rpx; }
+.note,.body { display: block; margin-top: 14rpx; font-size: 25rpx; color: #514963; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.button { margin-top: 18rpx; padding: 18rpx 22rpx; border-radius: 12rpx; background-color: #FF7A50; color: white; font-size: 25rpx; text-align: center; }
+.button--light { background-color: #F0EAF8; color: #7154A0; }
+.details { margin-top: 18rpx; border-top: 1rpx solid #EFEAF4; padding-top: 12rpx; }
+.label { display: block; font-size: 26rpx; font-weight: bold; color: #332C4E; margin-top: 22rpx; }
+.message,.material { padding: 18rpx; margin-top: 16rpx; background-color: #FAF6F0; border-radius: 12rpx; }
+.input { box-sizing: border-box; width: 100%; margin-top: 18rpx; padding: 16rpx; height: 190rpx; font-size: 25rpx; background-color: #FAF6F0; border-radius: 12rpx; }
 </style>
