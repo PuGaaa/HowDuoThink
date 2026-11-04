@@ -2,7 +2,7 @@
 
 日期：2026-11-04。初始内容基线：38d3b2409fa0bcfc446f4955a89b74ad5a6fe911。本批只修改学徒篇剩余23题，排除已完成的首批四题，不修改章节与注册表。
 
-当前完成 8/23。未完成题继续明确标记pending，不冒充已校准。校准指技术依据、证据关系、假设效应、停止点与评分审阅；不代替主实施流程的正式页面验收。
+当前完成 15/23。未完成题继续明确标记pending，不冒充已校准。校准指技术依据、证据关系、假设效应、停止点与评分审阅；不代替主实施流程的正式页面验收。
 
 全部场景按真实技术机制进行教学重建，数值、业务公司与日志样本不冒充生产实测或原始工单。六维中位数半档向下取整，不因结业位置硬标L3；来源与正式内容修订号由主发布流程统一处理，本记录不自造contentRevision。
 
@@ -18,13 +18,13 @@
 | access | ws-upgrade | 2 | 2 | pending |
 | access | cert-sni | 2 | 2 | pending |
 | access | canary-decision | 3 | 3 | pending |
-| build | white-screen | 1 | 1 | pending |
-| build | dep-hell | 1 | 1 | pending |
-| build | ci-cache-pollution | 2 | 2 | pending |
-| build | image-tag-drift | 2 | 2 | pending |
-| build | buildtime-inject | 2 | 2 | pending |
-| build | chunk-overlap | 2 | 2 | pending |
-| build | pipeline-review | 2 | 2 | pending |
+| build | white-screen | 1 | 1 | calibrated |
+| build | dep-hell | 1 | 1 | calibrated |
+| build | ci-cache-pollution | 2 | 2 | calibrated |
+| build | image-tag-drift | 2 | 2 | calibrated |
+| build | buildtime-inject | 2 | 2 | calibrated |
+| build | chunk-overlap | 2 | 2 | calibrated |
+| build | pipeline-review | 2 | 2 | calibrated |
 | error-reading | symptom-cluster | 2 | 2 | calibrated |
 | error-reading | first-domino | 3 | 2 | calibrated |
 | integration | field-mismatch | 1 | 1 | calibrated |
@@ -33,6 +33,247 @@
 | integration | poll-storm | 2 | 2 | calibrated |
 | integration | mock-canyon | 2 | 2 | calibrated |
 | integration | tri-platform | 3 | 2 | calibrated |
+
+## white-screen
+
+训练目标：区分模块加载与运行时错误，核对制品和响应。
+
+修正：
+
+- 移除404脚本必被当HTML执行的矛盾。
+- CDN没有缓存旧资源清单这一无依据机制被删除。
+- 区分完整构建正常和发布漏传。
+- 修正接口未发起却全部200的叙述。
+
+六维：1/1/1/1/2/1，L1。逐维原文依据：
+
+1. a-resources直接显示缺JS与HTML响应。
+2. 状态/MIME/字节直接记录。
+3. 模块加载基础规则。
+4. 结论与响应类型一致。
+5. 构建、发布与浏览器两边。
+6. 入门关无需危险陷阱。
+
+路径与评分：
+
+- 标准路径：a-impact → a-console → a-resources，4⚡；使用真实computeGrade，零错误为S。
+- 替代顺序：a-impact → a-resources → a-console，4⚡；使用真实computeGrade，零错误为S。
+
+停止条件：新入口缺文件、源站200HTML回退及模块MIME拒绝共同闭合。
+
+终局确认：h-res；其余候选在两条路径中均排除。
+
+技术依据：
+
+- [官方资料1](https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-single-module-script)。
+- [官方资料2](https://vite.dev/guide/build)。
+- [官方资料3](https://nginx.org/en/docs/http/ngx_http_core_module.html#try_files)。
+
+## dep-hell
+
+训练目标：用公开API和实际依赖图验证安装漂移。
+
+修正：
+
+- 移除不存在的Day.js1.12 API删除叙述。
+- 采用有公开依据的Lodash3pluck与4map。
+- 不把minor升级移除API作为正常semver规则。
+- 区分代码不同与依赖契约不适配，给出单变量对照。
+
+六维：1/2/1/1/1/1，L1。逐维原文依据：
+
+1. pluck与实际major差异直给。
+2. 同源码只换图的对照。
+3. 基础安装与API使用。
+4. 结论与版本变化一致。
+5. 同一前端构建层。
+6. 无L2危险要求。
+
+路径与评分：
+
+- 标准路径：a-impact → a-coderead → a-diff → a-lockfile，4⚡；使用真实computeGrade，零错误为S。
+- 替代顺序：a-impact → a-diff → a-lockfile → a-coderead，4⚡；使用真实computeGrade，零错误为S。
+
+停止条件：同文件、同环境、不同依赖图与锁状态及单变量对照闭合。
+
+终局确认：h-lock；其余候选在两条路径中均排除。
+
+技术依据：
+
+- [官方资料1](https://lodash.com/docs/3.10.1#pluck)。
+- [官方资料2](https://lodash.com/docs/4.17.21#map)。
+- [官方资料3](https://docs.npmjs.com/cli/v10/configuring-npm/package-json#dependencies)。
+- [官方资料4](https://docs.npmjs.com/cli/v10/commands/npm-ci)。
+
+## ci-cache-pollution
+
+训练目标：区分CI通过与关键用例真实执行。
+
+修正：
+
+- 修复生产包含calcDiscount却报该函数不存在的自相矛盾。
+- 补齐恢复后跳npm ci与用例skip机制。
+- 固定key不再被说成永不失效。
+- 标准4，避免把修复后的未来结果当停止前已知。
+
+六维：2/2/2/2/2/2，L2。逐维原文依据：
+
+1. 缓存顺序与skip机制组合。
+2. 只改安装步骤的对照。
+3. 锁、缓存与测试执行语义。
+4. 绿色来自跳过而非验证。
+5. CI依赖与生产制品。
+6. 旧目录恢复后跳安装。
+
+路径与评分：
+
+- 标准路径：a-impact → a-depdiff → a-cacheconf，4⚡；使用真实computeGrade，零错误为S。
+- 替代顺序：a-impact → a-cacheconf → a-depdiff，4⚡；使用真实computeGrade，零错误为S。
+
+停止条件：关键用例状态、依赖图及恢复后跳安装的执行顺序与对照闭合。
+
+终局确认：h-cache；其余候选在两条路径中均排除。
+
+技术依据：
+
+- [官方资料1](https://docs.npmjs.com/cli/v10/commands/npm-ci)。
+- [官方资料2](https://github.com/actions/setup-node/blob/main/docs/advanced-usage.md)。
+
+## image-tag-drift
+
+训练目标：用对象身份与Pod启动记录核实镜像漂移。
+
+修正：
+
+- 修正latest默认策略与建集群默认的错误。
+- 补齐真实Pod重建触发。
+- 删除IfNotPresent永不更新、Always零成本等绝对叙述。
+- 同类普查移出标准定位成本。
+
+六维：2/2/2/2/2/2，L2。逐维原文依据：
+
+1. 实际对象、模板与缓存事件组合。
+2. 同平台digest与制品对照。
+3. Kubernetes拉取及滚动机制。
+4. 部署成功不代表修复已到达。
+5. CI、仓库与节点。
+6. 只重建仍复用缓存。
+
+路径与评分：
+
+- 标准路径：a-impact → a-pullpolicy → a-imageinspect，4⚡；使用真实computeGrade，零错误为S。
+- 替代顺序：a-impact → a-imageinspect → a-pullpolicy，4⚡；使用真实computeGrade，零错误为S。
+
+停止条件：同平台镜像身份、显式策略与启动事件、制品内容对应。
+
+终局确认：h-taglatest；其余候选在两条路径中均排除。
+
+技术依据：
+
+- [官方资料1](https://kubernetes.io/docs/concepts/containers/images/)。
+
+## buildtime-inject
+
+训练目标：从实际读者定位构建变量与运行时配置断点。
+
+修正：
+
+- 不再声称本地永远无法复现。
+- 从代码读者与实际URL排除错误层。
+- 运行时注入不被说成必须或自动即时生效。
+- 最短修复为补齐构建输入重新发布。
+
+六维：2/2/2/2/1/2，L2。逐维原文依据：
+
+1. 读者、构建输入和包身份组合。
+2. 开发配置与本次构建对照。
+3. 构建静态替换。
+4. 配置改了但无运行时读者。
+5. 同一构建链路。
+6. 覆盖同hash破坏身份。
+
+路径与评分：
+
+- 标准路径：a-impact → a-bundlecheck → a-cdncheck，4⚡；使用真实computeGrade，零错误为S。
+- 替代顺序：a-impact → a-cdncheck → a-bundlecheck，4⚡；使用真实computeGrade，零错误为S。
+
+停止条件：构建输入、实际读取阶段与分发身份一致指向旧默认值内联。
+
+终局确认：h-inline；其余候选在两条路径中均排除。
+
+技术依据：
+
+- [官方资料1](https://vite.dev/guide/env-and-mode)。
+
+## chunk-overlap
+
+训练目标：区分发布空窗与持续断引用并验证精确URL。
+
+修正：
+
+- 删除旧hash不会在新包解压完成后自动恢复。
+- 保留旧目录与旧URL可访问分别说明。
+- 不把ln -sfn或24h一律当充分方案。
+- 标准5由四项必要证据组成，非机械保留旧基准4。
+
+六维：2/2/2/2/2/2，L2。逐维原文依据：
+
+1. 删除与新旧引用联合推断。
+2. 发布中/结束后的同URL对照。
+3. hash、路由与原子替换机制。
+4. 发布结束旧页仍失败。
+5. 部署到旧浏览器请求。
+6. 维护页仍有旧页请求。
+
+路径与评分：
+
+- 标准路径：a-impact → a-deploylog → a-assetname → a-edgecheck，5⚡；使用真实computeGrade，零错误为S。
+- 替代顺序：a-impact → a-edgecheck → a-deploylog → a-assetname，5⚡；使用真实computeGrade，零错误为S。
+
+停止条件：具体旧URL、删除记录与同URL保留对照支持持续断引用。
+
+终局确认：h-window；其余候选在两条路径中均排除。
+
+技术依据：
+
+- [官方资料1](https://vite.dev/guide/build)。
+- [官方资料2](https://nginx.org/en/docs/http/ngx_http_core_module.html#try_files)。
+- [官方资料3](https://pubs.opengroup.org/onlinepubs/9799919799/functions/rename.html)。
+
+## pipeline-review
+
+训练目标：区分评审的独立缺口与已治理条件。
+
+修正：
+
+- 把真实缓存风险从错误根因改为完整正确决策的一部分。
+- 不将所有自动合并或并行化笼统定罪。
+- 自建跨项目缓存与GitHub默认作用域分清。
+- 补齐并行和指纹核对，标准7与完整评审所需证据一致。
+
+六维：2/2/2/2/2/2，L2。逐维原文依据：
+
+1. 审批、缓存与隔离多项材料对照。
+2. 方案与实际job记录。
+3. 来源、hash与权限机制。
+4. 功能绿不证明依赖可信。
+5. CI与共享服务边界。
+6. 跳过既定审批是主动风险。
+
+路径与评分：
+
+- 标准路径：a-supply → a-botpath → a-cache → a-parallel → a-keyfix，7⚡；使用真实computeGrade，零错误为S。
+- 替代顺序：a-supply → a-cache → a-botpath → a-keyfix → a-parallel，7⚡；使用真实computeGrade，零错误为S。
+
+停止条件：既定审批、实际缓存权限、并行隔离与保留指纹全部核对后给完整有条件结论。
+
+终局确认：h-bot；其余候选在两条路径中均排除。
+
+技术依据：
+
+- [官方资料1](https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions)。
+- [官方资料2](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows)。
+- [官方资料3](https://slsa.dev/spec/v1.0/requirements)。
 
 ## symptom-cluster
 

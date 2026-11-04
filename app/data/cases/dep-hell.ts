@@ -1,47 +1,39 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 3 章 · 构建与依赖（依赖版本冲突教学关）
- * 教学点："我这里好好的"= 依赖树差异；锁文件是依赖版本的真相；报错指纹（xxx is not a function）。
- * 专家路径：impact(1) + diff(1) + lockfile(2) = 4⚡︎
+ * 学徒篇校准：用公开API和实际依赖图验证安装漂移。
+ * 原型：Lodash3/4公开API差异与npm锁文件；教学重建，不冒充原始事故日志。
+ * 六维：1/2/1/1/1/1，中位数半档向下取整，L1。
+ * 标准路径：a-impact → a-coderead → a-diff → a-lockfile；替代顺序：a-impact → a-diff → a-lockfile → a-coderead。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const depHellCase: DiagnosisCase = {
   id: 'dep-hell',
-  title: '同事拉完代码就白屏',
-  intro: '新功能开发完在同事机器上联调，同事的页面一打开就报错白屏，你和自己机器都正常。',
+  title: '同事拉完代码，旧工具函数不见了',
+  intro: '旧项目在原机器正常，新安装却提示pluck不是函数。先核对业务代码、实际依赖与锁文件。',
   domain: 'build',
-  layer: '依赖解析：package.json 声明范围，锁文件锁定真相',
+  layer: '范围声明不等于实际安装版本；锁文件与安装方式共同约束依赖图',
   part: 'apprentice',
   chapterId: 'build',
   order: 2,
   typeTags: ['dependency', 'config'],
   difficulty: 1,
-
   scene: {
     role: '你是前端开发，和同事结对开发新功能，同事拉完你的分支后页面报错。',
-    architecture: 'package.json（版本范围）→ lockfile（锁定版本）→ node_modules（实际安装）',
+    architecture: 'package.json lodash:"*" → 未提交的本地锁 → 旧机器3.10.1与新安装4.17.21',
     symptoms: [
-      {
-        type: 'error',
-        title: '同事的浏览器控制台',
-        text: "TypeError: dayjs.default is not a function\n at formatDate (utils/date.ts:12)\n→ 页面白屏，报错指向日期工具函数",
-      },
-      {
-        type: 'text',
-        title: '两台机器对比',
-        text: '你的机器：一切正常\n同事机器：npm install 后一运行就白屏\n同一个分支、同一份代码。',
-      },
+      { type: 'error', title: '同事的浏览器控制台', text: 'TypeError: _.pluck is not a function\n  at collectNames (utils/users.ts:12)\n旧项目同一份业务文件，新安装后出现。' },
+      { type: 'text', title: '两台机器对比', text: '你的机器：一切正常\n同事机器：npm install 后一运行就白屏\n同一个分支、同一份代码。' },
     ],
-    timeline: '上周你给项目新增了 dayjs 依赖（package.json 写的是 ^1.10.0）｜ 昨天同事拉分支',
-    impactHint: '同分支同代码不同结果——差异只能在代码之外。',
+    timeline: '维护旧项目，原机器保留旧node_modules ｜ 新同事全新安装 ｜ lodash使用*，本地锁未提交',
+    impactHint: '同分支只是起点，还要核对实际文件、依赖、运行环境和配置。',
+    tag: '教学重建',
   },
-
   hypotheses: [
     { id: 'h-lock', text: '两台机器的依赖版本不同（锁文件不一致/未提交）', excludeActionId: 'a-diff' },
     { id: 'h-env', text: '同事的 Node/npm 环境版本不同', excludeActionId: 'a-env' },
-    { id: 'h-code', text: '代码里日期工具函数写错了', excludeActionId: 'a-coderead' },
+    { id: 'h-code', text: '同事拿到了另一份业务工具代码', excludeActionId: 'a-coderead' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -53,27 +45,22 @@ export const depHellCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '复现范围',
-        text: '删掉 node_modules 重装后：同事依旧白屏；\n第三位同事新拉代码也白屏；只有你（写代码的机器）正常。',
-      },
+      result: { type: 'text', title: '复现范围', text: '两位全新安装的同事失败，原机器保留旧依赖时正常；失败稳定复现。\n这是依赖或环境差异的线索，不代表所有差异必在源代码之外。' },
     },
     {
       id: 'a-coderead',
-      name: '读报错行的日期工具代码',
+      name: '读报错行的集合工具代码',
       desc: 'dayjs.default is not a function 的含义',
       cost: 1,
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-code'],
-      hypotheses: [{ id: 'h-code', status: 'excluded' }],
-      result: {
-        type: 'code',
-        title: '报错行代码',
-        text: "import dayjs from 'dayjs'\ndayjs.default.format(...)  ← 错误行\n→ dayjs.default 存在于旧版 dayjs（1.x 的 CJS 兼容层），新版 1.12 移除了 .default——\n代码是为旧版 API 写的。",
-      },
+      tests: ['h-code', 'h-lock'],
+      hypotheses: [
+        { id: 'h-code', status: 'excluded' },
+        { id: 'h-lock', status: 'up' },
+      ],
+      result: { type: 'code', title: '代码与公开API', text: '两边相同提交、相同文件哈希：const names=_.pluck(users,"name");\nLodash3文档包含pluck；Lodash4使用map的属性简写，不再提供pluck。' },
     },
     {
       id: 'a-diff',
@@ -83,13 +70,12 @@ export const depHellCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-lock'],
-      hypotheses: [{ id: 'h-lock', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: 'npm ls 对比',
-        text: '你的机器:   dayjs@1.10.0\n同事机器:   dayjs@1.12.0\n→ 同一个 package.json（^1.10.0），实际装的版本不同！',
-      },
+      tests: ['h-env', 'h-lock'],
+      hypotheses: [
+        { id: 'h-env', status: 'excluded' },
+        { id: 'h-lock', status: 'up' },
+      ],
+      result: { type: 'code', title: '实际依赖对比', text: '同一Node20与npm10：旧机器lodash3.10.1，新安装4.17.21。\n声明lodash:"*"允许跨major解析；^1.10.0则不允许自动跨到2.0。\n这是两个实际安装样本，不把历史版本号当作当前registry最新版本。' },
     },
     {
       id: 'a-lockfile',
@@ -100,12 +86,10 @@ export const depHellCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-lock'],
-      hypotheses: [{ id: 'h-lock', status: 'up' }],
-      result: {
-        type: 'code',
-        title: 'git 状态',
-        text: '.gitignore 里赫然写着：package-lock.json\n→ 锁文件根本没进版本库！每台机器 install 时各自解析最新版本。',
-      },
+      hypotheses: [
+        { id: 'h-lock', status: 'confirmed' },
+      ],
+      result: { type: 'code', title: '锁与单变量核对', text: 'package-lock.json被忽略；作者的本地锁和旧node_modules未随仓库共享。\n只改变依赖图的对照：同一源码用3.10.1可调用pluck，用4.17.21失败；环境与输入不变。\n缺锁+跨major范围使新安装与旧机不同，不能从版本差异本身直接推定原因。' },
     },
     {
       id: 'a-reinstall',
@@ -116,12 +100,10 @@ export const depHellCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-lock'],
-      hypotheses: [{ id: 'h-lock', status: 'up' }],
-      result: {
-        type: 'text',
-        title: '重装结果',
-        text: '重装后 dayjs 还是 1.12——因为锁文件缺失，每次安装都解析到最新。重装修复不了"没有锁"的问题。',
-      },
+      hypotheses: [
+        { id: 'h-lock', status: 'up' },
+      ],
+      result: { type: 'text', title: '安装边界', text: '没有受控锁时，删除node_modules再装仍可解析不同图；已有满足范围的本地锁也会影响结果。\n重装不保证消除“各机一份锁”的差异。' },
     },
     {
       id: 'a-pin',
@@ -132,12 +114,10 @@ export const depHellCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-lock'],
-      hypotheses: [{ id: 'h-lock', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '固定版本结果',
-        text: '"dayjs": "1.10.0"（去掉 ^）→ 同事重装后 1.10.0，白屏消失！\n→ 实锤闭环：版本就是根因。',
-      },
+      hypotheses: [
+        { id: 'h-lock', status: 'confirmed' },
+      ],
+      result: { type: 'text', title: '版本对照与修复', text: '只为核实因果，在隔离对照中固定历史版本能恢复该旧API；这不构成长期发布建议。\n正式修复按维护版本API改为map，提交审阅过的锁文件并用npm ci复验。' },
     },
     {
       id: 'a-timeline',
@@ -149,11 +129,7 @@ export const depHellCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '时间线',
-        text: '同事上周拉的代码正常，昨天重新 install 后白屏——时间窗与你加 dayjs 的时间吻合。',
-      },
+      result: { type: 'text', title: '安装时间线', text: '原机器并非昨晚新解析依赖，而是保留旧项目安装；新同事全新安装后首次失败。\n时间线与实际安装记录一致，不声称一个不存在的minor版本删了API。' },
     },
     {
       id: 'a-env',
@@ -164,74 +140,29 @@ export const depHellCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-env'],
-      hypotheses: [{ id: 'h-env', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '环境对比',
-        text: '两台机器 Node 20.11 / npm 10.2 完全一致——环境相同，差异只在依赖解析结果。',
-      },
+      hypotheses: [
+        { id: 'h-env', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '环境核对', text: '两台Node/npm与相关构建配置一致，业务文件哈希一致；唯一改变依赖图的对照可以稳定改变结果。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-lock', text: 'lockfile 被 gitignore，同事安装时 ^范围解析到了更新的 dayjs（1.12），API 不兼容导致报错', correct: true },
-    { id: 'rc-env', text: '两台机器 Node 环境版本不同导致行为差异', correct: false },
-    { id: 'rc-code', text: '日期工具函数代码本身有 bug', correct: false },
+    { id: 'rc-lock', text: '旧项目Lodash范围为*且锁未提交，旧机保留3.10.1、新装解析4.17.21；旧源码调用已在major升级移除的pluck', correct: true },
+    { id: 'rc-env', text: 'Node/npm不同造成结果差异', correct: false },
+    { id: 'rc-code', text: '两台拿到不同业务源码', correct: false },
   ],
-
   expertCost: 4,
   restartActionId: '',
-
   expertChain: [
-    {
-      thought: '同分支同代码不同结果——差异必然在代码之外：依赖、环境、配置。',
-      update: '三分支：依赖版本 / 环境版本 / 代码本身。先圈复现范围。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 圈范围：新装机器都白、只有自己正常——"写代码的机器正常"是依赖漂移的经典指纹。',
-      conclusion: '复现范围确认 → 排除偶发，是系统性的环境差异。',
-    },
-    {
-      thought: '报错指纹很有信息量：dayjs.default is not a function——.default 是旧版 CJS 兼容层的产物。',
-      update: '代码假设了旧版 API → 依赖版本假设升权。读一行代码排除 h-code。',
-      actionId: 'a-coderead',
-      why: '1⚡︎ 读报错行：错误指纹直接告诉我们代码是为旧版 API 写的——版本假设从"猜"变成"基本确定"。',
-      conclusion: '代码依赖旧版 dayjs 的 .default → 谁装了新版谁就会白屏。',
-    },
-    {
-      thought: '验证版本假设最直接的办法：npm ls 对比两台机器的实际版本。',
-      update: '实锤：1.10.0 vs 1.12.0，同一份 package.json 装出不同版本。',
-      actionId: 'a-diff',
-      why: '1⚡︎ 一条命令实锤版本差异——白屏机器必然解析到了 1.12。',
-      conclusion: '版本漂移实锤。接下来查"为什么会漂"：锁文件。',
-    },
-    {
-      thought: '版本漂移的根源几乎只有一种：锁文件没锁住。查 git 里 lockfile 的状态。',
-      update: '根因实锤：lockfile 被 gitignore。',
-      actionId: 'a-lockfile',
-      why: '1⚡︎ 一眼定根因：锁文件没进版本库 = 每台机器各自解析 ^范围 = 时间越往后装到的版本越新。',
-      conclusion: '根因实锤。修复：从 gitignore 移除 lockfile 并提交，全员重装。',
-    },
-    {
-      thought: '证据链闭合：指纹（API 不存在）→ 版本漂移实锤 → 根因（锁文件未提交）。停止。',
-      update: '停止。修复 + 团队规范：禁止 gitignore lockfile。',
-      actionId: '',
-      why: '根因、修复、预防措施全部明确。',
-      conclusion: '提交 lockfile + 固定 dayjs 版本 + 全员删除 node_modules 重装。同事白屏消失。',
-    },
+    { actionId: 'a-impact', thought: '新安装失败，旧机稳定正常。', update: '需要核对实际文件与依赖。', why: '1⚡圈定安装条件，不把“同分支”当作完整环境相同。', conclusion: '读取报错代码。' },
+    { actionId: 'a-coderead', thought: '两边同一文件调用pluck，公开API在major之间不同。', update: '排除业务文件不同，依赖假设升权。', why: '1⚡代码与版本文档对照，避免把任意is not a function都归为版本漂移。', conclusion: '查实际依赖。' },
+    { actionId: 'a-diff', thought: '相同Node/npm，依赖3.10.1与4.17.21，范围*允许跨major。', update: '排除运行环境，确认依赖图差异。', why: '1⚡比较真实安装而不是只看package.json，尊重semver范围。', conclusion: '查锁与因果对照。' },
+    { actionId: 'a-lockfile', thought: '锁未共享，同源码只换依赖图即可重现或消除失败。', update: '依赖图漂移原因与结果闭合。', why: '1⚡锁状态解释为什么不同，单变量对照确认不同是否导致故障。', conclusion: '按新API和受控锁修复。' },
+    { actionId: '', thought: '相同源码、不同实际图、未共享锁和版本对照闭合；改用维护版本API并提交锁，不长期依赖旧版本救火。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '相同源码、不同实际图、未共享锁和版本对照闭合；改用维护版本API并提交锁，不长期依赖旧版本救火。' },
   ],
-
   lessons: [
-    {
-      text: 'package.json 写的是"版本范围"，lockfile 才是"实际版本"——后者必须进版本库。',
-      principle: '^1.10.0 的含义是"1.10.0 到 2.0.0 之间都行"：不同时间 install 会装到不同版本。lockfile 把范围钉死成唯一解，是团队依赖一致性的唯一保障。',
-    },
-    {
-      text: '"xxx is not a function" 常是依赖版本漂移的指纹：代码假设的 API 在新版本里变了。',
-      principle: '依赖更新遵循语义化版本，但 Minor/Major 更新可能移除 API。锁文件保证所有人拿到同一个版本，这类"装新装旧各不同"的诡异 bug 就不会存在。',
-    },
-    {
-      text: '同代码不同结果 = 差异在代码之外：依赖、环境、配置、数据。',
-      principle: '排查"我这里好好的"类问题的固定清单：依赖版本（npm ls / pip freeze）→ 运行环境版本 → 环境变量/配置 → 数据。逐一对比，差异点即嫌疑点。',
-    },
+    { text: '范围声明与实际安装分别核对；*可以跨major，^1.10.0不会自动跨到2.0。', principle: '不同安装时刻、现有锁与node_modules都会影响结果。锁文件记录具体依赖图，npm ci按一致锁安装；不能用不存在的版本故事解释报错。' },
+    { text: 'is not a function只是候选线索，需要实际文件、公开API与版本对照支持。', principle: '源码不同、导入方式、插件注册或依赖图都可能产生类似异常。本题用同文件哈希和只换依赖的对照区分，而不是仅凭字符串断案。' },
+    { text: '锁定依赖与适配API都要完成，历史版本回放不等于长期发布方案。', principle: '稳定依赖图帮助重复验证，但不会自动修正对新API的错误使用。将经审阅的锁与源码一起发布，检查安装命令和运行环境。' },
   ],
 }

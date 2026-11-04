@@ -93,7 +93,61 @@
       "originalHash": "ccc41b5fd598be0aa95096afcf744e09fb41e956a8b522fa4a4a6c18d4f73df9",
       "originalDifficulty": 1,
       "originalExpertCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "5c45fefb079441c2cb9eb0efce2c692456396bfc43126105ebe6c5bd70d93af3",
+      "difficulty": 1,
+      "dimensions": [
+        1,
+        1,
+        1,
+        1,
+        2,
+        1
+      ],
+      "dimensionEvidence": [
+        "a-resources直接显示缺JS与HTML响应",
+        "状态/MIME/字节直接记录",
+        "模块加载基础规则",
+        "结论与响应类型一致",
+        "构建、发布与浏览器两边",
+        "入门关无需危险陷阱"
+      ],
+      "goal": "区分模块加载与运行时错误，核对制品和响应",
+      "changes": [
+        "移除404脚本必被当HTML执行的矛盾",
+        "CDN没有缓存旧资源清单这一无依据机制被删除",
+        "区分完整构建正常和发布漏传",
+        "修正接口未发起却全部200的叙述"
+      ],
+      "sources": [
+        "https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-single-module-script",
+        "https://vite.dev/guide/build",
+        "https://nginx.org/en/docs/http/ngx_http_core_module.html#try_files"
+      ],
+      "stop": "新入口缺文件、源站200HTML回退及模块MIME拒绝共同闭合。",
+      "expectedConfirmed": [
+        "h-res"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-console",
+            "a-resources"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-resources",
+            "a-console"
+          ],
+          "cost": 4
+        }
+      ]
     },
     {
       "id": "dep-hell",
@@ -103,7 +157,64 @@
       "originalHash": "1e10af51c558b80eaee4b1c722f1cfdb5a0dd5a590c29e1cf24b4918cea2f2bc",
       "originalDifficulty": 1,
       "originalExpertCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "9a9dc18dc3efc65ff5f26c2bb8181619441210c4aba33b5cf331f270aeff1607",
+      "difficulty": 1,
+      "dimensions": [
+        1,
+        2,
+        1,
+        1,
+        1,
+        1
+      ],
+      "dimensionEvidence": [
+        "pluck与实际major差异直给",
+        "同源码只换图的对照",
+        "基础安装与API使用",
+        "结论与版本变化一致",
+        "同一前端构建层",
+        "无L2危险要求"
+      ],
+      "goal": "用公开API和实际依赖图验证安装漂移",
+      "changes": [
+        "移除不存在的Day.js1.12 API删除叙述",
+        "采用有公开依据的Lodash3pluck与4map",
+        "不把minor升级移除API作为正常semver规则",
+        "区分代码不同与依赖契约不适配，给出单变量对照"
+      ],
+      "sources": [
+        "https://lodash.com/docs/3.10.1#pluck",
+        "https://lodash.com/docs/4.17.21#map",
+        "https://docs.npmjs.com/cli/v10/configuring-npm/package-json#dependencies",
+        "https://docs.npmjs.com/cli/v10/commands/npm-ci"
+      ],
+      "stop": "同文件、同环境、不同依赖图与锁状态及单变量对照闭合。",
+      "expectedConfirmed": [
+        "h-lock"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-coderead",
+            "a-diff",
+            "a-lockfile"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-diff",
+            "a-lockfile",
+            "a-coderead"
+          ],
+          "cost": 4
+        }
+      ]
     },
     {
       "id": "ci-cache-pollution",
@@ -113,7 +224,60 @@
       "originalHash": "096145373061d0c89252ea26cfd429790919e6c7f5cdc16eb1d9b6de8efb1d5d",
       "originalDifficulty": 2,
       "originalExpertCost": 7,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "0078f00673be882bc33f9bb98e45aff215ae7e1d799f1043e20e6a7795708cfa",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "缓存顺序与skip机制组合",
+        "只改安装步骤的对照",
+        "锁、缓存与测试执行语义",
+        "绿色来自跳过而非验证",
+        "CI依赖与生产制品",
+        "旧目录恢复后跳安装"
+      ],
+      "goal": "区分CI通过与关键用例真实执行",
+      "changes": [
+        "修复生产包含calcDiscount却报该函数不存在的自相矛盾",
+        "补齐恢复后跳npm ci与用例skip机制",
+        "固定key不再被说成永不失效",
+        "标准4，避免把修复后的未来结果当停止前已知"
+      ],
+      "sources": [
+        "https://docs.npmjs.com/cli/v10/commands/npm-ci",
+        "https://github.com/actions/setup-node/blob/main/docs/advanced-usage.md"
+      ],
+      "stop": "关键用例状态、依赖图及恢复后跳安装的执行顺序与对照闭合。",
+      "expectedConfirmed": [
+        "h-cache"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-depdiff",
+            "a-cacheconf"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-cacheconf",
+            "a-depdiff"
+          ],
+          "cost": 4
+        }
+      ]
     },
     {
       "id": "image-tag-drift",
@@ -123,7 +287,59 @@
       "originalHash": "eea1afb74fdce4cec1fcee31e1f5fa1802c658307e2ac25b8d4ef07aa256ba8c",
       "originalDifficulty": 2,
       "originalExpertCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "85350272e646f0c2c9c809954f7dbdc7893c96e61a1928fcf544a02d8a938f1d",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "实际对象、模板与缓存事件组合",
+        "同平台digest与制品对照",
+        "Kubernetes拉取及滚动机制",
+        "部署成功不代表修复已到达",
+        "CI、仓库与节点",
+        "只重建仍复用缓存"
+      ],
+      "goal": "用对象身份与Pod启动记录核实镜像漂移",
+      "changes": [
+        "修正latest默认策略与建集群默认的错误",
+        "补齐真实Pod重建触发",
+        "删除IfNotPresent永不更新、Always零成本等绝对叙述",
+        "同类普查移出标准定位成本"
+      ],
+      "sources": [
+        "https://kubernetes.io/docs/concepts/containers/images/"
+      ],
+      "stop": "同平台镜像身份、显式策略与启动事件、制品内容对应。",
+      "expectedConfirmed": [
+        "h-taglatest"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-pullpolicy",
+            "a-imageinspect"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-imageinspect",
+            "a-pullpolicy"
+          ],
+          "cost": 4
+        }
+      ]
     },
     {
       "id": "buildtime-inject",
@@ -133,7 +349,59 @@
       "originalHash": "0bbcb4bd2f2e3b8c4431159ac416a29112e5a9fc876fbb188c32c5293e040490",
       "originalDifficulty": 2,
       "originalExpertCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "b9adccd6aacd151f35e12bcbbfdbafd45b4ac00a23ab735f409e62242f8cbae0",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        1,
+        2
+      ],
+      "dimensionEvidence": [
+        "读者、构建输入和包身份组合",
+        "开发配置与本次构建对照",
+        "构建静态替换",
+        "配置改了但无运行时读者",
+        "同一构建链路",
+        "覆盖同hash破坏身份"
+      ],
+      "goal": "从实际读者定位构建变量与运行时配置断点",
+      "changes": [
+        "不再声称本地永远无法复现",
+        "从代码读者与实际URL排除错误层",
+        "运行时注入不被说成必须或自动即时生效",
+        "最短修复为补齐构建输入重新发布"
+      ],
+      "sources": [
+        "https://vite.dev/guide/env-and-mode"
+      ],
+      "stop": "构建输入、实际读取阶段与分发身份一致指向旧默认值内联。",
+      "expectedConfirmed": [
+        "h-inline"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-bundlecheck",
+            "a-cdncheck"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-cdncheck",
+            "a-bundlecheck"
+          ],
+          "cost": 4
+        }
+      ]
     },
     {
       "id": "chunk-overlap",
@@ -143,7 +411,63 @@
       "originalHash": "0154a6f27ba6acf830fa6ceac01b4ee0968c6b5ce51a184fe15a0dbdd199103d",
       "originalDifficulty": 2,
       "originalExpertCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "378f026e68f25524669128f183e38397cb60eae88749f6ab46eed25e5255e8b3",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "删除与新旧引用联合推断",
+        "发布中/结束后的同URL对照",
+        "hash、路由与原子替换机制",
+        "发布结束旧页仍失败",
+        "部署到旧浏览器请求",
+        "维护页仍有旧页请求"
+      ],
+      "goal": "区分发布空窗与持续断引用并验证精确URL",
+      "changes": [
+        "删除旧hash不会在新包解压完成后自动恢复",
+        "保留旧目录与旧URL可访问分别说明",
+        "不把ln -sfn或24h一律当充分方案",
+        "标准5由四项必要证据组成，非机械保留旧基准4"
+      ],
+      "sources": [
+        "https://vite.dev/guide/build",
+        "https://nginx.org/en/docs/http/ngx_http_core_module.html#try_files",
+        "https://pubs.opengroup.org/onlinepubs/9799919799/functions/rename.html"
+      ],
+      "stop": "具体旧URL、删除记录与同URL保留对照支持持续断引用。",
+      "expectedConfirmed": [
+        "h-window"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-deploylog",
+            "a-assetname",
+            "a-edgecheck"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-edgecheck",
+            "a-deploylog",
+            "a-assetname"
+          ],
+          "cost": 5
+        }
+      ]
     },
     {
       "id": "pipeline-review",
@@ -153,7 +477,65 @@
       "originalHash": "9b85c86c73e9e8d11d2587e588a5c79b4f25418d3bc6c1c4000492ebd9155bf6",
       "originalDifficulty": 2,
       "originalExpertCost": 7,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "8a1917a17e98e06176a025a8b2a94674593fce885f66b8abe1d8130a80b182df",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "审批、缓存与隔离多项材料对照",
+        "方案与实际job记录",
+        "来源、hash与权限机制",
+        "功能绿不证明依赖可信",
+        "CI与共享服务边界",
+        "跳过既定审批是主动风险"
+      ],
+      "goal": "区分评审的独立缺口与已治理条件",
+      "changes": [
+        "把真实缓存风险从错误根因改为完整正确决策的一部分",
+        "不将所有自动合并或并行化笼统定罪",
+        "自建跨项目缓存与GitHub默认作用域分清",
+        "补齐并行和指纹核对，标准7与完整评审所需证据一致"
+      ],
+      "sources": [
+        "https://docs.github.com/en/code-security/dependabot/working-with-dependabot/automating-dependabot-with-github-actions",
+        "https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows",
+        "https://slsa.dev/spec/v1.0/requirements"
+      ],
+      "stop": "既定审批、实际缓存权限、并行隔离与保留指纹全部核对后给完整有条件结论。",
+      "expectedConfirmed": [
+        "h-bot"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-supply",
+            "a-botpath",
+            "a-cache",
+            "a-parallel",
+            "a-keyfix"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-supply",
+            "a-cache",
+            "a-botpath",
+            "a-keyfix",
+            "a-parallel"
+          ],
+          "cost": 7
+        }
+      ]
     },
     {
       "id": "symptom-cluster",

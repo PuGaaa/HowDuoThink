@@ -1,47 +1,39 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 3 章 · 构建与依赖（白屏教学关）
- * 教学点：白屏=运行时 JS 报错中断渲染；资源 404 与接口报错是两类指纹；本地正常线上挂 = 环境差异。
- * 专家路径：impact(1) + console(1) + resources(2) = 4⚡︎
+ * 学徒篇校准：区分模块加载与运行时错误，核对制品和响应。
+ * 原型：HTML模块脚本MIME校验与SPA静态路由；教学重建，不冒充原始事故日志。
+ * 六维：1/1/1/1/2/1，中位数半档向下取整，L1。
+ * 标准路径：a-impact → a-console → a-resources；替代顺序：a-impact → a-resources → a-console。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const whiteScreenCase: DiagnosisCase = {
   id: 'white-screen',
   title: '上线后的白屏',
-  intro: '今晚发版后，部分用户打开页面就是一片白。你本地却怎么也复现不了。',
+  intro: '新入口发布后部分用户白屏。检查模块脚本的状态、MIME与实际字节，再对照发布清单。',
   domain: 'build',
-  layer: '构建产物：本地跑的是源码，用户跑的是打包产物——差异就藏在里面',
+  layer: '开发构建、部署文件与浏览器响应是不同证据；缺资源不应被SPA入口回退掩成200',
   part: 'apprentice',
   chapterId: 'build',
   order: 1,
   typeTags: ['config', 'dependency'],
   difficulty: 1,
-
   scene: {
     role: '你是前端开发，今晚的版本刚上线，客服群开始有人反馈"页面白屏"。',
     architecture: '用户浏览器 → CDN(静态资源) → SPA 应用',
     symptoms: [
-      {
-        type: 'error',
-        title: '用户侧现象',
-        text: '打开页面一片白，无任何报错弹窗。刷新偶尔能恢复，过一会儿又白。',
-      },
-      {
-        type: 'text',
-        title: '你的本地环境',
-        text: 'npm run dev 一切正常，怎么点都不白——"我这里好好的"。',
-      },
+      { type: 'error', title: '用户侧现象', text: '新加载版本的用户白屏；仍打开旧页面的用户暂时正常。控制台无业务提示，需要看浏览器加载错误。' },
+      { type: 'text', title: '你的本地环境', text: 'npm run dev 一切正常，怎么点都不白——"我这里好好的"。' },
     ],
     timeline: '20:00 发版后开始出现 ｜ 发版内容：新增了一个依赖库并升级了打包配置',
-    impactHint: '是所有用户白屏还是部分？老版本用户有没有受影响？',
+    impactHint: '先分清新入口和旧页面，再核对浏览器实际拿到的资源。',
+    tag: '教学重建',
   },
-
   hypotheses: [
-    { id: 'h-js', text: '线上 JS 运行时报错，渲染中断', excludeActionId: 'a-console' },
-    { id: 'h-res', text: '静态资源（js/css）404 或版本错配', excludeActionId: 'a-resources' },
-    { id: 'h-api', text: '首屏接口挂了，页面没数据白屏', excludeActionId: 'a-network' },
+    { id: 'h-js', text: '新依赖已经执行后抛出运行时异常，导致渲染停止', excludeActionId: 'a-console' },
+    { id: 'h-res', text: '新入口引用的JS缺失，SPA回退返回了HTML，模块加载被拒', excludeActionId: 'a-resources' },
+    { id: 'h-api', text: '首屏API失败，导致没有数据可展示', excludeActionId: 'a-network' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -53,11 +45,7 @@ export const whiteScreenCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '影响范围',
-        text: '约 30% 用户白屏，且都是今晚之后**首次打开**的用户；\n打开过旧版本的用户（有缓存）全部正常。',
-      },
+      result: { type: 'text', title: '版本影响面', text: '失败样本均加载新入口；仍持有旧页面的用户尚未重新加载。\n这个分布提示发布资源链路，但不能仅凭缓存用户正常就确定CDN缓存错。' },
     },
     {
       id: 'a-console',
@@ -67,13 +55,12 @@ export const whiteScreenCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-js'],
-      hypotheses: [{ id: 'h-js', status: 'confirmed' }],
-      result: {
-        type: 'error',
-        title: '用户控制台（远程协助截图）',
-        text: 'Uncaught SyntaxError: Unexpected token \'<\'  at app.8f3c2a.js:1\n→ JS 文件的第一行是 \'<\'——这是 HTML 的开头，说明拿到的是 HTML 不是 JS。',
-      },
+      tests: ['h-js', 'h-res'],
+      hypotheses: [
+        { id: 'h-js', status: 'excluded' },
+        { id: 'h-res', status: 'up' },
+      ],
+      result: { type: 'error', title: '模块加载阶段', text: '浏览器模块加载错误摘要：请求app.8f3c2a.js，响应MIME为text/html，模块脚本未执行。\n不是新依赖执行后的TypeError。HTTP404的脚本通常不会作为成功脚本执行，不能同时声称404又必然解析出Unexpected token。' },
     },
     {
       id: 'a-resources',
@@ -83,13 +70,12 @@ export const whiteScreenCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-res'],
-      hypotheses: [{ id: 'h-res', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '资源加载详情',
-        text: 'index.html 200（新版本，引用 app.8f3c2a.js）\napp.8f3c2a.js → 404 Not Found（CDN 边缘节点还缓存着旧的资源清单）',
-      },
+      tests: ['h-res', 'h-api'],
+      hypotheses: [
+        { id: 'h-res', status: 'confirmed' },
+        { id: 'h-api', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '发布清单与响应', text: '新index.html引用app.8f3c2a.js；发布目录缺这个文件，制品包中却存在。\n直接请求源站该路径：200，Content-Type:text/html，正文是index.html；try_files将不存在静态文件回退入口。边缘响应与源站一致。\n首屏fetch代码在模块启动后，失败样本尚未启动；独立API探测正常。' },
     },
     {
       id: 'a-network',
@@ -100,12 +86,10 @@ export const whiteScreenCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-api'],
-      hypotheses: [{ id: 'h-api', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '首屏接口',
-        text: '接口全部 200 正常返回——但 JS 都没执行，接口好坏无关紧要。',
-      },
+      hypotheses: [
+        { id: 'h-api', status: 'excluded' },
+      ],
+      result: { type: 'text', title: 'API阶段', text: '独立请求首屏API成功；用户失败路径尚未执行模块中的fetch。\n应区分用户实际发出的请求与工程师单独探测，不能说“JS都没执行但用户接口全部200”。' },
     },
     {
       id: 'a-cache',
@@ -116,28 +100,22 @@ export const whiteScreenCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-res'],
-      hypotheses: [{ id: 'h-res', status: 'up' }],
-      result: {
-        type: 'text',
-        title: '清缓存结果',
-        text: '清缓存后正常了！但过几个小时新用户还是白屏——清缓存能救一个用户，救不了所有人。方向对，动作错。',
-      },
+      hypotheses: [
+        { id: 'h-res', status: 'up' },
+      ],
+      result: { type: 'text', title: '缓存边界', text: '清理浏览器缓存并不会生成源站缺失的JS文件；新加载仍可复现。\n缓存命中旧资源可能暂时遮住问题，不是修复发布清单。' },
     },
     {
       id: 'a-rollback',
       name: '回滚到上一版本',
       desc: '【状态变更】回滚静态资源',
-      cost: 6,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '回滚结果',
-        text: '回滚后白屏消失（旧资源清单在 CDN 有缓存）。\n业务恢复了，但根因还没找到——下次发版还会炸。',
-      },
+      result: { type: 'text', title: '回滚边界', text: '按完整旧版本清单回退入口和资源可以止血；还要定位漏传与错误回退，不能以回滚成功证明缓存是根因。' },
     },
     {
       id: 'a-source',
@@ -148,12 +126,10 @@ export const whiteScreenCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-res'],
-      hypotheses: [{ id: 'h-res', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: 'JS URL 响应内容',
-        text: 'curl app.8f3c2a.js 返回：\n<!DOCTYPE html><html>...404 页面...\n→ 实锤第二个证据：404 的响应体是 HTML，被浏览器当 JS 执行。',
-      },
+      hypotheses: [
+        { id: 'h-res', status: 'confirmed' },
+      ],
+      result: { type: 'text', title: '原始响应', text: '同一JS路径响应200且正文是入口HTML，不是真正JavaScript；仅看到字符<不能直接推导HTTP404或具体缓存原因。' },
     },
     {
       id: 'a-localbuild',
@@ -165,66 +141,25 @@ export const whiteScreenCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '本地构建',
-        text: 'npm run build 后本地预览，同样白屏——终于复现了！问题在构建产物，不在源码。',
-      },
+      result: { type: 'text', title: '产物与部署区分', text: '完整生产构建在同构静态服务中可正常加载；按错误发布清单故意漏传该JS且保留SPA回退，可复现MIME失败。\n构建可用与发布目录完整是两项检查，本地完整包正常并不排除发布错误。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-cdn', text: '发版后 HTML 引用了新哈希的 JS，但 CDN 边缘节点缓存了旧资源清单，新用户请求的 JS 文件 404，返回的 HTML 被当作 JS 解析报错白屏', correct: true },
-    { id: 'rc-js', text: '新依赖的代码在运行时抛错中断渲染', correct: false },
-    { id: 'rc-api', text: '首屏接口异常导致页面无数据白屏', correct: false },
+    { id: 'rc-cdn', text: '发布目录漏传新入口引用的JS，静态路径又回退为200的入口HTML，模块因MIME不符未执行；边缘与源站一致', correct: true },
+    { id: 'rc-js', text: '新依赖执行后发生业务运行时异常', correct: false },
+    { id: 'rc-api', text: '首屏API故障导致无数据显示', correct: false },
   ],
-
   expertCost: 4,
   restartActionId: '',
-
   expertChain: [
-    {
-      thought: '"我本地好好的"是最危险的结论——本地跑的是源码，用户跑的是打包产物，环境不同。先圈范围。',
-      update: '白屏的是无缓存的新用户 → 问题在新版本的资源链路上。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 圈范围：有缓存用户正常 = 新旧资源交替问题，这是构建部署类的经典指纹。',
-      conclusion: '只有首次打开的新用户白屏 → 聚焦新版本静态资源加载。',
-    },
-    {
-      thought: '白屏 = 渲染没执行 = 运行时 JS 挂了。让用户截图控制台，现场就在那里。',
-      update: 'JS 运行时报错实锤：Unexpected token \'<\'。',
-      actionId: 'a-console',
-      why: '1⚡︎ 拿到最关键线索：JS 文件内容是 HTML——「拿到的东西不对」比「代码写错了」更值得怀疑。',
-      conclusion: 'JS 文件内容是 HTML → 排除代码 bug，指向资源 404（404 页面返回了 HTML）。',
-    },
-    {
-      thought: '顺着"内容不对"查：资源请求的响应码是什么。',
-      update: 'h-res 升权为第一。',
-      actionId: 'a-resources',
-      why: '2⚡︎ 实锤：404 + CDN 缓存旧清单——完整因果链闭合。',
-      conclusion: '实锤：CDN 缓存策略问题，新 HTML 引用的 JS 在部分节点 404。',
-    },
-    {
-      thought: '接口正常（反正 JS 没执行）、本地构建复现成功——因果链闭合，停止收集。',
-      update: '停止。修复：CDN 缓存策略改为 index.html 不缓存/短缓存，资源文件长缓存。',
-      actionId: '',
-      why: '根因（CDN 缓存配置）已实锤，修复方案明确；继续收集不改变行动。',
-      conclusion: '刷新 CDN + 调整缓存策略，白屏消失。沉淀：HTML 不缓存、带哈希的资源长缓存。',
-    },
+    { actionId: 'a-impact', thought: '失败集中在新入口加载。', update: '发布链路升权，尚未确定缓存层。', why: '1⚡先分辨持有旧页与真正加载新版，避免把暂时未触发当正常验证。', conclusion: '看模块加载阶段。' },
+    { actionId: 'a-console', thought: '模块因HTML MIME被拒，尚未执行。', update: '排除新依赖运行时异常。', why: '1⚡读取真实浏览器阶段，不能把404与解析成功后的语法错混为一件事。', conclusion: '查实际响应与文件清单。' },
+    { actionId: 'a-resources', thought: '源站缺JS，SPA回退返回入口HTML200，API未被用户调用且独立探测正常。', update: '资源缺失与错误回退解释白屏。', why: '2⚡对照构建包、发布目录与响应字节，才能确定分发层的具体断点。', conclusion: '停止并修复部署与静态路由。' },
+    { actionId: '', thought: '入口引用、缺失文件与模块拒绝加载闭合；先传资源并核验再更新入口，缺静态文件应保留真实错误，不回退HTML。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '入口引用、缺失文件与模块拒绝加载闭合；先传资源并核验再更新入口，缺静态文件应保留真实错误，不回退HTML。' },
   ],
-
   lessons: [
-    {
-      text: '"本地好好的"不是证据：本地是源码，用户是打包产物——环境差异藏在构建里。',
-      principle: '前端故障排查第一分叉：源码环境 vs 构建产物环境。本地构建一次（npm run build）是复现线上问题的基本功。',
-    },
-    {
-      text: 'JS 文件报 "Unexpected token \'<\'" = 拿到的是 HTML——资源 404 的指纹。',
-      principle: '静态资源 404 时服务端常返回 HTML 格式的 404 页面，浏览器把它当 JS 解析立即报语法错。这个指纹直指资源加载，而非代码。',
-    },
-    {
-      text: '发版白屏三板斧：HTML 短缓存、带哈希资源长缓存、发布后刷 CDN。',
-      principle: 'SPA 资源加载的契约：index.html 是入口必须永远最新，带内容哈希的 js/css 才能永久缓存——缓存策略错配是发版事故的头号来源。',
-    },
+    { text: '浏览器报错先看失败阶段：HTTP状态、MIME和响应字节不能互相代替。', principle: '模块加载会检查MIME，未执行就不能归因依赖运行时异常。字符<只提示可能拿到HTML，不能单独证明404、CDN或缓存。' },
+    { text: '完整构建、发布目录和边缘响应分别核对，开发环境正常不是发布完整性的证明。', principle: '同一份制品可能在上传或路径映射时丢文件。对照制品清单与源站，再检查边缘是否一致，避免把所有白屏归罪缓存。' },
+    { text: '先发布并验证哈希资源，再更新入口；旧页面仍可能需要旧资源。', principle: '入口可短缓存或重新验证，哈希资源按不可变内容保存。刷新CDN不能补源站缺文件，也不应无条件删除仍被旧页面引用的对象。' },
   ],
 }

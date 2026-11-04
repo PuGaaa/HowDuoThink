@@ -1,10 +1,11 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 3 章 · 构建与依赖 第三批（构建期内联变量 L2）
- * 教学点：验证思维——构建期变量被"烤进"产物：运行时配置对它无效；CI 缺变量的静默回退是放大器；
- * 环境差异必须分层：构建期指纹 vs 运行时配置。
- * 专家路径：impact(1) + bundlecheck(2) + cdncheck(1) = 4⚡︎
+ * 学徒篇校准：从实际读者定位构建变量与运行时配置断点。
+ * 原型：Vite静态替换与配置生效阶段；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/1/2，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-bundlecheck → a-cdncheck；替代顺序：a-impact → a-cdncheck → a-bundlecheck。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const buildtimeInjectCase: DiagnosisCase = {
   id: 'buildtime-inject',
@@ -17,34 +18,23 @@ export const buildtimeInjectCase: DiagnosisCase = {
   order: 6,
   typeTags: ['build', 'config', 'verification'],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」H5 商城的前端工程负责人，地址迁移的第一天就卡在"改了没生效"。',
     architecture: 'Vite 构建(import.meta.env 内联) → 静态产物(CDN) → 浏览器(请求 API_BASE 指向的网关)',
-    tag: '故障现场',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '线上行为',
-        text: '全量用户的请求仍打到 old-api.example.com。\n产物 JS 反查：API_BASE = "https://old-api.example.com" 作为字面量写死在 bundle 里。',
-      },
-      {
-        type: 'text',
-        title: '诡异对照',
-        text: '配置中心变量已更新为 new-api ✓\n本地 dev 模式请求 new-api 正常 ✓（本地 .env.development 有值）\n只有 CI 构建的产物是旧地址——发布日志显示"构建成功、部署成功"。',
-      },
+      { type: 'error', title: '线上行为', text: '全量用户的请求仍打到 old-api.example.com。\n产物 JS 反查：API_BASE = "https://old-api.example.com" 作为字面量写死在 bundle 里。' },
+      { type: 'text', title: '诡异对照', text: '配置中心变量已更新为 new-api ✓\n本地 dev 模式请求 new-api 正常 ✓（本地 .env.development 有值）\n只有 CI 构建的产物是旧地址——发布日志显示"构建成功、部署成功"。' },
     ],
     timeline: '上周启动 API 地址迁移 ｜ 今天的发布用的是 CI 昨晚的构建 ｜ 代码里 API_BASE = import.meta.env.VITE_API_BASE ?? "https://old-api.example.com"（三个月前写的兜底）',
-    impactHint: '配置中心、本地、CI 三处的值各不相同——最后"说话"的是哪一处？',
+    impactHint: '核对代码实际读取哪份配置；配置中心改值不保证静态产物会读取它。',
   },
-
   hypotheses: [
     { id: 'h-inline', text: '构建期内联：变量构建时替换进产物；CI 构建环境缺该变量，静默回退到代码默认值（旧地址）', excludeActionId: 'a-bundlecheck' },
     { id: 'h-cdn', text: 'CDN 缓存旧产物未刷新，用户拿到旧 bundle', excludeActionId: 'a-cdncheck' },
     { id: 'h-config', text: '配置中心变量名/作用域错误，新值根本没下发', excludeActionId: 'a-configread' },
     { id: 'h-dns', text: '旧域名 DNS 仍解析有效，请求路由没切干净', excludeActionId: 'a-dnsresolve' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -54,13 +44,13 @@ export const buildtimeInjectCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
-      result: {
-        type: 'code',
-        title: '三处对质',
-        text: '配置中心：apiBase = "https://new-api.example.com" ✓ 已更新\n产物 bundle：API_BASE = "https://old-api.example.com" ← 字面量写死 ✗\n运行时行为：请求打 old-api（产物说了算）\n且运行时读取日志：apiBase 变量从未被读取过——它根本不在运行时。\n→ 三处值不同、产物赢——"谁最后说话"的答案：构建期。',
-      },
+      tests: ['h-config', 'h-dns', 'h-inline'],
+      hypotheses: [
+        { id: 'h-config', status: 'excluded' },
+        { id: 'h-dns', status: 'excluded' },
+        { id: 'h-inline', status: 'up' },
+      ],
+      result: { type: 'code', title: '实际读取链路', text: '配置中心记录apiBase为新地址；本次bundle中的API_BASE是旧地址字面量，Network请求URL也为旧域名。\n源码中的请求路径只引用import.meta.env.VITE_API_BASE，没有运行时配置中心读取入口。\n原始URL已经是旧域名，不是先请求新域名再被DNS解析到旧服务。' },
     },
     {
       id: 'a-bundlecheck',
@@ -71,12 +61,10 @@ export const buildtimeInjectCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-inline'],
-      hypotheses: [{ id: 'h-inline', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '构建链路审计',
-        text: 'import.meta.env.VITE_API_BASE 是构建期文本替换（非运行时读取）。\nCI 构建日志：VITE_API_BASE 未设置 → 静默回退 ?? "https://old-api..."（三个月前写的兜底默认值）。\n本地正常的原因：.env.development 有值——本地永远复现不了。\n实锤：构建期内联 × CI 缺变量 × 静默回退 = 旧地址永久烤进产物。',
-      },
+      hypotheses: [
+        { id: 'h-inline', status: 'confirmed' },
+      ],
+      result: { type: 'code', title: '构建来源', text: 'Vite生产构建静态替换import.meta.env；该次CI未提供VITE_API_BASE，源码??旧地址选中默认值，产物内出现旧字面量。\n按同一构建命令与变量配置可以复现；本地开发配置有新值并不意味着永远无法复现。\n构建变量来源的审计只记录所需项，不将真实凭据写进日志。' },
     },
     {
       id: 'a-cdncheck',
@@ -87,12 +75,10 @@ export const buildtimeInjectCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-cdn'],
-      hypotheses: [{ id: 'h-cdn', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: 'CDN 核对',
-        text: '边缘节点产物 hash 与源站一致（缓存已正确刷新）。\n→ 排除 CDN：最新产物里写的就是旧地址——刷新一百次也没用。',
-      },
+      hypotheses: [
+        { id: 'h-cdn', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '分发身份', text: '浏览器、边缘与本次源站产物哈希相同；本次新产物本身含旧地址，清缓存不会改变它。' },
     },
     {
       id: 'a-configread',
@@ -103,12 +89,10 @@ export const buildtimeInjectCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-config'],
-      hypotheses: [{ id: 'h-config', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '配置核对',
-        text: '变量名与作用域正确，其他变量的修改都正常生效。\n→ 排除配置中心：它无辜——这个变量从来没人读。',
-      },
+      hypotheses: [
+        { id: 'h-config', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '配置读者', text: '配置中心该键与作用域确实返回新地址；但当前页面代码根本不调用该运行时配置。\n别的变量正常不能代替这个键的核对，代码读取路径才说明它未参与。' },
     },
     {
       id: 'a-dnsresolve',
@@ -119,132 +103,77 @@ export const buildtimeInjectCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-dns'],
-      hypotheses: [{ id: 'h-dns', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: 'DNS 核对',
-        text: 'old-api 域名解析正常（迁移未完成前本就应有效），但无关紧要——请求的"目的地"是产物里写死的字符串，不是解析问题。\n→ 排除 DNS。',
-      },
+      hypotheses: [
+        { id: 'h-dns', status: 'excluded' },
+      ],
+      result: { type: 'text', title: 'URL与DNS边界', text: 'Network中的URL是old-api，DNS只为所请求域名解析地址，不会自行把字符串目的域改成new-api。' },
     },
     {
       id: 'a-danger',
-      name: 'CDN 产物文本替换紧急生效',
-      desc: '【状态变更】对产物 JS 做 old→new 字符串替换后重新上传',
-      cost: 1,
+      name: '回滚入口后直接覆盖同hash的JS',
+      desc: '【状态变更】手改旧字面量但复用已发布哈希路径',
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '替换结果（陷阱动作）',
-        text: '请求切到新地址，功能恢复。\n代价：产物 hash 与构建记录不再对应（内容与 hash 脱钩），下一次发版排障时"产物考古"全部失真；且替换未经过任何回归验证。\n→ 复盘点评：为省一次正确构建，破坏了产物完整性体系——短期止血要记账。',
-      },
+      result: { type: 'text', title: '制品覆盖风险', text: '覆盖同一hash路径使其对应不同字节，部分缓存仍有旧内容；制品记录和可能的完整性校验失配。\n止血须按完整发布协议处理，不能把手改产物伪装成原始构建。' },
     },
     {
       id: 'a-fixruntime',
-      name: '修复：环境差异改为运行时注入',
-      desc: '【状态变更】API_BASE 从 index.html 注入的 window.__APP_CONFIG__ 读取；构建期只留构建指纹',
+      name: '修复：提供构建变量并重新发布',
+      desc: '【状态变更】补齐所需变量，缺失即构建失败',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复结果',
-        text: '① index.html 由发布系统按目标环境注入 window.__APP_CONFIG__.apiBase\n② 同一产物可发布到任意环境（构建一次、处处部署）\n③ 回归：配置中心改地址 → 无需重新构建，刷新配置即生效。',
-      },
+      result: { type: 'text', title: '修复与选择', text: '本案最短修复是CI明确提供API地址、缺失阻断构建，重建并按不可变制品发布验证。\n若选择构建一次、多环境部署，可另设计运行时配置文件，但需明确发布生成、缓存和客户端重载；配置中心修改不会自动更新已打开页面。' },
     },
     {
       id: 'a-fixfailfast',
       name: '沉淀：构建期变量 fail-fast',
       desc: '【状态变更】CI 构建脚本：声明的构建期变量缺失即构建失败，禁止 ?? 默认值兜底',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '门禁上线',
-        text: '构建脚本加"变量清单校验"：清单内变量缺失 → 构建直接失败并报缺哪个。\n静默回退从机制上消灭——缺失必须大声说，不能悄悄用旧值。',
-      },
+      result: { type: 'text', title: '门禁上线', text: '构建脚本加"变量清单校验"：清单内变量缺失 → 构建直接失败并报缺哪个。\n静默回退从机制上消灭——缺失必须大声说，不能悄悄用旧值。' },
     },
     {
       id: 'a-fixdoc',
       name: '沉淀：环境差异分层登记表',
       desc: '【状态变更】登记表：每个配置项声明"构建期 or 运行时"；构建期项必须出现在 CI 变量清单',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '分层登记',
-        text: '登记表两列：构建期（机器/版本指纹，改动需重新构建）｜运行时（环境差异，改动即时生效）。\n新配置项入库必填——"烤进产物"从默认行为变成显式决定。',
-      },
+      result: { type: 'text', title: '配置分层', text: '为每项配置注明实际读取阶段、发布动作和生效时机。\n构建期改值需重新构建；运行时值也要有真实读取与刷新机制，不能承诺所有修改即时生效。' },
     },
   ],
-
   rootCauses: [
     { id: 'rc-inline', text: 'API_BASE 走构建期内联（import.meta.env）且带静默回退默认值（旧地址）：CI 构建环境从未配置该变量——旧地址被烤进产物，配置中心的运行时修改对它无效', correct: true },
     { id: 'rc-cdn', text: 'CDN 缓存旧产物未刷新', correct: false },
     { id: 'rc-config', text: '配置中心变量名/作用域错误未下发', correct: false },
     { id: 'rc-dns', text: '旧域名 DNS 残留导致路由未切换', correct: false },
   ],
-
   expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
-    {
-      thought: '三处值各不相同——先对质"谁最后说话"：配置中心的值、产物里的值、运行时的行为。',
-      update: '产物字面量赢了，且运行时从未读过该变量——"配置没生效"其实是"配置根本不在链路上"。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 三处对质把"改了没生效"这个模糊抱怨分解为取值链路问题：配置 → 构建 → 运行时，断点必在某一环。',
-      conclusion: '嫌疑锁定：构建期内联（h-inline 升权）。',
-    },
-    {
-      thought: '审计构建链路：这个变量构建时从哪取值、缺了会发生什么——静默回退是重点嫌疑。',
-      update: '实锤：CI 从未配置过该变量，?? 兜底把三个月前的旧地址烤进产物；本地因 .env 永远正常。',
-      actionId: 'a-bundlecheck',
-      why: '2⚡︎ 构建链路审计揭示双重缺陷：内联机制（运行时无效）× 静默回退（缺失不报错）——两者叠加才让错误悄无声息地通过了"构建成功、部署成功"。',
-      conclusion: '根因实锤 → 排除分发侧。',
-    },
-    {
-      thought: 'CDN 与配置中心各 1⚡︎ 排除——"缓存旧产物"是最直觉的解释，必须先关掉它。',
-      update: '产物 hash 一致（缓存正确）、配置下发正常——直觉解释全部出局。',
-      actionId: 'a-cdncheck',
-      why: '1⚡︎ "改了没生效"的第一直觉永远是缓存——最先排除它，团队才不会在清缓存上浪费两小时。',
-      conclusion: '嫌疑收敛单点。',
-    },
-    {
-      thought: 'DNS 假设同样排除——然后进入修复：机制层面改运行时注入，制度层面 fail-fast + 分层登记。停止收集。',
-      update: '停止。',
-      actionId: '',
-      why: '【停止规则】机制（内联×静默回退）✓ 分发侧（缓存/DNS/配置）✓ 修复（运行时注入+门禁）✓——现象、根因、防线三层闭合。',
-      conclusion: '沉淀：构建期变量是烤进产物的指纹——环境差异走运行时注入，构建期缺失必须 fail-fast。"一次构建，处处部署"是产物完整性的前提。',
-    },
+    { actionId: 'a-impact', thought: '代码只读构建变量，bundle和URL都仍是旧地址。', update: '排除本次配置中心错误和DNS改域，构建值升权。', why: '1⚡查实际读者与请求URL，不把配置存在等同页面会使用。', conclusion: '核对构建输入。' },
+    { actionId: 'a-bundlecheck', thought: '该次CI缺变量，静态替换与默认值选中旧地址。', update: '构建来源解释字面量，能按同条件复现。', why: '2⚡同时检查机制与本次输入，避免把默认行为当永远无法复现的环境差异。', conclusion: '核对分发的是不是这份包。' },
+    { actionId: 'a-cdncheck', thought: '客户端到源站都对应同一新包。', update: '排除旧缓存，错误已在构建输出。', why: '1⚡制品身份保证修复落在正确阶段，不重复刷新已经一致的缓存。', conclusion: '补变量、重建并复验。' },
+    { actionId: '', thought: '构建输入、静态读取与分发身份闭合；选择实际需要的配置生效方式，不强制所有环境配置都运行时读取。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '构建输入、静态读取与分发身份闭合；选择实际需要的配置生效方式，不强制所有环境配置都运行时读取。' },
   ],
-
   lessons: [
-    {
-      text: '构建期变量是烤进产物的指纹：运行时配置中心对它完全无效——环境差异类配置必须走运行时注入。',
-      principle: '验证思维：配置项入库先分层——"机器指纹"（构建期，改了要重新构建）与"环境差异"（运行时，改了即时生效）。同一产物多环境部署（一次构建处处部署）是产物完整性体系的前提，靠重新构建"适配环境"会滋生无数静默差异。',
-    },
-    {
-      text: '静默回退（?? 默认值）是配置缺陷的放大器：缺失不报错，错误值悄悄上线，且本地永远复现不了。',
-      principle: '程序设计：构建期变量缺失必须 fail-fast（构建失败并指出缺什么），禁止 ?? 旧值兜底。回退默认值的本意是"开发友好"，代价是"生产环境静默错"——好意兜底要在能大声报错的环境里做。',
-    },
-    {
-      text: '"改了没生效"先对质取值链路：配置中心 → 构建产物 → 运行时行为，三处各是什么值、断点在哪一环。',
-      principle: '排查方法：配置类问题的第一动作是三处对质，而不是逐个怀疑缓存/DNS。对质同时回答"谁在最后说话"——说话的那一层才是修复的落点。',
-    },
+    { text: 'import.meta.env在生产构建静态替换，运行时配置中心没有读者就不会改变它。', principle: '核对代码、构建输入和产物；构建期配置本身不是错误，问题是输入缺失且被旧默认值掩盖。' },
+    { text: '同条件可以复现；本地开发正常不代表构建差异永远无法复现。', principle: '使用相同构建命令、变量来源和产物验证。登记所需配置、缺失时明确失败，避免将敏感值打印到构建日志。' },
+    { text: '运行时注入是设计选择，不是自动即时生效；静态产物仍需遵守发布身份。', principle: '明确配置生成、缓存与重载路径。直接覆盖hash资源会破坏不可变内容契约；构建一次多环境部署也需要完整生效机制。' },
   ],
 }

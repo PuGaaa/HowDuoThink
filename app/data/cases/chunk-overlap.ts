@@ -1,15 +1,16 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 3 章 · 构建与依赖 结业（非原子发布窗口 L2）
- * 教学点：验证思维——"发版窗口"是一场比赛：用户的请求与产物的覆盖在赛跑；
- * 原子切换（版本目录+软链）与旧资源保留期是静态资源的生命周期契约。
- * 专家路径：impact(1) + deploylog(2) + assetname(1) = 4⚡︎
+ * 学徒篇校准：区分发布空窗与持续断引用并验证精确URL。
+ * 原型：静态发布、懒加载hash与资源可达性；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/2/2，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-deploylog → a-assetname → a-edgecheck；替代顺序：a-impact → a-edgecheck → a-deploylog → a-assetname。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const chunkOverlapCase: DiagnosisCase = {
   id: 'chunk-overlap',
-  title: '每次发版的两分钟，总有人页面崩掉',
-  intro: '发版那几分钟，线上用户页面随机崩：旧页面引用的 JS chunk 已被删——用户的请求和发布脚本在赛跑。',
+  title: '发版结束，旧页面的懒加载仍然404',
+  intro: '先删旧目录再发布新包，旧页面的hash引用不仅在发布窗口内失败，发版结束后也可能继续失效。',
   domain: 'build',
   layer: '发布窗口是一场比赛——旧资源的保留期要覆盖所有还活着的老页面',
   part: 'apprentice',
@@ -17,34 +18,23 @@ export const chunkOverlapCase: DiagnosisCase = {
   order: 7,
   typeTags: ['build', 'deploy', 'race'],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」H5 商城的发布负责人，"发版必崩几个人"成了团队的都市传说。',
     architecture: 'CI 构建 → 部署脚本(先删旧目录再解压新包) → 源站(Nginx 静态) → 已打开页面的浏览器(懒加载 chunk)',
-    tag: '故障现场',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '前端监控',
-        text: 'ChunkLoadError：/assets/chunk-abc123.js 404\n崩溃 100% 集中在每次发版后约 2 分钟内；受影响用户全部是"发版前已打开页面"的人。',
-      },
-      {
-        type: 'text',
-        title: '发布脚本',
-        text: '部署方式：rm -rf /var/www/app && unzip new.zip（先删后传，非原子）。\n崩溃用户的页面 HTML 是旧版本——它引用的 chunk 在"删掉"的那一刻就注定 404。',
-      },
+      { type: 'error', title: '前端监控', text: '旧页面请求/assets/chunk-abc123.js出现404，发版中与结束后30分钟都有样本；新加载页面在发布结束后正常。' },
+      { type: 'text', title: '发布脚本', text: '部署方式：rm -rf /var/www/app && unzip new.zip（先删后传，非原子）。\n崩溃用户的页面 HTML 是旧版本——它引用的 chunk 在"删掉"的那一刻就注定 404。' },
     ],
     timeline: '崩溃与发版逐次对应（近 30 次发版 28 次出现）｜ 懒加载路由的 chunk 在用户跳转时才请求 ｜ 每次发版约 90 秒完成',
-    impactHint: '崩的是"旧页面"引用的"旧 chunk"——旧 chunk 是被谁删的？删的那一刻，还有谁的页面活着？',
+    impactHint: '旧页面引用的对象发版后还可路由到吗？留一个旧目录但不保留URL访问，并不能解决问题。',
   },
-
   hypotheses: [
-    { id: 'h-window', text: '非原子发布：先删后传的 90 秒窗口内，旧 chunk 消失——已打开页面的懒加载请求落空', excludeActionId: 'a-deploylog' },
+    { id: 'h-window', text: '目录级删除移除了旧hash对象，又没有保留可访问旧URL，旧页面引用持续落空', excludeActionId: 'a-deploylog' },
     { id: 'h-hash', text: 'chunk 无内容 hash 命名，新旧文件互相覆盖', excludeActionId: 'a-assetname' },
     { id: 'h-cdn', text: 'CDN 边缘与源站版本不一致，回源拿到 404', excludeActionId: 'a-edgecheck' },
     { id: 'h-manifest', text: '新版本自身的 chunk 引用错乱（构建 manifest 问题）', excludeActionId: 'a-buildmanifest' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -56,11 +46,7 @@ export const chunkOverlapCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'code',
-        title: '崩溃用户画像',
-        text: '页面版本：全部是"发版前最后一次构建"的 HTML（旧页面）\n时间点：404 全部落在发版开始后 5~90 秒（= rm 执行后、解压完成前）\n请求内容：懒加载路由 chunk（用户此时才跳转触发）\n→ 崩溃 = 旧页面 × 发版窗口 × 懒加载时机——三者的交汇就是赛跑现场。',
-      },
+      result: { type: 'text', title: '旧页与时间范围', text: '失败者持有旧HTML，跳路由才请求旧chunk；新页在发布完成后正常。\n404既在T+5秒出现，也在T+120秒和T+30分钟出现；不是仅90秒临时缺口。' },
     },
     {
       id: 'a-deploylog',
@@ -71,12 +57,10 @@ export const chunkOverlapCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-window'],
-      hypotheses: [{ id: 'h-window', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '逐秒时间线（某次发版）',
-        text: 'T+0s   rm -rf /var/www/app        ← 旧 chunk 全部消失\nT+5s   首个 ChunkLoadError（用户此刻跳转懒加载）\nT+23s  unzip 进行中（部分文件就位）\nT+88s  解压完成 → 之后无 404\n404 时间戳 100% 落在 [T+0, T+88] 窗口内，窗口外零崩溃。\n实锤：先删后传的窗口 = 一个 90 秒的"合法故障期"。',
-      },
+      hypotheses: [
+        { id: 'h-window', status: 'up' },
+      ],
+      result: { type: 'code', title: '对象生命周期', text: 'T+0删除旧共享assets；T+88仅解压新版本对象。旧chunk-abc123不在新包，发布结束后仍不存在。\n旧HTML继续引用该hash，新HTML引用新hash；缺少兼容旧URL的对象保留，不是等解压完成旧对象就自动回来。' },
     },
     {
       id: 'a-assetname',
@@ -86,13 +70,12 @@ export const chunkOverlapCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-hash'],
-      hypotheses: [{ id: 'h-hash', status: 'down' }],
-      result: {
-        type: 'text',
-        title: '命名核对',
-        text: 'chunk 有内容 hash（chunk-abc123.js）——命名策略是对的。\n但删除是"整个目录 rm"：hash 再独特也随目录陪葬。\n→ 降权并入主因：hash 命名解决"互相覆盖"，解决不了"提前删除"——缺的是保留期，不是命名。',
-      },
+      tests: ['h-hash', 'h-manifest'],
+      hypotheses: [
+        { id: 'h-hash', status: 'excluded' },
+        { id: 'h-manifest', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '命名与引用核对', text: '新旧对象都有不同内容hash，未互相覆盖；新manifest引用的新对象在包内完整。\n缺的是旧对象和旧URL的可达性。只将旧文件保存在别的磁盘目录，不保证/assets/旧hash会路由过去。' },
     },
     {
       id: 'a-edgecheck',
@@ -102,13 +85,12 @@ export const chunkOverlapCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-cdn'],
-      hypotheses: [{ id: 'h-cdn', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: 'CDN 核对',
-        text: '边缘 404 与源站 404 时间一致（回源透传）；直连源站同样 404。\n→ 排除 CDN：源头在源站的文件生命周期。',
-      },
+      tests: ['h-window', 'h-cdn'],
+      hypotheses: [
+        { id: 'h-window', status: 'confirmed' },
+        { id: 'h-cdn', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '精确URL对照', text: '按旧页面的精确URL直查源站，发布结束后仍404；边缘回源结果一致。\n受控对照保留同一URL的旧对象后，旧页面懒加载恢复，新页面保持正常。' },
     },
     {
       id: 'a-buildmanifest',
@@ -119,139 +101,78 @@ export const chunkOverlapCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-manifest'],
-      hypotheses: [{ id: 'h-manifest', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: 'manifest 核对',
-        text: '新构建产物引用完整自洽；崩溃的是旧 HTML 对旧 chunk 的引用——旧版本没有错，错在"旧版本被物理抹除"。\n→ 排除构建问题。',
-      },
+      hypotheses: [
+        { id: 'h-manifest', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '新旧清单', text: '新包引用的对象都存在；旧页请求的是旧hash，这并不因新manifest自洽就自动得到满足。' },
     },
     {
       id: 'a-danger',
       name: '发版期间全量维护页',
       desc: '【状态变更】发版窗口内全站 503 维护页',
-      cost: 1,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '维护页结果',
-        text: '窗口竞争消失（没用户就没赛跑）。\n代价：每次发版全站停 2 分钟——用"全员陪葬"换"个别人不崩"，止血可以，常态化是灾难。',
-      },
+      result: { type: 'text', title: '维护页边界', text: '维护页阻止新访问，但已经打开的SPA仍可能发起懒加载并得到503；不能说“没用户就无竞赛”。\n它扩大中断范围，不能代替对象保留与路由设计。' },
     },
     {
       id: 'a-fixatomic',
-      name: '修复：原子发布 + 旧版本保留 24h',
-      desc: '【状态变更】版本目录 + 符号链接原子切换；旧版本目录保留 24h',
+      name: '修复：版本化URL与原子入口切换',
+      desc: '【状态变更】先上传校验资源，入口原子替换，旧URL继续可达',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复结果',
-        text: '① 发布改为：传到 /app-<buildid>/ → ln -sfn 原子切换 current 链接（无窗口）\n② 旧版本目录保留 24 小时：已打开的旧页面引用的 chunk 全程可取\n③ 回归：连续 20 次发版，窗口期 404 = 0。',
-      },
+      result: { type: 'text', title: '发布协议', text: '资源URL包含发布ID，如/releases/r42/assets/hash.js；旧发布目录继续由该URL路由。\n新目录完整校验后，用临时入口与原子rename切换入口；不要把ln -sfn本身当作保证无空窗的原子替换。\n若采用共享hash空间，则只追加并按引用策略回收。固定24小时不能保证覆盖所有长期打开的页面。' },
     },
     {
       id: 'a-fixprobe',
       name: '沉淀：发布窗口合成探测',
       desc: '【状态变更】发版期间合成用户持续访问懒加载路由，404 即告警',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '探测上线',
-        text: '发版触发合成探测：模拟"打开旧页面→跳转懒加载"路径，404 即时告警。\n窗口竞争从"都市传说"变成"可观测的事件"——下次任何发布方式退化，第一分钟被抓。',
-      },
+      result: { type: 'text', title: '跨版本探测', text: '探测先打开旧页面，再跨越发版过程与完成后触发未加载路由；同时核对新页。\n仅探测新首页200或仅覆盖90秒不能检验旧引用可用性。' },
     },
     {
       id: 'a-fixlifecycle',
       name: '沉淀：静态资源生命周期规范',
       desc: '【状态变更】删除旧资源前必答"谁还引用它"：已打开页面、缓存副本、分享链接',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '生命周期规范',
-        text: '静态资源删除三问：已打开的页面还引用吗？缓存里还有副本吗？外部还挂着链接吗？\n保留期 = 三者中最长的存活时间——删除是比发布更危险的操作，因为它让"过去"失效。',
-      },
+      result: { type: 'text', title: '回收策略', text: '按受支持的页面、缓存与外部链接寿命确定保留策略；超出支持期设计明确升级接续，不静默丢操作。\n既要保留字节，也要保留旧URL的实际访问路径。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-window', text: '非原子发布（rm -rf 旧目录后解压新包）制造 90 秒窗口：发版前已打开页面的懒加载 chunk 在窗口内 404——hash 命名正确但目录级删除让旧资源陪葬，无保留期机制', correct: true },
+    { id: 'rc-window', text: '目录级删除移除旧hash对象，发布新包未保留旧URL；旧页面在发布中和完成后均可404，命名正确也不能替代对象生命周期', correct: true },
     { id: 'rc-hash', text: 'chunk 无内容 hash 命名，新旧文件互相覆盖', correct: false },
     { id: 'rc-cdn', text: 'CDN 边缘与源站版本不一致', correct: false },
     { id: 'rc-manifest', text: '新版本构建 manifest 引用错乱', correct: false },
   ],
-
-  expertCost: 4,
+  expertCost: 5,
   restartActionId: 'a-danger',
-
   expertChain: [
-    {
-      thought: '崩的是旧页面的懒加载——先切分崩溃用户：持有什么版本的页面、404 发生在发版第几秒。',
-      update: '全部是旧页面持有者、404 全落发版窗口内——"窗口"成为主嫌疑，赛跑现场找到。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 用户画像与时间轴的交叉，把"随机崩"收敛为"窗口内必崩"——窗口的存在本身就指向非原子操作。',
-      conclusion: '嫌疑锁定：发布窗口（h-window 升权）。',
-    },
-    {
-      thought: '部署日志与 404 时间线逐秒对齐——把窗口的每一秒和脚本的每一步对上。',
-      update: '实锤：rm 与 unzip 完成之间 88 秒，404 全落此窗口——先删后传的窗口实锤。',
-      actionId: 'a-deploylog',
-      why: '2⚡︎ 逐秒对齐是竞态问题的显微镜：竞态的"随机性"其实是两个时间线的相对位置——对齐后每一次崩溃都有确定性的解释。',
-      conclusion: '根因实锤：非原子发布窗口。',
-    },
-    {
-      thought: 'hash 命名假设单独澄清——命名是对的但删法让 hash 失义，这层澄清决定修复方案。',
-      update: 'hash 存在但被目录级删除陪葬——缺的是"保留期"，不是"命名"。',
-      actionId: 'a-assetname',
-      why: '1⚡︎ 澄清"对的机制为什么没起作用"：hash 命名与保留期是两个互补机制，混为一谈会让修复只做一半（换了命名照样崩）。',
-      conclusion: '修复 = 原子切换 + 保留期，两者缺一不可。',
-    },
-    {
-      thought: 'CDN 与 manifest 各 1⚡︎ 排除——分发层与构建层清场。',
-      update: '边缘透传、manifest 自洽——问题收敛在源站文件生命周期。',
-      actionId: 'a-edgecheck',
-      why: '1⚡︎ 排除动作让修复不发散：窗口竞态的修复只涉及部署脚本与保留策略，CDN 与构建零改动。',
-      conclusion: '嫌疑收敛单点。',
-    },
-    {
-      thought: '止血（维护页）、修复（原子切换+保留期）、防线（合成探测+生命周期规范）。停止收集。',
-      update: '停止。',
-      actionId: '',
-      why: '【停止规则】机制（非原子窗口）✓ 机制补全（hash 与保留期互补）✓ 防线（探测+三问）✓——三层闭合。',
-      conclusion: '沉淀：发布窗口是一场比赛——原子切换让比赛不存在，保留期让迟到的选手也能到场。删除旧资源前，先数清还有谁活着。',
-    },
+    { actionId: 'a-impact', thought: '旧页在发布结束后仍404，新页正常。', update: '不是单纯90秒临时缺口。', why: '1⚡按页面版本和精确URL划分，不把观察窗口当资源寿命。', conclusion: '查删除与上传记录。' },
+    { actionId: 'a-deploylog', thought: '旧hash被删除，新包没有它。', update: '旧引用持续落空的机制成立。', why: '2⚡对照发布对象清单，明确哪些文件在发布完成后仍不会回来。', conclusion: '核对命名和新清单。' },
+    { actionId: 'a-assetname', thought: 'hash存在、新引用自洽，未发生覆盖。', update: '排除无hash和新manifest错误，缺的是旧URL可达。', why: '1⚡区分命名、存储与路由，不能只保留一个未被服务的旧目录。', conclusion: '验证源站与边缘。' },
+    { actionId: 'a-edgecheck', thought: '精确旧URL源站404，保留同URL对象后恢复。', update: '排除独立CDN差异，资源生命周期因果闭合。', why: '1⚡真实URL与单变量对照决定修复落点，不能仅凭文件在某处存在判断可用。', conclusion: '设计完整发布与保留协议。' },
+    { actionId: '', thought: '删除记录、hash引用、旧URL可达性和对照闭合；资源保留与原子入口切换分别解决持续断引用和发布空窗。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '删除记录、hash引用、旧URL可达性和对照闭合；资源保留与原子入口切换分别解决持续断引用和发布空窗。' },
   ],
-
   lessons: [
-    {
-      text: '发布窗口是一场比赛：用户的请求与产物的覆盖在赛跑——非原子的"先删后传"让这场比赛每天都有输家。',
-      principle: '验证思维：发布必须原子化（版本目录 + 符号链接切换），窗口内不存在"半新半旧"的文件系统状态。竞态的随机性是时间线相对位置的确定性——逐秒对齐部署日志与错误时间线，比赛就现形了。',
-    },
-    {
-      text: 'hash 命名与保留期是互补机制：hash 解决"互相覆盖"，保留期解决"提前删除"——缺一个，另一个白做。',
-      principle: '程序设计：静态资源删除前三问——已打开页面还引用吗、缓存有副本吗、外链还挂着吗。保留期 = 最长存活时间；删除是比发布更危险的操作，它让"过去"失效。',
-    },
-    {
-      text: '全量维护页是止血不是方案：用"全员陪葬"换"个别人不崩"，方向对但代价错——正确粒度是让竞争消失。',
-      principle: '止血权衡：紧急措施要评估"代价覆盖面 vs 受益面"。维护页覆盖所有用户，受益者只是窗口内的懒加载用户——原子切换后维护页退役，保持发版不停服的初衷。',
-    },
+    { text: '发布空窗与旧引用失效是两个问题，结束解压不代表旧chunk恢复。', principle: '旧页面可能很久后才请求懒加载。对照新旧清单和精确URL，检查发布结束后的行为，不把90秒观察窗当永久结论。' },
+    { text: '保留旧目录还不够，旧页面所用URL必须继续能访问该对象。', principle: '采用版本化资源URL或追加式hash空间，并明确回收策略。原子切换入口不自动保证所有旧路径仍可达。' },
+    { text: '原子替换与保留期需要具体机制，不能靠ln -sfn或固定24小时口号保证。', principle: '在合适文件系统中用原子rename替换已就绪入口，按受支持页面和缓存寿命保留资源。维护页也不能阻止所有已打开页面继续请求。' },
   ],
 }

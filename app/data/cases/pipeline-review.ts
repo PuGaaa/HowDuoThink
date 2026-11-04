@@ -1,17 +1,16 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * B3-2 · build L2（构建章结业评审）
- * 主训思维：架构设计（自动化的每一步都要有门禁——"自动 merge"是供应链攻击的自动化入口）
- * 次训思维：验证思维（构建缓存的隔离性——一个项目的污染会传染全部）
- * 真实原型：依赖自动升级 bot 无人工审核 + 跨项目共享构建缓存
- * 情绪兽设计：惊讶獭（惊讶）——"流水线 2.0 把上次投毒的教训变成了自动化"
- * 检查单：思维型 3 + 知识型 1
+ * 学徒篇校准：区分评审的独立缺口与已治理条件。
+ * 原型：依赖审批、缓存信任与并行测试边界；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/2/2，中位数半档向下取整，L2。
+ * 标准路径：a-supply → a-botpath → a-cache → a-parallel → a-keyfix；替代顺序：a-supply → a-cache → a-botpath → a-keyfix → a-parallel。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const pipelineReviewCase: DiagnosisCase = {
   id: 'pipeline-review',
   title: '流水线 2.0 评审——自动化的门禁缺失',
-  intro: '构建团队提交"流水线 2.0"方案：依赖机器人自动合并升级 + 全公司共享构建缓存 + 测试并行化提速 50%。三个月前供应链投毒的教训，似乎没被写进方案。',
+  intro: '方案提速不能替代现有发布约束。区分需要修正的依赖与缓存门禁、已治理的并行风险，再给完整结论。',
   domain: 'build',
   layer: '自动化的每一步都要有门禁：没有门禁的自动化，是把人为失误升级为系统性风险',
   part: 'apprentice',
@@ -19,34 +18,23 @@ export const pipelineReviewCase: DiagnosisCase = {
   order: 8,
   typeTags: ['build', 'architecture'],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」的平台工程评审委员。流水线 2.0 方案宣称"测试提速 50%、依赖永不过时"——但上个月投毒事故的整改清单，你还记得。',
-    architecture: 'Git → 流水线 2.0(机器人合并/共享缓存/并行测试) → 制品库 → 生产',
-    tag: '评审现场',
+    architecture: '机器人提PR → CI → 按组织规则审批 → 制品发布；另有自建跨项目共享缓存与并行测试',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '方案文档 · 关键句',
-        text: '① 依赖机器人：minor/patch 版本自动合并（"全绿即合，无需人工"）\n② 构建缓存：全公司统一缓存池（"命中率提升到 90%"）\n③ 测试并行化：按文件切片并行（"耗时砍半"）',
-      },
-      {
-        type: 'text',
-        title: '评审输入 · 未竟事项',
-        text: '上季度供应链投毒（request-utils@2.1.1）的整改清单第三条：\n"依赖升级必须人工审核 + 内部源白名单"——流水线 2.0 方案中未见落实。',
-      },
+      { type: 'error', title: '方案文档 · 关键句', text: '① 依赖机器人：minor/patch 版本自动合并（"全绿即合，无需人工"）\n② 构建缓存：全公司统一缓存池（"命中率提升到 90%"）\n③ 测试并行化：按文件切片并行（"耗时砍半"）' },
+      { type: 'text', title: '评审输入 · 未竟事项', text: '组织已生效规则：该类依赖升级需人工审阅与受信来源；新方案却全绿自动发布。\n这是本组织的已定约束，不声称所有自动合并天然不安全。' },
     ],
-    timeline: '投毒事故整改 3 个月前完成（缓存 key 指纹化已落地）｜ 流水线 2.0 计划下月全量启用 ｜ 全公司 12 个服务共用流水线',
+    timeline: '组织整改明确高风险依赖需审阅 ｜ 新方案计划全量启用 ｜ 缓存锁指纹保留，权限与并行隔离待核',
     impactHint: '提速与安全不是二选一——但方案里，安全的三条整改去哪了？',
   },
-
   hypotheses: [
-    { id: 'h-bot', text: '依赖机器人自动合并 = 供应链攻击的自动化入口：投毒版本"全绿"也会被合入', excludeActionId: 'a-supply' },
-    { id: 'h-cache', text: '全公司共享缓存无项目隔离：一个项目的污染缓存会传染全部 12 个服务', excludeActionId: 'a-cache' },
-    { id: 'h-parallel', text: '测试并行化破坏依赖顺序的用例（数据竞争类测试失效）', excludeActionId: 'a-parallel' },
-    { id: 'h-keyfix', text: '上次的缓存 key 指纹化修复会在 2.0 中丢失', excludeActionId: 'a-keyfix' },
+    { id: 'h-bot', text: '依赖发布违反既定审批、共享缓存缺信任边界，两项都修正后再放行', excludeActionId: 'a-cache' },
+    { id: 'h-cache', text: '只修共享缓存即可，依赖全绿就足以自动发布', excludeActionId: 'a-botpath' },
+    { id: 'h-parallel', text: '并行测试必然不可信，应全盘否定方案', excludeActionId: 'a-parallel' },
+    { id: 'h-keyfix', text: '锁文件指纹在新方案中被删除，恢复它即可解决', excludeActionId: 'a-keyfix' },
   ],
-
   actions: [
     {
       id: 'a-supply',
@@ -57,12 +45,10 @@ export const pipelineReviewCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-bot'],
-      hypotheses: [{ id: 'h-bot', status: 'confirmed' }],
-      result: {
-        type: 'text',
-        title: '整改落实核对',
-        text: '投毒整改三条：① 依赖升级人工审核——方案改为"自动合并"（倒退）\n② 内部源白名单——方案未提及（缺失）\n③ install 后完整性校验——方案未提及（缺失）\n→ 机器人自动合并 = 把投毒事故的根因做成了自动化功能。',
-      },
+      hypotheses: [
+        { id: 'h-bot', status: 'up' },
+      ],
+      result: { type: 'text', title: '范围与既定约束', text: '评审范围12个项目；现有组织规则要求这类依赖审阅与受信来源，新方案却跳过该审批。\n方案中的测试提速50%只是目标，尚无同负载测量；自动合并本身不是所有组织的统一禁令。' },
     },
     {
       id: 'a-botpath',
@@ -72,13 +58,12 @@ export const pipelineReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-bot'],
-      hypotheses: [{ id: 'h-bot', status: 'confirmed' }],
-      result: {
-        type: 'text',
-        title: '攻击路径推演',
-        text: '投毒版本发布 → 机器人自动升级 PR → CI 跑测试：\n新版本无破坏性 API 变更 → 测试全绿 → 自动合并 → 自动发布。\n→ 全程零人工。上次投毒靠的是"人没看住"，这次连"看"的环节都被移除了。\n→ 供应链攻击的自动化入口，实锤。',
-      },
+      tests: ['h-cache', 'h-bot'],
+      hypotheses: [
+        { id: 'h-cache', status: 'excluded' },
+        { id: 'h-bot', status: 'up' },
+      ],
+      result: { type: 'code', title: '审批路径', text: '路径：外部升级PR→功能测试通过→自动合并并发布，未执行现有强制审批与来源核对。\n恶意行为不必破坏公开API，功能测试绿不能证明依赖可信；人工审批也不是无投毒保证。\n只修缓存无法消除这个独立约束缺口。' },
     },
     {
       id: 'a-cache',
@@ -88,13 +73,11 @@ export const pipelineReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-cache'],
-      hypotheses: [{ id: 'h-cache', status: 'confirmed' }],
-      result: {
-        type: 'text',
-        title: '缓存隔离审计',
-        text: '缓存 key 无项目维度（全局共享池）；无写入校验（任何项目的产物都可写入）。\n→ A 项目构建产物被恶意注入 → B/C 项目直接命中缓存使用。\n投毒事故的缓存 key 修复（lockfile 指纹）只防了"过期"，没防"跨项目传染"。',
-      },
+      tests: ['h-bot'],
+      hypotheses: [
+        { id: 'h-bot', status: 'confirmed' },
+      ],
+      result: { type: 'code', title: '信任边界', text: '自建缓存服务允许任意项目向已知他项目key写入输出，消费者直接信任输出；不是GitHub原生缓存默认跨所有仓库共享。\n锁指纹区分输入，不证明写入者受信或输出未被替换；需要权限隔离与来源/完整性核对。\n攻击范围依访问与key命中决定，不能宣称一次污染必然感染12个项目。' },
     },
     {
       id: 'a-keyfix',
@@ -105,12 +88,10 @@ export const pipelineReviewCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-keyfix'],
-      hypotheses: [{ id: 'h-keyfix', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '修复保留核对',
-        text: '2.0 方案保留 lockfile 指纹化（修复未丢失）。\n→ 上次修复健在；但指纹化只解决"过期"，不解决"传染"——两个问题不同维度。',
-      },
+      hypotheses: [
+        { id: 'h-keyfix', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '指纹核对', text: '方案与样例key仍包含lockfile指纹；该修复未丢失。\n输入指纹与可写权限是不同维度，恢复一个已有hash不能修审批与信任边界。' },
     },
     {
       id: 'a-parallel',
@@ -121,12 +102,10 @@ export const pipelineReviewCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-parallel'],
-      hypotheses: [{ id: 'h-parallel', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '并行隔离评估',
-        text: '并行框架自带数据隔离（每 worker 独立 schema）；依赖共享数据库的 12 个用例已标记串行。\n→ 并行化可接受（风险已治理），非阻断项。',
-      },
+      hypotheses: [
+        { id: 'h-parallel', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '并行隔离', text: '方案明确由fixtures给每worker独立schema，日志验证实际隔离；12个依赖共享状态的用例进入独立串行job，不与同schema并发。\n这是已检查的配置与行为，不是所有并行框架天然保证。' },
     },
     {
       id: 'a-frequency',
@@ -137,12 +116,10 @@ export const pipelineReviewCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-bot'],
-      hypotheses: [{ id: 'h-bot', status: 'up' }],
-      result: {
-        type: 'text',
-        title: '升级频率统计',
-        text: '近 90 天依赖升级 PR：147 个（日均 1.6 个）——每个都会被机器人自动合并。\n→ 暴露频次 = 日均 1.6 次供应链赌博；人工审核的边际成本可控（每天 < 10 分钟）。',
-      },
+      hypotheses: [
+        { id: 'h-bot', status: 'up' },
+      ],
+      result: { type: 'text', title: '人力估计', text: '90天147个PR约1.63个/天，只能估计工作量输入；审阅时长需用真实样本测量，不能保证每天少于10分钟。' },
     },
     {
       id: 'a-minspec',
@@ -157,87 +134,40 @@ export const pipelineReviewCase: DiagnosisCase = {
         { id: 'h-bot', status: 'confirmed' },
         { id: 'h-cache', status: 'confirmed' },
       ],
-      result: {
-        type: 'text',
-        title: '评审结论 · 修正清单',
-        text: '① 依赖机器人：自动 PR + 人工审核后合并（minor/patch 也不自动）\n② 缓存池加项目维度隔离 + 写入校验\n③ 并行化按方案执行（隔离已治理）\n→ 三项后评审通过：提速与安全兼得。',
-      },
+      result: { type: 'text', title: '有条件结论', text: '先落实既定依赖审批与来源核对，修复共享缓存权限和输出信任边界；保留已验证的并行隔离。\n条件完成后按同负载测性能与故障用例，不保证提速50%或绝对无风险。' },
     },
     {
       id: 'a-golive',
-      name: '跳过修正全量启用流水线 2.0',
-      desc: '【状态变更】不等修正清单，提速优先',
-      cost: 3,
+      name: '回滚审批门禁并全量启用',
+      desc: '【状态变更】未经裁定移除既定审批与缓存边界',
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '启用结果',
-        text: '流水线 2.0 全量启用。\n下一次投毒事件发生时：机器人自动把投毒版本合并、自动发布——供应链攻击从"需要绕过门禁"变成"搭顺风车"。',
-      },
+      result: { type: 'text', title: '启用风险', text: '移除既定门禁扩大了未经审阅输出进入发布的路径；是否发生事故仍取决于攻击和实际输入，不把风险推演写成必然下一次投毒。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-bot', text: '核心阻断缺陷：依赖机器人自动合并（全绿即合、零人工）——供应链投毒版本"无破坏性变更"即可自动合并并发布，把投毒事故的根因做成了自动化功能', correct: true },
-    { id: 'rc-cache', text: '真实风险：全公司共享缓存无项目隔离，单项目污染会传染全部 12 个服务', correct: false },
-    { id: 'rc-parallel', text: '测试并行化破坏依赖顺序用例', correct: false },
-    { id: 'rc-keyfix', text: '上次的缓存 key 指纹化修复丢失', correct: false },
+    { id: 'rc-bot', text: '依赖发布绕过既定审批与来源规则，自建缓存又缺跨项目写权限和输出信任边界；两项均须修正，已验证的并行隔离可保留', correct: true },
+    { id: 'rc-cache', text: '仅修缓存即可，功能全绿足以自动发布依赖', correct: false },
+    { id: 'rc-parallel', text: '并行测试必然不可信，应否决全部方案', correct: false },
+    { id: 'rc-keyfix', text: '新方案丢掉锁指纹，恢复hash即可解决', correct: false },
   ],
-
   expertCost: 7,
   restartActionId: 'a-golive',
-
   expertChain: [
-    {
-      thought: '评审的第一动作：拿上季度投毒事故的整改清单逐条核对——安全整改的落实状态是流水线方案的前置条件。',
-      update: '三条整改：一条倒退（人工审核→自动合并）、两条缺失（白名单/完整性校验）——方案建立在未完成的安全基线上。',
-      actionId: 'a-supply',
-      why: '1⚡ 整改清单核对是流水线评审的前置条件：安全基线未落实的流水线，提速越多风险越大。',
-      conclusion: '整改缺口确认 → 推演自动合并的攻击路径。',
-    },
-    {
-      thought: '推演攻击路径：投毒版本从发布到上线需要几步、哪一步有人类决策。',
-      update: '全程零人工：投毒版本只要"不破坏 API"就自动合并、自动发布——机器人把供应链攻击做成了自动化。',
-      actionId: 'a-botpath',
-      why: '2⚡ 攻击路径推演是评审的杀手锏：站在攻击者视角走一遍流程，每一个"无人工"节点都是攻击者的免费通道。',
-      conclusion: '自动合并实锤为核心阻断缺陷 → 审查共享缓存的隔离性。',
-    },
-    {
-      thought: '共享缓存的隔离性：12 个项目共用的缓存池，一次投毒是感染一个项目还是全部。',
-      update: '无项目隔离 + 无写入校验——缓存成为跨项目污染的传播媒介。与投毒事故同级的传染风险。',
-      actionId: 'a-cache',
-      why: '2⚡ 缓存隔离审计补全传染维度：上次修复了"过期"维度，这次审计发现"传染"维度——同一基础设施的两个独立风险。',
-      conclusion: '修正清单齐了：机器人人工审核 + 缓存项目隔离 + 并行化放行。',
-    },
-    {
-      thought: '并行化隔离已治理（风险放行）、上次修复健在（指纹化保留）、修正清单可交付——评审闭环。',
-      update: '停止评审。有条件通过：两项安全修正 + 并行化放行，提速与安全兼得。',
-      actionId: '',
-      why: '【评审停止规则】缺陷全部有对应修正且不牺牲方案核心收益（提速 50%）——评审的产出是"带条件的通过"，不是"全盘否定"。',
-      conclusion: '有条件通过：机器人人工审核 + 缓存项目隔离后启用；并行化与提速收益保留。',
-    },
+    { actionId: 'a-supply', thought: '先核对本组织已生效的约束与方案范围。', update: '自动发布绕过规定，性能收益尚未证实。', why: '1⚡评审先明确必须满足的契约，避免把偏好写成全行业铁律。', conclusion: '审查完整审批路径。' },
+    { actionId: 'a-botpath', thought: '功能绿后直接发布，没有执行既定审批和来源核对。', update: '只改缓存不足以放行。', why: '2⚡检查每条信任路径，功能正确与依赖可信是不同命题。', conclusion: '继续查缓存边界。' },
+    { actionId: 'a-cache', thought: '任意项目可覆盖其他项目已知key，输出未验证来源。', update: '审批与共享缓存是两项独立必修缺口。', why: '2⚡输入hash不替代写权限与输出信任，确定实际传播条件而不夸大必然范围。', conclusion: '核对另外两项候选。' },
+    { actionId: 'a-parallel', thought: '实际fixture与job记录证明状态隔离。', update: '并行不是本案阻断项。', why: '1⚡以实际隔离行为作证，不能只因并行就全盘否决。', conclusion: '确认旧指纹仍在。' },
+    { actionId: 'a-keyfix', thought: '锁指纹明确保留。', update: '排除修复丢失，完整评审范围收束。', why: '1⚡检查已治理项，避免把修正清单扩成无依据重做所有基础设施。', conclusion: '提出带验收条件的结论。' },
+    { actionId: '', thought: '两项实际缺口与两项已治理条件均有证据；补门禁后再测收益，不把安全或提速承诺成必然。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '两项实际缺口与两项已治理条件均有证据；补门禁后再测收益，不把安全或提速承诺成必然。' },
   ],
-
   lessons: [
-    {
-      text: '自动化的每一步都要有门禁："全绿即合"的依赖机器人，会把供应链投毒从人为失误升级为自动化流程。',
-      principle: '架构设计：自动化改变的是"谁执行"，不改变"该不该执行"。供应链投毒的教训必须转译成流水线的门禁——否则自动化只是让错误的传播更快。',
-    },
-    {
-      text: '安全整改的落实状态是基础设施方案的前置条件：未落实的整改会在新方案里被"顺理成章"地继承。',
-      principle: '沉淀思维：评审基础设施方案前，先核对历史事故的整改清单——整改未落实时，新方案会以"设计如此"的方式把旧风险制度化。',
-    },
-    {
-      text: '共享基础设施的隔离性是传染维度的风险：一个项目的污染缓存，可以感染全部 12 个服务。',
-      principle: '架构设计：共享缓存/共享制品库必须按项目隔离 + 写入校验。"过期"与"传染"是两个独立维度，修复了一个不等于修复了另一个。',
-    },
-    {
-      text: '评审的产出是"带条件的通过"：指出缺陷的同时保留方案的核心收益，才是有效的评审。',
-      principle: '评审方法论：好的评审不是全盘否定——开出最小修正清单，让"提速 50%"与"安全门禁"兼得。全盘否定会让下一次方案学会隐藏，而不是学会正确。',
-    },
+    { text: '功能测试通过不证明依赖可信；审批规则要按组织已定契约审查。', principle: '自动合并可以有不同风险模型，本题阻断依据是绕过已生效审批与来源要求。人工也不是安全保证，应检查完整信任路径。' },
+    { text: '锁指纹、写权限和输出来源分别解决不同问题。', principle: 'hash描述输入或字节一致性，不证明写入者可信。跨项目共享服务要按真实权限和命中条件分析，不能从“共享”直接推出所有项目必感染。' },
+    { text: '评审应覆盖已治理条件，再给有验收前提的完整结论。', principle: '并行隔离要看fixture与运行记录，性能目标要同负载测量。补安全门禁后可能仍有成本和收益取舍，不能保证安全与提速50%无条件兼得。' },
   ],
 }
