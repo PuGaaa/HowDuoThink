@@ -2,6 +2,11 @@
 const route = useRoute()
 const api = useApi()
 const { data: a } = await useFetch<any>('/api/solutions/' + route.params.id, { baseURL: api.base })
+const caseId = String(route.params.id).replace(/^a-/, '')
+const { data: contributors } = await useFetch<{ items: Array<{ author: string; role: string }> }>(
+  '/api/submissions/contributors/' + caseId,
+  { baseURL: api.base },
+)
 </script>
 
 <template>
@@ -11,6 +16,12 @@ const { data: a } = await useFetch<any>('/api/solutions/' + route.params.id, { b
     <span class="chip">{{ a.layer }}</span>
     <span class="chip">作者 {{ a.author }}</span>
     <span class="chip">{{ a.published_at?.slice(0, 10) }}</span>
+    <div v-if="contributors?.items?.length" class="contributors">
+      <span class="muted">贡献者</span>
+      <span v-for="person in contributors.items" :key="person.author + person.role" class="chip">
+        {{ person.author }} · {{ person.role === 'source' ? '投稿来源' : '补证贡献' }}
+      </span>
+    </div>
 
     <h2 style="font-size: 17px; margin-top: 26px">解决步骤</h2>
     <div v-for="s in a.steps" :key="s.no" class="step">
@@ -27,3 +38,8 @@ const { data: a } = await useFetch<any>('/api/solutions/' + route.params.id, { b
   </div>
   <p v-else class="muted">加载中……</p>
 </template>
+
+<style scoped>
+.contributors { margin-top: 10px; }
+.contributors .muted { margin-right: 6px; }
+</style>
