@@ -127,8 +127,7 @@ def reindex_all() -> dict:
 def process_index_tasks(limit: int = 20) -> dict:
     """消费发布事务产生的索引任务；旧修订只收敛为 stale，不覆盖新索引。"""
     rows = db.q(
-        "SELECT id, case_id, content_revision FROM index_tasks WHERE status='pending' "
-        "ORDER BY created_at, id LIMIT ?",
+        "SELECT id, case_id, content_revision FROM index_tasks WHERE status='pending' ORDER BY created_at, id LIMIT ?",
         (limit,),
     )
     done = stale = failed = 0
@@ -151,13 +150,22 @@ def process_index_tasks(limit: int = 20) -> dict:
             continue
         try:
             if index_case(row["case_id"]):
-                db.ex("UPDATE index_tasks SET status='done', last_error=NULL, updated_at=datetime('now') WHERE id=?", (row["id"],))
+                db.ex(
+                    "UPDATE index_tasks SET status='done', last_error=NULL, updated_at=datetime('now') WHERE id=?",
+                    (row["id"],),
+                )
                 done += 1
             else:
-                db.ex("UPDATE index_tasks SET status='failed', last_error=?, updated_at=datetime('now') WHERE id=?", ("向量供应商未就绪", row["id"]))
+                db.ex(
+                    "UPDATE index_tasks SET status='failed', last_error=?, updated_at=datetime('now') WHERE id=?",
+                    ("向量供应商未就绪", row["id"]),
+                )
                 failed += 1
         except Exception as exc:
-            db.ex("UPDATE index_tasks SET status='failed', last_error=?, updated_at=datetime('now') WHERE id=?", (str(exc)[:500], row["id"]))
+            db.ex(
+                "UPDATE index_tasks SET status='failed', last_error=?, updated_at=datetime('now') WHERE id=?",
+                (str(exc)[:500], row["id"]),
+            )
             failed += 1
     return {"ok": failed == 0, "done": done, "stale": stale, "failed": failed, "claimed": len(rows)}
 
