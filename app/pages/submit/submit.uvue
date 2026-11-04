@@ -65,10 +65,19 @@
           </view>
         </view>
 
+        <view class="field">
+          <text class="field__label">提交前看看公开的相似案例</text>
+          <view class="lessonrow__add" @click="checkSimilar"><text class="lessonrow__add-text">查找相似案例</text></view>
+          <text class="field__hint">相似不等于重复；不同机制或新增证据仍可投稿，最终由编辑核实。</text>
+          <view v-for="candidate in candidates" :key="candidate.id" class="similar">
+            <text class="field__label">{{ candidate.title }}</text><text class="field__hint">{{ candidate.excerpt }}</text>
+          </view>
+          <text v-if="checkedSimilar && candidates.length === 0" class="field__hint">当前没有检索到相似的公开案例。</text>
+        </view>
         <view :class="busy ? 'submitbtn submitbtn--busy' : 'submitbtn'" @click="doSubmit">
           <text class="submitbtn__text">{{ busy ? '提交中…' : '提交投稿' }}</text>
         </view>
-        <text class="foot">提交后进入编辑审核；被采纳的投稿会署名并转化为正式关卡。</text>
+        <text class="foot">提交后编辑会查重与核实证据。脱敏版本需你确认；采纳表示制作中，正式发布后才有可玩和文章入口。</text>
       </template>
     </view>
   </view>
@@ -76,6 +85,7 @@
 
 <script setup lang="uts">
 import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { isLoggedIn } from '../../utils/auth'
 import { API_BASE } from '../../config'
 import { getToken } from '../../utils/auth'
@@ -90,6 +100,12 @@ const lessons = ref<string[]>([''])
 const domainHint = ref('')
 const busy = ref(false)
 const errMsg = ref('')
+const requestId = ref('')
+let previousBody = ''
+let formToken = getToken()
+interface SimilarVM { id: string; title: string; excerpt: string }
+const candidates = ref<SimilarVM[]>([])
+const checkedSimilar = ref(false)
 
 const domains = [
   { v: 'network', label: '接入/网络' },
@@ -99,6 +115,16 @@ const domains = [
   { v: 'concurrency', label: '并发' },
   { v: 'deploy', label: '部署/配置' },
 ]
+
+onShow(() => {
+  loggedIn.value = isLoggedIn()
+  const token = getToken()
+  if (token !== formToken) {
+    title.value = ''; symptom.value = ''; resolution.value = ''; keyError.value = ''; timeline.value = ''
+    lessons.value = ['']; domainHint.value = ''; candidates.value = []; checkedSimilar.value = false
+    requestId.value = ''; previousBody = ''; busy.value = false; formToken = token
+  }
+})
 
 function onTitle(e: any) { title.value = e.detail.value }
 function onSymptom(e: any) { symptom.value = e.detail.value }
@@ -119,28 +145,33 @@ function doSubmit() {
   if (symptom.value.trim().length < 10) { errMsg.value = '症状描述至少 10 个字'; toast(errMsg.value); return }
   if (resolution.value.trim().length < 10) { errMsg.value = '解决过程至少 10 个字'; toast(errMsg.value); return }
   const ls = lessons.value.filter((x) => x.trim().length > 0)
-  if (ls.length === 0) { errMsg.value = '至少写一条经验教训'; toast(errMsg.value); return }
+  const payload = {
+    requestId: '', title: title.value.trim(), symptom: symptom.value.trim(), resolution: resolution.value.trim(),
+    keyError: keyError.value.trim().length > 0 ? keyError.value.trim() : null,
+    timeline: timeline.value.trim().length > 0 ? timeline.value.trim() : null,
+    lessons: ls, stackTags: [], domainHint: domainHint.value.length > 0 ? domainHint.value : null,
+  } as any
+  const content = JSON.stringify(payload)
+  if (content !== previousBody) {
+    requestId.value = Date.now().toString() + '-' + Math.random().toString().slice(2)
+    previousBody = content
+  }
+  payload.requestId = requestId.value
+  const token = getToken()
   busy.value = true
   uni.request({
     url: API_BASE + '/api/submissions',
     method: 'POST',
-    header: { Authorization: 'Bearer ' + getToken(), 'Content-Type': 'application/json' } as any,
-    data: {
-      title: title.value.trim(),
-      symptom: symptom.value.trim(),
-      resolution: resolution.value.trim(),
-      keyError: keyError.value.trim().length > 0 ? keyError.value.trim() : null,
-      timeline: timeline.value.trim().length > 0 ? timeline.value.trim() : null,
-      lessons: ls,
-      stackTags: [],
-      domainHint: domainHint.value.length > 0 ? domainHint.value : null,
-    } as any,
+    header: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' } as any,
+    data: payload,
     timeout: 8000,
     success: (res) => {
+      if (token !== getToken()) return
       busy.value = false
       if (res.statusCode === 200) {
-        uni.showToast({ title: '投稿成功，等待编辑审核', icon: 'none' })
-        setTimeout(() => { uni.navigateBack({}) }, 900)
+        const receipt = res.data as any
+        uni.showToast({ title: receipt.duplicate ? '已关联原投稿，没有重复建单' : '已收到，可在我的投稿查看进度', icon: 'none' })
+        setTimeout(() => { uni.redirectTo({ url: '/pages/mysubmissions/mysubmissions' }) }, 900)
         return
       }
       errMsg.value = '提交失败（' + res.statusCode + '）'
@@ -151,6 +182,21 @@ function doSubmit() {
       errMsg.value = '无法连接社区服务'
       toast(errMsg.value)
     },
+  })
+}
+
+function checkSimilar() {
+  uni.request({
+    url: API_BASE + '/api/submissions/similar?q=' + encodeURIComponent(title.value + ' ' + symptom.value),
+    method: 'GET', header: { Authorization: 'Bearer ' + getToken() } as any,
+    success: (res) => {
+      if (res.statusCode !== 200) { toast('查找失败（' + res.statusCode + '）'); return }
+      const response = res.data as any
+      const items = response.items as any[]
+      candidates.value = items.map((item): SimilarVM => ({ id: item.id, title: item.title, excerpt: item.excerpt }))
+      checkedSimilar.value = true
+    },
+    fail: () => toast('无法连接社区服务'),
   })
 }
 
@@ -204,6 +250,7 @@ function toast(t: string) {
   font-size: 26rpx;
   font-weight: bold;
 }
+.similar { padding-top: 18rpx; margin-top: 12rpx; border-top: 1rpx solid #EFEAF4; }
 .field {
   background-color: #FFFFFF;
   border-radius: 20rpx;
