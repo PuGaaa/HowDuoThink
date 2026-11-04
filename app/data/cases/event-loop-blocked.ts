@@ -1,13 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * B1-1 · runtime L2
- * 主训思维：程序设计（事件循环——同步 CPU 任务会阻塞所有并发请求）
- * 次训思维：全栈视野（Node 单线程模型，CPU 利用率要按核看）
- * 真实原型：上线同步 bcrypt/图片压缩等 CPU 密集调用后全接口间歇超时
- * 情绪兽设计：不行蜗（迟疑）——接口很忙却说不清卡在哪
- * 检查单：思维型 3 + 知识型 1
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const eventLoopBlockedCase: DiagnosisCase = {
   id: 'event-loop-blocked',
   title: '接口集体超时，CPU 却很闲',
@@ -17,9 +11,11 @@ export const eventLoopBlockedCase: DiagnosisCase = {
   part: 'engineer',
   chapterId: 'runtime',
   order: 2,
-  typeTags: ['runtime', 'code'],
+  typeTags: [
+    'runtime',
+    'code',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」网关聚合服务的负责人，新版上线第三天，客服和前端一起找上了你。',
     architecture: 'App → 网关聚合服务(Node.js 18, 4 核容器) → 下游微服务 ×5',
@@ -28,7 +24,7 @@ export const eventLoopBlockedCase: DiagnosisCase = {
       {
         type: 'error',
         title: '监控大盘',
-        text: '全接口 P99 从 80ms 飙到 2.4s，间歇性——每几分钟卡顿一阵又恢复。\n容器 CPU 利用率 25%，内存平稳，下游依赖 P99 全部正常。',
+        text: '单Node进程运行于4核容器；导出期间全接口P99到2.4s，event-loop延迟约800ms；容器按4核归一CPU约25%，主线程约一核满。内存与下游延迟平稳。',
       },
       {
         type: 'text',
@@ -39,14 +35,28 @@ export const eventLoopBlockedCase: DiagnosisCase = {
     timeline: 'v2.3.0 发布于三天前 ｜ 卡顿全天间歇出现，与流量高峰弱相关 ｜ 下游五个微服务零变更',
     impactHint: '"资源很闲，用户很急"——资源利用率的数字骗了所有人。什么程序结构会让 CPU 看起来很闲、服务却卡死？',
   },
-
   hypotheses: [
-    { id: 'h-cpu', text: '单核被打满：某个同步 CPU 密集任务阻塞了事件循环，其余三个核在旁观', excludeActionId: 'a-metrics' },
-    { id: 'h-gc', text: 'GC 停顿变长：堆内存暴涨导致全局停顿', excludeActionId: 'a-gclog' },
-    { id: 'h-down', text: '某个下游依赖变慢，拖住了所有聚合请求', excludeActionId: 'a-down' },
-    { id: 'h-lock', text: '共享资源锁竞争：下游正常但服务内部锁住了', excludeActionId: 'a-dblog' },
+    {
+      id: 'h-cpu',
+      text: '单核被打满：某个同步 CPU 密集任务阻塞了事件循环，其余三个核在旁观',
+      excludeActionId: 'a-code',
+    },
+    {
+      id: 'h-gc',
+      text: 'GC 停顿变长：堆内存暴涨导致全局停顿',
+      excludeActionId: 'a-gclog',
+    },
+    {
+      id: 'h-down',
+      text: '某个下游依赖变慢，拖住了所有聚合请求',
+      excludeActionId: 'a-down',
+    },
+    {
+      id: 'h-lock',
+      text: '数据库锁等待阻塞聚合路径，导致全接口卡顿',
+      excludeActionId: 'a-dblog',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -57,11 +67,16 @@ export const eventLoopBlockedCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: [],
-      hypotheses: [{ id: 'h-down', status: 'down' }],
+      hypotheses: [
+        {
+          id: 'h-down',
+          status: 'down',
+        },
+      ],
       result: {
         type: 'text',
         title: '影响面分析',
-        text: '全部接口无差别卡顿，包括最简单的健康检查接口。\n卡顿呈周期性：每 2~3 秒卡 200ms 左右，像心跳一样规律。\n→ 连 /health 都卡 = 不是业务逻辑问题，是进程级的东西在堵。',
+        text: '导出时同进程/health也延迟约800ms，其他副本不做导出时正常。不是所有业务代码无罪：某业务回调若堵主线程，也会拖住健康检查。',
       },
     },
     {
@@ -72,12 +87,19 @@ export const eventLoopBlockedCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-cpu'],
-      hypotheses: [{ id: 'h-cpu', status: 'confirmed' }],
+      tests: [
+        'h-cpu',
+      ],
+      hypotheses: [
+        {
+          id: 'h-cpu',
+          status: 'up',
+        },
+      ],
       result: {
         type: 'code',
         title: '指标对比',
-        text: 'event loop lag: 平时 2ms，卡顿瞬间 1.2s ↑↑↑\n容器 CPU 25%，但按核拆分：核 1 接近 100%，核 2~4 几乎为 0\n→ 事件循环被周期性阻塞 + 单核打满：同步 CPU 任务实锤。\n（其余核空闲 = 多核容器救不了单线程的事件循环）',
+        text: 'event-loop延迟约800ms，容器4核归一CPU25%；主线程profile接近一核算力。操作系统可迁移线程，不要求固定“核1”始终满。\n这些指标支持主线程忙，尚不能单独区分业务同步计算与GC；需CPU profile与代码。',
       },
     },
     {
@@ -104,12 +126,24 @@ export const eventLoopBlockedCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-cpu'],
-      hypotheses: [{ id: 'h-cpu', status: 'confirmed' }],
+      tests: [
+        'h-cpu',
+        'h-gc',
+      ],
+      hypotheses: [
+        {
+          id: 'h-cpu',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-gc',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: 'export.js 关键行',
-        text: 'const hash = bcrypt.hashSync(password, 12)   ← 同步！\nconst zip = archiver.sync.compress(files)      ← 同步！\n// 每次导出：~800ms 的纯 CPU 计算，事件循环全程冻结\n→ 每次用户点"导出发票"，全服务的所有请求一起陪冻。',
+        text: '导出回调中：\nconst hash = bcrypt.hashSync(password, 12);\nconst zip = zlib.gzipSync(invoiceBytes);\n主线程CPU profile约800ms集中在这两处，且与event-loop阻塞同窗；不是不存在的archiver.sync.compress API。副本只移除同步导出步骤，相同输入下/health延迟恢复。GC轨迹最大8ms，不能解释800ms。',
       },
     },
     {
@@ -120,12 +154,19 @@ export const eventLoopBlockedCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-down'],
-      hypotheses: [{ id: 'h-down', status: 'excluded' }],
+      tests: [
+        'h-down',
+      ],
+      hypotheses: [
+        {
+          id: 'h-down',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '下游监控',
-        text: '五个下游服务 P99 全部 < 60ms，零变更。\n→ 下游无辜。',
+        text: '同trace下游调用各<60ms；/health不调用下游也在导出期间卡住。排除下游变慢主因，零变更本身不等于无故障。',
       },
     },
     {
@@ -136,8 +177,15 @@ export const eventLoopBlockedCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-gc'],
-      hypotheses: [{ id: 'h-gc', status: 'excluded' }],
+      tests: [
+        'h-gc',
+      ],
+      hypotheses: [
+        {
+          id: 'h-gc',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'GC 日志',
@@ -152,12 +200,19 @@ export const eventLoopBlockedCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-lock'],
-      hypotheses: [{ id: 'h-lock', status: 'excluded' }],
+      tests: [
+        'h-lock',
+      ],
+      hypotheses: [
+        {
+          id: 'h-lock',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'DB 监控',
-        text: '慢查询 0 条，锁等待 0 次，连接池健康。\n→ 数据库侧无异常。',
+        text: '本次调用链DB锁等待与连接池等待均0；卡顿profile在bcrypt/zlib而非驱动等待，/health不查DB仍卡。排除数据库锁阻塞解释。',
       },
     },
     {
@@ -173,14 +228,14 @@ export const eventLoopBlockedCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: 'bcrypt.hashSync → bcrypt.hash（异步）\n压缩逻辑迁移到 worker_threads。\n灰度发布：event loop lag 回落至 3ms，卡顿消失。',
+        text: 'bcrypt使用其异步接口、压缩使用zlib异步接口或有界worker队列；异步通常转移工作到线程池，不会消除CPU成本。限制并发和队列，复验event-loop延迟、worker饱和、整体吞吐及P99。\n把同步函数包进async/Promise本身不会移出主线程。',
       },
     },
     {
       id: 'a-revert',
       name: '回滚 v2.3.0 止血',
       desc: '【状态变更】回滚到 v2.2.9',
-      cost: 3,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -193,67 +248,86 @@ export const eventLoopBlockedCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-cpu', text: '新功能使用同步 CPU 密集调用（bcrypt.hashSync / 同步压缩），每次导出冻结事件循环约 800ms——单线程服务所有并发请求陪冻', correct: true },
-    { id: 'h-gc', text: '堆内存暴涨导致 GC 全局停顿', correct: false },
-    { id: 'rc-down', text: '某个下游依赖变慢拖住聚合请求', correct: false },
-    { id: 'rc-lock', text: '服务内部共享资源锁竞争', correct: false },
+    {
+      id: 'rc-cpu',
+      text: '导出回调在主线程执行bcrypt.hashSync与zlib.gzipSync，约800ms同步计算阻塞同进程事件循环，健康检查与其他请求一起延迟',
+      correct: true,
+    },
+    {
+      id: 'h-gc',
+      text: '堆内存暴涨导致 GC 全局停顿',
+      correct: false,
+    },
+    {
+      id: 'rc-down',
+      text: '某个下游依赖变慢拖住聚合请求',
+      correct: false,
+    },
+    {
+      id: 'rc-lock',
+      text: '数据库锁等待阻塞全部接口',
+      correct: false,
+    },
   ],
-
-  expertCost: 6,
+  expertCost: 7,
   restartActionId: 'a-revert',
-
   expertChain: [
     {
-      thought: '最简单的 /health 接口也卡——业务逻辑无罪，是进程级的东西在堵。先看节律。',
-      update: '周期性卡顿（每 2~3 秒一次）像某种定时/高频触发，不是随机抖动。',
+      thought: '对齐导出与同进程健康检查。',
+      update: '导出时连不查下游的health也卡。',
       actionId: 'a-impact',
-      why: '1⚡ 先分清"全接口无差别卡"还是"特定接口卡"：前者排除业务逻辑，直接指向进程本身——排查方向在此分岔。',
-      conclusion: '进程级问题 → 事件循环/内存/宿主三选一。',
+      why: '1⚡指向共享调度，但业务同步回调仍可能是源头。',
+      conclusion: '核对线程时间。',
     },
     {
-      thought: 'Node 服务的心电图是 event loop lag，CPU 要按核拆开看——容器平均利用率是最会骗人的数字。',
-      update: 'lag 峰值 1.2s + 单核 100% 其余空闲 → 同步 CPU 任务阻塞事件循环，实锤。',
+      thought: '结合归一CPU和event-loop延迟。',
+      update: '约一核算力，事件循环被占用。',
       actionId: 'a-metrics',
-      why: '2⚡ 两个指标同时破案：lag 证明"事件循环被堵"，分核 CPU 证明"有一个核在狂奔"——多核容器对单线程事件循环毫无帮助。',
-      conclusion: '同步 CPU 密集任务实锤 → 找到它。',
+      why: '2⚡平均25%不等于主线程有余量，指标仍需profile定性。',
+      conclusion: '同步计算候选升权。',
     },
     {
-      thought: '周期性阻塞 + 时间线对齐三天前的发布——变更清单里谁是 CPU 密集的？',
-      update: '发票导出是新功能，bcrypt 加密 + 压缩都是潜在 CPU 大户。',
-      actionId: 'a-release',
-      why: '1⚡ 变更必进时间线：周期性故障几乎总能在最近的变更里找到嫌疑人。',
-      conclusion: '锁定发票导出功能 → 读代码。',
-    },
-    {
-      thought: '代码里找同步调用：hashSync、sync.compress——每一个 Sync 后缀都是事件循环的敌人。',
-      update: '每次导出 ~800ms 纯 CPU 计算，事件循环全程冻结——与观测到的卡顿完全吻合。',
+      thought: '读取profile与真实API代码并做对照。',
+      update: 'hashSync/gzipSync约800ms，移出后恢复，GC仅8ms。',
       actionId: 'a-code',
-      why: '2⚡ 直捣机制：Sync 后缀的 API 会在事件循环上同步执行——这是 Node 程序设计的第一课，也是最容易在新功能里犯的错。',
-      conclusion: '机制闭环：用户导出 → 800ms 冻结 → 全服务请求陪冻。修复：异步接口 + worker 线程。',
+      why: '2⚡具体热点与受控对照证明机制，同时排除GC。',
+      conclusion: '确认同步CPU阻塞。',
     },
     {
-      thought: '下游/GC/锁全部排除，机制闭环——停止收集，转入修复。',
-      update: '停止。止血用回滚，根治用异步化。',
+      thought: '核对同trace下游耗时。',
+      update: '下游正常，health无下游依赖仍卡。',
+      actionId: 'a-down',
+      why: '1⚡实际调用证据排除下游主因。',
+      conclusion: '排除下游。',
+    },
+    {
+      thought: '核对DB等待与调用栈。',
+      update: '没有锁/池等待，热点不在DB。',
+      actionId: 'a-dblog',
+      why: '1⚡数据库锁候选需独立等待证据。',
+      conclusion: '全部候选收敛。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】四条假设三条排除一条实锤，机制完整。继续收集不会改变"同步改异步"这个行动。',
-      conclusion: '止血回滚 v2.3.0；修复版（bcrypt 异步 + worker 线程）灰度验证后重新发布。检查单：Node 服务禁用 Sync 后缀的 CPU 密集 API。',
+      why: '【停止规则】同步CPU热点与800ms阻塞吻合，GC、下游和数据库锁解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '导出回调在主线程执行bcrypt.hashSync与zlib.gzipSync，约800ms同步计算阻塞同进程事件循环，健康检查与其他请求一起延迟',
     },
   ],
-
   lessons: [
     {
       text: '事件循环是单线程服务的心脏：一个同步 CPU 任务会堵住所有并发请求——哪怕容器有 64 个核。',
       principle: 'Node 的并发靠事件循环调度，同步调用 = 心脏骤停。CPU 利用率要按核看：容器平均 25% 不代表没打满，单核 100% 就足以瘫痪全服务。',
     },
     {
-      text: '看到 Sync 后缀要警惕：bcrypt.hashSync、zlib.sync、JSON.parse 超大对象——它们都在事件循环上同步执行。',
-      principle: '程序设计纪律：CPU 密集任务（加密/压缩/图像处理/大 JSON）一律走异步接口或 worker_threads；代码评审时 Sync 后缀是必须检查的红名单。',
+      text: '同步CPU计算会占用当前事件循环；async函数或Promise包装不会自动把计算送到其他线程。',
+      principle: '选择真正异步的SDK接口或worker_threads，并设置并发预算。异步压缩和bcrypt仍消耗worker资源与CPU，可能把瓶颈转移到线程池。',
     },
     {
       text: 'event loop lag 是 Node 服务的心电图——没有这个监控，这类故障无解。',
-      principle: '可观测性清单：Node 服务必配 event loop lag（如 perf_hooks 监控）。lag 飙升 + CPU 单核满 = 同步阻塞的标准指纹，一秒定位。',
+      principle: 'event-loop延迟和主线程CPU profile是重要定位证据，GC、同步JS、原生调用都可能抬高延迟。不能仅看lag就宣布同步业务计算已确认，更不能说没有监控就无解。',
     },
     {
       text: '"资源很闲，用户很急"——平均利用率是最会骗人的监控数字。',

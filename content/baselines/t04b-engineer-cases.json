@@ -1299,7 +1299,57 @@
       "originalDifficulty": 2,
       "originalExpertCost": 7,
       "originalPathCost": 7,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "41c65e805f379a50399f9e904586aab4167f097655e1a6e488c72d6a24abfaa5",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "退出→曲线→引用链",
+        "cgroup/GC/快照对照",
+        "V8与容器内存",
+        "CPU正常仍被杀",
+        "进程堆到cgroup",
+        "重启重复掩盖"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-k8sevent",
+            "a-rsscurve",
+            "a-heapsnap",
+            "a-coderead"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-k8sevent",
+            "a-heapsnap",
+            "a-coderead",
+            "a-rsscurve"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-cache"
+      ],
+      "review": "7⚡保留；修正137等于OOM、RSS形态直接判泄漏、缓存必需同时TTL/LRU及异步函数语法；增长量与36小时对账。",
+      "sources": [
+        "https://nodejs.org/api/process.html#processmemoryusage",
+        "https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/"
+      ]
     },
     {
       "id": "event-loop-blocked",
@@ -1310,7 +1360,57 @@
       "originalDifficulty": 2,
       "originalExpertCost": 6,
       "originalPathCost": 6,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "583388d58c55e0426287c36daca9564d4835b274dd2ed95ba7a2af1fd11674cd",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "健康检查→线程profile",
+        "分核/lag/CPU栈",
+        "事件循环与worker",
+        "平均CPU低仍堵",
+        "业务回调到进程调度",
+        "回滚恢复但无长效边界"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-metrics",
+            "a-code",
+            "a-down",
+            "a-dblog"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-down",
+            "a-dblog",
+            "a-metrics",
+            "a-code"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-cpu"
+      ],
+      "review": "人工裁定7⚡（原6漏排错），删除低信息release读取，新增下游/DB反证；修复不存在压缩API和200ms/800ms/1.2s矛盾。",
+      "sources": [
+        "https://nodejs.org/learn/asynchronous-work/dont-block-the-event-loop",
+        "https://nodejs.org/api/zlib.html"
+      ]
     },
     {
       "id": "closure-leak",
@@ -1321,7 +1421,55 @@
       "originalDifficulty": 2,
       "originalExpertCost": 7,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "c7d6ca262ae67aa6eba4e24795955d598ca645d1f93a908bab0525ca9f54b742",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "旧修复→新保留链",
+        "引用链与内存分类",
+        "闭包生命周期",
+        "无发布仍暴露旧路径",
+        "请求到全局emitter",
+        "once不保证请求关联"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-snapdiff",
+            "a-coderead",
+            "a-heaptype"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-heaptype",
+            "a-coderead",
+            "a-snapdiff"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-listener"
+      ],
+      "review": "人工裁定6⚡（原7、旧链5漏反证）；重建16KiB×2429/小时与900MiB/天自洽样例，移除不存在的临时Buffer保留因果与2.3GB释放；修正once及N²倍数。",
+      "sources": [
+        "https://nodejs.org/api/events.html",
+        "https://nodejs.org/api/process.html#processmemoryusage"
+      ]
     },
     {
       "id": "timewait-exhausted",

@@ -1,11 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 4 章 · 运行时暗面（无界缓存 OOM L2）
- * 教学点：OOMKilled 是内核杀的不是自己崩的；锯齿曲线是泄漏的指纹；
- * 无界缓存 = 慢性泄漏；重启是止血不是修复。
- * 专家路径：impact(1) + k8sevent(1) + rsscurve(1) + heapsnap(2) + coderead(2) = 7⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const oomLeakCase: DiagnosisCase = {
   id: 'oom-leak',
   title: '服务每 36 小时准时死一次',
@@ -15,9 +11,12 @@ export const oomLeakCase: DiagnosisCase = {
   part: 'engineer',
   chapterId: 'runtime',
   order: 1,
-  typeTags: ['resource', 'capacity', 'code'],
+  typeTags: [
+    'resource',
+    'capacity',
+    'code',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是订单查询服务的负责人。运维第三次在群里 @你：你们服务又 OOM 重启了，集市查询超时了 40 秒。',
     architecture: 'K8s Pod(内存限额 2Gi) → 订单查询服务(Node.js 18) → 订单库 MySQL',
@@ -33,17 +32,31 @@ export const oomLeakCase: DiagnosisCase = {
         text: '每次重启前 1~2 分钟，查询接口批量超时；重启后立即恢复。\n服务 CPU 全程平稳（<30%），重启不挑时间——深夜也会被杀。',
       },
     ],
-    timeline: '近 9 天第 6 次重启，间隔稳定在 34~38 小时 ｜ 一个月前上过一次"订单查询提速"优化 ｜ 限额与镜像三个月未变',
+    timeline: '近9天第6次重启，间隔34~38小时；一个月前提速优化引入缓存，当前镜像随后未变；限额2Gi未改。',
     impactHint: '"重启后恢复"说明进程状态里有东西在长大——它是什么，从哪来的？',
   },
-
   hypotheses: [
-    { id: 'h-cache', text: '进程内缓存无上限，条目只进不出，慢慢撑爆限额', excludeActionId: 'a-heapsnap' },
-    { id: 'h-listener', text: '事件监听器/闭包被重复注册，对象无法回收', excludeActionId: 'a-listenercheck' },
-    { id: 'h-traffic', text: '流量自然增长，内存水位随之上涨', excludeActionId: 'a-qps' },
-    { id: 'h-limit', text: '容器内存限额配置过低，正常业务本就不够用', excludeActionId: 'a-limitcfg' },
+    {
+      id: 'h-cache',
+      text: '进程内缓存无上限，条目只进不出，慢慢撑爆限额',
+      excludeActionId: 'a-heapsnap',
+    },
+    {
+      id: 'h-listener',
+      text: '事件监听器/闭包被重复注册，对象无法回收',
+      excludeActionId: 'a-listenercheck',
+    },
+    {
+      id: 'h-traffic',
+      text: '流量自然增长，内存水位随之上涨',
+      excludeActionId: 'a-qps',
+    },
+    {
+      id: 'h-limit',
+      text: '容器内存限额配置过低，正常业务本就不够用',
+      excludeActionId: 'a-limitcfg',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -54,7 +67,12 @@ export const oomLeakCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: [],
-      hypotheses: [{ id: 'h-traffic', status: 'down' }],
+      hypotheses: [
+        {
+          id: 'h-traffic',
+          status: 'down',
+        },
+      ],
       result: {
         type: 'text',
         title: '重启规律',
@@ -70,11 +88,11 @@ export const oomLeakCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: [],
-      hypotheses: [{ id: 'h-limit', status: 'down' }],
+      hypotheses: [],
       result: {
         type: 'code',
         title: 'kubectl describe pod',
-        text: 'Last State: Terminated, Reason: OOMKilled, Exit Code: 137\nLimits:  memory: 2Gi\n→ exit 137 = 内核 cgroup OOM killer 所为，不是 Node 自己抛错。\n且每次重启后内存从约 400Mi 起步——正常业务 400Mi 就能跑。',
+        text: '终止Reason=OOMKilled、ExitCode137，cgroup memory.events中oom_kill递增，内存触及2Gi；三者共同确认本次内存限额杀进程。137只代表SIGKILL，单独不能排除人工kill等原因。\n重启起始约400Mi，但这个起点本身不能证明峰值容量一定足够。',
       },
     },
     {
@@ -85,12 +103,19 @@ export const oomLeakCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [{ id: 'h-traffic', status: 'excluded' }],
+      tests: [
+        'h-traffic',
+      ],
+      hypotheses: [
+        {
+          id: 'h-traffic',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '内存曲线（Prometheus container_memory_rss）',
-        text: '重启后 400Mi 起步 → 每小时稳定上涨 40~50Mi → 36h 左右触顶 2Gi 被杀。\n深夜 QPS 只有白天 1/5，内存却照涨不误、从不回落。\n→ 只涨不跌 = 泄漏指纹；正常的内存曲线应该"峰涨谷落"。',
+        text: 'RSS从400Mi以约45Mi/小时增长，(2048-400)/45≈36.6小时接近重启周期。低峰仍增长，且相同QPS下完整GC后的heapUsed基线也持续增加；三周QPS无持续增长。\n持续保留对象是线索，RSS单调并非单独证明泄漏，分配器高水位和合法缓存也需区分。',
       },
     },
     {
@@ -101,12 +126,24 @@ export const oomLeakCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-cache'],
-      hypotheses: [{ id: 'h-cache', status: 'confirmed' }],
+      tests: [
+        'h-cache',
+        'h-listener',
+      ],
+      hypotheses: [
+        {
+          id: 'h-cache',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-listener',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '堆快照 Diff（t1 → t1+1h）',
-        text: 'Map               3.1M → 3.9M 个条目   (+180MB)\n  └ retainer: orderCache (module 顶层 Map)\nstring(订单JSON)   +96MB   被 orderCache 持有\nTimers/Listeners   数量稳定，无增长\n→ 增长全部被顶层 Map「orderCache」持有：只进不出。',
+        text: '相隔1小时的同负载快照：orderCache条目800000→880000；Map结构约+6Mi，持有订单字符串约+39Mi，总约45Mi，与曲线同量级。\nRetainer为模块顶层Map；Timers/Listeners计数及保留体积稳定，排除监听器持续注册。',
       },
     },
     {
@@ -117,8 +154,15 @@ export const oomLeakCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-listener'],
-      hypotheses: [{ id: 'h-listener', status: 'excluded' }],
+      tests: [
+        'h-listener',
+      ],
+      hypotheses: [
+        {
+          id: 'h-listener',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '监听器数量',
@@ -133,8 +177,15 @@ export const oomLeakCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-traffic'],
-      hypotheses: [{ id: 'h-traffic', status: 'excluded' }],
+      tests: [
+        'h-traffic',
+      ],
+      hypotheses: [
+        {
+          id: 'h-traffic',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '流量 vs 内存',
@@ -149,12 +200,19 @@ export const oomLeakCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-limit'],
-      hypotheses: [{ id: 'h-limit', status: 'excluded' }],
+      tests: [
+        'h-limit',
+      ],
+      hypotheses: [
+        {
+          id: 'h-limit',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '限额历史',
-        text: 'memory limit 2Gi 自服务上线以来从未改过；同规格同限额的兄弟服务已稳定运行半年。\n→ 限额没变也没配错；变的是这个进程自己的行为。',
+        text: '限额2Gi未变只是背景，不能靠兄弟服务稳定证明本服务够用。相同本服务负载在有界缓存对照中稳定600~800Mi，才是排除固定正常容量不足的依据。',
       },
     },
     {
@@ -165,19 +223,31 @@ export const oomLeakCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-cache'],
-      hypotheses: [{ id: 'h-cache', status: 'confirmed' }],
+      tests: [
+        'h-cache',
+        'h-limit',
+      ],
+      hypotheses: [
+        {
+          id: 'h-cache',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-limit',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: 'cache.js（一个月前"查询提速"优化引入）',
-        text: 'const orderCache = new Map()            // 顶层常驻\nexport function getOrder(id) {\n  if (orderCache.has(id)) return orderCache.get(id)\n  const o = await db.query(...)\n  orderCache.set(id, o)                 // ← 只进不出\n  return o\n}\n// 没有 TTL、没有容量上限、没有淘汰；\n// 注释：「先内存顶着，下期换 Redis」→ 下期一直没来',
+        text: 'const orderCache = new Map();\nexport async function getOrder(id) {\n if (orderCache.has(id)) return orderCache.get(id);\n const order = await db.query(...);\n orderCache.set(id, order); return order;\n}\n无条目上限/淘汰；持续出现不同id时保留量增长。教学同构对照在相同输入、相同2Gi限额下将缓存限定为预算内，完整业务负载内存稳定600~800Mi，排除“正常业务固定就需超过2Gi”。',
       },
     },
     {
       id: 'a-restartnow',
       name: '手动重启服务止血',
       desc: '【状态变更】立即 kubectl rollout restart 释放内存',
-      cost: 2,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -193,7 +263,7 @@ export const oomLeakCase: DiagnosisCase = {
       id: 'a-fixcache',
       name: '给缓存加上限与 TTL 并发版',
       desc: '【状态变更】LRU 容量 10 万条 + TTL 30 分钟，灰度发布',
-      cost: 6,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -206,78 +276,90 @@ export const oomLeakCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-cache', text: '一个月前"提速"优化引入的进程内订单缓存（裸 Map）无上限、无 TTL，条目只进不出，约 36 小时撑爆 2Gi 限额被内核 OOMKilled', correct: true },
-    { id: 'rc-listener', text: '事件监听器重复注册，闭包堆积导致对象无法回收', correct: false },
-    { id: 'rc-traffic', text: '业务流量增长，内存水位自然上涨', correct: false },
-    { id: 'rc-limit', text: '容器内存限额配置过低，正常业务本就不够用', correct: false },
+    {
+      id: 'rc-cache',
+      text: '一个月前"提速"优化引入的进程内订单缓存（裸 Map）无上限、无 TTL，条目只进不出，约 36 小时撑爆 2Gi 限额被内核 OOMKilled',
+      correct: true,
+    },
+    {
+      id: 'rc-listener',
+      text: '事件监听器重复注册，闭包堆积导致对象无法回收',
+      correct: false,
+    },
+    {
+      id: 'rc-traffic',
+      text: '业务流量增长，内存水位自然上涨',
+      correct: false,
+    },
+    {
+      id: 'rc-limit',
+      text: '容器内存限额配置过低，正常业务本就不够用',
+      correct: false,
+    },
   ],
-
   expertCost: 7,
   restartActionId: 'a-fixcache',
-
   expertChain: [
     {
-      thought: '只有这一个服务在死，先看重启有没有时间规律——有规律的死一定有节律性的原因。',
-      update: '间隔稳定 34~38h 且与流量高峰无关 → 像是进程内部有个东西在匀速长大。',
+      thought: '确定单服务重启的周期。',
+      update: '34~38小时，和峰值时间无固定对应。',
       actionId: 'a-impact',
-      why: '1⚡︎ 先圈范围再找节律：单服务死亡排除全局问题；"间隔固定"提示是累积型而非触发型故障。',
-      conclusion: '单服务 + 固定间隔死亡 → 方向锁定进程内累积。',
+      why: '1⚡周期提示累积状态，但不直接排除全部平台故障。',
+      conclusion: '核实终止原因。',
     },
     {
-      thought: 'OOMKilled 要先和进程自杀区分：exit 137 是内核 cgroup 限额所为。',
-      update: '确认是被内核杀；且重启后 400Mi 就能正常跑——说明限额本身够用，是有什么东西额外长到了 2Gi。',
+      thought: '联合终止原因和cgroup记录。',
+      update: '本次是内存限额OOM，非仅凭137。',
       actionId: 'a-k8sevent',
-      why: '1⚡︎ 退出码一步区分"崩了"和"被杀"，两者排查对象完全不同（代码异常 vs 内存占用）。',
-      conclusion: '内核 OOMKill 实锤 + 限额够用的基线确立。',
+      why: '1⚡同一退出码可能多因，必须看Reason和内存事件。',
+      conclusion: '核对内存基线。',
     },
     {
-      thought: '看内存曲线形态：泄漏的曲线"只涨不跌"，正常曲线"峰涨谷落"。',
-      update: '低峰不回落、匀速爬升 → 泄漏特征成立，流量假设进一步失权。',
+      thought: '比较RSS、GC后heap与QPS。',
+      update: '约45Mi/小时保留增长，约36.6小时耗尽。',
       actionId: 'a-rsscurve',
-      why: '1⚡︎ 曲线形态是免费的诊断信息：一条 Prometheus 曲线就能区分"泄漏"与"水位"，决定后面走堆分析还是走容量扩容。',
-      conclusion: '泄漏指纹成立 → 采堆快照找"谁在长"。',
+      why: '1⚡统一Mi单位，且用GC后基线区分仅RSS高水位。',
+      conclusion: '排除持续流量增长。',
     },
     {
-      thought: '堆快照对比是泄漏排查的实锤动作：两份快照做 diff，看增长对象的 retainer 链。',
-      update: '增长全部被顶层 Map orderCache 持有，3 小时长了 3 万条订单 JSON——只进不出。',
+      thought: '比较retainer和监听器计数。',
+      update: 'Map与字符串增长45Mi，监听器稳定。',
       actionId: 'a-heapsnap',
-      why: '2⚡︎ 快照 diff 直接给出"谁在长、被谁持有"，把猜测变成指认——这是内存排查里信息密度最高的动作。',
-      conclusion: '无界缓存实锤 → 读它的实现代码找引入原因。',
+      why: '2⚡增长量与周期可对账，引用链指出持有者。',
+      conclusion: '确认缓存并排除监听器。',
     },
     {
-      thought: '看代码确认机制：这个 Map 为什么会存在、为什么没有淘汰逻辑。',
-      update: '一个月前"提速"优化引入的裸 Map 缓存，注释写着"先内存顶着，下期换 Redis"——临时方案变成了永久隐患。',
+      thought: '核对无界实现和同负载有界对照。',
+      update: '无淘汰；同2Gi限定缓存时业务稳定。',
       actionId: 'a-coderead',
-      why: '2⚡︎ 找到引入动机才能正确修复：不知道它是为了"减少 DB 压力"，就可能直接删缓存导致 DB 被打挂——修复要保留收益、补上边界。',
-      conclusion: '机制闭环：提速优化引入无界缓存 → 匀速增长 → 36h 触顶被杀。',
+      why: '2⚡代码说明机制，同负载对照反证正常业务必须超限。',
+      conclusion: '全部候选收敛。',
     },
     {
-      thought: '证据闭合：OOMKilled 实锤 + 泄漏曲线 + 快照指认 + 代码机制。锁、流量、限额全部排除。停止收集。',
-      update: '停止。修复：LRU + TTL 保留缓存收益、补上容量边界；重启只能止血，不能写进结论。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '根因与修复方案都已明确；监听器/流量/限额三条假设已排除，继续收集不改变行动。',
-      conclusion: 'LRU(10万)+TTL(30min) 上线后内存稳定锯齿，7 天零重启。检查单：进程内缓存必须同时有容量上限和过期策略。',
+      why: '【停止规则】OOM事件、保留量增长和无界Map因果吻合，流量、监听器与固定正常容量不足均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '一个月前"提速"优化引入的进程内订单缓存（裸 Map）无上限、无 TTL，条目只进不出，约 36 小时撑爆 2Gi 限额被内核 OOMKilled',
     },
   ],
-
   lessons: [
     {
-      text: 'exit code 137 + Reason OOMKilled = 内核杀的，不是进程自己崩的——排查对象从"代码异常"切换为"谁在吃内存"。',
-      principle: 'cgroup 限额触顶时内核直接 SIGKILL，进程来不及打任何日志。所以"没有报错日志就重启"的服务，第一步永远是查退出码，而不是翻应用日志。',
+      text: '137是SIGKILL的常见退出码，结合OOMKilled、cgroup事件及内存曲线才能确认本次内存限额杀进程。',
+      principle: '先区分容器OOM、节点压力驱逐及其他kill来源；不要仅凭退出码推导唯一死因。',
     },
     {
-      text: '内存曲线形态是免费诊断：只涨不跌是泄漏，峰涨谷落是正常水位。',
-      principle: '先看形态再动手：泄漏曲线匀速爬升且低峰不回落，与流量形态脱相关。这一眼能省掉大半盲目排查——直接进入堆分析，而不是去扩容。',
+      text: 'RSS持续增加是线索，完整GC后堆基线与retainer增长才支持不可回收对象的定位。',
+      principle: '合法缓存、分配器高水位及堆外占用也会增加RSS。快照要关联持续持有者和输入基数，不能只看曲线形状判病。',
     },
     {
-      text: '无界缓存 = 慢性泄漏：没有容量上限和 TTL 的 Map，结局一定是 OOM，只是时间问题。',
-      principle: '进程内缓存的写入速度永远大于清理速度（如果没有清理）。任何缓存必须同时具备：容量上限（LRU）+ 过期时间（TTL）。"先内存顶着"的临时方案必须有到期日。',
+      text: '本案不同订单id持续写无界Map，未淘汰的保留量约45Mi/小时；容量边界是修复重点。',
+      principle: '不必给所有缓存无条件同时加TTL和LRU；按空间预算、数据时效选择容量上限和失效机制。有限键集也不一定无限增长，结论须依赖本案输入。',
     },
     {
-      text: '重启是止血不是修复：它能证明"状态在进程里"，但不能写进值班手册当解决方案。',
-      principle: '面对周期性故障，重启的价值是恢复服务并确认"凶手在进程内"。如果只重启不排查，故障间隔就是你的破案倒计时——36 小时后它准时回来。',
+      text: '重启可临时恢复，但不足以证明缓存就是根因；还需引用链和同负载对照。',
+      principle: '止血与修复分开记录。堆快照采集本身有暂停与额外内存开销，选择副本和窗口，避免在极限水位盲采。',
     },
   ],
 }

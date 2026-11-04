@@ -510,3 +510,72 @@
 
 技术机制依据：[官方资料1](https://dev.mysql.com/doc/refman/8.0/en/explain-output.html)、[官方资料2](https://dev.mysql.com/doc/refman/8.0/en/limit-optimization.html)。
 
+## oom-leak（runtime/1）
+
+学习目标：内存与连接是有生命周期的资源——无界容器就是慢性泄漏。
+
+编审：7⚡保留；修正137等于OOM、RSS形态直接判泄漏、缓存必需同时TTL/LRU及异步函数语法；增长量与36小时对账。
+
+难度：L2→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 退出→曲线→引用链
+2. cgroup/GC/快照对照
+3. V8与容器内存
+4. CPU正常仍被杀
+5. 进程堆到cgroup
+6. 重启重复掩盖
+
+标准路径：a-impact → a-k8sevent → a-rsscurve → a-heapsnap → a-coderead，7⚡，零错S；终态确认h-cache，其余全部excluded。
+
+替代路径：a-impact → a-k8sevent → a-heapsnap → a-coderead → a-rsscurve，7⚡，零错S；终态确认h-cache，其余全部excluded。
+
+停止点：【停止规则】OOM事件、保留量增长和无界Map因果吻合，流量、监听器与固定正常容量不足均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://nodejs.org/api/process.html#processmemoryusage)、[官方资料2](https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/)。
+
+## event-loop-blocked（runtime/2）
+
+学习目标：事件循环是单线程服务的心脏：一个同步 CPU 任务会堵住所有并发请求。
+
+编审：人工裁定7⚡（原6漏排错），删除低信息release读取，新增下游/DB反证；修复不存在压缩API和200ms/800ms/1.2s矛盾。
+
+难度：L2→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 健康检查→线程profile
+2. 分核/lag/CPU栈
+3. 事件循环与worker
+4. 平均CPU低仍堵
+5. 业务回调到进程调度
+6. 回滚恢复但无长效边界
+
+标准路径：a-impact → a-metrics → a-code → a-down → a-dblog，7⚡，零错S；终态确认h-cpu，其余全部excluded。
+
+替代路径：a-impact → a-down → a-dblog → a-metrics → a-code，7⚡，零错S；终态确认h-cpu，其余全部excluded。
+
+停止点：【停止规则】同步CPU热点与800ms阻塞吻合，GC、下游和数据库锁解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://nodejs.org/learn/asynchronous-work/dont-block-the-event-loop)、[官方资料2](https://nodejs.org/api/zlib.html)。
+
+## closure-leak（runtime/3）
+
+学习目标：监听器和闭包的生命周期，必须与它们依附的对象对齐——否则每一次调用都在给内存上锁。
+
+编审：人工裁定6⚡（原7、旧链5漏反证）；重建16KiB×2429/小时与900MiB/天自洽样例，移除不存在的临时Buffer保留因果与2.3GB释放；修正once及N²倍数。
+
+难度：L2→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 旧修复→新保留链
+2. 引用链与内存分类
+3. 闭包生命周期
+4. 无发布仍暴露旧路径
+5. 请求到全局emitter
+6. once不保证请求关联
+
+标准路径：a-impact → a-snapdiff → a-coderead → a-heaptype，6⚡，零错S；终态确认h-listener，其余全部excluded。
+
+替代路径：a-impact → a-heaptype → a-coderead → a-snapdiff，6⚡，零错S；终态确认h-listener，其余全部excluded。
+
+停止点：【停止规则】监听器与上下文保留链及增长算术一致，旧缓存、timer和独立native泄漏均排除；重复回调另有样例，不冒充已对账推送数。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://nodejs.org/api/events.html)、[官方资料2](https://nodejs.org/api/process.html#processmemoryusage)。
+

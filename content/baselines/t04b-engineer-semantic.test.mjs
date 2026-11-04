@@ -92,3 +92,9 @@ test('深分页4501页与90000 OFFSET相符，COUNT单独计时不与第一页60
 test('提交状态决定误更新能否普通回滚，秒级复制指标不能给出毫秒精度',()=>{
  const c=load('app/data/cases/data-script-accident.ts');assert.match(c.actions[0].result.text,/autocommit=1/);assert.match(c.actions.find(a=>a.id==='a-restore').result.text,/隔离实例/);const lag=load('app/data/cases/replica-lag.ts');assert.match(lag.scene.symptoms[0].text,/秒级指示/);assert.match(lag.actions.find(a=>a.id==='a-fixsession').result.text,/固定10秒.*不保证/)
 })
+test('监听器泄漏的字节和回调次数可对账，once不能代替关联生命周期',()=>{
+ assert.equal(2429*16/1024,37.953125);assert.equal(3*(3+1)/2,6);const c=load('app/data/cases/closure-leak.ts');assert.match(c.actions.find(a=>a.id==='a-coderead').result.text,/const context = buildLabelContext/);assert.match(c.actions.find(a=>a.id==='a-fix').result.text,/on改once不能阻止/);assert.match(c.actions.find(a=>a.id==='a-heaptype').result.text,/external和arrayBuffers近似稳定/)
+})
+test('OOM结合Reason和cgroup事件，事件循环题使用真实zlib同步API',()=>{
+ const oom=load('app/data/cases/oom-leak.ts');assert.match(oom.actions.find(a=>a.id==='a-k8sevent').result.text,/137只代表SIGKILL/);assert.ok(Math.abs((2048-400)/45-36.6)<.1);const loop=load('app/data/cases/event-loop-blocked.ts');assert.match(loop.actions.find(a=>a.id==='a-code').result.text,/zlib.gzipSync/);assert.match(loop.actions.find(a=>a.id==='a-fix').result.text,/async\/Promise本身不会移出主线程/)
+})
