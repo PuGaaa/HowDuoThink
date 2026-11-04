@@ -13,60 +13,7 @@
       "originalHash": "34a618bf6f7b1e6ff90a43b221d5fbb4241a5beede0885c9d6cdb885b10d728d",
       "originalDifficulty": 2,
       "originalExpertCost": 4,
-      "status": "calibrated",
-      "calibratedHash": "b11c8e8c3d3bcc3922e9a114143eaf75a23dde49776ea6ef568b2c897e81d798",
-      "difficulty": 2,
-      "dimensions": [
-        2,
-        2,
-        2,
-        2,
-        2,
-        2
-      ],
-      "dimensionEvidence": [
-        "“地域×解析器”后核对权威并保留TLS直达，需两步归因",
-        "“R答198.51.100.20”与权威记录、客户端连接交叉验证",
-        "需区分递归/权威、Host/SNI与地址",
-        "“解析成功”仍可能连错，推翻DNS失败只等于UnknownHost",
-        "跨DNS、HTTPS与CDN路径",
-        "“切换权威DNS”是显式危险动作，却不能修复递归端错误答案，符合L2危险陷阱"
-      ],
-      "goal": "错误DNS答案与网络故障的变量隔离",
-      "changes": [
-        "按解析器限定影响，删除全省全部失败及请求根本没出发的过断结论",
-        "DNS错误地址改证书主机名错误，不再伪造UnknownHost",
-        "正确IP对照用--resolve保留SNI与证书校验并排除CDN/骨干",
-        "IP登记不证明广告劫持，TTL及HTTPDNS恢复不作保证"
-      ],
-      "sources": [
-        "https://datatracker.ietf.org/doc/html/rfc1034",
-        "https://curl.se/docs/manpage.html#--resolve"
-      ],
-      "stop": "已确认故障位于R的错误答案，可受控切换正常解析并向解析服务方提供证据；不把IP归属调查或TTL等待当作恢复保证。",
-      "expectedConfirmed": [
-        "h-dns"
-      ],
-      "paths": [
-        {
-          "name": "标准路径",
-          "actions": [
-            "a-impact",
-            "a-dnsquery",
-            "a-compare"
-          ],
-          "cost": 4
-        },
-        {
-          "name": "替代顺序",
-          "actions": [
-            "a-impact",
-            "a-compare",
-            "a-dnsquery"
-          ],
-          "cost": 4
-        }
-      ]
+      "status": "pending"
     },
     {
       "id": "ssl-chain-missing",
@@ -76,65 +23,7 @@
       "originalHash": "285359c0b503e26b5bdcf19bcf2f121b05d9f0b28378d0bf01648ae10c835f59",
       "originalDifficulty": 2,
       "originalExpertCost": 7,
-      "status": "calibrated",
-      "calibratedHash": "bcd24267df0a923f874fe26d3742adcf7d706301b47d2b0c214c248d03e5bdda",
-      "difficulty": 2,
-      "dimensions": [
-        2,
-        2,
-        2,
-        2,
-        2,
-        2
-      ],
-      "dimensionEvidence": [
-        "“有效期/SAN正确”后以缺链及补链验证收敛",
-        "客户端alert、发布材料和干净库对照三种材料",
-        "区分验证方向与中间/根信任",
-        "“成功样本有缓存”说明部分成功不证明完整链",
-        "跨客户端TLS、L4转发与Nginx部署",
-        "“回滚22:00配置”“重启全部节点”均有代价却不补22:45缺链，属于L2危险动作陷阱"
-      ],
-      "goal": "证书链缺失的验证方向、分布与触发闭环",
-      "changes": [
-        "改为L4透传到Nginx终止TLS，修正客户端验证被写成服务端验证的方向错误",
-        "有效期候选核对客户端时钟而非服务器NTP",
-        "签发三天前与22:45部署分开，22:00gzip独立",
-        "不泛化iOS/Android补链策略，加入真实库与干净状态单变量验证",
-        "两条7成本路径完整排除6个候选中的错误项"
-      ],
-      "sources": [
-        "https://nginx.org/en/docs/http/configuring_https_servers.html",
-        "https://docs.openssl.org/3.0/man1/openssl-s_client/"
-      ],
-      "stop": "停止诊断；部署CA提供的叶子+中间证书，校验顺序并reload，以无中间缓存的真实库A重试；不关闭证书校验，不向客户端硬塞叶子为受信根。",
-      "expectedConfirmed": [
-        "h-chain"
-      ],
-      "paths": [
-        {
-          "name": "标准路径",
-          "actions": [
-            "a-impact",
-            "a-errorlog",
-            "a-expiry",
-            "a-chain",
-            "a-lib"
-          ],
-          "cost": 7
-        },
-        {
-          "name": "替代顺序",
-          "actions": [
-            "a-errorlog",
-            "a-impact",
-            "a-chain",
-            "a-expiry",
-            "a-lib"
-          ],
-          "cost": 7
-        }
-      ]
+      "status": "pending"
     },
     {
       "id": "cors-101",
@@ -144,59 +33,7 @@
       "originalHash": "4f4a2e24b0238738cc78e4bcc403aed4a8ebdbf34d776a9f79f3bf0a60d2b91e",
       "originalDifficulty": 1,
       "originalExpertCost": 5,
-      "status": "calibrated",
-      "calibratedHash": "ab847ee4831207c2fbf9cdb4866cea99ba4e70b487ef0b37d4e13020a0b56f01",
-      "difficulty": 1,
-      "dimensions": [
-        1,
-        1,
-        1,
-        1,
-        2,
-        1
-      ],
-      "dimensionEvidence": [
-        "“普通GET已发出”到“缺ACAO”直接对应",
-        "请求方法与响应头均直接可见",
-        "只需同源与CORS基本规则",
-        "200不等于JS可读是入门反直觉",
-        "浏览器与网关两层对照",
-        "无需隐藏状态或主动陷阱"
-      ],
-      "goal": "简单跨源GET的响应授权而非虚构预检",
-      "changes": [
-        "选择简单无凭证GET一致场景，删除GET200却用失败预检实锤的冲突",
-        "保留a-options稳定ID但动作改核对实际GET与来源表",
-        "实际状态/业务体排除401与500，来源配置单改验证CORS",
-        "专家路径实购1+1+2=4，不机械保留原标5"
-      ],
-      "sources": [
-        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS"
-      ],
-      "stop": "停止；按开发来源精确授权并复验实际GET。其他使用非简单头/方法的接口另验OPTIONS，不能把本题结论扩成所有跨源请求均先预检。",
-      "expectedConfirmed": [
-        "h-cors"
-      ],
-      "paths": [
-        {
-          "name": "标准路径",
-          "actions": [
-            "a-impact",
-            "a-console",
-            "a-options"
-          ],
-          "cost": 4
-        },
-        {
-          "name": "替代顺序",
-          "actions": [
-            "a-impact",
-            "a-options",
-            "a-console"
-          ],
-          "cost": 4
-        }
-      ]
+      "status": "pending"
     },
     {
       "id": "nginx-trap",
@@ -206,63 +43,7 @@
       "originalHash": "f8cebc7120cd67c9e4556afbf1fe9c93e4e70dc9172d1fc42afac62fecaf6418",
       "originalDifficulty": 2,
       "originalExpertCost": 6,
-      "status": "calibrated",
-      "calibratedHash": "51979e6554b493e44259b17704defe9fa7d5197d820a87625f91a0435822dd1f",
-      "difficulty": 2,
-      "dimensions": [
-        2,
-        2,
-        2,
-        2,
-        2,
-        2
-      ],
-      "dimensionEvidence": [
-        "分桶到逐层关联再到默认值/环境差异",
-        "请求ID、upstream标记与配置归档交叉",
-        "掌握指令继承、默认字节与加载时点",
-        "“nginx -T”不等于运行内存，“图片”不等于body",
-        "跨客户端/CDN/WAF/Nginx与应用",
-        "“扩容应用”不改变接入层拒绝点，状态变更与明确大小阈值相冲突，危险修配置前需定位"
-      ],
-      "goal": "完整body边界、拒绝层与已加载配置核验",
-      "changes": [
-        "按完整body而非文件大小量1048576阈值，补multipart开销",
-        "不再仅凭Server头和无trace-id断言拦截层",
-        "nginx -T与成功reload归档/哈希对齐，不冒称内存生效配置",
-        "标准6成本仍含四份不同必要证据，终局错误候选均排除",
-        "按20MiB业务上限验上下界，不声称所有大文件全成功"
-      ],
-      "sources": [
-        "https://nginx.org/en/docs/http/ngx_http_core_module.html#client_max_body_size",
-        "https://nginx.org/en/docs/switches.html"
-      ],
-      "stop": "完整请求体阈值、拒绝层、已加载配置与环境差异均闭合。停止诊断，按业务上限修复并验上下边界，不无条件取消限额。",
-      "expectedConfirmed": [
-        "h-size"
-      ],
-      "paths": [
-        {
-          "name": "标准路径",
-          "actions": [
-            "a-impact",
-            "a-sizecorr",
-            "a-nginxconf",
-            "a-confdiff"
-          ],
-          "cost": 6
-        },
-        {
-          "name": "替代顺序",
-          "actions": [
-            "a-impact",
-            "a-nginxconf",
-            "a-sizecorr",
-            "a-confdiff"
-          ],
-          "cost": 6
-        }
-      ]
+      "status": "pending"
     },
     {
       "id": "gateway-review",
@@ -272,66 +53,7 @@
       "originalHash": "54b7ef085e10d7e56cdad33c1d879803e5fbcbdb7503844b4c3b2c283bb146fe",
       "originalDifficulty": 2,
       "originalExpertCost": 7,
-      "status": "calibrated",
-      "calibratedHash": "b8947abbe77872d3131f5b09712600ea7e2035b007aafcaa1b3bc08157025e3c",
-      "difficulty": 2,
-      "dimensions": [
-        2,
-        2,
-        2,
-        2,
-        3,
-        3
-      ],
-      "dimensionEvidence": [
-        "四项分别核验后形成一个完整放行条件",
-        "8000×40%、命中日志、续期演练与数据流交叉",
-        "限流维度、容量模型、证书与信任域均为工程概念",
-        "“总量未超”仍可过载，“隔离”不等于令牌可明文",
-        "“路由容量、用户公平性、证书监控、令牌信任域”跨服务及组织规则边界，符合跨系统/职能L3",
-        "“只改IP即可”“只补证书监控即可”均含真风险却给不充分放行结论，是看似正确的L3陷阱"
-      ],
-      "goal": "四个独立契约的完整网关评审结论",
-      "changes": [
-        "全局10000与每IP20分开，不混总量与分组上限",
-        "补路由比例和调用次数，8000×40%=3200超过库存2000才证明风险",
-        "不把真实风险列成错误答案，改一个完整结论与三个不充分结论",
-        "内网令牌加密按已定组织规则审阅，不凭roadmap默许",
-        "五证据动作1+2+2+1+1=7，清单动作不赠确认"
-      ],
-      "sources": [
-        "https://nginx.org/en/docs/http/ngx_http_limit_req_module.html",
-        "https://letsencrypt.org/docs/integration-guide/",
-        "https://csrc.nist.gov/pubs/sp/800/207/final"
-      ],
-      "stop": "停止补材料，输出四项验收后再放行的完整评审结论；写下清单不等于完成实施，阈值也必须由实际容量与突发模型确定。",
-      "expectedConfirmed": [
-        "h-limit"
-      ],
-      "paths": [
-        {
-          "name": "标准路径",
-          "actions": [
-            "a-impact",
-            "a-capacity",
-            "a-ipdim",
-            "a-certmon",
-            "a-tls"
-          ],
-          "cost": 7
-        },
-        {
-          "name": "替代顺序",
-          "actions": [
-            "a-impact",
-            "a-certmon",
-            "a-tls",
-            "a-ipdim",
-            "a-capacity"
-          ],
-          "cost": 7
-        }
-      ]
+      "status": "pending"
     },
     {
       "id": "ws-upgrade",
@@ -341,61 +63,7 @@
       "originalHash": "92273584c0d35c33a96372e71958a5e9300a5c67fa4b9a462bf8b23efe37e347",
       "originalDifficulty": 2,
       "originalExpertCost": 4,
-      "status": "calibrated",
-      "calibratedHash": "907d457e312d5d371f2a796eefe9e314029f599e5e4097a682e07d3c17a57ffa",
-      "difficulty": 2,
-      "dimensions": [
-        2,
-        2,
-        2,
-        2,
-        2,
-        2
-      ],
-      "dimensionEvidence": [
-        "分群后出站核对再只补头验证",
-        "出站协议/头与同构对照相互支持",
-        "需要HTTP/1.1逐跳头及Nginx继承概念",
-        "“传入有头”不保证出站有头",
-        "客户端/反代/后端三层",
-        "“回滚网关配置”恢复握手但连带回退其他配置，是明确L2危险动作陷阱"
-      ],
-      "goal": "固定版本下逐跳升级头的单根因校准",
-      "changes": [
-        "固定Nginx1.24.0且显式1.1，删除实际1.0也为错选的双真因",
-        "补版本边界，官方1.29.7以后默认变化不写成通则",
-        "Origin用值/允许表/单变量实验证明，不把校验未到当无问题",
-        "区分101前400与长连读取间隔超时",
-        "标准1+2+1=4，移除重复及未购买证据的专家叙述"
-      ],
-      "sources": [
-        "https://nginx.org/en/docs/http/websocket.html",
-        "https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_http_version"
-      ],
-      "stop": "握手层因果已闭合，停止诊断并精确补头；修后另验双向消息与空闲心跳，101不等于连接永不掉线。",
-      "expectedConfirmed": [
-        "h-upgrade"
-      ],
-      "paths": [
-        {
-          "name": "标准路径",
-          "actions": [
-            "a-impact",
-            "a-nginxdump",
-            "a-repro"
-          ],
-          "cost": 4
-        },
-        {
-          "name": "替代顺序",
-          "actions": [
-            "a-impact",
-            "a-repro",
-            "a-nginxdump"
-          ],
-          "cost": 4
-        }
-      ]
+      "status": "pending"
     },
     {
       "id": "cert-sni",
@@ -405,62 +73,7 @@
       "originalHash": "f827e4a4850e6b8a4ae29d6bb5b7a04b7e193690e9a27d2bbd491d6919356f0b",
       "originalDifficulty": 2,
       "originalExpertCost": 4,
-      "status": "calibrated",
-      "calibratedHash": "7e8703268ff3352d1aacbf5414ddb869f7a9acb27618f4481ff781f53bf5e4a6",
-      "difficulty": 2,
-      "dimensions": [
-        2,
-        2,
-        2,
-        2,
-        2,
-        3
-      ],
-      "dimensionEvidence": [
-        "路径排除后读字段，再仅改SNI",
-        "ClientHello、已加载站点配置和验证输出交叉",
-        "需区分SNI、Host与证书链/名称校验",
-        "“链可验证”不代表主机名匹配",
-        "跨DNS/TLS/虚拟站点与兼容客户端",
-        "“换默认证书后新站恢复”看似正确，却使同IP旧站无SNI用户失败，是L3恢复引发旁路损害陷阱"
-      ],
-      "goal": "SNI选证与链/名称校验分离及完整兼容修复",
-      "changes": [
-        "删除2018分水岭、Java7全无SNI与全网解析一致等过断断言",
-        "修正无效-nosni为-noservername，保留目标主机名与受信根验证",
-        "标准三动作4成本，实际覆盖链/边缘/解析三错误候选",
-        "不按多数流量换默认证书冒充全修，改独立兼容入口并验旧新站",
-        "失败在HTTP前不依赖UA，也不自动从缺SNI判定全部根因"
-      ],
-      "sources": [
-        "https://nginx.org/en/docs/http/configuring_https_servers.html",
-        "https://docs.openssl.org/3.0/man1/openssl-s_client/",
-        "https://letsencrypt.org/docs/integration-guide/"
-      ],
-      "stop": "已定位SNI缺失与默认站点名称不匹配，停止诊断。为新域名提供独立兼容入口或完整覆盖所需名称的证书方案，分别验旧/新站，不按多数比例直接搬走故障。",
-      "expectedConfirmed": [
-        "h-sni"
-      ],
-      "paths": [
-        {
-          "name": "标准路径",
-          "actions": [
-            "a-impact",
-            "a-clientprobe",
-            "a-repro"
-          ],
-          "cost": 4
-        },
-        {
-          "name": "替代顺序",
-          "actions": [
-            "a-impact",
-            "a-repro",
-            "a-clientprobe"
-          ],
-          "cost": 4
-        }
-      ]
+      "status": "pending"
     },
     {
       "id": "canary-decision",
@@ -470,65 +83,7 @@
       "originalHash": "170a65f4cf6f472cb8893ba18f673c4d4f3465b0c5d38273de0d67584ce642cb",
       "originalDifficulty": 3,
       "originalExpertCost": 5,
-      "status": "calibrated",
-      "calibratedHash": "5a2d1aaf3eea0084e4779634955a085056b1a3372bcaa496b6bd918c014061c2",
-      "difficulty": 3,
-      "dimensions": [
-        2,
-        3,
-        3,
-        2,
-        3,
-        3
-      ],
-      "dimensionEvidence": [
-        "核对样本/机制/故障后与D0规则合并决策",
-        "“区间跨零也包含损失”需要组合不确定证据，不直接给根因",
-        "二项比例标准误、百分点/相对差与非劣性边界",
-        "不显著不等于安全，可回退也不等于已发生损失可逆",
-        "“分组/指标有效性、推荐机制、D0授权和商业损失预算”跨算法与产品发布职能边界，符合L3",
-        "“扩大样本提高信息量”本身合理，却被误用为越过已定风险边界的扩量理由，是L3看似正确陷阱"
-      ],
-      "goal": "保留统计不确定性并按预定风险边界决策",
-      "changes": [
-        "移除样本×4等于置信度×4、24h必识别原因、老用户排冷启动、趋势必然扩大的错误",
-        "补独立用户分母460/5000与9500/95000，给可复核探索区间",
-        "明确D0固定5%至D7与未触护栏，正确决策为不扩量，终局不达标/不确定回退",
-        "候选改为完整行动与有错误理由的三项，不把合理保守回退一概当错",
-        "实际五必要动作5成本；六维2/3/3/2/3/3中位数3，量化证据/统计机制/职能跨度/看似正确陷阱支持保留章尾唯一L3"
-      ],
-      "sources": [
-        "https://www.itl.nist.gov/div898/handbook/prc/section3/prc33.htm",
-        "https://sre.google/workbook/canarying-releases/"
-      ],
-      "stop": "停止当前决策循环，维持已批准5%而不扩量；技术/商业护栏持续生效，D7按预定方法验收，未达标准或仍不确定即回退。没有承诺自动恢复或下次一定能识别机制。",
-      "expectedConfirmed": [
-        "h-real"
-      ],
-      "paths": [
-        {
-          "name": "标准路径",
-          "actions": [
-            "a-impact",
-            "a-sample",
-            "a-cold",
-            "a-bug",
-            "a-trend"
-          ],
-          "cost": 5
-        },
-        {
-          "name": "替代顺序",
-          "actions": [
-            "a-impact",
-            "a-bug",
-            "a-cold",
-            "a-sample",
-            "a-trend"
-          ],
-          "cost": 5
-        }
-      ]
+      "status": "pending"
     },
     {
       "id": "white-screen",
@@ -547,7 +102,7 @@
         1,
         1,
         2,
-        2
+        1
       ],
       "dimensionEvidence": [
         "a-resources直接显示缺JS与HTML响应",
@@ -555,7 +110,7 @@
         "模块加载基础规则",
         "结论与响应类型一致",
         "构建、发布与浏览器两边",
-        "“回滚上一版本”是明确有状态代价的动作，按危险动作维度应为L2；其余四维直陈仍为整体L1"
+        "入门关无需危险陷阱"
       ],
       "goal": "区分模块加载与运行时错误，核对制品和响应",
       "changes": [
@@ -608,7 +163,7 @@
       "dimensions": [
         1,
         2,
-        2,
+        1,
         1,
         1,
         1
@@ -616,7 +171,7 @@
       "dimensionEvidence": [
         "pluck与实际major差异直给",
         "同源码只换图的对照",
-        "“*允许跨major、锁与实际依赖图”属于领域安装机制L2，证据仍直接指向缺锁和API变更",
+        "基础安装与API使用",
         "结论与版本变化一致",
         "同一前端构建层",
         "无L2危险要求"
@@ -676,17 +231,17 @@
         2,
         2,
         2,
-        3,
         2,
-        3
+        2,
+        2
       ],
       "dimensionEvidence": [
         "缓存顺序与skip机制组合",
         "只改安装步骤的对照",
         "锁、缓存与测试执行语义",
-        "“CI全绿”实际是关键断言被skip，直觉中的质量证据反向失效，符合L3",
+        "绿色来自跳过而非验证",
         "CI依赖与生产制品",
-        "“恢复node_modules缓存且存在就不安装”看似加速成功却绕过依赖一致性和断言，是L3主动陷阱"
+        "旧目录恢复后跳安装"
       ],
       "goal": "区分CI通过与关键用例真实执行",
       "changes": [
@@ -741,7 +296,7 @@
         2,
         2,
         2,
-        3
+        2
       ],
       "dimensionEvidence": [
         "实际对象、模板与缓存事件组合",
@@ -749,7 +304,7 @@
         "Kubernetes拉取及滚动机制",
         "部署成功不代表修复已到达",
         "CI、仓库与节点",
-        "“删Pod重建就会拿最新”看似正确，却在显式IfNotPresent和旧节点缓存下重现故障，符合L3"
+        "只重建仍复用缓存"
       ],
       "goal": "用对象身份与Pod启动记录核实镜像漂移",
       "changes": [
@@ -802,16 +357,16 @@
         2,
         2,
         2,
-        2,
-        3
+        1,
+        2
       ],
       "dimensionEvidence": [
         "读者、构建输入和包身份组合",
         "开发配置与本次构建对照",
         "构建静态替换",
         "配置改了但无运行时读者",
-        "“CI构建时变量”与“浏览器已发布产物”跨构建/运行两跳，为L2",
-        "“回滚入口后覆盖同hash JS”看似修URL却破坏不可变内容契约，属于L3陷阱"
+        "同一构建链路",
+        "覆盖同hash破坏身份"
       ],
       "goal": "从实际读者定位构建变量与运行时配置断点",
       "changes": [
@@ -865,7 +420,7 @@
         2,
         2,
         2,
-        3
+        2
       ],
       "dimensionEvidence": [
         "删除与新旧引用联合推断",
@@ -873,7 +428,7 @@
         "hash、路由与原子替换机制",
         "发布结束旧页仍失败",
         "部署到旧浏览器请求",
-        "“发布期间维护页”看似隔离流量，却仍挡不住已打开SPA请求旧chunk，是L3看似正确陷阱"
+        "维护页仍有旧页请求"
       ],
       "goal": "区分发布空窗与持续断引用并验证精确URL",
       "changes": [
@@ -930,16 +485,16 @@
         2,
         2,
         2,
-        3,
-        3
+        2,
+        2
       ],
       "dimensionEvidence": [
         "审批、缓存与隔离多项材料对照",
         "方案与实际job记录",
         "来源、hash与权限机制",
         "功能绿不证明依赖可信",
-        "“依赖审批、跨项目可写缓存、worker隔离”跨供应链与发布组织边界，符合L3",
-        "“功能测试全绿即可自动发布”看似质量充分，却不满足已定来源与审批契约，属于L3陷阱"
+        "CI与共享服务边界",
+        "跳过既定审批是主动风险"
       ],
       "goal": "区分评审的独立缺口与已治理条件",
       "changes": [
@@ -998,16 +553,16 @@
         2,
         2,
         2,
-        3,
-        2
+        2,
+        1
       ],
       "dimensionEvidence": [
         "需将共享键与三种消费路径对照，a-originstamp",
         "相同输入与只补键的对照，a-cointoss",
         "null解引用、整数解析与配置契约",
         "同秒只作线索，需撤键复现",
-        "“会员、积分、营销”不同服务共同读取配置，跨服务关联为L3",
-        "“紧急重启三模块”有明确状态代价且不能生成缺失配置键，属于L2危险陷阱"
+        "配置到三个独立服务",
+        "重启缺键不恢复"
       ],
       "goal": "用共享输入与对照验证多症状归一",
       "changes": [
@@ -1061,16 +616,16 @@
         2,
         2,
         2,
-        3,
-        3
+        2,
+        2
       ],
       "dimensionEvidence": [
         "需回查超时前30秒等待及SQL变更",
         "分阶段与全量trace/retryOf对照",
         "连接等待、查询计划与重试机制",
         "第一条异常不等于首因",
-        "“订单借连接→catch空指针→调用方重试→库存/优惠券”跨服务链为L3",
-        "“重启并扩容订单”看似增加处理能力，反而增加DB借用压力，属于L3恢复动作反噬陷阱"
+        "订单、数据库与下游两跳",
+        "重启扩容反而加数据库负载"
       ],
       "goal": "用事前事件和请求传播恢复错误风暴",
       "changes": [
@@ -1187,7 +742,7 @@
         2,
         2,
         2,
-        3
+        1
       ],
       "dimensionEvidence": [
         "代码与只改include的对照",
@@ -1195,7 +750,7 @@
         "same-origin/include与SameSite机制",
         "Set-Cookie可见不等于保存",
         "浏览器请求与API响应边界",
-        "“回退为同源代理”可以使登录恢复，却不再验证所需跨源条件，是L3看似通过但验收对象改变"
+        "代理回退掩盖验收"
       ],
       "goal": "区分跨源凭证模式、同站属性和CORS",
       "changes": [
@@ -1251,7 +806,7 @@
         2,
         2,
         2,
-        2
+        1
       ],
       "dimensionEvidence": [
         "Timing与独立代理记录组合",
@@ -1259,7 +814,7 @@
         "代理、TCP/TLS与TTFB边界",
         "后端120ms与客户端3秒并不冲突",
         "浏览器、代理与服务端两跳",
-        "“回滚邻近证书变更”是明确危险动作，不能修CONNECT代理目录等待，为L2"
+        "回滚相邻证书变更不修代理等待"
       ],
       "goal": "分清代理、连接、TTFB与服务端处理时间",
       "changes": [
@@ -1310,19 +865,19 @@
       "difficulty": 2,
       "dimensions": [
         2,
-        3,
         2,
         2,
         2,
-        3
+        2,
+        2
       ],
       "dimensionEvidence": [
         "定时器计数与负载复测组合",
-        "“30页×100个÷5秒=600QPS，加40超过500；清理后46”需量化对账，符合L3证据形态",
+        "清理前640/清理后46对照",
         "interval清理和排队容量",
         "人不操作不代表页面停止",
         "浏览器、网关与后端",
-        "“回滚前端”看似恢复旧逻辑，却不清理已打开SPA的timer，属于L3看似正确陷阱"
+        "回滚不清理已开SPA"
       ],
       "goal": "按调度器生命周期与正确单位核算前端负载",
       "changes": [
@@ -1377,16 +932,16 @@
         2,
         2,
         2,
-        3,
-        3
+        2,
+        2
       ],
       "dimensionEvidence": [
         "原始输入与÷100代码对账",
         "mock/真实同金额输入对照",
         "协议、签名、幂等职责",
         "联调全绿反而隐藏适配器错",
-        "“客户端金额适配、网关协议、回调/入账”跨支付系统边界，为L3",
-        "“回滚旧mock后全绿”仅恢复错误参照，不证明真实provider协议，为L3错误验收陷阱"
+        "测试依赖到结算流水",
+        "回滚错误模板会隐藏缺陷"
       ],
       "goal": "核实验证对象、单位换算与真实协议",
       "changes": [

@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 学徒篇校准：区分模块加载与运行时错误，核对制品和响应。
  * 原型：HTML模块脚本MIME校验与SPA静态路由；教学重建，不冒充原始事故日志。
- * 六维：1/1/1/1/2/2，中位数半档向下取整，L1。
+ * 六维：1/1/1/1/2/1，中位数半档向下取整，L1。
  * 标准路径：a-impact → a-console → a-resources；替代顺序：a-impact → a-resources → a-console。
  * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */

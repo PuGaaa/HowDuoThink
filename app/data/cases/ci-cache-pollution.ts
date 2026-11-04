@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 学徒篇校准：区分CI通过与关键用例真实执行。
  * 原型：npm ci安装规则、旧目录缓存与条件skip；教学重建，不冒充原始事故日志。
- * 六维：2/2/2/3/2/3，中位数半档向下取整，L2。
+ * 六维：2/2/2/2/2/2，中位数半档向下取整，L2。
  * 标准路径：a-impact → a-depdiff → a-cacheconf；替代顺序：a-impact → a-cacheconf → a-depdiff。
  * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
