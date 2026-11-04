@@ -1,50 +1,40 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 4 章 · 联调之夜 第三批（瀑布图分段解读 L2）
- * 教学点：验证思维——"接口 3 秒"是句废话：瀑布图把总耗时拆成四段（DNS/连接/等待/下载），
- * 每段对应不同的责任方；OCSP 在线校验是慢握手的隐形税。
- * 专家路径：impact(1) + waterfall(2) + repro(1) = 4⚡︎
+ * 学徒篇校准：分清代理、连接、TTFB与服务端处理时间。
+ * 原型：Chrome DevTools网络计时与CONNECT代理协商；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/2/1，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-waterfall → a-repro；替代顺序：a-impact → a-repro → a-waterfall。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const waterfallReadCase: DiagnosisCase = {
   id: 'waterfall-read',
-  title: '"接口要 3 秒"——这句话里藏了四段故事',
-  intro: '测试反馈"接口要 3 秒"：瀑布图把 3 秒拆成四段——DNS 0.1、连接 2.6、等待 0.2、下载 0.1。慢在哪一段？',
+  title: '接口三秒：慢在服务端还是连接之前',
+  intro: '请求全程三秒，服务端只处理120毫秒。将代理、连接、等待与下载分开计时，找到同一段额外等待。',
   domain: 'network',
-  layer: '总耗时是四段故事的总和——分段定责，别让后端背连接的锅',
+  layer: '总耗时、代理协商、连接与TTFB的边界不同；用分段与同条件对照定位等待',
   part: 'apprentice',
   chapterId: 'integration',
   order: 3,
   typeTags: ['network', 'verification'],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」的新人前端，测试的 bug 单写着"接口慢 3 秒"，指派给了后端，后端说"我接口很快"。',
-    architecture: '浏览器 → 跨机房网关(新证书上线一周) → 商品服务 ｜ 测试环境：首次访问为主',
-    tag: '故障现场',
+    architecture: '测试浏览器 → 显式企业代理(CONNECT) → HTTPS网关 → 商品服务',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '测试的单据',
-        text: '商品详情接口耗时 3.0s（Network 面板总量）。\n后端的单据：服务端日志处理耗时 200ms——"我很快，是你的问题"。',
-      },
-      {
-        type: 'text',
-        title: '僵局',
-        text: '前端："Network 面板显示 3 秒。"\n后端："我日志 200ms。"\n同一个接口，两个数字差 15 倍——两个数字都是真的，它们量的是不同的东西。',
-      },
+      { type: 'error', title: '两个数字', text: 'Network请求全程3.0秒；同requestId服务端处理120毫秒。\n两者量段不同，不能直接说其中一方数据造假。' },
+      { type: 'log', title: '邻近变更', text: '网关近期换证书；代理鉴权目录服务也在同周迁移，需要证据区分。' },
     ],
-    timeline: '网关一周前上线新证书（此前无此问题）｜ 测试环境首次访问为主（无浏览器缓存）｜ 无其他变更',
-    impactHint: '"3 秒"是一个总数——把它拆开：DNS、连接、等待、下载，每段的故事不同，责任方也不同。',
+    timeline: '测试终端通过显式代理访问 ｜ 首次连接较慢 ｜ 网关换证与代理目录迁移在同周发生',
+    impactHint: '把总数拆回原始Timing：代理协商与TCP/TLS不要重叠相加，等待首字节也不等于服务端处理时间。',
   },
-
   hypotheses: [
-    { id: 'h-connect', text: '连接建立占 2.6s：TLS 完整握手 + OCSP 在线校验阻塞（新证书上线时间吻合）', excludeActionId: 'a-waterfall' },
+    { id: 'h-connect', text: '代理CONNECT协商等待占大头，而不是商品服务处理慢', excludeActionId: 'a-waterfall' },
     { id: 'h-ttfb', text: '服务端等待（TTFB）占大头：后端处理慢', excludeActionId: 'a-ttfbcheck' },
     { id: 'h-download', text: '内容下载占大头：响应体过大', excludeActionId: 'a-sizecheck' },
     { id: 'h-dns', text: 'DNS 解析慢拖住起点', excludeActionId: 'a-dnscheck' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -54,29 +44,28 @@ export const waterfallReadCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
-      result: {
-        type: 'code',
-        title: '瀑布图四段拆解',
-        text: 'DNS 解析：    0.1s\n连接建立：    2.6s  ← TCP + TLS\n等待(TTFB)：  0.2s  ← 服务端处理\n内容下载：    0.1s\n总 3.0s：慢的 87% 在"连接建立"——两个数字的谜底：\n后端的 200ms 量的是 TTFB，测试的 3 秒量的是全程——它们没打架，量段不同。',
-      },
+      tests: ['h-ttfb', 'h-download', 'h-dns', 'h-connect'],
+      hypotheses: [
+        { id: 'h-ttfb', status: 'excluded' },
+        { id: 'h-download', status: 'excluded' },
+        { id: 'h-dns', status: 'excluded' },
+        { id: 'h-connect', status: 'up' },
+      ],
+      result: { type: 'code', title: 'Timing分段', text: 'DNS0.10s；代理CONNECT协商2.36s；TCP/TLS建立0.24s；请求发出后等待首字节0.20s；下载0.10s，总3.00s。\n这里把代理与连接合计2.60s便于比较，但原始Timing分别记录，不能互相重叠相加。\n等待首字节包含网络往返和服务端处理，并不等同服务端日志120ms。' },
     },
     {
       id: 'a-waterfall',
-      name: '细拆连接段：2.6 秒里发生了什么',
-      desc: 'TCP 握手 × RTT + TLS 握手 + 证书验证，逐项对账',
+      name: '核对代理协商与连接的分段记录',
+      desc: '对齐浏览器Timing、代理日志和连接事件',
       cost: 2,
       gain: 'high',
       danger: false,
       effects: [],
       tests: ['h-connect'],
-      hypotheses: [{ id: 'h-connect', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '连接段解剖（跨机房 RTT 80ms）',
-        text: 'TCP 三次握手：3 × 80ms ≈ 0.24s\nTLS 握手：完整握手 2 × RTT ≈ 0.16s —— 合计 0.4s，还差 2.2s！\n抓包补刀：TLS Certificate 消息后，客户端卡 2.2s——\nOCSP 在线校验：客户端逐级查询证书状态（新证书未配 OCSP stapling），\n每级 OCSP 查询跨公网 0.7~1.1s。\n实锤：OCSP 在线校验 × 无 stapling = 每次全握手交 2.2s 的"验证税"。',
-      },
+      hypotheses: [
+        { id: 'h-connect', status: 'up' },
+      ],
+      result: { type: 'code', title: '代理与连接对账', text: '同请求代理日志：CONNECT入口后，鉴权目录lookup等待2.36秒；完成后才允许TLS隧道。\n连接记录为TCP约0.08s、TLS约0.16s，不用“三次握手=3×RTT”算耗时。\n代理等待的起止与浏览器Proxy negotiation对应，目录迁移后额外等待出现。\n没有客户端OCSP在线请求证据，不能从换证时间线直接声称浏览器逐级查吊销2.2秒。' },
     },
     {
       id: 'a-repro',
@@ -86,13 +75,11 @@ export const waterfallReadCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
-      result: {
-        type: 'code',
-        title: '首连 vs 复用对照',
-        text: '首次连接：connect 2.6s（OCSP + 完整握手）\n会话复用连接：connect 0.05s（TLS session 恢复，无证书重验）\n对照结论：慢的只是"每次全新握手"——与"新证书上线"时间吻合（换证书=新信任链=全量重验）。',
-      },
+      tests: ['h-connect'],
+      hypotheses: [
+        { id: 'h-connect', status: 'confirmed' },
+      ],
+      result: { type: 'code', title: '单变量对照', text: '已留存的受控对照：同浏览器、同网关证书、同请求；代理目录lookup恢复后，协商由2.36s降至0.04s，其余分段近似不变。\n总耗时约0.68s，服务端仍约120ms；再次复现目录延迟，协商段重新变长。\n这检验的是代理等待，不是把连接复用与TLS会话恢复混为一件事。' },
     },
     {
       id: 'a-ttfbcheck',
@@ -103,12 +90,10 @@ export const waterfallReadCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-ttfb'],
-      hypotheses: [{ id: 'h-ttfb', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: 'TTFB 核对',
-        text: '等待段 0.2s 与后端日志 200ms 一致——后端无辜，它的数字是真的，只是不是全部。',
-      },
+      hypotheses: [
+        { id: 'h-ttfb', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '服务处理与TTFB', text: '请求发出到首字节约200ms，服务端处理120ms，余下包含网络往返与调度。\n本次2.36秒额外等待在CONNECT协商前段，不在商品服务执行。' },
     },
     {
       id: 'a-sizecheck',
@@ -119,12 +104,10 @@ export const waterfallReadCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-download'],
-      hypotheses: [{ id: 'h-download', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '下载核对',
-        text: '响应 12KB / 0.1s——正常。\n→ 排除下载段。',
-      },
+      hypotheses: [
+        { id: 'h-download', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '下载段', text: '响应12KB，下载100ms；首字节后的传输不是3秒中的主要等待。' },
     },
     {
       id: 'a-dnscheck',
@@ -135,116 +118,65 @@ export const waterfallReadCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-dns'],
-      hypotheses: [{ id: 'h-dns', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: 'DNS 核对',
-        text: 'DNS 0.1s 正常（本地递归命中）。\n→ 排除 DNS。',
-      },
+      hypotheses: [
+        { id: 'h-dns', status: 'excluded' },
+      ],
+      result: { type: 'text', title: 'DNS段', text: 'DNS100ms，原始Timing与代理协商分开。不能把所有建立前等待都算成DNS。' },
     },
     {
       id: 'a-danger',
-      name: '紧急在客户端禁用 OCSP 校验',
-      desc: '【状态变更】测试端 curl --no-ocsp / 浏览器策略关 OCSP',
-      cost: 1,
+      name: '紧急回滚网关证书',
+      desc: '【状态变更】仅凭同周变更回滚证书',
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '禁用结果',
-        text: '连接 0.4s——快了，但证书吊销状态不再被验证：\n被吊销的证书也能通过——安全校验降级换速度。\n→ 复盘点评：OCSP 该用"服务端随握手递送"（stapling）解决，而不是让客户端闭眼。',
-      },
+      result: { type: 'text', title: '回滚陷阱', text: '代理目录仍等待2.36秒，回滚证书不能修复已经定位的CONNECT鉴权等待；还引入新的证书变更。\n本题其余动作读取原始记录，不依赖这个回滚先执行。' },
     },
     {
       id: 'a-fixstaple',
-      name: '修复：网关 OCSP stapling + TLS 会话复用',
-      desc: '【状态变更】网关开启 stapling（随握手附验证结果）+ session ticket 复用',
+      name: '修复：代理鉴权目录等待',
+      desc: '【状态变更】恢复目录依赖并按相同路径复验',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复结果',
-        text: '① OCSP stapling：服务端定时取签名好的验证结果随握手递送——客户端免在线查询\n② TLS session 复用：复用连接 0.05s（已有），全握手也降至 0.4s\n回归：首次连接 2.6s → 0.4s，接口总耗时 3.0s → 0.8s；吊销校验保留。',
-      },
+      result: { type: 'text', title: '针对性修复', text: '按代理目录服务迁移记录处理依赖等待，保持TLS验证与网关证书。\n按相同浏览器、代理、请求复验每个Timing分段；不靠关闭证书校验换速度。' },
     },
     {
       id: 'a-fixmonitor',
       name: '沉淀：连接分段埋点',
       desc: '【状态变更】前端监控按分段上报（DNS/connect/TTFB/download）；connect > 1s 告警',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '分段监控',
-        text: '沿用连接分段埋点（happy-eyeballs 批次的基建）：每段独立 P95 + "connect > 1s" 告警。\n下次"接口慢 3 秒"的单子，第一眼就知道该派给谁——分段定责结束甩锅文化。',
-      },
+      result: { type: 'text', title: '分段监测', text: '分别记录代理协商、DNS、连接、首字节等待与下载，注明连接复用及采样条件。\n比较同requestId的服务端处理时间，避免把两种不同量段直接相等。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-connect', text: '连接建立占 3 秒中的 2.6s：新证书未配 OCSP stapling，客户端逐级在线查询吊销状态（2.2s）+ 完整 TLS 握手——"接口慢 3 秒"的 87% 由连接段贡献，后端无辜', correct: true },
+    { id: 'rc-connect', text: '显式代理CONNECT鉴权目录等待2.36秒，独立日志与浏览器Timing对应；恢复目录后仅协商段缩短，其余段近似不变', correct: true },
     { id: 'rc-ttfb', text: '服务端处理慢拖高 TTFB', correct: false },
     { id: 'rc-download', text: '响应体过大拖慢下载段', correct: false },
     { id: 'rc-dns', text: 'DNS 解析慢拖住起点', correct: false },
   ],
-
   expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
-    {
-      thought: '"3 秒"是一个总数——第一动作就是拆：DNS/连接/等待/下载四段，每段有自己的责任方。',
-      update: '87% 在连接建立段——后端的 200ms 与测试的 3 秒没打架，量段不同。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 教学核心：总耗时是四段故事的总和——分段是性能争议的终审程序。"谁的问题"这种争论，在瀑布图面前自动终止。',
-      conclusion: '主嫌疑锁定：连接段（h-connect 升权）。',
-    },
-    {
-      thought: '细拆连接段：TCP/握手/证书验证逐项对账——2.6s 里还藏着一段"看不见的等待"。',
-      update: '实锤：OCSP 在线校验 2.2s（新证书无 stapling）+ 握手 0.4s——验证税实锤。',
-      actionId: 'a-waterfall',
-      why: '2⚡︎ 分段之后还要再分段：连接段内部（TCP/TLS/OCSP）各有账本——"拆到能行动为止"是性能分析的分寸：OCSP 一项就对应一个明确的修复（stapling）。',
-      conclusion: '根因实锤：OCSP 验证税。',
-    },
-    {
-      thought: '首连 vs 会话复用的对照实验——把"证书换新"这个变量钉死。',
-      update: '复用 0.05s vs 首连 2.6s——慢只发生在全新握手；与换证书时间线吻合。',
-      actionId: 'a-repro',
-      why: '1⚡︎ 对照实验同时解释"为什么现在才出现"：换证书重置了信任链缓存——变量与时间线的咬合，让修复不再怀疑"是不是还要查别处"。',
-      conclusion: '变量钉死 → 排除其余三段。',
-    },
-    {
-      thought: 'TTFB/下载/DNS 各 1⚡︎ 排除留证——四段都有"无责证明"，甩锅文化终结。停止收集。',
-      update: '停止。',
-      actionId: '',
-      why: '【停止规则】分段（87% 在连接）✓ 细拆（OCSP 2.2s）✓ 对照（复用 0.05s）✓——四段无责 + 一段实锤，证据链完整。',
-      conclusion: '沉淀：总耗时是四段故事的总和——分段定责后，"慢"从一句废话变成一张派工单。',
-    },
+    { actionId: 'a-impact', thought: '先拆原始Timing，保留代理协商与连接的边界。', update: '额外等待集中CONNECT协商，其余段不是主因。', why: '1⚡先统一量段，避免把全程3秒直接归给后端120毫秒。', conclusion: '核对代理日志。' },
+    { actionId: 'a-waterfall', thought: 'CONNECT鉴权目录lookup等待2.36秒，与浏览器记录对应。', update: '换证只是相邻变更，尚无证据归因OCSP。', why: '2⚡独立日志与客户端Timing对账，区分实际等待和推测的协议往返。', conclusion: '需要单变量对照。' },
+    { actionId: 'a-repro', thought: '只恢复目录lookup，其余条件相同，协商缩短2.32秒。', update: '代理等待的机制得到支持。', why: '1⚡同条件对照避免把连接复用或证书替换造成的变化混入结论。', conclusion: '按同路径验证修复。' },
+    { actionId: '', thought: '分段、代理事件和单变量对照闭合；保留TLS校验，不把TTFB等同服务端处理或把TCP握手算作3RTT。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '分段、代理事件和单变量对照闭合；保留TLS校验，不把TTFB等同服务端处理或把TCP握手算作3RTT。' },
   ],
-
   lessons: [
-    {
-      text: '总耗时是四段故事的总和：DNS/连接/等待/下载——每段对应不同的责任方，分段是性能争议的终审程序。',
-      principle: '验证思维：任何"接口慢 X 秒"的单子，第一动作是打开瀑布图分段——后端的日志只量 TTFB，客户端的总耗时包含连接与传输。分段定责终结"前后端互相甩锅"：每段的无责证明与实锤一样重要。',
-    },
-    {
-      text: '分段之后还要拆到"能行动为止"：连接段内部再拆 TCP/TLS/证书验证——OCSP 在线校验一项就对应一个明确修复。',
-      principle: '程序设计：性能分析的分寸 = 拆到"一个症状对应一个动作"。OCSP stapling（服务端随握手递送验证结果）是慢握手的特效药——新手证书上线清单里必须有它，否则每次全握手都交 2 秒验证税。',
-    },
-    {
-      text: '两个数字都是真的：后端 200ms 与客户端 3s 量的是不同的段——先问"你量的是哪一段"，再谈谁的问题。',
-      principle: '沟通纪律：性能争议的第一句话应该是"定义量段"而不是"我很快"。分段埋点（DNS/connect/TTFB/download 独立上报）让每一段有公开的数字——甩锅文化终结于共同的仪表盘。',
-    },
+    { text: '先统一计时边界，再比较客户端总耗时和服务端处理时间。', principle: '代理协商、DNS、连接、等待首字节和下载覆盖不同阶段。等待首字节包含网络因素，不能直接等同应用处理日志。' },
+    { text: 'TCP三次握手不等于耗时3RTT；连接复用与TLS会话恢复也不是一回事。', principle: '协议包数、往返次数和工具展示时间必须分别判断。采用真实Timing与连接事件，不用错误乘法解释剩余等待。' },
+    { text: '同周换证只是候选线索，缺少在线吊销查询证据不能声称浏览器必查OCSP。', principle: '用独立日志与单变量对照确认具体等待来源，保留安全校验。不能因为stapling存在就把它当所有慢连接的特效药。' },
   ],
 }

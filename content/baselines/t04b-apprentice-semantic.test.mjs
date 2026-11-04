@@ -40,7 +40,7 @@ for (const r of baseline.cases.filter(r => r.status === 'calibrated')) {
       const states = Object.fromEntries(c.hypotheses.map(h => [h.id, 'open']))
       let cost = 0
       assert.equal(new Set(path.actions).size, path.actions.length)
-      assert.equal(path.actions[0], c.expertChain[0].actionId)
+      if (path.name === '标准路径') assert.equal(path.actions[0], c.expertChain[0].actionId)
       for (const id of path.actions) {
         const a = c.actions.find(a => a.id === id)
         cost += a.cost
@@ -76,4 +76,34 @@ test('错误风暴区分报出超时与先行事件，标准路径包含全量�
   assert.match(first, /01:13:20新SQL/)
   assert.match(c.actions.find(a => a.id === 'a-independence').result.text, /3000\+1200\+800=5000/)
   assert.equal(c.expertChain[2].actionId, 'a-independence')
+})
+
+test('Cookie题只有凭证模式成立，不能把三个候选同时标为根因', () => {
+  const c = load('app/data/cases/cookie-lost.ts')
+  const detail = c.actions.find(a => a.id === 'a-cookiedetail').result.text
+  assert.match(detail, /SameSite=Lax; Max-Age=604800/)
+  assert.match(detail, /跨源但同站/)
+  assert.match(c.actions.find(a => a.id === 'a-fetchcode').result.text, /既不发送目标源Cookie，也不接纳响应的Set-Cookie/)
+})
+
+test('轮询题的QPS与容量算术能对账，304不减少调度次数', () => {
+  const c = load('app/data/cases/poll-storm.ts')
+  assert.equal(30 * 100 / 5, 600)
+  assert.equal(30 * 12 / 60, 6)
+  assert.ok(600 + 40 > 500)
+  assert.equal(30 / 5 + 40, 46)
+  assert.match(c.actions.find(a => a.id === 'a-timeraudit').result.text, /30页×100个÷5秒=600QPS/)
+  assert.match(c.actions.find(a => a.id === 'a-backendlog').result.text, /总46QPS/)
+  assert.match(c.actions.find(a => a.id === 'a-fixcache').result.text, /不会把600次请求自动变成6次/)
+})
+
+test('性能分段总和3秒，金额单位方向不再写反', () => {
+  const timing = load('app/data/cases/waterfall-read.ts')
+  assert.equal(Math.round((0.10 + 2.36 + 0.24 + 0.20 + 0.10) * 100), 300)
+  assert.match(timing.actions.find(a => a.id === 'a-impact').result.text, /代理CONNECT协商2.36s/)
+  assert.match(timing.actions.find(a => a.id === 'a-repro').result.text, /总耗时约0.68s/)
+  const amount = load('app/data/cases/mock-canyon.ts')
+  assert.equal(880 / 100, 8.8)
+  assert.equal((8.8 / 100).toFixed(3), '0.088')
+  assert.match(amount.actions.find(a => a.id === 'a-impact').result.text, /缩小100倍/)
 })

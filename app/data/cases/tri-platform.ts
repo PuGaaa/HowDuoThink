@@ -1,50 +1,40 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 4 章 · 联调之夜 结业（三端同故障归一 L3）
- * 教学点：全栈视野——三端同秒各坏各的，表象互不相关：同一次网关变更的三个涟漪；
- * 安全策略发布要按"端 × 规则"矩阵展开，三端拨测让健康一屏可见。
- * 专家路径：impact(1) + policydiff(2) + cointoss(1) = 4⚡︎
+ * 学徒篇校准：按客户端与规则对照验证共享发布影响。
+ * 原型：CORS、TLS协商与网关规则发布；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/3/2，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-policydiff → a-cointoss；替代顺序：a-impact → a-cointoss → a-policydiff。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const triPlatformCase: DiagnosisCase = {
   id: 'tri-platform',
   title: '三端同时各坏各的：小程序、App、H5',
   intro: '商品列表接口三端同秒各坏各的：小程序 403、App 握手失败、H5 报 CORS——三份日志三个世界，根因只有一个。',
   domain: 'network',
-  layer: '三端表象互不相关，恰是同一个变更的三种涟漪——变更影响半径按端展开',
+  layer: '同次发布可包含多个独立规则；逐端按请求与规则匹配验证，不靠同秒概率定因',
   part: 'apprentice',
   chapterId: 'integration',
   order: 6,
   typeTags: ['network', 'security', 'deploy'],
-  difficulty: 3,
-
+  difficulty: 2,
   scene: {
     role: '你是「鲜到家」的全端联调负责人，商品列表接口今晚让三个端的小群同时炸了。',
     architecture: '小程序端 / App 端(旧 TLS 栈) / H5 端(新域名) → 统一网关(昨晚发布"安全基线统一") → 商品服务',
-    tag: '故障现场',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '三端三症状（同秒开始）',
-        text: '小程序：403 Forbidden（请求被拒，日志提示 referer 校验失败）\nApp 老版本：TLS 握手失败（协议版本被拒）\nH5（新域名）：CORS 预检失败（OPTIONS 被 403）',
-      },
-      {
-        type: 'text',
-        title: '排查僵局',
-        text: '三个端的同学各自排查：小程序查了 referer 配置、App 查了 TLS 版本、H5 查了 CORS——\n各端近期代码零变更，"我这边没动过"×3。',
-      },
+      { type: 'error', title: '三端三症状（同秒开始）', text: '小程序：403 Forbidden（请求被拒，日志提示 referer 校验失败）\nApp 老版本：TLS 握手失败（协议版本被拒）\nH5（新域名）：CORS 预检失败（OPTIONS 被 403）' },
+      { type: 'text', title: '排查僵局', text: '三个端的同学各自排查：小程序查了 referer 配置、App 查了 TLS 版本、H5 查了 CORS——\n各端近期代码零变更，"我这边没动过"×3。' },
     ],
-    timeline: '昨晚 22:00 网关发布"安全基线统一"（安全周整改项）｜ 三端故障今晨同时爆发 ｜ 三端代码均无变更',
+    timeline: '22:00仅部署安全策略包 ｜ 07:02:11启用规则开关 ｜ 三端同刻出现各自错误，客户端制品未变',
     impactHint: '三端代码零变更、故障同秒爆发、症状互不相同——"互不相关"的表象下，谁动了它们共享的东西？',
   },
-
   hypotheses: [
     { id: 'h-policy', text: '网关安全策略一次性收紧：三端各自踩中一条新规则（referer 白名单/TLS 1.2 最低/CORS 白名单）', excludeActionId: 'a-policydiff' },
     { id: 'h-threebug', text: '三端各自的代码 bug 巧合爆发', excludeActionId: 'a-cointoss' },
     { id: 'h-cluster', text: '三端解析到不同网关集群（灰度未完成）', excludeActionId: 'a-clusterroute' },
     { id: 'h-cert', text: '证书轮换只对部分域名生效', excludeActionId: 'a-certmatrix' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -56,11 +46,7 @@ export const triPlatformCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'code',
-        title: '三端对时',
-        text: '小程序 403：     07:02:11 起\nApp 握手失败：   07:02:11 起\nH5 CORS 403：    07:02:11 起\n三端代码变更史：均无（最近的改动都在一个月前）\n起点同秒 + 代码零变更 → 三端共享的层（网关）成为唯一嫌疑人。',
-      },
+      result: { type: 'text', title: '时间与变更范围', text: '三端首次失败都在07:02:11规则开关启用后，客户端制品版本未变。\n这提高共享层变更的优先级，不排除证书、路由或客户端已有缺陷，需要逐项核对。' },
     },
     {
       id: 'a-policydiff',
@@ -70,29 +56,28 @@ export const triPlatformCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-policy'],
-      hypotheses: [{ id: 'h-policy', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '网关变更审计',
-        text: '昨晚"安全基线统一"一次上线三条规则：\n① referer 白名单校验开启 —— 小程序端 referer 格式特殊 → 403 ✓ 对上\n② TLS 最低版本 1.0→1.2 —— App 老内核仅支持 TLS1.0 → 握手失败 ✓ 对上\n③ CORS 白名单收紧（新增域名未加白）—— H5 新域名 → 预检 403 ✓ 对上\n实锤：一次发布三条规则，三端各踩一条——"互不相关"的表象下是同一个变更的三个涟漪。',
-      },
+      tests: ['h-cluster', 'h-cert', 'h-policy'],
+      hypotheses: [
+        { id: 'h-cluster', status: 'excluded' },
+        { id: 'h-cert', status: 'excluded' },
+        { id: 'h-policy', status: 'up' },
+      ],
+      result: { type: 'code', title: '逐端规则证据', text: '启用包内三条变化：Referer允许列表漏掉该小程序实际Referer；TLS最低1.2，旧App ClientHello只提供1.0；H5实际Origin不在新允许列表，网关明确拒OPTIONS为403。\n三端连接记录命中同一网关集群与同一策略版本；证书指纹与上版一致。\nApp在TLS握手协商阶段被拒、尚未进入证书校验，不叫“握手前”。' },
     },
     {
       id: 'a-cointoss',
-      name: '算"三端巧合"的概率',
-      desc: '三端零变更同秒故障的可能性',
+      name: '核对逐规则单变量演练',
+      desc: '不以巧合概率代替客户端与规则对照',
       cost: 1,
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-threebug'],
-      hypotheses: [{ id: 'h-threebug', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '概率反证',
-        text: '三端代码零变更 × 同秒故障 × 症状恰好对应三条新规则——巧合概率趋零。\n→ 排除三端各自 bug：共享层变更的涟漪，在各端表现为"各坏各的"。',
-      },
+      tests: ['h-policy', 'h-threebug'],
+      hypotheses: [
+        { id: 'h-policy', status: 'confirmed' },
+        { id: 'h-threebug', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '逐规则对照', text: '已留存的同客户端同请求演练：只补该小程序Referer允许项，小程序恢复而另外两端仍失败；只补H5 Origin，H5恢复；旧App换支持TLS1.2的内核后通过，服务器基线不降低。\n每端成功/失败与它命中的规则对应，支持共同发布触发而非三端各自新bug。\n这不保证所有兼容与安全目标都能无条件同时满足。' },
     },
     {
       id: 'a-clusterroute',
@@ -103,12 +88,10 @@ export const triPlatformCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-cluster'],
-      hypotheses: [{ id: 'h-cluster', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '路由核对',
-        text: '三端解析同一网关集群（无灰度分流）。\n→ 排除集群差异。',
-      },
+      hypotheses: [
+        { id: 'h-cluster', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '路由与版本', text: '三端的连接、网关实例与策略版本都落在同一已核验集群；仅DNS同IP不足以证明没有其他路由策略。' },
     },
     {
       id: 'a-certmatrix',
@@ -119,132 +102,77 @@ export const triPlatformCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-cert'],
-      hypotheses: [{ id: 'h-cert', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '证书核对',
-        text: '证书无轮换（上月已稳定）；App 失败是 TLS 协议版本拒绝（握手前），非证书校验。\n→ 排除证书。',
-      },
+      hypotheses: [
+        { id: 'h-cert', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '协议与证书阶段', text: '证书指纹未变，TLS告警为protocol_version且发生于版本协商；不是证书链验证失败。\n“证书未变”本身不证明证书永远无问题，此处有阶段与错误码支持。' },
     },
     {
       id: 'a-danger',
       name: '紧急回滚网关安全策略',
       desc: '【状态变更】三条规则全量回退',
-      cost: 1,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '回滚结果',
-        text: '三端全部恢复——三端拨测立刻转绿。\n代价：上周安全扫描的整改项全部回退（referre 校验/TLS 基线/CORS 白名单都是扫描整改项）——\n安全与兼容被做成全量二选一。\n→ 复盘点评：回滚是对"一次性上线"的惩罚——分级上线本可以两者兼得。',
-      },
+      result: { type: 'text', title: '回滚取舍', text: '全量回退会暂时恢复兼容，却一并撤销新安全基线。应按真实影响、回滚策略与责任审批处置，不把回滚本身一概视为错误。' },
     },
     {
       id: 'a-fixtiered',
       name: '修复：三条规则分级上线',
       desc: '【状态变更】规则分三次发布，每次先加白后收紧 + 各端灰度验证',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '分级上线',
-        text: '① CORS：新域名先加白（H5 验证）→ 收紧白名单外域名\n② referer：小程序域名先加白（端上验证）→ 开启校验\n③ TLS：App 老内核迁移评估 + 双协议过渡期 → 收紧最低版本\n每步"先给出路、再设门槛"——三端全绿后，安全基线逐条回归。',
-      },
+      result: { type: 'text', title: '分级修复', text: '核对实际Referer和Origin，在允许列表内明确加入合法值并逐端验证；TLS保持最低1.2，旧App必须升级或执行经批准的兼容处置。\n不能以“过渡期”名义无条件重新开放TLS1.0/1.1；分级上线也不能保证没有现实取舍。' },
     },
     {
       id: 'a-fixmatrix',
       name: '沉淀：安全策略发布矩阵',
       desc: '【状态变更】发布检查单：规则 × 端 矩阵逐条过——变更的影响半径按端展开',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '发布矩阵',
-        text: '安全策略变更检查单：每条规则 × 三端（小程序/App/H5）逐格确认（影响谁/如何过渡/验证方式）。\n一次发布三条规则 × 三端 = 九格——九格里任何一格没想清楚，就是今晨的一个 403。',
-      },
+      result: { type: 'text', title: '发布矩阵', text: '每条规则列出受影响客户端、合法输入、版本能力、回滚条件和验证样本。\n已核验的策略矩阵指导逐项发布，不用一次全绿代替未覆盖客户端。' },
     },
     {
       id: 'a-fixprobe',
       name: '沉淀：三端拨测',
       desc: '【状态变更】每端一条代表性合成拨测，网关变更后自动执行——三端健康一屏可见',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '三端拨测',
-        text: '三端拨测上线：小程序请求(带特殊 referer)/App 请求(旧 TLS 栈模拟)/H5 跨域预检。\n网关变更后自动执行——三条拨测的红色就是今晨的三个故障，变更后 1 分钟全现形。',
-      },
+      result: { type: 'text', title: '代表性验证', text: '使用真实客户端代表样本核对Referer、TLS协商和H5预检；监测发现时间由执行频率与覆盖决定，不承诺必定一分钟。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-policy', text: '网关"安全基线统一"一次上线三条规则（referer 白名单/TLS 最低 1.2/CORS 白名单收紧）：三端各踩一条——小程序 403、App 握手失败、H5 预检 403；一次发布 × 三端 = 九格影响无人核对', correct: true },
+    { id: 'rc-policy', text: '同次安全策略启用漏掉合法Referer/Origin并提高TLS基线，三个客户端分别命中不同规则；逐规则演练验证了对应关系', correct: true },
     { id: 'rc-threebug', text: '三端各自代码 bug 巧合爆发', correct: false },
     { id: 'rc-cluster', text: '三端解析到不同网关集群', correct: false },
     { id: 'rc-cert', text: '证书轮换部分域名未生效', correct: false },
   ],
-
   expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
-    {
-      thought: '三端代码零变更、故障同秒爆发——三端对时的意义：共享层是唯一嫌疑人。',
-      update: '起点同秒 + 各端无变更——小程序/App/H5 共享的"网关"浮出。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 多端故障的归一动作与多服务同构：代码零变更 × 同秒起点 = 共享层变更——"互不相关"的表象恰恰是"同源"的伪装。',
-      conclusion: '嫌疑锁定：网关安全策略（h-policy 升权）。',
-    },
-    {
-      thought: '审计网关昨晚发布——三条新规则与三个症状逐一对号。',
-      update: '实锤：referer/TLS/CORS 三条规则分别命中三端——一次发布的三个涟漪。',
-      actionId: 'a-policydiff',
-      why: '2⚡︎ 变更审计的粒度要到"每条规则"：一次发布不是原子的影响——它包含 N 条规则，每条规则的杀伤半径不同。三症状对三规则的全对号，是归一的铁证。',
-      conclusion: '根因实锤：一次性上线三条规则。',
-    },
-    {
-      thought: '巧合概率反证——三端零变更同秒故障，"各自 bug"叙事出局。',
-      update: '概率趋零 + 症状与规则全对号——巧合论退场。',
-      actionId: 'a-cointoss',
-      why: '1⚡︎ 多端排查的政治学：三端都会说"我这边没动过"——概率反证给出中立的裁判：大家的确都没动，动的是大家共享的那层。',
-      conclusion: '责任归位到共享层。',
-    },
-    {
-      thought: '集群/证书各 1⚡︎ 排除；回滚陷阱（安全整改全回退）点评；分级上线 + 发布矩阵 + 三端拨测。停止收集。',
-      update: '停止。',
-      actionId: '',
-      why: '【停止规则】根因（三规则一次上线）✓ 涟漪（三端对号）✓ 防线（矩阵+拨测）✓——个案、结构、防线三层闭合。',
-      conclusion: '沉淀：三端表象互不相关，恰是同一变更的三种涟漪——安全策略发布按"端×规则"矩阵展开，先给出路再设门槛。',
-    },
+    { actionId: 'a-impact', thought: '把部署与开关启用分开对时。', update: '共同启用时刻只是共享层候选线索。', why: '1⚡先核对实际生效时刻，避免把昨晚部署与今晨故障硬接成同秒。', conclusion: '逐端核对规则与失败阶段。' },
+    { actionId: 'a-policydiff', thought: '每端请求命中一条明确新规则，连接版本和证书有记录。', update: '路由及证书替代假设得到排除。', why: '2⚡依据实际Referer、Origin与ClientHello匹配规则，不只凭变更说明猜测。', conclusion: '需要逐项对照验证。' },
+    { actionId: 'a-cointoss', thought: '每次只更改一个合法条件，对应端恢复，其他端不变。', update: '规则与症状对应得到支持，排除无关三端新bug。', why: '1⚡单变量演练比“巧合概率趋零”更能支持发布归因，也暴露兼容取舍。', conclusion: '逐项修复并验证。' },
+    { actionId: '', thought: '启用时刻、逐端命中与单变量对照闭合；保留TLS安全基线，不把分级发布承诺成无条件兼容。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '启用时刻、逐端命中与单变量对照闭合；保留TLS安全基线，不把分级发布承诺成无条件兼容。' },
   ],
-
   lessons: [
-    {
-      text: '三端表象互不相关，恰是同一个变更的三种涟漪：共享层的一次发布，在每端表现为"各自的故障"。',
-      principle: '全栈视野：多端归一与多服务归一同构——代码零变更 × 同秒起点 = 共享层变更。变更审计要到"每条规则"粒度：一次发布 N 条规则，每条的杀伤半径不同，混在一起就没人看得清。',
-    },
-    {
-      text: '安全策略发布按"端×规则"矩阵展开：先给出路（加白/过渡期/灰度）再设门槛（收紧/拒绝）——安全与兼容不必二选一。',
-      principle: '发布设计：一次发布三条规则 × 三端 = 九格影响——任何一格没想清楚就是一次故障。分级上线（CORS 加白→收紧、TLS 双协议过渡、referer 先白后校）让安全基线逐条回归，而非全量回滚。',
-    },
-    {
-      text: '三端拨测让"多端健康"一屏可见：每端一条代表性合成请求，变更后自动执行——三端故障的发现时间从半天到 1 分钟。',
-      principle: '可观测性设计：拨测的"端代表性"是关键——小程序带特殊 referer、App 模拟旧 TLS 栈、H5 走跨域预检，每条拨测都是该端的"最易碎路径"。多端产品的健康监控，必须按端建拨测，而不是只盯服务端。',
-    },
+    { text: '部署时刻与规则启用时刻要分开；同秒只是线索，逐端规则命中才是证据。', principle: '客户端未更新也可能暴露既有兼容缺口。连接实例、策略版本、实际输入和单变量演练用于检验共享变更假设。' },
+    { text: 'TLS版本协商是握手的一部分；协议版本拒绝与证书校验失败不是同一阶段。', principle: '根据ClientHello、告警和证书阶段区分原因。TLS1.0/1.1已被弃用，兼容处置不能无条件降低既定安全基线。' },
+    { text: '安全与兼容有真实取舍，分级发布用于提前发现，不能保证两者永远兼得。', principle: '为每类端保留代表样本、版本升级计划与明确回滚条件。回滚可能是必要止血，但范围和代价必须由具体证据决定。' },
   ],
 }

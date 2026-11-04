@@ -1,49 +1,39 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 4 章 · 联调之夜 首批（字段命名不一致 L1）
- * 教学点：验证思维——联调三步：网络面板看请求、响应体看数据、再看代码；
- * "接口 200 + 日志无错 + 页面空白"的三无现场，真相在两层代码之间的传输数据里。
- * 专家路径：impact(1) + netpanel(2) + responsebody(1) = 4⚡︎
+ * 学徒篇校准：解释成功响应为何被前端过滤为空。
+ * 原型：JavaScript属性读取与数组过滤；教学重建，不冒充原始事故日志。
+ * 六维：1/1/1/1/2/1，中位数半档向下取整，L1。
+ * 标准路径：a-impact → a-netpanel → a-responsebody；替代顺序：a-impact → a-responsebody → a-netpanel。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const fieldMismatchCase: DiagnosisCase = {
   id: 'field-mismatch',
   title: '接口 200、日志无错，页面却是空的',
-  intro: '联调第一晚：后端接口 200 正常、前端代码没报错，积分页面就是空白——两个"没错"，数据在哪变了形？',
+  intro: '接口成功，数组也非空，页面却没有行。将响应字段与实际过滤表达式逐项对照。',
   domain: 'network',
-  layer: '联调三步：先看网络面板，再看响应体，最后才看代码——传输中的数据是唯一的真相',
+  layer: '成功状态不保证展示契约一致；字段与过滤表达式决定哪些数据真正渲染',
   part: 'apprentice',
   chapterId: 'integration',
   order: 1,
   typeTags: ['config', 'data'],
   difficulty: 1,
-
   scene: {
     role: '你是「鲜到家」的新人前端，第一次前后端联调就卡在"三无现场"。',
-    architecture: '前端页面(JS: data.user_id 渲染) → HTTP 接口(后端 Java: 返回 userId) → 用户服务',
-    tag: '故障现场',
+    architecture: 'Java接口返回userId与points → 浏览器接收JSON → Vue过滤并渲染积分列表',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '三无现场',
-        text: '① 接口状态 200 ✓　② 后端日志：查询成功、返回数据 ✓　③ 前端控制台：零报错 ✓\n但积分列表一片空白——数据像在半路蒸发。',
-      },
-      {
-        type: 'text',
-        title: '联调局面',
-        text: '后端："我接口好的，你看 200，数据也返回了。"\n前端："我代码没报错，按接口写的。"\n两个人都没错——那谁错了？',
-      },
+      { type: 'error', title: '三无现场', text: '① 接口状态 200 ✓　② 后端日志：查询成功、返回数据 ✓　③ 前端控制台：零报错 ✓\n但积分列表一片空白——数据像在半路蒸发。' },
+      { type: 'text', title: '联调局面', text: '后端展示查询成功记录，前端展示静态页面骨架；双方都没有检查响应字段与过滤表达式是否一致。' },
     ],
     timeline: '联调第一晚 21:00 ｜ 积分页面前后端第一次对接 ｜ 接口文档是口头的（"返回用户积分列表"）',
-    impactHint: '"三无"现场排除了一切"出错"的地方——剩下的嫌疑：没出错，但"对不上"。',
+    impactHint: '没有报错不表示契约正确，先看实际响应与页面读取规则。',
   },
-
   hypotheses: [
     { id: 'h-field', text: '字段名对不上：后端返回 userId，前端读的是 user_id——数据到了，钥匙不对', excludeActionId: 'a-netpanel' },
     { id: 'h-empty', text: '后端返回了空数组：数据真的没有', excludeActionId: 'a-responsebody' },
     { id: 'h-status', text: '状态码误判：业务包装码非 200，前端判断逻辑放过了错误', excludeActionId: 'a-statuscode' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -55,11 +45,7 @@ export const fieldMismatchCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '边界圈定',
-        text: '页面骨架正常渲染（静态部分都在）——JS 在跑；\n列表区域空——渲染循环没拿到"可迭代的用户数组"；\n接口确实返回了 200 与数据（后端自证）。\n→ 骨架在、数据在后端、中间的"接收-渲染"环节是盲区——从盲区的第一站看起：网络面板。',
-      },
+      result: { type: 'text', title: '影响面', text: '静态骨架正常；新接口的12个预期用户都没显示，其他旧接口列表正常。\nHTTP200只说明请求处理成功，不能证明响应非空或字段符合页面契约。' },
     },
     {
       id: 'a-netpanel',
@@ -69,29 +55,27 @@ export const fieldMismatchCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-field'],
-      hypotheses: [{ id: 'h-field', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '网络面板（Response 标签）',
-        text: '后端真实返回：\n{ "code": 0, "data": [ { "userId": 1001, "points": 880 }, … ] }\n前端渲染代码：\nlist.map(u => u.user_id + "：" + u.points)\n→ 后端给的是 userId（驼峰），前端读的是 user_id（下划线）——\nu.user_id === undefined → 渲染空。数据全程都在，钥匙对不上锁。',
-      },
+      tests: ['h-empty', 'h-field'],
+      hypotheses: [
+        { id: 'h-empty', status: 'excluded' },
+        { id: 'h-field', status: 'up' },
+      ],
+      result: { type: 'code', title: '真实响应', text: '真实响应HTTP200，body为{code:0,data:[{userId:1001,points:880},…]}，data有12行，每行有userId。\n这排除响应为空；是否被页面错误过滤，还要读取实际消费表达式，不能替前端代码猜结果。' },
     },
     {
       id: 'a-responsebody',
-      name: '核对响应体非空',
-      desc: '排除"数据真没有"',
+      name: '核对页面分支与过滤表达式',
+      desc: '将实际响应与真正的消费代码逐项对照',
       cost: 1,
-      gain: 'low',
+      gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-empty'],
-      hypotheses: [{ id: 'h-empty', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '响应体核对',
-        text: 'data 数组 12 个元素，字段齐全（只是名字不同）。\n→ 排除空数据：数据富余，是"名字"出了问题。',
-      },
+      tests: ['h-field', 'h-status'],
+      hypotheses: [
+        { id: 'h-field', status: 'confirmed' },
+        { id: 'h-status', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '消费代码对照', text: '当前页面：if(body.code===0) rows=body.data.filter(u=>u.user_id!=null);\n成功分支按该接口约定的code=0放行；过滤读取user_id，而接口契约和本次响应字段是userId。\n12行的user_id均为undefined，被过滤为空，不会因这个比较自动抛异常。\n如果先读代码，再用网络面板核实实际响应，最终结论相同。' },
     },
     {
       id: 'a-statuscode',
@@ -102,131 +86,76 @@ export const fieldMismatchCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-status'],
-      hypotheses: [{ id: 'h-status', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '状态核对',
-        text: 'HTTP 200 + 业务码 code:0——两层状态都是成功语义，前端判断也正确放行。\n→ 排除状态误判。',
-      },
+      hypotheses: [
+        { id: 'h-status', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '状态协议', text: '该接口约定code=0表示成功，页面也按code===0放行；HTTP200与业务码不是同一个数字协议。\n排除本案业务码误判。' },
     },
     {
       id: 'a-fixmap',
       name: '修复：前端字段映射对齐',
       desc: '【状态变更】按实际返回字段渲染（userId），页面出数据',
       cost: 1,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复结果',
-        text: '渲染字段改为 userId，页面立刻出 12 条积分记录。\n联调第一晚的最终答案：不是谁错了，是两个人对"同一份数据"用了两套命名——\n这类问题唯一的裁判是网络面板里的真实数据。',
-      },
+      result: { type: 'text', title: '映射修复', text: '将页面读取与过滤统一为实际契约userId；相同12条响应均被展示。\n不能只把示例字符串中的undefined当成“必然空页面”，需要说明真正隐藏行的条件。' },
     },
     {
       id: 'a-fixschema',
       name: '沉淀：接口类型由 schema 生成',
       desc: '【状态变更】前端类型从 OpenAPI/schema 自动生成，禁止手写字段名',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '类型生成',
-        text: '接入 schema 生成：后端改字段 → 前端类型定义自动更新 → 编译期报错替代联调期空白。\n手写 interface 是漂移的温床——让"对齐"发生在构建期，而不是深夜的联调现场。',
-      },
+      result: { type: 'text', title: '契约生成', text: '通过同一OpenAPI/schema生成契约并在构建中检查兼容性。\n仅手写一个TypeScript断言不会验证运行时JSON，类型生成也必须与实际发布契约一致。' },
     },
     {
       id: 'a-fixchecklist',
       name: '沉淀：联调三步检查单',
       desc: '【状态变更】①网络面板看请求 ②Response 看响应体 ③最后才看代码——写进新人手册第一页',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '三步检查单',
-        text: '联调问题的标准动作序列：\n① Network 面板：请求真的发出去了吗（URL/参数/头）\n② Response：真的数据长什么样（不是文档说的样子）\n③ 代码：拿真实数据对照读取逻辑。\n顺序不能反——先看代码的人，会在自己的假设里绕三小时。',
-      },
+      result: { type: 'text', title: '联调检查', text: '核对请求、响应、消费代码三份事实；按当前最便宜的证据选择顺序。\n没有“必须最后才能读代码”的绝对规则，关键是三者对得上。' },
     },
     {
       id: 'a-fixcontract',
       name: '沉淀：接口文档从"口头"到"契约"',
       desc: '【状态变更】新接口联调前必须有 schema 文档（示例响应必含），口头约定废止',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '契约前置',
-        text: '"返回用户积分列表"的口头约定 ≠ 契约。\n规范：联调前提供 schema + 示例响应（字段名/类型/嵌套结构）——\n一次 10 分钟的文档，省一晚上的"三无现场"。',
-      },
+      result: { type: 'text', title: '契约前置', text: '"返回用户积分列表"的口头约定 ≠ 契约。\n规范：联调前提供 schema + 示例响应（字段名/类型/嵌套结构）——\n一次 10 分钟的文档，省一晚上的"三无现场"。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-field', text: '前后端字段命名不一致：后端 camelCase（userId/points），前端按下划线（user_id）读取——undefined 渲染为空；接口无 schema 契约，双方各自"没错"', correct: true },
+    { id: 'rc-field', text: '响应有userId，页面却按user_id过滤，12行均被排除；成功码和非空响应不保证展示契约正确', correct: true },
     { id: 'rc-empty', text: '后端返回空数组，数据确实不存在', correct: false },
-    { id: 'rc-status', text: '业务包装码非 200，前端状态判断误放行', correct: false },
+    { id: 'rc-status', text: '业务code与页面判断不一致，导致错误分支被放行', correct: false },
   ],
-
   expertCost: 4,
-  restartActionId: 'a-fixmap',
-
+  restartActionId: '',
   expertChain: [
-    {
-      thought: '"三无现场"先圈边界：哪些环节被排除了（200/日志/无报错），剩下的盲区在哪一站。',
-      update: '骨架正常、数据在后端、接收-渲染环节是盲区——从盲区第一站（网络面板）看起。',
-      actionId: 'a-impact',
-      why: '1⚡︎ "三无"的价值是排除法：所有会"报错"的环节都干净，剩下的是"不报错但可以对不上"的环节——数据传输层。',
-      conclusion: '排查路径确立：网络面板 → 响应体 → 代码。',
-    },
-    {
-      thought: '网络面板看真实响应——传输中的数据不撒谎，它同时回答"后端给了什么"和"前端拿到了什么"。',
-      update: '实锤：后端给 userId，前端读 user_id——undefined 渲染为空。双方都没"错"，是两套命名没对齐。',
-      actionId: 'a-netpanel',
-      why: '2⚡︎ 教学核心：联调的裁判是真实传输数据，不是任何一方的口头自证。网络面板一次给出全部事实——这是"先看数据再看代码"纪律的最好教材。',
-      conclusion: '根因实锤：命名不对齐。',
-    },
-    {
-      thought: '空数据与状态误判各 1⚡︎ 排除——两个最常见的"翻案"假设留证。',
-      update: '数据 12 条富余、两层状态码均成功——排除完毕，嫌疑收敛单点。',
-      actionId: 'a-responsebody',
-      why: '1⚡︎ 排除"数据真没有"要最先做：它是最常见的另一种可能——排除后，"字段不对齐"的结论才站得稳。',
-      conclusion: '嫌疑收敛 → 修复与契约化。',
-    },
-    {
-      thought: '修复（字段映射）、防线（schema 生成）、纪律（三步检查单）、契约（文档前置）——四层落地。停止收集。',
-      update: '停止。',
-      actionId: '',
-      why: '【停止规则】根因（命名不对齐）✓ 修复（映射对齐）✓ 防线（schema+检查单+契约前置）✓——个案、机制、流程三层闭合。',
-      conclusion: '沉淀：联调三步——网络面板、响应体、最后才是代码。两个"没错"对不上时，真相在中间的传输数据里。',
-    },
+    { actionId: 'a-impact', thought: '先圈定新接口列表异常，而不是整页JS停止。', update: 'HTTP成功尚不证明数据与消费契约一致。', why: '1⚡圈出范围，保留空响应、字段与业务状态三种候选。', conclusion: '读取真实响应。' },
+    { actionId: 'a-netpanel', thought: '真实响应code=0，有12行userId与points。', update: '排除无数据，尚需实际代码确认消费方式。', why: '2⚡用网络面板获取真实字段与状态，不依靠任一方口头描述。', conclusion: '去核对消费表达式。' },
+    { actionId: 'a-responsebody', thought: '页面按user_id过滤，12行均被排除；code=0分支正确。', update: '字段错位解释空表且没有异常，排除业务状态误判。', why: '1⚡代码是另一份必要证据；仅看到响应里的userId不能证明页面怎样使用它。', conclusion: '对齐字段并复验。' },
+    { actionId: '', thought: '真实响应、成功分支与过滤表达式闭合；不用字符串拼接undefined推导必然空表。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '真实响应、成功分支与过滤表达式闭合；不用字符串拼接undefined推导必然空表。' },
   ],
-
   lessons: [
-    {
-      text: '联调三步：网络面板看请求 → Response 看真实响应体 → 最后才看代码。传输中的数据是唯一不撒谎的证人。',
-      principle: '验证思维：联调问题的标准动作序列不能反——先看代码的人会在自己的假设里绕三小时。"接口 200 + 日志无错 + 页面异常"的三无现场，答案必然在"没人检查的传输层"。',
-    },
-    {
-      text: '"双方都没错"是字段问题的签名：后端给 userId、前端读 user_id——各自遵守了各自的规范，拼起来就是 undefined。',
-      principle: '全栈视野：camelCase 与 snake_case 的命名鸿沟是跨语言协作的第一坑。解法是消灭"手写对齐"：前端类型从 schema 自动生成，后端改字段时前端在编译期就知道——让对齐发生在构建期，不发生在深夜。',
-    },
-    {
-      text: '口头约定不是契约："返回用户积分列表"没有定义字段名、类型、结构——联调前 10 分钟的 schema 文档，省一晚上的三无现场。',
-      principle: '流程设计：联调前必须有 schema + 示例响应。契约前置的本质是把"对齐成本"从联调现场（人肉试探）转移到设计时刻（一次写清）——成本前置永远比成本后置便宜。',
-    },
+    { text: 'HTTP200、业务成功与页面展示正确是三件事，必须分别核对。', principle: '状态码不描述所有消费契约。把实际响应与页面分支、过滤和读取表达式对照，才能解释数据为何未被展示。' },
+    { text: '读错字段不会总是报错；它也可能让过滤条件静默排除所有行。', principle: '访问不存在的属性得到undefined，具体结果取决于后续表达式。字符串拼接可能显示undefined，不能直接推导空表；本题有明确过滤代码。' },
+    { text: '契约生成配合兼容检查，不能用类型断言替代运行时事实。', principle: 'TypeScript的静态类型不会自动校验服务器JSON。生成源、实际发布版本与消费代码必须一致，联调仍需检查真实响应。' },
   ],
 }

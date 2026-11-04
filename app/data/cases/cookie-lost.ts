@@ -1,50 +1,40 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 4 章 · 联调之夜 第二批（跨域 Cookie 丢失 L2）
- * 教学点：全栈视野——跨域 Cookie 三要素：credentials: include、CORS Allow-Credentials、
- * SameSite=None; Secure——缺一个，登录态就断在浏览器手里。
- * 专家路径：impact(1) + fetchcode(2) + corscheck(1) = 4⚡︎
+ * 学徒篇校准：区分跨源凭证模式、同站属性和CORS。
+ * 原型：Fetch credentials与Cookie接纳规则；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/2/1，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-cookiedetail → a-fetchcode；替代顺序：a-impact → a-fetchcode → a-cookiedetail。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const cookieLostCase: DiagnosisCase = {
   id: 'cookie-lost',
   title: '本地好的，联调环境登录态丢了',
-  intro: '登录接口 Set-Cookie 正常返回，后续请求全部 401：Cookie 在跨域的那一跳没跟上——三要素缺了一环。',
+  intro: '同源代理下正常，跨源请求却不保存会话。先区分请求凭证模式、Cookie属性与CORS响应。',
   domain: 'network',
-  layer: '跨域 Cookie 三要素缺一不可——浏览器替你守着规矩，也替你挡住了登录态',
+  layer: '跨源凭证模式影响发送Cookie及是否接受Set-Cookie；跨源与跨站不是同一概念',
   part: 'apprentice',
   chapterId: 'integration',
   order: 2,
   typeTags: ['config', 'security'],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」的新人前端，本地一切正常的功能，一到联调环境就"全员未登录"。',
-    architecture: '前端(localhost:5173, Vite dev) → 联调网关(api-test.example.com, 跨域) ｜ 登录态: Cookie(session)',
-    tag: '故障现场',
+    architecture: 'https://app.dev.example.test → https://api.dev.example.test；跨源但同站，均HTTPS；同一浏览器策略',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '联调环境表现',
-        text: '登录接口：返回 200，Response Headers 里有 Set-Cookie: session=abc123… ✓\n下一个请求（查用户信息）：401 Unauthorized——请求头里根本没有 Cookie。',
-      },
-      {
-        type: 'text',
-        title: '本地对照',
-        text: '本地开发（前端代理到同源）：一切正常，Cookie 带得好好的。\n只有"直连联调网关"的跨域场景丢 Cookie。',
-      },
+      { type: 'error', title: '联调环境表现', text: '登录接口：返回 200，Response Headers 里有 Set-Cookie: session=abc123… ✓\n下一个请求（查用户信息）：401 Unauthorized——请求头里根本没有 Cookie。' },
+      { type: 'text', title: '本地对照', text: '本地开发（前端代理到同源）：一切正常，Cookie 带得好好的。\n只有"直连联调网关"的跨域场景丢 Cookie。' },
     ],
-    timeline: '联调环境今晚切到独立域名（原为同源代理）｜ 丢 Cookie 自切换后开始 ｜ 前端代码与后端配置均"从未改过 Cookie 相关内容"',
-    impactHint: 'Set-Cookie 明明到了浏览器，下一个请求却不带——浏览器把它"没收"了。没收的理由一定写在某个属性或某个配置里。',
+    timeline: '从同源代理改为直连API子域 ｜ 同一代码、同一Cookie配置 ｜ 浏览器未禁用该站Cookie',
+    impactHint: '先核对存储与发送，再逐项排除；看到Set-Cookie响应头不等于浏览器已经接纳。',
   },
-
   hypotheses: [
-    { id: 'h-credentials', text: '前端 fetch 未设 credentials: include：跨域请求默认不携带 Cookie（发送侧三要素缺一）', excludeActionId: 'a-fetchcode' },
-    { id: 'h-cors', text: '后端 CORS 未开 Allow-Credentials：浏览器拒绝 JS 读取/使用跨域凭证（响应侧缺一）', excludeActionId: 'a-corscheck' },
-    { id: 'h-samesite', text: 'Cookie 缺 SameSite=None：新版浏览器跨站请求自动剥离 Cookie（存储侧缺一）', excludeActionId: 'a-cookiedetail' },
-    { id: 'h-expire', text: 'Cookie 过期时间配置错误，到达浏览器即过期', excludeActionId: 'a-expirecheck' },
+    { id: 'h-credentials', text: 'fetch保留默认same-origin，跨源请求未启用凭证模式', excludeActionId: 'a-fetchcode' },
+    { id: 'h-cors', text: 'API的跨源凭证响应头不满足要求', excludeActionId: 'a-corscheck' },
+    { id: 'h-samesite', text: 'Cookie属性或浏览器站点策略阻止本次请求的会话', excludeActionId: 'a-cookiedetail' },
+    { id: 'h-expire', text: '会话Cookie已过期', excludeActionId: 'a-expirecheck' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -56,11 +46,7 @@ export const cookieLostCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'code',
-        title: 'Cookie 旅程切分',
-        text: '站点 ①Set-Cookie 到达：Response 里有 ✓（登录响应可见）\n站点 ②浏览器存储：Application 面板 → Cookies 列表 —— 空！（没存上）\n站点 ③后续请求携带：请求头无 Cookie（因为②就没存）\n→ 断在"存储站"：浏览器拒绝保存这个跨站 Cookie——拒绝理由写在 Set-Cookie 的属性里。',
-      },
+      result: { type: 'text', title: '分开收到与接纳', text: '登录响应在Network中含Set-Cookie，存储面板没有该会话；后续请求也未发Cookie。\n仅同源代理模式正常；需检查凭证模式和Cookie/CORS条件，不能仅凭没存就归罪SameSite。' },
     },
     {
       id: 'a-cookiedetail',
@@ -70,13 +56,13 @@ export const cookieLostCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-samesite'],
-      hypotheses: [{ id: 'h-samesite', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: 'Set-Cookie 属性解剖',
-        text: 'Set-Cookie: session=abc123; Path=/; HttpOnly\n缺什么：\n  SameSite —— 缺省按 Lax 处理：跨站 XHR 一律不带\n  Secure   —— 跨站 Cookie 要求 Secure（https），联调是 http\n浏览器控制台的黄色警告也在说话：\n  "This Set-Cookie was blocked because it had the SameSite=Lax attribute but came from a cross-site response"\n实锤：存储侧被 SameSite（缺省 Lax）+ 非 Secure 拦截。',
-      },
+      tests: ['h-samesite', 'h-expire', 'h-cors'],
+      hypotheses: [
+        { id: 'h-samesite', status: 'excluded' },
+        { id: 'h-expire', status: 'excluded' },
+        { id: 'h-cors', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '属性与站点边界', text: '完整头：session=teaching-session; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=604800。\n页面与API均HTTPS、同一可注册域，跨源但同站；本次Lax不阻止同站请求，Cookie未到期，站点策略允许。\n同批响应CORS为允许的具体Origin且Allow-Credentials:true，头可再独立复核。' },
     },
     {
       id: 'a-fetchcode',
@@ -87,12 +73,10 @@ export const cookieLostCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-credentials'],
-      hypotheses: [{ id: 'h-credentials', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '前端代码审计',
-        text: 'fetch(url, { method: "POST", body })   ← 没有 credentials！\nfetch 的 credentials 默认值是 "same-origin"：\n跨域请求不携带 Cookie——即使浏览器存下了也不发。\n本地为什么正常：Vite 代理让请求"同源"，默认值恰好工作。\n→ 发送侧三要素同样缺：credentials: "include" 必须显式声明。',
-      },
+      hypotheses: [
+        { id: 'h-credentials', status: 'confirmed' },
+      ],
+      result: { type: 'code', title: '凭证模式与单变量对照', text: '登录与后续请求均为fetch(url,{method:"POST",body})，未设置credentials，默认same-origin。\n跨源时该模式既不发送目标源Cookie，也不接纳响应的Set-Cookie。\n对照记录仅改为credentials:"include"，其余Origin、Cookie和响应头不变，会话可保存并发送，用户查询200。' },
     },
     {
       id: 'a-corscheck',
@@ -103,12 +87,10 @@ export const cookieLostCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-cors'],
-      hypotheses: [{ id: 'h-cors', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: 'CORS 响应头核对',
-        text: 'Access-Control-Allow-Origin: *           ← 通配符！\nAccess-Control-Allow-Credentials: （缺失）\n带凭证的跨域请求规范：Origin 必须回显具体值（不能用 *）+ Allow-Credentials: true。\n→ 响应侧三要素同样缺。三个要素全部缺失——本地"恰好正常"是因为同源绕过了所有检查。',
-      },
+      hypotheses: [
+        { id: 'h-cors', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '凭证响应头', text: 'Access-Control-Allow-Origin: https://app.dev.example.test\nAccess-Control-Allow-Credentials: true\nOrigin来自已配置允许列表，不是无条件回显；本次凭证CORS条件满足。' },
     },
     {
       id: 'a-expirecheck',
@@ -119,139 +101,77 @@ export const cookieLostCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-expire'],
-      hypotheses: [{ id: 'h-expire', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '过期核对',
-        text: 'Max-Age 7 天正常（会话级/持久级都不是问题——问题在存不存得上，不是活多久）。\n→ 排除过期。',
-      },
+      hypotheses: [
+        { id: 'h-expire', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '有效期核对', text: 'Cookie带Max-Age=604800，诊断采样在登录后数秒；无立即失效属性。\n不能一边展示无过期字段的头，一边声称里面配置了七天Max-Age。' },
     },
     {
       id: 'a-danger',
-      name: '紧急把前端代理回同源模式',
-      desc: '【状态变更】Vite 代理恢复，绕开跨域',
-      cost: 1,
+      name: '回退为同源代理后宣布跨源验收通过',
+      desc: '【状态变更】回退部署结构，避开本次验收边界',
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '代理回退结果',
-        text: '本地恢复登录态（同源绕开三要素）。\n代价：联调环境"独立域名"的验收目的落空（要测的就是跨域场景）；\n且生产将跨域部署 CDN——问题只是被推迟。\n→ 复盘点评：绕过验证对象 = 没验证。三要素该补齐，而不是绕过去。',
-      },
+      result: { type: 'text', title: '回退验收边界', text: '改为同源代理后默认same-origin碰巧工作，但没有验证直连API子域时的凭证模式。\n本次缺陷是fetch配置，不是要求把本来正确的Lax、HTTPS和具体Origin全部重写。' },
     },
     {
       id: 'a-fixtriad',
       name: '修复：跨域 Cookie 三要素补齐',
       desc: '【状态变更】credentials include + CORS 回显 Origin 且 Allow-Credentials + SameSite=None; Secure',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复结果',
-        text: '① 前端：请求封装统一 credentials: "include"\n② 后端 CORS：Origin 回显具体值 + Access-Control-Allow-Credentials: true\n③ Cookie：SameSite=None; Secure（联调网关升 https）\n回归：跨域登录 → 携带 Cookie → 200 全链路 ✓；本地/联调/生产三环境一致。',
-      },
+      result: { type: 'text', title: '针对性修复', text: '本案只改fetch的credentials:"include"，保留已正确的HTTPS、具体Origin允许列表与Cookie属性。\n若将来真正跨站，需再核对SameSite及第三方Cookie策略；即使None; Secure、include、CORS都齐，也不保证浏览器允许第三方Cookie。' },
     },
     {
       id: 'a-fixdoc',
       name: '沉淀：跨域 Cookie 三要素检查单',
       desc: '【状态变更】检查单进联调文档：发送侧/响应侧/存储侧 三处逐项核对',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '三要素检查单',
-        text: '发送侧：credentials: include ✓\n响应侧：CORS 回显 Origin + Allow-Credentials: true ✓\n存储侧：Set-Cookie 带 SameSite=None; Secure ✓\n三处逐项打勾——跨域登录态问题的排查从"玄学"变成"清单"。',
-      },
+      result: { type: 'text', title: '边界检查单', text: '分别检查origin、site、fetch凭证、Cookie作用域/属性、CORS与浏览器站点策略。\n不能把所有跨源场景一律要求SameSite=None，也不能用三要素齐全保证任何浏览器均成功。' },
     },
     {
       id: 'a-fixenv',
       name: '沉淀：本地与联调环境同构',
       desc: '【状态变更】本地 dev 默认走"独立域名跨域模式"，与联调/生产同构——问题在本地第一天现形',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '环境同构',
-        text: '本地开发默认也走跨域（不再默认同源代理）：\n三要素缺失在本地第一天就爆——"本地好的"不再能欺骗任何人。\n环境差异从"上线才发现"前移到"编码当天"。',
-      },
+      result: { type: 'text', title: '环境与测试', text: '开发、联调和生产使用相同服务实现与SDK，只让连接与域名配置不同；明确测试跨源的凭证模式。\n不能依赖本地同源代理掩盖实际部署边界。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-credentials', text: '跨域 Cookie 三要素全缺：fetch 未带 credentials（发送侧）、CORS 无 Allow-Credentials（响应侧）、Cookie 无 SameSite=None; Secure（存储侧）——登录态断在存储站', correct: true },
-    { id: 'rc-cors', text: '后端 CORS 未开启凭证支持（三要素之一）', correct: false },
-    { id: 'rc-samesite', text: 'Cookie 缺 SameSite=None 与 Secure 被浏览器拒存（三要素之一）', correct: false },
-    { id: 'rc-expire', text: 'Cookie 过期时间配置错误', correct: false },
+    { id: 'rc-credentials', text: 'fetch默认same-origin，在跨源登录与后续请求中未接纳或发送Cookie；其余Cookie与CORS条件已核对正确', correct: true },
+    { id: 'rc-cors', text: 'API凭证CORS响应配置错误', correct: false },
+    { id: 'rc-samesite', text: 'Cookie属性不适用于当前站点边界', correct: false },
+    { id: 'rc-expire', text: 'Cookie到达后立即过期', correct: false },
   ],
-
   expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
-    {
-      thought: 'Cookie 的旅程有三站：收到→存储→携带。先切分断在哪一站——每站的证据形态不同。',
-      update: 'Set-Cookie 到了、Cookies 列表是空的、请求头自然没有——断在"存储站"。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 旅程切分是 Cookie 问题的标准起手式：三站各自有不同的拒绝理由（属性拦截/同源策略/凭证缺省），断站定位让排查范围缩到一屏。',
-      conclusion: '断点定位：浏览器存储站被拦截。',
-    },
-    {
-      thought: '看 Set-Cookie 的完整属性——浏览器的"没收理由"它会亲口说出来（控制台警告）。',
-      update: '实锤存储侧：缺 SameSite=None + 非 Secure——跨站 Cookie 被按 Lax 拦截。',
-      actionId: 'a-cookiedetail',
-      why: '1⚡︎ 浏览器的控制台警告是最被低估的证据源：它不仅拦截，还说明了拦截依据——先读警告再读规范，效率翻倍。',
-      conclusion: '存储侧缺陷确认。',
-    },
-    {
-      thought: '存储只是三站之一——发送侧与响应侧的"同伙"要一起清点，否则修好存储还会死在发送。',
-      update: '实锤：fetch 无 credentials（默认 same-origin）+ CORS 通配符无 Allow-Credentials——三要素全缺，本地同源恰好全部绕过。',
-      actionId: 'a-fetchcode',
-      why: '2⚡︎ 三要素要一次清点：跨域 Cookie 是"发送/响应/存储"三方协约，任何一环缺失都表现为同一个症状（401）——只修一处，症状原样复发，这是它最迷惑人的地方。',
-      conclusion: '三要素全缺确认 → 修复合并处理。',
-    },
-    {
-      thought: '过期假设 1⚡︎ 排除；"本地为什么正常"要专门解释——同源恰好绕过全部检查。',
-      update: 'Max-Age 正常；本地正常的原因查明——不是"本地更对"，是"本地没触发检查"。环境同构的改进由此而来。',
-      actionId: 'a-expirecheck',
-      why: '1⚡︎ "本地好的线上坏"必须专门解释机制：同源代理绕过跨域检查——解释通了，才能设计"环境同构"让问题在本地第一天现形。',
-      conclusion: '嫌疑收敛 → 修复三要素 + 环境同构。',
-    },
-    {
-      thought: '止血（回退代理=绕过验证对象，陷阱）、修复（三要素）、防线（检查单+环境同构）。停止收集。',
-      update: '停止。',
-      actionId: '',
-      why: '【停止规则】三要素（发送/响应/存储）✓ 环境解释（同源绕过）✓ 防线（检查单+同构）✓——机制、解释、防线三层闭合。',
-      conclusion: '沉淀：跨域 Cookie 三要素缺一不可——credentials、Allow-Credentials、SameSite=None; Secure。绕过验证对象等于没验证，环境同构让问题在本地现形。',
-    },
+    { actionId: 'a-impact', thought: '会话未被接纳，不能只看Network响应头。', update: '存储和发送都缺失，但原因尚未区分。', why: '1⚡先切分Cookie旅程，再查对应规则，避免把空存储直接归因某个属性。', conclusion: '检查属性与凭证模式。' },
+    { actionId: 'a-cookiedetail', thought: '同站HTTPS、Lax和七天有效期适用于当前场景，CORS允许具体Origin。', update: '排除Cookie属性、立即过期与凭证响应头。', why: '1⚡核对实际站点边界和完整属性，跨源不等于跨站。', conclusion: '查fetch模式。' },
+    { actionId: 'a-fetchcode', thought: 'fetch使用默认same-origin；仅改include的对照恢复保存与发送。', update: '凭证模式是本案唯一已证实根因。', why: '2⚡代码加单变量对照区分三类候选，避免把三个不同缺陷都标为实锤。', conclusion: '停止并修正请求契约。' },
+    { actionId: '', thought: '凭证默认值、边界条件和只改include的对照闭合；不无差别修改已正确的Cookie/CORS配置。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '凭证默认值、边界条件和只改include的对照闭合；不无差别修改已正确的Cookie/CORS配置。' },
   ],
-
   lessons: [
-    {
-      text: '跨域 Cookie 三要素缺一不可：发送侧 credentials: include、响应侧 CORS 回显 Origin + Allow-Credentials、存储侧 SameSite=None; Secure。',
-      principle: '全栈视野：Cookie 的旅程有三站（收到→存储→携带），任何一站被拦都表现为同一个 401 症状。排查按旅程切分断站，修复按三要素清点——只修一站，症状原样复发。',
-    },
-    {
-      text: '浏览器的控制台警告是最被低估的证据源：拦截发生时，浏览器会写明拦截依据（SameSite/CORS/Secure）。',
-      principle: '验证思维：被"规则引擎"拒绝的行为（浏览器/CORS/JWT 校验），先读引擎的控制台输出与日志——它们通常引用了具体规则名。先读警告再翻规范，把"玄学"翻译成"条款"。',
-    },
-    {
-      text: '"本地好的"必须专门解释机制：同源代理恰好绕过全部跨域检查——不是本地更对，是本地没触发检查。',
-      principle: '流程设计：本地开发环境应与联调/生产同构（同样的跨域模式），让环境特有问题在编码第一天现形。默认同源代理是"善意的欺骗"——它推迟问题的暴露，并把暴露成本转移到深夜联调。',
-    },
+    { text: 'fetch凭证模式同时影响发送Cookie与接受Set-Cookie，不只是发送侧开关。', principle: '默认same-origin只在同源请求使用凭证。跨源需要include，并同时满足Cookie、CORS和浏览器策略；Network可见响应头不等于Cookie已存。' },
+    { text: '跨源与跨站分别判断；同站子域请求不必因为跨源就使用SameSite=None。', principle: 'Origin由协议、主机和端口界定，site按站点规则判断。SameSite限制与CORS的边界不同，先确定当前关系再选择属性。' },
+    { text: '先找到本次缺陷再修，不把多种可能性同时当成唯一根因。', principle: '逐项排除并做单变量对照，能避免修正正确配置或引入新风险。第三方Cookie政策仍可能独立阻止真正跨站会话。' },
   ],
 }
