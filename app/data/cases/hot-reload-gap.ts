@@ -1,23 +1,22 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 7 章 · 配置与启动 第三批（热更新不生效 L2）
- * 教学点：程序设计——@Value 启动期固化：热更新需要刷新语义（RefreshScope/直读）；
- * 配置分两类登记：启动期（改了要重启）与热更期（改了即时生效）。
- * 专家路径：impact(1) + injectmode(2) + usageaudit(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const hotReloadGapCase: DiagnosisCase = {
   id: 'hot-reload-gap',
   title: '配置中心显示已推送，功能用的还是旧值',
-  intro: '风控阈值推送"推送成功"（回执也在岗），运行值仍是旧值：@Value 在启动时固化——推送 ≠ 刷新。',
+  intro: '配置推送全部ACK，风控决策仍使用旧阈值。送达之后还要核对哪些环节？',
   domain: 'deploy',
   layer: '推送解决"送达"，不解决"生效"——热更新需要刷新语义',
   part: 'engineer',
   chapterId: 'config-boot',
   order: 3,
-  typeTags: ['config', 'race', 'verification'],
+  typeTags: [
+    'config',
+    'race',
+    'verification',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」风控链路的负责人，大促放宽阈值的操作在大促当天"静默失败"了。',
     architecture: '配置中心(推送+ACK 回执) → 风控服务(@Value 注入 risk.threshold) → 风控决策',
@@ -37,14 +36,28 @@ export const hotReloadGapCase: DiagnosisCase = {
     timeline: '阈值推送 10:00（ACK 全绿）｜ 拦截异常 10:25 被运营发现 ｜ 注入代码一年未动 ｜ 上次 config-drift 整改后"送达"已有保障',
     impactHint: '上次修的是"送达"，这次断在"生效"——收到消息的字段，为什么没有换心？',
   },
-
   hypotheses: [
-    { id: 'h-frozen', text: '@Value 启动期注入：字段随 Bean 创建固化，推送只更新 Environment 不回写字段——热更新缺刷新语义', excludeActionId: 'a-injectmode' },
-    { id: 'h-usagesite', text: '使用点在启动期缓存了阈值（Bean 内已读死）', excludeActionId: 'a-usageaudit' },
-    { id: 'h-bizcache', text: '业务自建缓存缓存了阈值（TTL 长）', excludeActionId: 'a-bizcache' },
-    { id: 'h-wrongkey', text: '又是键不匹配（config-typo 同款）', excludeActionId: 'a-keycheck' },
+    {
+      id: 'h-frozen',
+      text: '@Value 启动期注入：字段随 Bean 创建固化，推送只更新 Environment 不回写字段——热更新缺刷新语义',
+      excludeActionId: 'a-injectmode',
+    },
+    {
+      id: 'h-usagesite',
+      text: '使用点在启动期缓存了阈值（Bean 内已读死）',
+      excludeActionId: 'a-usageaudit2',
+    },
+    {
+      id: 'h-bizcache',
+      text: '业务自建缓存缓存了阈值（TTL 长）',
+      excludeActionId: 'a-bizcache',
+    },
+    {
+      id: 'h-wrongkey',
+      text: '又是键不匹配（config-typo 同款）',
+      excludeActionId: 'a-keycheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -70,12 +83,24 @@ export const hotReloadGapCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-frozen'],
-      hypotheses: [{ id: 'h-frozen', status: 'confirmed' }],
+      tests: [
+        'h-frozen',
+        'h-wrongkey',
+      ],
+      hypotheses: [
+        {
+          id: 'h-frozen',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-wrongkey',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '注入模式解剖',
-        text: '@Value("${risk.threshold}") private int threshold;\n语义：Bean 创建时一次性赋值（启动期固化）。\n配置中心推送：更新 Spring Environment ✓，但不会回写已创建 Bean 的字段。\n实验：字段临时加 @RefreshScope + actuator/refresh → 推送后运行值变 80 ✓\n实锤：缺的是"刷新语义"——推送只换了 Environment，字段还是旧心。',
+        text: '本案自定义Nacos监听器只替换MapPropertySource；不发布刷新事件，也未调用ContextRefresher。\n中心与代码精确键均为risk.threshold；Environment.getProperty=80，普通单例Bean中@Value字段仍50。\n同构对照：把Bean类标注@RefreshScope，并显式触发受控ContextRefresher.refresh()后，重新取Bean读取80。@RefreshScope不标在字段上。不是所有Nacos集成都有本案行为。',
       },
     },
     {
@@ -102,12 +127,24 @@ export const hotReloadGapCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-usagesite'],
-      hypotheses: [{ id: 'h-usagesite', status: 'down' }],
+      tests: [
+        'h-usagesite',
+        'h-bizcache',
+      ],
+      hypotheses: [
+        {
+          id: 'h-usagesite',
+          status: 'excluded',
+        },
+        {
+          id: 'h-bizcache',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '使用点核对',
-        text: '决策代码每次直读字段（无启动期二次缓存）——若字段能刷新即热生效。\n→ 降权：使用点无辜，根因在字段刷新机制缺失。',
+        text: '决策调用链每次直接读取该Bean的threshold字段；无第二个启动快照字段，也无业务缓存包装。字段仍50已经足以解释决策结果；排除使用点二次缓存和业务TTL。',
       },
     },
     {
@@ -118,8 +155,15 @@ export const hotReloadGapCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-bizcache'],
-      hypotheses: [{ id: 'h-bizcache', status: 'excluded' }],
+      tests: [
+        'h-bizcache',
+      ],
+      hypotheses: [
+        {
+          id: 'h-bizcache',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '缓存核对',
@@ -134,19 +178,26 @@ export const hotReloadGapCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-wrongkey'],
-      hypotheses: [{ id: 'h-wrongkey', status: 'excluded' }],
+      tests: [
+        'h-wrongkey',
+      ],
+      hypotheses: [
+        {
+          id: 'h-wrongkey',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '键名核对',
-        text: '中心与代码键名一致（risk.threshold）；绑定校验在岗（typo 会启动告警）。\n→ 排除键名问题：上次学费交得值。',
+        text: '中心与代码键均为risk.threshold，Environment中可直接读到80。键名不匹配已排除；不能仅凭声称绑定校验在岗替代这个证据。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急滚动重启 12 实例让配置生效',
       desc: '【状态变更】逐实例重启读取新配置',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -171,7 +222,7 @@ export const hotReloadGapCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 热调参数统一 @RefreshScope（推送即刷新，actuator/refresh 自动触发）\n② 4 处启动期参数保持 @Value（明确"改了要重启"）\n③ 回归：阈值推送 → 3 秒内全实例运行值更新 ✓。',
+        text: '对需要热调的Bean类/工厂方法配置@RefreshScope，并让监听器在成功更新Environment后触发受控刷新。启动期参数明确标注重启生效。\n同构回归记录中心值、Environment值、实际决策字段及收敛时延。若使用Actuator刷新端点，必须保持鉴权；标注作用域不等于自动收到刷新事件。',
       },
     },
     {
@@ -207,48 +258,60 @@ export const hotReloadGapCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-frozen', text: '@Value 启动期注入固化：配置中心推送只更新 Environment 不回写 Bean 字段，热更新缺刷新语义（无 @RefreshScope/无监听器）——大促放宽阈值静默失败 25 分钟', correct: true },
-    { id: 'rc-usagesite', text: '使用点缓存了启动期值（使用点直读字段，非根因）', correct: false },
-    { id: 'rc-bizcache', text: '业务层缓存了阈值', correct: false },
-    { id: 'rc-wrongkey', text: '配置键不匹配（config-typo 同款，已被绑定校验防住）', correct: false },
+    {
+      id: 'rc-frozen',
+      text: '本案监听器只更新Environment，无刷新事件；普通单例Bean的@Value字段仍为启动值50，决策未读取到新阈值80',
+      correct: true,
+    },
+    {
+      id: 'rc-usagesite',
+      text: '使用点缓存了启动期值（使用点直读字段，非根因）',
+      correct: false,
+    },
+    {
+      id: 'rc-bizcache',
+      text: '业务层缓存了阈值',
+      correct: false,
+    },
+    {
+      id: 'rc-wrongkey',
+      text: '配置键不匹配（config-typo 同款，已被绑定校验防住）',
+      correct: false,
+    },
   ],
-
   expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '三处对质先定层：送达链是通的（ACK 在岗），断点必然在"送达之后"——注入与读取层。',
-      update: '中心 80 / ACK ✓ / 运行 50——上次修的"送达"没白修，这次是新的一层。',
+      thought: '先核对送达和决策差异。',
+      update: '中心80、ACK全绿、决策50。',
       actionId: 'a-impact',
-      why: '1⚡︎ 历史修复的价值在分层：config-drift 修好了"送达"，把断点"挤"到了下一层——排查的进度是层层推进的。',
-      conclusion: '嫌疑锁定：注入/刷新语义（h-frozen 升权）。',
+      why: '1⚡ACK只证明收件，不能据此证明字段刷新。',
+      conclusion: '核对注入及实际读取。',
     },
     {
-      thought: '审计注入模式：字段怎么拿到 50、推送后它还会不会变——一次实验让语义现形。',
-      update: '实锤：@Value 启动期固化，推送只更新 Environment；加 @RefreshScope 实验即生效——刷新语义缺失实锤。',
+      thought: '同一实例核对Environment、字段及监听器。',
+      update: 'Environment80而字段50；显式刷新Bean后读80。',
       actionId: 'a-injectmode',
-      why: '2⚡︎ 教学核心：配置体系有三层语义——送达（传输）、绑定（键对上）、刷新（运行值跟随）。三者缺一的表现都是"改了没生效"，但修复完全不同：本关的学费补上了第三层。',
-      conclusion: '根因实锤：刷新语义缺失。',
+      why: '2⚡限定本案集成方式并做同构对照，避免把框架行为说成无条件规律。',
+      conclusion: '确认刷新缺失，排除键错。',
     },
     {
-      thought: '全仓注入审计把个案升级为体系：9 处可调参数 5 处该热更而固化——注入语义无约定。',
-      update: '体系问题确认：不是一处漏配 @RefreshScope，是"哪些参数该热更"从未被约定——需要登记表制度。',
-      actionId: 'a-usageaudit',
-      why: '1⚡︎ 个案审计→体系审计的跃迁：5 处隐形雷意味着运营团队一直以为"都能热调"——预期与实现的鸿沟靠登记表弥合。',
-      conclusion: '修复升级为两类登记制度。',
+      thought: '跟踪一次真实读取调用链。',
+      update: '无第二份启动快照，无业务缓存。',
+      actionId: 'a-usageaudit2',
+      why: '1⚡直接读取链路排除两个缓存候选，避免全仓审计代替本局证据。',
+      conclusion: '其余候选排除。',
     },
     {
-      thought: '使用点/业务缓存/键名三个假设逐个定权与排除——键名排除顺便验证上次防线在岗。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（固化）✓ 体系（无语义约定）✓ 防线（两类登记+热更演练）✓——机制、体系、防线三层闭合。',
-      conclusion: '沉淀：推送解决送达，不解决生效——热更新需要刷新语义，配置分两类登记让预期与实现对齐。',
+      why: '【停止规则】Environment与字段差异及刷新对照已确认，键错、二次缓存和业务缓存均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '本案监听器只更新Environment，无刷新事件；普通单例Bean的@Value字段仍为启动值50，决策未读取到新阈值80',
     },
   ],
-
   lessons: [
     {
       text: '推送解决"送达"，不解决"生效"：@Value 启动期固化，Environment 更新不回写字段——热更新需要刷新语义（@RefreshScope/直读）。',

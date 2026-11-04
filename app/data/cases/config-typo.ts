@@ -1,23 +1,21 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 7 章 · 配置与启动 首批（配置键 typo 静默回退 L1）
- * 教学点：验证思维——配置键对不上时框架静默用默认值：配置的"生效断言"要成为习惯；
- * 绑定校验（未知键告警/必填键缺失 fail-fast）让 typo 在启动时尖叫。
- * 专家路径：impact(1) + keydiff(2) + loadcheck(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const configTypoCase: DiagnosisCase = {
   id: 'config-typo',
-  title: '启动全绿，功能是坏的：键少了一个 s',
-  intro: '报表服务的"导出超时"配置怎么改都不生效：配置中心写的 timeouts，代码读的是 timeout——差一个字母。',
+  title: '启动全绿，导出仍然三十秒超时',
+  intro: '面板里的超时已调大，导出仍在旧时限失败。配置从修改到运行，断在哪一环？',
   domain: 'deploy',
   layer: '配置键对不上时，框架静默用默认值——生效断言要成为配置的习惯',
   part: 'engineer',
   chapterId: 'config-boot',
   order: 1,
-  typeTags: ['config', 'verification'],
+  typeTags: [
+    'config',
+    'verification',
+  ],
   difficulty: 1,
-
   scene: {
     role: '你是「鲜到家」报表服务的新任负责人，接手第一天就遇到"配置改了像没改"的灵异现象。',
     architecture: '配置中心(Nacos) → 报表服务(启动读取 @Value("${export.timeout}")) → 导出功能(大报表生成)',
@@ -26,7 +24,7 @@ export const configTypoCase: DiagnosisCase = {
       {
         type: 'error',
         title: '现象',
-        text: '配置中心 export.timeout 已调到 120s——导出功能的行为依然像 30s（大报表超时失败）。\n应用启动日志全绿，没有任何"配置未生效"的告警。',
+        text: '配置中心面板显示导出超时已调到120s；大报表仍在30s失败。\n启动日志全绿，没有配置未生效告警。',
       },
       {
         type: 'text',
@@ -37,14 +35,28 @@ export const configTypoCase: DiagnosisCase = {
     timeline: '配置 3 天前调整为 120s（大促报表变大的预案）｜ 今天的导出失败告警让预案现出原形 ｜ @Value 注入代码一年未动',
     impactHint: '配置中心的值、代码想读的键、运行时实际生效的值——三个数字，先对质再下结论。',
   },
-
   hypotheses: [
-    { id: 'h-typo', text: '配置键拼写不一致：配置中心 timeouts，代码读 timeout——键对不上，@Value 静默回退默认 30s', excludeActionId: 'a-keydiff' },
-    { id: 'h-load', text: '配置文件没被加载（未打进包/路径不对）', excludeActionId: 'a-loadcheck' },
-    { id: 'h-priority', text: '配置优先级被其他来源覆盖（环境变量/命令行）', excludeActionId: 'a-priority' },
-    { id: 'h-profile', text: '部署环境激活了错误的 profile，读的是另一套配置', excludeActionId: 'a-profilecheck' },
+    {
+      id: 'h-typo',
+      text: '配置键拼写不一致：配置中心 timeouts，代码读 timeout——键对不上，@Value 静默回退默认 30s',
+      excludeActionId: 'a-keydiff',
+    },
+    {
+      id: 'h-load',
+      text: '配置文件没被加载（未打进包/路径不对）',
+      excludeActionId: 'a-loadcheck',
+    },
+    {
+      id: 'h-priority',
+      text: '配置优先级被其他来源覆盖（环境变量/命令行）',
+      excludeActionId: 'a-priority',
+    },
+    {
+      id: 'h-profile',
+      text: '部署环境激活了错误的 profile，读的是另一套配置',
+      excludeActionId: 'a-profilecheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +71,7 @@ export const configTypoCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '三处对质',
-        text: '配置中心：export.timeouts = 120000 ✓（你想要的值在这里）\n代码注入：@Value("${export.timeout:30000}") ← 键是 timeout（无 s），默认 30000\n运行时行为：大报表 30s 整被杀——行为与"默认值"精确吻合\n→ 三个值两个世界：配置中心活在 timeouts 的世界，代码活在 timeout 的世界。',
+        text: '小报表正常；大报表均在30s超时，调整前后相同。\n12个实例表现一致；中心面板显示120s。先比较配置意图、绑定代码和实际生效值。',
       },
     },
     {
@@ -70,28 +82,52 @@ export const configTypoCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-typo'],
-      hypotheses: [{ id: 'h-typo', status: 'confirmed' }],
+      tests: [
+        'h-typo',
+      ],
+      hypotheses: [
+        {
+          id: 'h-typo',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '键名逐字符对照',
-        text: '配置中心键：export.timeout  s   ← 多一个 s（timeouts）\n代码注入键：export.timeout      ← @Value("${export.timeout:30000}")\nSpring 行为：找不到 export.timeout 的配置源 → 静默使用冒号后的默认值 30000\n无警告、无报错、启动全绿——一个字母的差距，三天的"配置不生效"。\n实锤：typo × 静默默认值 = 配置的薛定谔状态。',
+        text: '中心实际键：export.timeouts=120000\n代码：@Value("${export.timeout:30000}")\n逐字比对：中心多一个s。当前Environment没有精确键export.timeout，Bean字段为30000；占位符采用显式默认值。',
       },
     },
     {
       id: 'a-loadcheck',
-      name: '核对配置加载链路',
-      desc: '排除"配置没被加载"',
+      name: '核对加载来源与激活环境快照',
+      desc: '读取同一份来源诊断：配置版本、profile与同名键覆盖',
       cost: 1,
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-load'],
-      hypotheses: [{ id: 'h-load', status: 'excluded' }],
+      tests: [
+        'h-load',
+        'h-priority',
+        'h-profile',
+      ],
+      hypotheses: [
+        {
+          id: 'h-load',
+          status: 'excluded',
+        },
+        {
+          id: 'h-priority',
+          status: 'excluded',
+        },
+        {
+          id: 'h-profile',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '加载核对',
-        text: '启动日志确认 Nacos 配置源已连接；同文件其他键（导出行数限制等）全部生效。\n→ 排除加载问题：加载得好好的，只是"名字对不上"的那个键永远等不到值。',
+        text: '同一份启动诊断快照：激活prod，Nacos group/dataId及版本与预期一致；同源行数限制已生效。\nPropertySources逐源检索：环境变量、命令行、JVM参数及本地文件均无export.timeout；没有更高来源覆盖该键。\n加载、来源覆盖、错误profile三项均排除。',
       },
     },
     {
@@ -102,8 +138,15 @@ export const configTypoCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-priority'],
-      hypotheses: [{ id: 'h-priority', status: 'excluded' }],
+      tests: [
+        'h-priority',
+      ],
+      hypotheses: [
+        {
+          id: 'h-priority',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '优先级核对',
@@ -118,12 +161,19 @@ export const configTypoCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-profile'],
-      hypotheses: [{ id: 'h-profile', status: 'excluded' }],
+      tests: [
+        'h-profile',
+      ],
+      hypotheses: [
+        {
+          id: 'h-profile',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'profile 核对',
-        text: '激活 profile = prod（正确）；各 profile 中都无 timeouts 键的影子——typo 发生在配置中心的"正确 profile"里。\n→ 排除 profile。',
+        text: '激活profile=prod；读取的正是prod中心配置，其中存在export.timeouts而没有export.timeout。不是选错环境。',
       },
     },
     {
@@ -155,7 +205,7 @@ export const configTypoCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '绑定校验',
-        text: '① 配置收敛到 @ConfigurationProperties 类（键集中、IDE 可导航、重构可跟随）\n② 启动校验：未知的 export.* 键打 WARN（typo 当场现形）；必填键缺失直接启动失败\n③ 全仓扫描：另有 2 处散落 @Value 带静默默认值，一并收敛。',
+        text: '采用@ConfigurationProperties集中绑定；显式设置ignoreUnknownFields=false拒绝未知字段。结合@Validated与必填字段约束拒绝缺失配置，不再靠默认值掩盖必填项。\n同构回归：旧拼写启动失败，修正键后字段为120000。仅替换注解并不会默认拒绝未知键。',
       },
     },
     {
@@ -175,52 +225,64 @@ export const configTypoCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-typo', text: '配置键 typo：中心写 timeouts、代码读 @Value("${export.timeout:30000}")——键不匹配静默回退默认值 30s，无告警无提示', correct: true },
-    { id: 'rc-load', text: '配置文件未加载/路径错误', correct: false },
-    { id: 'rc-priority', text: '配置被更高优先级来源覆盖', correct: false },
-    { id: 'rc-profile', text: '部署环境激活错误 profile', correct: false },
+    {
+      id: 'rc-typo',
+      text: '配置键 typo：中心写 timeouts、代码读 @Value("${export.timeout:30000}")——键不匹配静默回退默认值 30s，无告警无提示',
+      correct: true,
+    },
+    {
+      id: 'rc-load',
+      text: '配置文件未加载/路径错误',
+      correct: false,
+    },
+    {
+      id: 'rc-priority',
+      text: '配置被更高优先级来源覆盖',
+      correct: false,
+    },
+    {
+      id: 'rc-profile',
+      text: '部署环境激活错误 profile',
+      correct: false,
+    },
   ],
-
   expertCost: 4,
-  restartActionId: 'a-fixkey',
-
+  restartActionId: '',
   expertChain: [
     {
-      thought: '"改了像没改"——先做三处对质：配置中心的值、代码的注入、运行时的行为。',
-      update: '三个值来自两个世界：timeouts（中心）vs timeout（代码）——键名差异浮出。',
+      thought: '先量出失败边界。',
+      update: '只有大报表在30s失败，所有实例一致。',
       actionId: 'a-impact',
-      why: '1⚡︎ 三处对质是配置类问题的标准起手：意图（中心）、实现（代码）、事实（运行时）各读一次，断点在哪一环立刻可见。',
-      conclusion: '嫌疑锁定：键名不匹配（h-typo 升权）。',
+      why: '1⚡先分清功能与时限，避免把面板值误当运行值。',
+      conclusion: '进入键与来源核对。',
     },
     {
-      thought: '逐字符 diff 两个键名——typo 的确认不需要灵感，需要耐心。',
-      update: '实锤：timeouts vs timeout，差一个 s；@Value 的冒号默认值让 typo 静默落地 30000。',
+      thought: '逐字核对键名及占位符。',
+      update: 'timeouts和timeout不相同，字段取到显式默认30000。',
       actionId: 'a-keydiff',
-      why: '2⚡︎ 教学核心：静默回退的默认值是"配置 typo"的掩护——框架不报错是因为它认为"默认值也是一种合法选择"。验证思维：默认值必须被显式验证，不能被隐式信任。',
-      conclusion: '根因实锤：typo × 静默默认。',
+      why: '2⚡完整键、默认值与运行字段构成可复核机制证据。',
+      conclusion: '确认h-typo。',
     },
     {
-      thought: '加载/优先级/profile 三个常规嫌疑各 1⚡︎ 排除——每个都是"配置不生效"的真实可能，必须留证。',
-      update: '加载正常、无覆盖、profile 正确——三个假设有证据排除，嫌疑收敛单点。',
+      thought: '读取来源和环境诊断。',
+      update: '加载正确、profile正确、无同名键覆盖。',
       actionId: 'a-loadcheck',
-      why: '1⚡︎ 配置不生效的鉴别诊断有固定四象限（键名/加载/优先级/环境）——逐一留证既是排除，也是给修复后的回归立边界。',
-      conclusion: '嫌疑收敛 → 修复与防复发。',
+      why: '1⚡同一份来源快照覆盖其余三个候选，而非凭一个正常键排除所有配置问题。',
+      conclusion: '其余候选全部排除。',
     },
     {
-      thought: '修复（键名统一）、防线（绑定校验 fail-fast + 未知键告警）、流程（生效断言进发布检查单）。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（typo × 静默默认）✓ 防线（绑定校验）✓ 流程（生效断言）✓——个案、机制、流程三层闭合。',
-      conclusion: '沉淀：配置的"改了"要验证成"生效了"——绑定校验让 typo 在启动时尖叫，生效断言让意图变成被验证的事实。',
+      why: '【停止规则】精确键不匹配和默认值路径已确认，加载、覆盖、profile均有反证。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '配置键 typo：中心写 timeouts、代码读 @Value("${export.timeout:30000}")——键不匹配静默回退默认值 30s，无告警无提示',
     },
   ],
-
   lessons: [
     {
       text: '配置键对不上时框架静默用默认值：@Value 的冒号兜底让 typo 无声无息——"启动全绿"不代表"配置生效"。',
-      principle: '验证思维：散落 @Value + 静默默认值是配置 typo 的温床。收敛到 @ConfigurationProperties（键集中可导航）+ 未知键启动告警 + 必填键缺失 fail-fast——typo 的暴露时机应提前到启动那一秒。',
+      principle: '将配置集中绑定；显式拒绝未知键，并为必填字段配置校验。@ConfigurationProperties本身默认不拒绝未知键，不能把改注解当作已经有了校验。',
     },
     {
       text: '配置三处对质：配置中心的意图、代码的读取、运行时的行为——断点在哪一环，修复就在哪一环。',

@@ -1,26 +1,25 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 7 章 · 配置与启动 第二批（启动期依赖失败被吞 L2）
- * 教学点：程序设计——启动期依赖失败被 catch 吞掉 = 半初始化：核心依赖 fail-fast，
- * 非核心依赖显式降级 + 健康上报；"启动成功"必须有精确定义。
- * 专家路径：impact(1) + bootlog(2) + poolcheck(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const bootOrderCase: DiagnosisCase = {
   id: 'boot-order',
   title: '发布后一半功能"没醒"：启动成功的假象',
-  intro: 'DB 维护窗口后重启应用：启动全绿，但缓存预热、消息监听等一半功能没醒——启动期失败被 catch 吞掉了。',
+  intro: '维护后端口和探针都正常，订单通知却没有恢复。先区分进程存活与组件就绪。',
   domain: 'deploy',
   layer: '启动成功必须有精确定义——核心依赖 fail-fast，非核心显式降级',
   part: 'engineer',
   chapterId: 'config-boot',
   order: 2,
-  typeTags: ['config', 'dependency', 'process'],
+  typeTags: [
+    'config',
+    'dependency',
+    'process',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」订单服务的后端，一次例行的 DB 维护窗口让你的服务"活着，但没完全活"。',
-    architecture: '订单服务(启动时: 连 DB / 预热本地缓存 / 启动 MQ 监听 / 拉取配置快照) → DB(维护窗口内主从切换)',
+    architecture: '订单服务：缓存预热、订阅游标和业务配置快照均读取DB；监听器读到游标后才注册MQ消费。普通请求按需借DB连接。',
     tag: '故障现场',
     symptoms: [
       {
@@ -31,20 +30,34 @@ export const bootOrderCase: DiagnosisCase = {
       {
         type: 'text',
         title: '启动日志的真相',
-        text: '启动日志里藏着 3 条 WARN：\n"cache warmup failed, skipped" / "MQ listener start failed, will not retry"\n它们被 try-catch 包裹——启动继续了，但一半功能永远没醒。',
+        text: '启动日志中有cache warmup failed、MQ listener start failed、config snapshot fetch failed三条WARN；随后记录Application started successfully。另有日志归档重试WARN。',
       },
     ],
     timeline: 'DB 维护窗口 01:00-01:20 ｜ 应用 01:05 重启（DB 切换中）｜ 01:30 用户反馈"通知收不到" ｜ 02:00 定位到启动日志',
-    impactHint: '"启动成功"的定义是什么？进程活着 = 功能都活着吗？启动日志里那 3 条 WARN 是这题的答案。',
+    impactHint: '把受影响的业务路径与启动时间线对齐，避免把端口存活当作所有组件就绪。',
   },
-
   hypotheses: [
-    { id: 'h-swallow', text: '启动期依赖失败被 catch 吞掉：预热/监听器半初始化，应用"假活"——启动成功的定义有漏洞', excludeActionId: 'a-bootlog' },
-    { id: 'h-pool', text: '连接池初始连接获取失败，首波请求排队超时', excludeActionId: 'a-poolcheck' },
-    { id: 'h-cachepoison', text: '预热失败时把空数据写进了缓存，运行时读到空', excludeActionId: 'a-cachecheck' },
-    { id: 'h-dns', text: '主从切换后 DNS/连接串残留旧实例，写请求发往已下线的库', excludeActionId: 'a-dnscheck' },
+    {
+      id: 'h-swallow',
+      text: '启动期依赖失败被 catch 吞掉：预热/监听器半初始化，应用"假活"——启动成功的定义有漏洞',
+      excludeActionId: 'a-bootlog',
+    },
+    {
+      id: 'h-pool',
+      text: '连接池初始连接获取失败，首波请求排队超时',
+      excludeActionId: 'a-poolcheck',
+    },
+    {
+      id: 'h-cachepoison',
+      text: '预热失败时把空数据写进了缓存，运行时读到空',
+      excludeActionId: 'a-cachecheck',
+    },
+    {
+      id: 'h-dns',
+      text: '主从切换后 DNS/连接串残留旧实例，写请求发往已下线的库',
+      excludeActionId: 'a-dnscheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -70,12 +83,24 @@ export const bootOrderCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-swallow'],
-      hypotheses: [{ id: 'h-swallow', status: 'confirmed' }],
+      tests: [
+        'h-swallow',
+        'h-cachepoison',
+      ],
+      hypotheses: [
+        {
+          id: 'h-swallow',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-cachepoison',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '启动日志解剖',
-        text: '01:05:12  [WARN]  cache warmup failed (Connection refused), skipped\n01:05:12  [WARN]  MQ listener start failed, will not retry\n01:05:13  [WARN]  config snapshot fetch failed, using empty\n01:05:14  [INFO]  Application started successfully   ← "成功"的假象\n代码解剖：三个组件的启动逻辑都是 try{ init() } catch(e){ log.warn } ——\nDB 维护窗口内全部失败被吞，应用"成功"启动。\n实锤：半初始化——进程活着，一半的功能死在了起跑线，且没有重试、没有健康上报。',
+        text: '01:05:12缓存预热读DB被拒绝；01:05:12监听器读DB订阅游标被拒绝，未执行MQ注册；01:05:13业务配置快照读DB被拒绝。\n三个init的catch仅记录WARN后返回，无状态上报或重试；缓存失败分支没有写入空对象，样本键均不存在。01:05:14打印started。\n日志归档WARN来自独立定时器，重试成功；不参与上述初始化调用链。',
       },
     },
     {
@@ -86,12 +111,24 @@ export const bootOrderCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-pool'],
-      hypotheses: [{ id: 'h-pool', status: 'excluded' }],
+      tests: [
+        'h-pool',
+        'h-dns',
+      ],
+      hypotheses: [
+        {
+          id: 'h-pool',
+          status: 'excluded',
+        },
+        {
+          id: 'h-dns',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '连接池核对',
-        text: '连接池懒加载模式：首请求才建连接——01:30 时 DB 已恢复，核心读写全部正常。\n→ 排除连接池：它"躲过"了维护窗口（懒加载），也解释了核心功能为何正常。',
+        text: '01:30连接池活跃4、空闲16、等待0，抽样读写成功。实际连接peer为新主VIP，旧主已下线且无残留连接。故当前池排队和旧地址不能解释持续缺失的监听注册。',
       },
     },
     {
@@ -102,12 +139,19 @@ export const bootOrderCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-cachepoison'],
-      hypotheses: [{ id: 'h-cachepoison', status: 'down' }],
+      tests: [
+        'h-cachepoison',
+      ],
+      hypotheses: [
+        {
+          id: 'h-cachepoison',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '缓存核对',
-        text: '预热代码失败分支写入了"空对象"占位（防止穿透）——运行时读到空缓存数据，\n即便后续重跑预热，占位键存在导致跳过——放大器实锤。\n→ 列入整改：失败不得写占位，或占位带短 TTL。',
+        text: '失败分支只记日志，不写占位；样本缓存键均不存在。读取时回源可成功，缺的是启动预热，不是空对象把重试锁死。',
       },
     },
     {
@@ -118,8 +162,15 @@ export const bootOrderCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-dns'],
-      hypotheses: [{ id: 'h-dns', status: 'excluded' }],
+      tests: [
+        'h-dns',
+      ],
+      hypotheses: [
+        {
+          id: 'h-dns',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'DNS 核对',
@@ -130,7 +181,7 @@ export const bootOrderCase: DiagnosisCase = {
       id: 'a-danger',
       name: '紧急重启全部实例（DB 已就绪后）',
       desc: '【状态变更】凌晨批量重启，赌一次"干净启动"',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -155,13 +206,13 @@ export const bootOrderCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 核心依赖（DB/配置）：启动失败 → 终止进程（fail-fast，交给重启策略）\n② 非核心（预热/监听）：失败 → 实例标记 degraded + 后台指数重试 + 成功后自愈\n③ MQ 监听去掉 "will not retry"，改为持续重连\n混沌回归：DB 不可用窗口启动 → 核心实例快速失败重排（不假活）；恢复后 3 分钟内全部自愈。',
+        text: '按本业务契约：订单通知监听和业务配置快照是核心能力，初始化失败则不就绪，停止接流量并按受控策略重试；不可只让进程活着。缓存预热可降级，显式上报并在依赖恢复后重试。\n同构演练中延长DB故障窗口，确认核心未就绪时不会误接业务流量。',
       },
     },
     {
       id: 'a-fixreadiness',
       name: '沉淀：就绪探针带上依赖健康',
-      desc: '【状态变更】/healthz 汇报各组件状态（core/degraded），degraded 不接流量并告警',
+      desc: '【状态变更】核心监听/配置未就绪不接流量，缓存预热可显式降级',
       cost: 1,
       gain: 'mid',
       danger: false,
@@ -191,60 +242,72 @@ export const bootOrderCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-swallow', text: '启动期三个组件（缓存预热/MQ 监听/配置快照）的依赖失败被 try-catch 吞成 WARN：DB 维护窗口内重启 → 半初始化假活，无重试无健康上报——"启动成功"的定义缺少组件级语义', correct: true },
-    { id: 'rc-pool', text: '连接池初始连接失败导致首波请求超时', correct: false },
-    { id: 'rc-cachepoison', text: '预热失败写入空占位缓存且跳过重预热（放大器）', correct: false },
-    { id: 'rc-dns', text: '主从切换后 DNS/连接串残留旧库', correct: false },
+    {
+      id: 'rc-swallow',
+      text: '启动期三个组件（缓存预热/MQ 监听/配置快照）的依赖失败被 try-catch 吞成 WARN：DB 维护窗口内重启 → 半初始化假活，无重试无健康上报——"启动成功"的定义缺少组件级语义',
+      correct: true,
+    },
+    {
+      id: 'rc-pool',
+      text: '连接池初始连接失败导致首波请求超时',
+      correct: false,
+    },
+    {
+      id: 'rc-cachepoison',
+      text: '预热失败写入空占位缓存且跳过重预热（放大器）',
+      correct: false,
+    },
+    {
+      id: 'rc-dns',
+      text: '主从切换后 DNS/连接串残留旧库',
+      correct: false,
+    },
   ],
-
   expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '功能"活着/没醒"的分级是第一动作：正常与失败的分组，指向它们启动期的差异。',
-      update: '没醒的功能全部在启动期碰过 DB（维护窗口），正常的功能启动时不碰 DB——分级结果直指启动期交互。',
+      thought: '按业务功能划分影响面。',
+      update: '缺失功能都在启动阶段读DB。',
       actionId: 'a-impact',
-      why: '1⚡︎ 分级把"一半功能没醒"变成"启动期碰依赖的功能没醒"——分组特征直接锁定时间窗（启动期）与空间（依赖交互）。',
-      conclusion: '嫌疑锁定：启动期失败被吞（h-swallow 升权）。',
+      why: '1⚡功能分组能定位共同的初始化时间窗。',
+      conclusion: '重点读取启动组件记录。',
     },
     {
-      thought: '重读启动日志——"Application started successfully"的上一行往往就是真相。',
-      update: '实锤：3 条 WARN 对应 3 个没醒的组件，全部被 catch 吞掉且无重试——半初始化假活。',
+      thought: '把WARN与初始化代码对应。',
+      update: 'DB失败后未注册监听、未重试；没有写空缓存。',
       actionId: 'a-bootlog',
-      why: '2⚡︎ 教学核心：启动日志的 INFO 成功语句会掩盖 WARN 的失败清单——"启动成功"若无组件级定义，就只是进程级的自我安慰。catch-吞-异常在启动期比运行期更危险：它没有第二次机会。',
-      conclusion: '根因实锤：半初始化假活。',
+      why: '2⚡异常时间线与失败分支同时证明半初始化，并反证空占位。',
+      conclusion: '确认吞失败，排除缓存污染。',
     },
     {
-      thought: '连接池/缓存占位/DNS 三个假设逐个定权——核心为何正常、放大器在哪、残留是否存在。',
-      update: '懒加载让核心躲过窗口、占位缓存是放大器、DNS 清白——三层结构（根因/放大器/无关）清晰。',
+      thought: '核对恢复后的连接状态。',
+      update: '池无等待，新连接指向新主。',
       actionId: 'a-poolcheck',
-      why: '1⚡︎ 多层定权防止"一锅修"：根因（吞异常）与放大器（占位缓存）修复方式完全不同——定权让修复清单各就各位。',
-      conclusion: '定权完成 → 分级修复。',
+      why: '1⚡当前池统计和实际peer共同排除池排队与旧地址。',
+      conclusion: '其余解释排除。',
     },
     {
-      thought: '止血（重启靠运气）、修复（两级启动）、语义（就绪分级）、流程（窗口 runbook）。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（catch 吞启动失败）✓ 定义（启动成功的组件级语义）✓ 防线（探针分级+runbook）✓——机制、语义、防线三层闭合。',
-      conclusion: '沉淀：启动成功必须有精确定义——核心依赖 fail-fast，非核心显式降级 + 健康上报；半初始化的"假活"比崩溃更难被发现。',
+      why: '【停止规则】启动失败被忽略且无重试已确认，缓存占位、池等待和旧地址均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '启动期三个组件（缓存预热/MQ 监听/配置快照）的依赖失败被 try-catch 吞成 WARN：DB 维护窗口内重启 → 半初始化假活，无重试无健康上报——"启动成功"的定义缺少组件级语义',
     },
   ],
-
   lessons: [
     {
       text: '启动期 catch 吞掉依赖失败 = 半初始化假活：进程健康、探针通过、一半功能死在起跑线且无重试无上报。',
-      principle: '程序设计：启动期与运行期的异常处理策略必须不同——运行期可吞可重试，启动期失败要么 fail-fast（核心）要么显式降级（非核心，标记 degraded + 后台重试）。"will not retry" 是启动日志里最危险的短语。',
+      principle: '无论启动期还是运行期，都不能只吞异常。按业务契约决定失败、重试或显式降级；核心能力未就绪必须反映到readiness。',
     },
     {
       text: '"启动成功"必须有精确定义：进程活 + 核心组件就绪 + 非核心组件状态可见（degraded 标记）——三层缺一不可。',
       principle: '可观测性设计：健康端点分级汇报 core/degraded，就绪探针只认 core，degraded 接流量但告警。没有组件级定义的"启动成功"是进程的自我表扬——功能是否真的活着，要看每个组件的初始化结果。',
     },
     {
-      text: '失败不得写占位：预热失败时把"空数据"写进缓存，等于给故障上了锁——占位必须有短 TTL 或干脆不写。',
-      principle: '程序设计：防御性占位（防空穿透）与故障态的边界要清晰——"数据暂缺"是短暂状态，用短 TTL 占位；"初始化失败"是异常状态，不写任何占位。占位错写会让修复后的重试也被跳过（键存在即跳过）。',
+      text: '初始化失败与合法空数据要分开表示。本案没有写空占位，不能把未发生的缓存污染列为已证实放大器。',
+      principle: '复盘只写已取得的证据。预热是否核心、监听是否可降级由业务契约决定；不能按组件名称一概判定。',
     },
   ],
 }

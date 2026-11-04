@@ -1,26 +1,25 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 7 章 · 配置与启动 第四批（配置来源优先级覆盖 L2）
- * 教学点：验证思维——同一键多个来源时，优先级链决定"最终事实"：环境变量压过配置中心；
- * 来源审计制度化（同键多源 = 治理工单）；环境变量只放基础设施连接信息。
- * 专家路径：impact(1) + sourcecheck(2) + multisource(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const priorityClashCase: DiagnosisCase = {
   id: 'priority-clash',
   title: '配置中心改了三个月，连接池一直是 20',
-  intro: '运维在配置中心把连接池 20→50 调了三个月都没生效：启动脚本里的 ENV_DB_POOL=20 悄悄赢了一切。',
+  intro: '配置中心连续三次调大连接池，重启后却始终是20。运行值究竟来自哪个来源？',
   domain: 'deploy',
   layer: '同一键多个来源时，优先级链决定最终事实——同键多源就是治理工单',
   part: 'engineer',
   chapterId: 'config-boot',
   order: 4,
-  typeTags: ['config', 'resource', 'process'],
+  typeTags: [
+    'config',
+    'resource',
+    'process',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」的 DBA 兼平台工程师，大促前调连接池的操作已经失败了三个月。',
-    architecture: '配置来源三层(优先级从高到低)：容器环境变量 ENV_DB_POOL → 配置中心(Nacos) → 本地 application.yml ｜ DB 连接池(Druid, pool.size)',
+    architecture: 'Spring Boot服务：环境变量、Nacos自定义PropertySource、本地yml均可提供pool.size；具体顺序由当前集成及配置决定。',
     tag: '故障现场',
     symptoms: [
       {
@@ -34,17 +33,31 @@ export const priorityClashCase: DiagnosisCase = {
         text: '上次的 config-drift 整改装了 ACK 回执——回执证明"配置送到了应用"。\n但"送到"与"被采纳"是两回事：应用收到了 50，转身用了 20。',
       },
     ],
-    timeline: '连接池配置半年前 K8s 迁移时写死在 Deployment env（ENV_DB_POOL=20）｜ 此后无人再看过它 ｜ 配置中心上线后成为"大家默认的配置入口"',
+    timeline: '连接池配置半年前 K8s 迁移时写死在 Deployment env（POOL_SIZE=20）｜ 此后无人再看过它 ｜ 配置中心上线后成为"大家默认的配置入口"',
     impactHint: '回执说"送到了"，运行值说"没采纳"——应用在两个求婚者之间选了谁？为什么？',
   },
-
   hypotheses: [
-    { id: 'h-priority', text: '环境变量覆盖：启动脚本 ENV_DB_POOL=20 在优先级链上压过配置中心——改中心永远无效', excludeActionId: 'a-sourcecheck' },
-    { id: 'h-typo', text: '键不匹配（config-typo 同款）', excludeActionId: 'a-keycheck' },
-    { id: 'h-runtime', text: '池大小启动期固定：改了要重启，没重启所以没生效', excludeActionId: 'a-runtimecheck' },
-    { id: 'h-multi', text: '多个配置源同键不同值，加载顺序混乱不可预期', excludeActionId: 'a-multisource' },
+    {
+      id: 'h-priority',
+      text: '环境变量覆盖：启动脚本 POOL_SIZE=20 在优先级链上压过配置中心——改中心永远无效',
+      excludeActionId: 'a-sourcecheck',
+    },
+    {
+      id: 'h-typo',
+      text: '键不匹配（config-typo 同款）',
+      excludeActionId: 'a-keycheck',
+    },
+    {
+      id: 'h-runtime',
+      text: '池大小启动期固定：改了要重启，没重启所以没生效',
+      excludeActionId: 'a-runtimecheck',
+    },
+    {
+      id: 'h-multi',
+      text: '多个配置源同键不同值，加载顺序混乱不可预期',
+      excludeActionId: 'a-multisource',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -70,12 +83,29 @@ export const priorityClashCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-priority'],
-      hypotheses: [{ id: 'h-priority', status: 'confirmed' }],
+      tests: [
+        'h-priority',
+        'h-typo',
+        'h-multi',
+      ],
+      hypotheses: [
+        {
+          id: 'h-priority',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-typo',
+          status: 'excluded',
+        },
+        {
+          id: 'h-multi',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '来源审计（/actuator/env）',
-        text: 'pool.size 的候选来源（按优先级）：\n① 系统环境变量 ENV_DB_POOL=20          ← 赢家\n② Nacos 配置中心 pool.size=50          ← 三个月被忽略的求婚者\n③ application.yml pool.size=30         ← 更老的求婚者\nSpring 优先级：系统环境变量 > 远程配置中心 > 本地文件。\n来源考古：ENV_DB_POOL 写死于半年前 K8s 迁移（当时配置中心未接入，它是唯一来源）。\n实锤：优先级链上它站得最高——配置中心的 50 永远是"备胎"。',
+        text: '当前实例Environment来源诊断（高→低）：systemEnvironment中的POOL_SIZE=20；本案Nacos PropertySource中pool.size=50；application.yml中pool.size=30。\n标准环境变量映射POOL_SIZE→pool.size；三次受控启动均显示相同来源顺序和origin，最终池容量20。不是Nacos在所有版本/接入方式下都低于环境变量。键名匹配，加载顺序确定。',
       },
     },
     {
@@ -86,12 +116,19 @@ export const priorityClashCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-multi'],
-      hypotheses: [{ id: 'h-multi', status: 'confirmed' }],
+      tests: [
+        'h-multi',
+      ],
+      hypotheses: [
+        {
+          id: 'h-multi',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '同键多源扫描',
-        text: '全仓配置项来源比对：\n同键多源 ×11 项（环境变量 ∩ 配置中心 ∩ 本地 yml）：连接池/超时/开关类为主\n三源同值 ×6（无害）｜三源三值 ×5（每项都是一颗 config-drift+本案例的合体雷）\n→ 体系缺陷确认："配置入口"从本地文件→配置中心迁移了三年，旧来源从未清理——每个旧值都是优先级链上的一颗雷。',
+        text: '同一版本重复启动三次，PropertySources顺序与最终origin一致，排除随机加载。额外审计发现11项多源，其中5项值不同，作为治理线索；它们不构成本局第二个已确认根因。',
       },
     },
     {
@@ -102,12 +139,19 @@ export const priorityClashCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-typo'],
-      hypotheses: [{ id: 'h-typo', status: 'excluded' }],
+      tests: [
+        'h-typo',
+      ],
+      hypotheses: [
+        {
+          id: 'h-typo',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '键名核对',
-        text: '三来源键名一致（pool.size）；绑定校验在岗。\n→ 排除 typo：这次键名全对，错的是"谁说了算"。',
+        text: 'POOL_SIZE按标准环境变量命名映射为pool.size，Nacos及yml都提供同一规范键pool.size；Environment来源报告可见三者。排除拼写不匹配。',
       },
     },
     {
@@ -118,19 +162,26 @@ export const priorityClashCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-runtime'],
-      hypotheses: [{ id: 'h-runtime', status: 'down' }],
+      tests: [
+        'h-runtime',
+      ],
+      hypotheses: [
+        {
+          id: 'h-runtime',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '生效时机核对',
-        text: '池大小确为启动期固定（这半句对）；但重启后依然 20（环境变量还在）——\n"改了要重启"解释不了"重启也没用"。→ 降权：生效时机是背景，优先级覆盖是根因。',
+        text: '发布记录和进程startTime证明已在变更后重启；池仍20。池容量确为启动期读取，但“没有重启”与本案事实不符。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急改环境变量为 50 并重启',
-      desc: '【状态变更】Deployment env ENV_DB_POOL=20→50，滚动重启',
-      cost: 1,
+      desc: '【状态变更】Deployment env POOL_SIZE=20→50，滚动重启',
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -155,7 +206,7 @@ export const priorityClashCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '清理结果',
-        text: '① pool.size：环境变量与 yml 中的同键删除——配置中心成为唯一事实源\n② 环境变量红线：只保留"基础设施连接信息"（DB 地址/凭据/区域），业务参数禁入\n③ 5 项三源三值配置逐项清理（每项确认唯一来源）。\n回归：配置中心调整 → 重启后生效（预期明确），无幽灵值。',
+        text: '本团队决定pool.size由配置中心维护，删除遗留POOL_SIZE覆盖，并核对本地默认值的用途；这是团队治理选择，不是框架禁止环境变量承载容量参数。\n回归中心调整、受控重启后池容量符合预期，来源可追溯。',
       },
     },
     {
@@ -187,64 +238,76 @@ export const priorityClashCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '优先级图',
-        text: '配置优先级图（命令行 > 环境变量 > 远程中心 > 本地文件 > 默认值）+ 各层用途约定。\n新人第一次配置前就看到这张图——"谁说了算"从玄学变成常识。',
+        text: '记录当前集成版本、PropertySources实际顺序及覆盖开关，升级后重新验证。团队约定容量参数的维护入口，并保留可追溯默认值；不要把本案来源顺序写成所有Nacos版本的固定规则。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-priority', text: '环境变量覆盖：半年前 K8s 迁移写死的 ENV_DB_POOL=20 在 Spring 优先级链上压过配置中心——配置中心三次调整（回执全绿）永不采纳；同键三源（env/中心/yml）为体系性缺陷', correct: true },
-    { id: 'rc-typo', text: '配置键不匹配', correct: false },
-    { id: 'rc-runtime', text: '池大小启动期固定需重启（背景：重启也无效）', correct: false },
-    { id: 'rc-multi', text: '多配置源同键不同值（体系性缺陷的普遍形态，5 项确认）', correct: false },
+    {
+      id: 'rc-priority',
+      text: '环境变量覆盖：半年前 K8s 迁移写死的 POOL_SIZE=20 在 Spring 优先级链上压过配置中心——配置中心三次调整（回执全绿）永不采纳；同键三源（env/中心/yml）为体系性缺陷',
+      correct: true,
+    },
+    {
+      id: 'rc-typo',
+      text: '配置键不匹配',
+      correct: false,
+    },
+    {
+      id: 'rc-runtime',
+      text: '池大小启动期固定需重启（背景：重启也无效）',
+      correct: false,
+    },
+    {
+      id: 'rc-multi',
+      text: '多配置源同键不同值（体系性缺陷的普遍形态，5 项确认）',
+      correct: false,
+    },
   ],
-
   expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '回执全绿但运行值三个月不动——上次修的"送达"在岗，断点在"采纳"。三处对质先确认这一点。',
-      update: '重启验证都被驳回（依然 20）——应用有一个比配置中心更强的来源。',
+      thought: '对照中心与运行值。',
+      update: '重启后仍20，中心为50。',
       actionId: 'a-impact',
-      why: '1⚡︎ "重启也无效"是本案例的关键证据：它同时排除了"要重启"和"网络没送达"两类解释，指向"有更强的值"。',
-      conclusion: '嫌疑锁定：来源优先级覆盖（h-priority 升权）。',
+      why: '1⚡先证实差异存在，不能把回执当成采用值。',
+      conclusion: '核对实际配置来源。',
     },
     {
-      thought: '来源审计：actuator/env 全景列出 pool.size 的所有求婚者与优先级排序。',
-      update: '实锤：环境变量 20 压过中心 50——半年前迁移的遗留值站在优先级链顶端。',
+      thought: '读取有序来源及绑定映射。',
+      update: 'POOL_SIZE映射正确、顺序稳定且优先，最终origin为环境变量。',
       actionId: 'a-sourcecheck',
-      why: '2⚡︎ 来源审计是配置排查的"全家福"：单看配置中心永远发现不了"被谁覆盖"——只有把所有来源按优先级排开，采纳链的断点才可见。',
-      conclusion: '根因实锤：优先级覆盖。',
+      why: '2⚡实际来源和重复启动对照同时排除键错与随机顺序。',
+      conclusion: '确认覆盖根因。',
     },
     {
-      thought: '同键多源普查把个案升级为体系：11 项多源、5 项三值——每个旧来源都是一颗雷。',
-      update: '体系缺陷确认：配置入口迁移三年，旧来源从未清理——"配置中心是唯一入口"只是团队的以为。',
-      actionId: 'a-multisource',
-      why: '1⚡︎ 体系审计的杠杆：一个 pool.size 背后是 11 项同键多源——修复单位从"一个键"升级为"来源治理制度"，否则修一个雷排一颗雷。',
-      conclusion: '修复升级：单一事实源清理 + 审计制度。',
+      thought: '核对启动时间和变更记录。',
+      update: '变更后确已重启，未重启假设不成立。',
+      actionId: 'a-runtimecheck',
+      why: '1⚡时间证据排除生效时机候选，而非只把它含混降权。',
+      conclusion: '其余候选排除。',
     },
     {
-      thought: '键名排除（上次防线在岗）、生效时机降权、止血陷阱（改环境变量=又埋一处）点评。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（优先级覆盖）✓ 体系（11 项多源）✓ 防线（单一事实源+审计制度+优先级图）✓——个案、体系、防线三层闭合。',
-      conclusion: '沉淀：同一键多个来源时，优先级链决定最终事实——同键多源就是治理工单，环境变量只放基础设施连接信息。',
+      why: '【停止规则】实际来源覆盖已确认，键错、随机顺序及未重启均有反证。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '环境变量覆盖：半年前 K8s 迁移写死的 POOL_SIZE=20 在 Spring 优先级链上压过配置中心——配置中心三次调整（回执全绿）永不采纳；同键三源（env/中心/yml）为体系性缺陷',
     },
   ],
-
   lessons: [
     {
-      text: '同一键多个来源时，优先级链决定最终事实：环境变量压过配置中心——配置中心的回执再绿，也赢不了站得更高的来源。',
-      principle: '验证思维：配置排查的"全家福"是来源审计（actuator/env 全景）——把所有来源按优先级排开。"送达了但没采纳"的证据组合，直接指向优先级覆盖而非传输问题。',
+      text: '收到配置与采纳配置是两件事。先列出实际来源、优先级与最终origin，再解释运行值。',
+      principle: 'Spring Boot有来源覆盖规则，但远程源位置还依赖集成方式和版本；依据当前Environment实测顺序，不能照搬固定的Nacos优先级表。',
     },
     {
-      text: '同键多源是体系性缺陷：配置入口迁移时旧来源不清理，每个旧值都是优先级链上的一颗雷——11 项多源意味着 11 颗。',
-      principle: '沉淀思维：配置入口迁移（本地文件→配置中心）必须伴随"旧来源清理"步骤——迁移不是叠加。来源审计制度化（周期扫描同键多源→治理工单）让雷有账本、有期限，而不是等某次大促引爆。',
+      text: '环境变量名需按绑定规则映射；本案POOL_SIZE对应pool.size，ENV_DB_POOL不会自然变成这个键。',
+      principle: '把原始来源键、规范键和运行值三者并列，避免把命名约定误当框架自动推断。',
     },
     {
-      text: '环境变量只放基础设施连接信息：业务参数进环境变量 = 给优先级链埋雷——红线写进规范。',
-      principle: '架构设计：配置分层的用途约定——环境变量（基础设施：地址/凭据/区域）、配置中心（业务参数：唯一事实源）、本地文件（默认值兜底）。红线一旦写清，"该把配置放哪"从口味问题变成规范问题。',
+      text: '迁移配置入口时要处理遗留覆盖；多源默认值可以保留，但用途和最终来源必须清楚。',
+      principle: '唯一维护入口属于团队约定。治理目标是可追溯、可验证，而不是宣称所有多源配置都错误。',
     },
   ],
 }

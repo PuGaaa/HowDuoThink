@@ -1,23 +1,21 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 7 章 · 配置与启动 第五批（profile 分层合并 L2）
- * 教学点：验证思维——profile 分层合并的隐形差异：环境专属键只在某一层存在，本地永远测不到；
- * 配置 dump 对比工具 + 环境红线（行为类键三环境同值）。
- * 专家路径：impact(1) + profilediff(2) + artifactcompare(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const profileMazeCase: DiagnosisCase = {
   id: 'profile-maze',
   title: '本地测得好好的，生产行为不同',
-  intro: '导出格式本地是 CSV，生产是 XLSX：一个键只在 prod 的 yml 里——profile 合并的隐形差异，本地测不到。',
+  intro: '同一镜像在本地导出CSV，在生产导出XLSX；配置中心没有这个键。先对比最终生效值及来源。',
   domain: 'deploy',
   layer: 'profile 分层合并的隐形差异——环境专属键必须显式盘点',
   part: 'engineer',
   chapterId: 'config-boot',
   order: 5,
-  typeTags: ['config', 'data'],
+  typeTags: [
+    'config',
+    'data',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」报表服务的后端，运营的疑问让你发现"同一个配置，两个世界"。',
     architecture: '报表服务(配置三层合并: application.yml → application-{profile}.yml → 配置中心) ｜ 三环境：dev/test/prod',
@@ -34,17 +32,31 @@ export const profileMazeCase: DiagnosisCase = {
         text: '运营依赖 CSV 做对账脚本解析（XLSX 解析成本高）；\n生产却一直产出 XLSX——功能方提了 bug，开发者本地复现不了。',
       },
     ],
-    timeline: 'export.format 配置三个月前引入（本地与测试默认 CSV）｜ 生产 application-prod.yml 三个月前被"顺手加过一行"｜ 无人记得此事',
-    impactHint: '代码相同、配置中心无键、行为不同——三层合并的中间层里，藏着一行没人记得的配置。',
+    timeline: '三个月前引入导出格式配置；本地和测试一直导出CSV，生产导出XLSX；本周运营对账脚本首次暴露差异。',
+    impactHint: '镜像相同并不能证明运行配置相同，先看最终值及其来源。',
   },
-
   hypotheses: [
-    { id: 'h-profile', text: 'profile 分层差异：application-prod.yml 有 export.format=XLSX，本地/test 无此键走默认 CSV', excludeActionId: 'a-profilediff' },
-    { id: 'h-artifact', text: '构建产物不同：打包含不同配置文件', excludeActionId: 'a-artifactcompare' },
-    { id: 'h-env', text: '部署时环境变量注入了不同值', excludeActionId: 'a-envinject' },
-    { id: 'h-version', text: '生产实例运行不同版本代码', excludeActionId: 'a-versioncheck' },
+    {
+      id: 'h-profile',
+      text: 'profile 分层差异：application-prod.yml 有 export.format=XLSX，本地/test 无此键走默认 CSV',
+      excludeActionId: 'a-profilediff',
+    },
+    {
+      id: 'h-artifact',
+      text: '构建产物不同：打包含不同配置文件',
+      excludeActionId: 'a-artifactcompare',
+    },
+    {
+      id: 'h-env',
+      text: '部署时环境变量注入了不同值',
+      excludeActionId: 'a-envinject',
+    },
+    {
+      id: 'h-version',
+      text: '生产实例运行不同版本代码',
+      excludeActionId: 'a-versioncheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +71,7 @@ export const profileMazeCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '同异盘点',
-        text: '镜像 hash：三环境一致 ✓（同一份代码）\n配置中心：export.format 键不存在（任何环境）✓\n行为差异：仅生产为 XLSX\n→ 代码同、中心同、行为异——差异必在"本地文件层"（application*.yml）的合并里。',
+        text: '三个环境同一镜像digest；同输入在dev/test得到CSV，在prod得到XLSX。中心各环境均无export.format。\n日志归档有一次上传重试，但三环境导出均完成；重试不在格式选择调用链。差异来源仍需查配置和注入。',
       },
     },
     {
@@ -70,28 +82,52 @@ export const profileMazeCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-profile'],
-      hypotheses: [{ id: 'h-profile', status: 'confirmed' }],
+      tests: [
+        'h-profile',
+      ],
+      hypotheses: [
+        {
+          id: 'h-profile',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '生效配置 diff（三环境）',
-        text: '本地生效：export.format = CSV（application.yml 默认值）\ntest 生效：  export.format = CSV（同上）\nprod 生效：  export.format = XLSX ← application-prod.yml 多了一行！\n考古：三个月前某次"生产导出兼容旧系统"的临时调整，写进了 application-prod.yml——\n当时说"回头统一"，然后无人记得。配置合并语义：prod 层覆盖默认层。\n实锤：环境专属键的隐形差异——本地永远测不到生产的那一行。',
+        text: '最终配置与origin：dev/test的export.format=CSV，来自打包application.yml；prod为XLSX，来自部署侧外置application-prod.yml。\n当前激活profile分别为dev/test/prod，符合部署意图。只在同构副本移除prod外置文件这一行、保持其他来源不变，输出变回CSV。',
       },
     },
     {
       id: 'a-artifactcompare',
-      name: '核对构建产物内容',
+      name: '核对产物与部署注入清单',
       desc: '排除打包含不同配置',
       cost: 1,
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-artifact'],
-      hypotheses: [{ id: 'h-artifact', status: 'excluded' }],
+      tests: [
+        'h-artifact',
+        'h-env',
+        'h-version',
+      ],
+      hypotheses: [
+        {
+          id: 'h-artifact',
+          status: 'excluded',
+        },
+        {
+          id: 'h-env',
+          status: 'excluded',
+        },
+        {
+          id: 'h-version',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '产物核对',
-        text: '三环境 jar 内 application*.yml 内容一致（差异在部署侧的外置配置目录）。\n→ 排除构建：外置 prod 配置目录是差异源（应用启动时叠加）。',
+        text: '同一部署清单诊断：三个环境运行镜像digest和JAR校验和相同，包内application*.yml相同；部署进程环境变量/命令行均无export.format覆盖。\n生产差异只在外置目录，不在构建产物，也不是代码版本或环境注入。',
       },
     },
     {
@@ -102,8 +138,15 @@ export const profileMazeCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-env'],
-      hypotheses: [{ id: 'h-env', status: 'excluded' }],
+      tests: [
+        'h-env',
+      ],
+      hypotheses: [
+        {
+          id: 'h-env',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '环境变量核对',
@@ -118,8 +161,15 @@ export const profileMazeCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-version'],
-      hypotheses: [{ id: 'h-version', status: 'excluded' }],
+      tests: [
+        'h-version',
+      ],
+      hypotheses: [
+        {
+          id: 'h-version',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '版本核对',
@@ -130,7 +180,7 @@ export const profileMazeCase: DiagnosisCase = {
       id: 'a-danger',
       name: '紧急回滚 prod 配置文件到三个月前版本',
       desc: '【状态变更】git 回滚 application-prod.yml——把三个月的变更全部冲掉',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -187,7 +237,7 @@ export const profileMazeCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: 'profile 红线',
-        text: 'profile 分层规则：\n✔ 环境专属：连接地址、凭据、容量参数（本来就应不同）\n✘ 禁止分叉：行为类键（格式/单位/开关语义）——三环境强制同值，或走配置中心统一管理\n"顺手在生产加一行"从此有了红线。',
+        text: '本团队约定：地址、凭据、容量允许按环境配置；格式、单位及开关语义若无明确测试目标则保持一致。采用配置中心也要比较各环境生效值与来源，中心管理不自动保证同值。',
       },
     },
     {
@@ -207,48 +257,60 @@ export const profileMazeCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-profile', text: 'application-prod.yml 三个月前被加入 export.format=XLSX（本地/test 无此键走默认 CSV）——profile 分层合并的隐形环境差异：本地永远测不到生产的那一行', correct: true },
-    { id: 'rc-artifact', text: '构建打包含不同配置文件', correct: false },
-    { id: 'rc-env', text: '部署时环境变量注入不同值', correct: false },
-    { id: 'rc-version', text: '生产实例运行不同版本代码', correct: false },
+    {
+      id: 'rc-profile',
+      text: 'application-prod.yml 三个月前被加入 export.format=XLSX（本地/test 无此键走默认 CSV）——profile 分层合并的隐形环境差异：本地永远测不到生产的那一行',
+      correct: true,
+    },
+    {
+      id: 'rc-artifact',
+      text: '构建打包含不同配置文件',
+      correct: false,
+    },
+    {
+      id: 'rc-env',
+      text: '部署时环境变量注入不同值',
+      correct: false,
+    },
+    {
+      id: 'rc-version',
+      text: '生产实例运行不同版本代码',
+      correct: false,
+    },
   ],
-
   expertCost: 4,
-  restartActionId: 'a-fixalign',
-
+  restartActionId: 'a-danger',
   expertChain: [
     {
-      thought: '代码同、中心同、行为异——先盘点三层配置源的"同异"，差异必藏在没对过的那一层。',
-      update: '镜像与配置中心排除——剩余嫌疑：本地文件层（application*.yml）的分层合并。',
+      thought: '先验证相同输入的行为差异。',
+      update: '同镜像但prod输出不同，中心无该键。',
       actionId: 'a-impact',
-      why: '1⚡︎ 配置的"三层合并"（本地默认→profile 层→配置中心）每层都可能藏键——先盘点哪些层对过账，剩下没对的就是盲区。',
-      conclusion: '嫌疑锁定：profile 层（h-profile 升权）。',
+      why: '1⚡确定比较条件，不能凭镜像相同直接排除所有注入。',
+      conclusion: '核对最终配置来源。',
     },
     {
-      thought: '三环境生效配置 dump 对比——不猜哪一层，直接 diff 最终合并结果并标注来源。',
-      update: '实锤：application-prod.yml 多一行 export.format=XLSX（三个月前的临时调整被遗忘）。',
+      thought: '读取最终值和origin并做单变量对照。',
+      update: 'prod外置profile值覆盖默认值，移除这一行则恢复CSV。',
       actionId: 'a-profilediff',
-      why: '2⚡︎ 生效配置 diff 是 profile 迷宫的地图：合并语义（下层覆盖上层）让"某层独有的键"只在该环境生效——dump 标注来源层，一行配置的来历一目了然。',
-      conclusion: '根因实锤：环境专属键隐形分叉。',
+      why: '2⚡来源追溯与同构对照证明差异因果，不靠记忆考古。',
+      conclusion: '确认profile分叉。',
     },
     {
-      thought: '产物/环境变量/版本三个常规嫌疑各 1⚡︎ 排除——"同代码不同行为"的教科书排除链。',
-      update: '产物一致、无变量注入、版本一致——三层配置源之外全部清白。',
+      thought: '读取产物及部署注入清单。',
+      update: '代码/包相同，无环境变量或命令行覆盖。',
       actionId: 'a-artifactcompare',
-      why: '1⚡︎ "同代码不同行为"的三源排查（产物/注入/分层）是固定套路——产物与注入排除后，分层合并成为唯一解。',
-      conclusion: '嫌疑收敛单点。',
+      why: '1⚡同一份部署诊断给出三个候选各自的反证。',
+      conclusion: '其余候选排除。',
     },
     {
-      thought: '修复（显式对齐）、工具（dump-diff）、红线（行为键同值）、冒烟（行为一致性断言）。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（prod 层独有键）✓ 工具（dump-diff）✓ 红线（行为键同值）✓——个案、工具、规范三层闭合。',
-      conclusion: '沉淀：profile 分层合并的隐形差异——环境专属键必须显式盘点，行为类键三环境同值；本地测不到的差异，用 dump-diff 让它可见。',
+      why: '【停止规则】外置profile差异及输出对照已确认，产物、版本、注入均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: 'application-prod.yml 三个月前被加入 export.format=XLSX（本地/test 无此键走默认 CSV）——profile 分层合并的隐形环境差异：本地永远测不到生产的那一行',
     },
   ],
-
   lessons: [
     {
       text: 'profile 分层合并的隐形差异：某层独有的键只在该环境生效——本地永远测不到生产的那一行。',
@@ -256,7 +318,7 @@ export const profileMazeCase: DiagnosisCase = {
     },
     {
       text: 'profile 红线：环境专属配置仅限"本来就应不同"项（地址/凭据/容量），行为类键（格式/单位/开关语义）三环境强制同值。',
-      principle: '程序设计：行为类配置分叉 = 同一份代码在不同环境"人格分裂"——测试通过的语义到生产失效。"顺手在生产加一行"是环境差异最常见的诞生方式：红线 + dump-diff 巡检让它无法隐身。',
+      principle: '行为差异必须是可审查的明确选择。统一配置入口仍可能有各环境独立值；通过生效值diff及同输入冒烟验证语义一致，不能只看配置放在哪里。',
     },
     {
       text: '"生产像本地"要靠冒烟断言：发布后抽样关键行为的输出特征（格式/单位）三环境比对——本地测得到的才是真的测到了。',

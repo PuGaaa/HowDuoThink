@@ -1,23 +1,22 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 7 章 · 配置与启动 结业（重启惊群 L3）
- * 教学点：架构设计——恢复期的第二场事故：50 实例同时重启的连接风暴+预热惊群；
- * 分批重启+连接爬坡+预热分级——惊群要有刹车，恢复要有编排。
- * 专家路径：impact(1) + stormcurves(2) + poolcfg(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const bootStormCase: DiagnosisCase = {
   id: 'boot-storm',
   title: 'DB 刚醒，又被 50 个实例同时扑倒',
-  intro: 'DB 维护恢复后的第二场事故：50 实例同时重启——连接风暴 × 预热惊群，刚醒的 DB 又被压回去了。',
+  intro: '数据库刚恢复，批量重启又触发过载。需要分别核算建连、预热查询和恢复窗口，找出失控的负载来源。',
   domain: 'deploy',
   layer: '恢复期的惊群要有刹车——分批、爬坡、抽样预热',
   part: 'engineer',
   chapterId: 'config-boot',
   order: 6,
-  typeTags: ['deploy', 'capacity', 'race'],
-  difficulty: 3,
-
+  typeTags: [
+    'deploy',
+    'capacity',
+    'race',
+  ],
+  difficulty: 2,
   scene: {
     role: '你是「鲜到家」订单域的值班负责人，DB 恢复后的"第二场事故"比第一场更让人崩溃。',
     architecture: 'DB 主从切换恢复(缓冲池冷) ← 50 个应用实例同时重启(每实例: 初始 20 连接 + 全量预热查询) ｜ 呼应 boot-order 事件',
@@ -26,25 +25,39 @@ export const bootStormCase: DiagnosisCase = {
       {
         type: 'error',
         title: '第二场事故',
-        text: 'DB 恢复后值班执行"全员重启"（每实例 10s 内完成启动）。\n重启后 3 分钟：DB CPU 再度 100%、连接数 980/800 超限、部分实例启动失败自动重试——惊群循环。',
+        text: '恢复后50个实例在10秒内同时启动。首次发起1000次建连，800个建立、200个被max_connections拒绝；失败实例无退避重试，DB CPU升至100%。',
       },
       {
         type: 'text',
         title: '曲线特征',
-        text: '连接建立曲线与重启脚本时间线完全重合：10 秒内 980 连接同时涌入。\n预热查询：每实例 240 次全量预热 × 50 实例 = 1.2 万次/分钟——全部落向刚恢复的 DB。',
+        text: '首轮60秒内执行/尝试预热查询12000次，即平均200QPS；实例启动与建连曲线重合。日常活跃连接总量约450，峰值不超过500。',
       },
     ],
-    timeline: '01:20 DB 主从切换完成（缓冲池冷：缓存全空）｜ 01:22 值班"全员重启" ｜ 01:25 DB 二次过载告警 ｜ 部分实例启动失败进入自动重试循环',
+    timeline: '01:20旧慢查询已停止、主从切换完成，缓冲池命中率12%；01:22同时启动50实例；01:25二次过载，失败实例持续重试。',
     impactHint: '第一场事故是慢查询，第二场是"所有人同时起床"——恢复期的资源状态（缓冲池冷）与惊群叠加，谁来踩刹车？',
   },
-
   hypotheses: [
-    { id: 'h-storm', text: '重启惊群：50 实例 × (20 连接 + 240 预热查询) 同时涌入冷缓冲池的 DB——二次过载', excludeActionId: 'a-stormcurves' },
-    { id: 'h-fragile', text: 'DB 恢复不完整（慢查询未清/缓冲池过冷），重启只是压垮骆驼的最后一根稻草', excludeActionId: 'a-dbhealth' },
-    { id: 'h-poolburst', text: '连接池初始连接数过大（20/实例），启动即打满配额', excludeActionId: 'a-poolcfg' },
-    { id: 'h-probe', text: '健康检查探活风暴加剧 DB 负载', excludeActionId: 'a-probestorm' },
+    {
+      id: 'h-storm',
+      text: '恢复编排无节流：同时建连和预热叠加冷缓冲池，失败后无退避重试',
+      excludeActionId: 'a-stormcurves',
+    },
+    {
+      id: 'h-fragile',
+      text: '第一场事故的慢查询仍在执行，主从切换没有完成',
+      excludeActionId: 'a-dbhealth',
+    },
+    {
+      id: 'h-poolburst',
+      text: '即使不重启，稳态连接需求也已超过800，是持续容量不足',
+      excludeActionId: 'a-poolcfg',
+    },
+    {
+      id: 'h-probe',
+      text: '健康检查探活风暴加剧 DB 负载',
+      excludeActionId: 'a-probestorm',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +72,7 @@ export const bootStormCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '三线对齐（第二场事故）',
-        text: '重启脚本：01:22:00 触发，50 实例并行拉起（10s 内全部启动）\n连接曲线：01:22:08 DB 连接 0 → 980（10s 内）\nDB 负载：01:22:15 CPU 100%（第二次）\n两场事故的元凶不同：第一场是慢查询（01:14），第二场是惊群（01:22）。\n→ "恢复"动作本身成为新事故——惊群没有刹车。',
+        text: '01:20切换结束后CPU18%；01:22同时拉起50实例，10秒内首次建连尝试1000次。\n建立800、拒绝200；01:22:15 CPU100%，失败实例反复建连。要区分尝试数和已建立数，不能把980/800写成合法的实际连接计数。',
       },
     },
     {
@@ -70,12 +83,19 @@ export const bootStormCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-storm'],
-      hypotheses: [{ id: 'h-storm', status: 'confirmed' }],
+      tests: [
+        'h-storm',
+      ],
+      hypotheses: [
+        {
+          id: 'h-storm',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '惊群解剖',
-        text: '连接风暴：50 实例 × 初始 20 连接 = 1000 连接请求（DB 上限 800）→ 超限拒绝\n预热风暴：50 × 240 查询 = 12,000 次/分钟，全部 miss（缓冲池冷）→ 直接打磁盘\n乘法效应：冷缓冲池让每个查询都慢 × 惊群让每个查询同时来 = 雪崩\n实锤：三要素乘法——量大（50 实例）× 每量大（20 连接+240 查询）× 时机差（冷恢复）。',
+        text: '第一轮：50×20=1000次建连尝试，DB普通连接上限800。50×240=12000次预热查询在60秒内执行/尝试，平均200QPS；命中率12%（暖态97%），磁盘读取显著增多。\n同构冷池回放只改变恢复编排：10实例/批、初始5连接、有限速预热和退避，CPU峰值58%、无拒绝。连接与查询单位不同，分别算，不能相加成50×(20+240)。',
       },
     },
     {
@@ -86,12 +106,19 @@ export const bootStormCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-fragile'],
-      hypotheses: [{ id: 'h-fragile', status: 'down' }],
+      tests: [
+        'h-fragile',
+      ],
+      hypotheses: [
+        {
+          id: 'h-fragile',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'DB 状态评估',
-        text: '主从切换完成 ✓ 慢查询已 kill ✓——"基本健康但脆弱"：\n缓冲池冷（命中率 12%→恢复需要 30 分钟自然回温）。\n→ 降权为背景脆弱性：它放大了惊群的伤害，但惊群本身是主因——一个健康的 DB 也扛不住 1000 连接惊群。',
+        text: '旧慢查询已停止，切换状态完成且读写校验通过；无同一慢SQL残留。缓冲池命中率12%是恢复背景，并非“所有查询miss”，也不能据此声称数据库仍未切换成功。',
       },
     },
     {
@@ -102,12 +129,19 @@ export const bootStormCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-poolburst'],
-      hypotheses: [{ id: 'h-poolburst', status: 'down' }],
+      tests: [
+        'h-poolburst',
+      ],
+      hypotheses: [
+        {
+          id: 'h-poolburst',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '池参数评估',
-        text: '初始连接 20 = 稳态峰值需求（日常够用）——但它是"惊群的弹药"：\n50 实例 × 20 = 1000 > 800 上限，启动即超配。\n→ 降权为构成要素：初始连接应"爬坡"（初始 5 → 按需升至 20），稳态与启动态分离。',
+        text: '稳态峰值每实例8~10活跃连接，总需求不超过50×10=500，小于800；20是初始预建数，不是稳态实际需求。\n故持续容量不足不成立；初始预建造成的瞬时超配属于已确认恢复风暴的一部分。',
       },
     },
     {
@@ -118,19 +152,26 @@ export const bootStormCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-probe'],
-      hypotheses: [{ id: 'h-probe', status: 'excluded' }],
+      tests: [
+        'h-probe',
+      ],
+      hypotheses: [
+        {
+          id: 'h-probe',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '探活核对',
-        text: '探活间隔 10s、查询极轻（SELECT 1）——风暴贡献可忽略。\n→ 排除探活。',
+        text: '50实例每10秒一次SELECT 1，理论5QPS；实际追踪也为5QPS，无重试放大。预热平均200QPS且读取业务页；暂停探活保持预热不变的同构对照仍过载，排除探活为主因。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急重启 DB 并扩大缓冲池',
       desc: '【状态变更】DB 停机扩内存 + 重启',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -139,7 +180,7 @@ export const bootStormCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: 'DB 重启结果（陷阱动作）',
-        text: '停服 5 分钟扩缓冲 + DB 重启——缓冲池更冷了（二次冷启动），\n实例的自动重试循环立刻再次涌向 DB——惊群重来，雪上加霜。\n→ 复盘点评：对"惊群"扩容是对症错了药——惊群要刹车（错峰/爬坡），不是更大的池子。',
+        text: '没有先暂停客户端重试就扩内存并重启DB，业务中断且缓冲池重新变冷；恢复后请求再次同时涌入。扩容可能改善容量，但不能自动消除本案未节流和无退避，先控制负载再评估容量。',
       },
     },
     {
@@ -155,7 +196,7 @@ export const bootStormCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 分批重启：10 实例/批、批间隔 2min、批间健康门槛（DB 负载 < 60% 才放下一批）\n② 连接爬坡：初始 5 → 按需增长至 20（启动压力 ÷4）\n③ 预热分级：核心热点抽样 10% 预热，全量预热改异步低峰\n回归：全员恢复 18 分钟（比惊群方式慢 8 分钟），但 DB 全程 CPU < 65%——稳稳地醒来。',
+        text: '暂停自动重试后分5批、每批10实例启动；批间最少2分钟且CPU<60%才继续。初始5连接，按稳态预算增长；热点预热限速，其余低峰执行。\n教学回放记录0/2/4/6/8分钟放行5批，最后1分钟确认健康，共9分钟；CPU峰值58%。若未过健康门槛则暂停，不能预先承诺固定恢复时长。',
       },
     },
     {
@@ -207,60 +248,86 @@ export const bootStormCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-storm', text: '重启惊群：50 实例同时启动 × (初始 20 连接 + 240 全量预热查询) 对刚恢复、缓冲池冷的 DB 形成乘法风暴（1000 连接超限 + 1.2 万查询/分钟）——二次过载与启动失败循环', correct: true },
-    { id: 'rc-fragile', text: 'DB 恢复不完整（缓冲池冷）的脆弱性放大伤害（背景）', correct: false },
-    { id: 'rc-poolburst', text: '连接池初始连接过大（惊群弹药构成）', correct: false },
-    { id: 'rc-probe', text: '健康检查探活风暴加剧负载', correct: false },
+    {
+      id: 'rc-storm',
+      text: '重启惊群：50 实例同时启动 × (初始 20 连接 + 240 全量预热查询) 对刚恢复、缓冲池冷的 DB 形成乘法风暴（1000 连接超限 + 1.2 万查询/分钟）——二次过载与启动失败循环',
+      correct: true,
+    },
+    {
+      id: 'rc-fragile',
+      text: 'DB 恢复不完整（缓冲池冷）的脆弱性放大伤害（背景）',
+      correct: false,
+    },
+    {
+      id: 'rc-poolburst',
+      text: '连接池初始连接过大（惊群弹药构成）',
+      correct: false,
+    },
+    {
+      id: 'rc-probe',
+      text: '健康检查探活风暴加剧负载',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 6,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '"恢复动作引发新事故"——先对齐三条曲线：重启、连接、DB 负载，确认第二场事故的元凶换了。',
-      update: '三线重合：10 秒 980 连接 + DB 二次 100%——惊群与慢查询是两个不同的凶手。',
+      thought: '先对齐恢复与负载时间线。',
+      update: '第一轮1000次尝试、800建立、200拒绝。',
       actionId: 'a-impact',
-      why: '1⚡︎ 区分"两场事故"是本案的钥匙：把恢复期的过载误认为"DB 还没修好"，就会重复第一场的处置（等/kill）——曲线对齐揭示元凶已换人。',
-      conclusion: '嫌疑锁定：重启惊群（h-storm 升权）。',
+      why: '1⚡区分事件与计数单位，避免超上限的假数据。',
+      conclusion: '核对恢复负载组成。',
     },
     {
-      thought: '解剖惊群的乘法结构：实例数 × 每实例弹药 × 时机敏感度——三个因子各自贡献什么。',
-      update: '实锤：50 × (20+240) × 冷缓冲池——连接超限 + 磁盘风暴的乘法雪崩。',
+      thought: '分别核算连接、查询及同构对照。',
+      update: '冷池回放仅改变编排即可避免拒绝。',
       actionId: 'a-stormcurves',
-      why: '2⚡︎ 乘法结构的拆解决定修复的落点：三个因子各自可治——实例分批（÷5）、连接爬坡（÷4）、预热分级（÷10）——拆解成乘法因子，修复就有了三个互不冲突的抓手。',
-      conclusion: '根因实锤：三因子乘法惊群。',
+      why: '2⚡对照支持恢复风暴因果，不能把连接和查询机械相加。',
+      conclusion: '确认恢复编排根因。',
     },
     {
-      thought: 'DB 脆弱性与池参数单独定权：背景放大器与弹药构成，都不是"唯一的根因"。',
-      update: '缓冲池冷 = 背景（放大器）、初始 20 连接 = 弹药（构成要素）——修复方案两者都覆盖（预热分级/连接爬坡）。',
+      thought: '检查首场故障是否残留。',
+      update: '旧SQL停止、切换与读写校验完成。',
+      actionId: 'a-dbhealth',
+      why: '1⚡冷池是背景，不能代替首场故障未恢复的证据。',
+      conclusion: '排除h-fragile。',
+    },
+    {
+      thought: '区分稳态预算和预建策略。',
+      update: '稳态≤500，初始预建1000。',
       actionId: 'a-poolcfg',
-      why: '1⚡︎ 惊群的多因子定权防止"单点修复"的幻觉：只改分批不改爬坡，单批的连接仍超限——三个因子三个抓手，缺一则惊群换姿势重来。',
-      conclusion: '定权完成 → 三抓手修复。',
+      why: '1⚡分别比较需求与800上限，持续容量不足不成立。',
+      conclusion: '排除h-poolburst。',
     },
     {
-      thought: '探活排除、扩容陷阱（对症错了药）点评、编排化与季度演练。停止收集。',
-      update: '停止。',
+      thought: '量化探活并比较负载。',
+      update: '5QPS探活，停探活仍过载。',
+      actionId: 'a-probestorm',
+      why: '1⚡计数和单变量对照共同反证探活主因。',
+      conclusion: '全部候选完成收敛。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（三因子乘法）✓ 刹车（分批/爬坡/分级）✓ 防线（编排+演练）✓——机制、刹车、防线三层闭合。',
-      conclusion: '沉淀：恢复期的惊群要有刹车——分批、爬坡、抽样预热；恢复不是一拥而上，是有秩序的醒来。',
+      why: '【停止规则】恢复风暴有时间线和同构对照，残留慢查询、稳态超配和探活主因均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '重启惊群：50 实例同时启动 × (初始 20 连接 + 240 全量预热查询) 对刚恢复、缓冲池冷的 DB 形成乘法风暴（1000 连接超限 + 1.2 万查询/分钟）——二次过载与启动失败循环',
     },
   ],
-
   lessons: [
     {
-      text: '恢复期的惊群要有刹车：50 实例同时起床的连接风暴 × 预热惊群，能把刚恢复的 DB 再次打倒。',
-      principle: '架构设计：惊群是乘法——实例数 × 每实例弹药 × 时机敏感度。三个因子三个刹车：分批重启（实例数）、连接爬坡（弹药）、预热分级（时机）。恢复不是一拥而上，是有秩序的醒来。',
+      text: '分别核算建连次数、已建连接、查询数和时间窗，不能把连接与查询相加，也不能把拒绝的尝试算成已建立连接。',
+      principle: '50×20=1000次建连尝试；50×240÷60=200QPS。稳态需求≤500与瞬时预建1000是不同约束，恢复预算必须分别设限。',
     },
     {
-      text: '对"惊群"扩容是对症错了药：DB 扩内存让缓冲更冷、实例重试更凶——先分清"容量不足"与"同时到达"。',
-      principle: '验证思维：二次过载的鉴别诊断——容量不足（加资源有效）vs 同时到达（错峰有效）。本例 DB 本可扛 800 稳态连接，扛不住的是 10 秒内 1000 的瞬时——惊群要用编排刹车，不是用容量硬接。',
+      text: '冷缓冲池放大预热I/O，但不代表所有页都miss；二次过载需要时间线和同构对照支持。',
+      principle: '先确认首场故障已解除，再比较恢复编排。分批、连接爬坡、查询限速和退避控制瞬时负载；容量调整是否有益需另算，不能笼统否定扩容。',
     },
     {
-      text: '恢复动作本身要被编排：一次性全员重启的脚本，把"恢复"变成了"第二场事故"——人的手滑要有编排兜底。',
-      principle: '流程设计：重启/恢复类高危操作编排化（分批策略+健康门槛+异常自动暂停）——值班凌晨的手速和判断力不该是系统可用性的最后防线。恢复演练季度化：第二场事故从"必发生"变"演练过"。',
+      text: '恢复脚本也要有健康门槛和异常暂停，单批时间间隔不能代替容量预算。',
+      principle: '把冷池、重试与批量恢复放进演练；记录最后一批放行和健康确认时间，避免用没有时间依据的恢复分钟数论证方案。',
     },
   ],
 }

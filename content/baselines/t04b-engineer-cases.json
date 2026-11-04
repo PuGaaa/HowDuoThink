@@ -1,0 +1,604 @@
+{
+  "schemaVersion": 1,
+  "kind": "t04b-engineer-calibration",
+  "frozenAt": "2026-11-04",
+  "sourceCommit": "98cc581",
+  "count": 29,
+  "cases": [
+    {
+      "id": "config-typo",
+      "file": "app/data/cases/config-typo.ts",
+      "chapter": "config-boot",
+      "order": 1,
+      "originalHash": "67b918c8731bf67ecc6f2ffd7336e3764c70f69c81e9d105dbb2d62dd8b90334",
+      "originalDifficulty": 1,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "calibrated",
+      "calibratedHash": "0300c393e20bf80e9c138dfcbca349443dd2dc0f3bb979e0d87f73141fc51707",
+      "difficulty": 1,
+      "dimensions": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "dimensionEvidence": [
+        "30s症状→精确键对照",
+        "完整两行键名",
+        "显式占位符默认值",
+        "默认值与30s直接吻合",
+        "同一应用配置绑定",
+        "无危险试错动作"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-keydiff",
+            "a-loadcheck"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-loadcheck",
+            "a-keydiff"
+          ],
+          "cost": 4
+        }
+      ],
+      "expectedConfirmed": [
+        "h-typo"
+      ],
+      "review": "保留4⚡：逐字对照2⚡+来源快照1⚡是必要证据，修复不计定位成本。去除题面答案及错误的默认未知键告警承诺。",
+      "sources": [
+        "https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html"
+      ]
+    },
+    {
+      "id": "boot-order",
+      "file": "app/data/cases/boot-order.ts",
+      "chapter": "config-boot",
+      "order": 2,
+      "originalHash": "5f675937dcbffc7bd7e13f67179b08cde654d20344599d0b4b82ca2a8d70a8f2",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "calibrated",
+      "calibratedHash": "4ae4520070f6845ea4ce90c1292c0c345b1aa9fff63f0c2cb2a078b6d4fcf2e4",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "功能分组→初始化分支",
+        "日志与代码交叉",
+        "就绪契约与初始化",
+        "端口正常而功能缺失",
+        "业务组件与DB时间窗",
+        "重启恢复掩盖无重试"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-bootlog",
+            "a-poolcheck"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-poolcheck",
+            "a-bootlog"
+          ],
+          "cost": 4
+        }
+      ],
+      "expectedConfirmed": [
+        "h-swallow"
+      ],
+      "review": "保留4⚡，修正MQ依赖因果、三条WARN及缓存污染自相矛盾；区分核心监听与可降级预热。",
+      "sources": [
+        "https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html"
+      ]
+    },
+    {
+      "id": "hot-reload-gap",
+      "file": "app/data/cases/hot-reload-gap.ts",
+      "chapter": "config-boot",
+      "order": 3,
+      "originalHash": "32371c22653e9463c80ec862d58a190b2942912b9c1b1ffff48a705e62da2cca",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "calibrated",
+      "calibratedHash": "1199b32dfe3638d500e612d913b9bea33b66c93fb67e4b48bd75e49c02f9a128",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "送达→绑定→读取",
+        "运行值+代码+对照",
+        "单例与刷新作用域",
+        "ACK成功仍旧值",
+        "配置监听与业务字段",
+        "重启可暂时掩盖"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-injectmode",
+            "a-usageaudit2"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-usageaudit2",
+            "a-injectmode"
+          ],
+          "cost": 4
+        }
+      ],
+      "expectedConfirmed": [
+        "h-frozen"
+      ],
+      "review": "保留4⚡；以使用点核对替代非必要全仓审计，修复字段注解错误及自动刷新过度概括。",
+      "sources": [
+        "https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html",
+        "https://docs.spring.io/spring-cloud-commons/reference/spring-cloud-commons/application-context-services.html"
+      ]
+    },
+    {
+      "id": "priority-clash",
+      "file": "app/data/cases/priority-clash.ts",
+      "chapter": "config-boot",
+      "order": 4,
+      "originalHash": "24299f2c4d1b9b667d5a4ee64c13c7e3c2362ae6792847e04870d18fdf5c9605",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "calibrated",
+      "calibratedHash": "92e2b026e148ab45d7463cf61fdc26270106f58ab6408510377ada6fb5cac077",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "面板→来源→运行",
+        "有序来源与启动记录",
+        "绑定与优先级",
+        "送达成功但未采纳",
+        "部署环境到应用池",
+        "再改高优先级来源掩盖治理"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-sourcecheck",
+            "a-runtimecheck"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-runtimecheck",
+            "a-sourcecheck"
+          ],
+          "cost": 4
+        }
+      ],
+      "expectedConfirmed": [
+        "h-priority"
+      ],
+      "review": "保留4⚡，纠正环境变量映射、固定Nacos优先级和双confirmed；全仓审计移出必要定位路径。",
+      "sources": [
+        "https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html"
+      ]
+    },
+    {
+      "id": "profile-maze",
+      "file": "app/data/cases/profile-maze.ts",
+      "chapter": "config-boot",
+      "order": 5,
+      "originalHash": "c6fd33ed960dee5176a58a36d63e1fc187ec44f934f6b7fa9e5caf118decee21",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "calibrated",
+      "calibratedHash": "806cf69cce3bb2faa962e7489a35de273c879e80502f3e4902dd5d00f102a660",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "同输入→最终值→origin",
+        "diff与单变量复验",
+        "profile合并与外置配置",
+        "镜像同而行为不同",
+        "部署目录到应用输出",
+        "文件级回滚破坏其他合法项"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-profilediff",
+            "a-artifactcompare"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-artifactcompare",
+            "a-profilediff"
+          ],
+          "cost": 4
+        }
+      ],
+      "expectedConfirmed": [
+        "h-profile"
+      ],
+      "review": "保留4⚡；把注入/版本反证真正写入被执行动作，区分包内文件与部署外置文件。",
+      "sources": [
+        "https://docs.spring.io/spring-boot/3.5/reference/features/external-config.html"
+      ]
+    },
+    {
+      "id": "boot-storm",
+      "file": "app/data/cases/boot-storm.ts",
+      "chapter": "config-boot",
+      "order": 6,
+      "originalHash": "692b1369624c89d5e084cb3133fe8b06cdcc011ff59681247a50b8df8a2afef0",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "calibrated",
+      "calibratedHash": "74d38d702befd99b5ccb602e26df384c5f8ebb1e26a23b7e9a9559286f0bc94e",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        3,
+        2,
+        3
+      ],
+      "dimensionEvidence": [
+        "区分首场与恢复事件",
+        "多曲线与单位核算",
+        "连接和预热容量",
+        "恢复反而过载",
+        "应用启动到DB资源",
+        "无退避重启再次触发"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-stormcurves",
+            "a-dbhealth",
+            "a-poolcfg",
+            "a-probestorm"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-dbhealth",
+            "a-poolcfg",
+            "a-probestorm",
+            "a-stormcurves"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-storm"
+      ],
+      "review": "人工裁定必要成本6⚡（原4遗漏DB状态与探活反证），不因章尾保留L3；六维中位数2.5向下为L2。重写不可能的980/800与混合单位算式。",
+      "sources": [
+        "https://dev.mysql.com/doc/refman/8.0/en/too-many-connections.html",
+        "https://dev.mysql.com/doc/refman/8.0/en/innodb-preload-buffer-pool.html"
+      ]
+    },
+    {
+      "id": "required-field",
+      "file": "app/data/cases/required-field.ts",
+      "chapter": "contract",
+      "order": 1,
+      "originalHash": "4d6b2c4d9a197789dd4c29e949b71a3c7c4b8feac2c156c3f4ba9635a5b8f1d4",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "doc-drift",
+      "file": "app/data/cases/doc-drift.ts",
+      "chapter": "contract",
+      "order": 2,
+      "originalHash": "8c64cd4b660d7b8031161ba9140c9af7e847a592701d6f76555d68f1651d616c",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "timeout-contract",
+      "file": "app/data/cases/timeout-contract.ts",
+      "chapter": "contract",
+      "order": 3,
+      "originalHash": "80b3884b4f2dba6ff0844ce0d4cb35aa592c3532587164cb5f878753d59afa8d",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "enum-drift",
+      "file": "app/data/cases/enum-drift.ts",
+      "chapter": "contract",
+      "order": 4,
+      "originalHash": "08c92222b32423230d88e9722653b6a5ce4750ec767a4f38db6fd8b6830ab5b5",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "error-contract",
+      "file": "app/data/cases/error-contract.ts",
+      "chapter": "contract",
+      "order": 5,
+      "originalHash": "e27b102a624de0cca3e15165ee79d0d0eee420b2678232b1385219bd4ff4622e",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "contract-review",
+      "file": "app/data/cases/contract-review.ts",
+      "chapter": "contract",
+      "order": 6,
+      "originalHash": "702e3fa8c0fb17635c2dd14f41b232e632c67a8c77589d76393a17c2f7d3afe1",
+      "originalDifficulty": 3,
+      "originalExpertCost": 8,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "pool-exhausted",
+      "file": "app/data/cases/pool-exhausted.ts",
+      "chapter": "data",
+      "order": 1,
+      "originalHash": "ce3160cc6322eb3390e2cd298813d1099f6814364ef1cd84f0f0b9850d37ef6e",
+      "originalDifficulty": 2,
+      "originalExpertCost": 6,
+      "originalPathCost": 6,
+      "status": "pending"
+    },
+    {
+      "id": "cache-drift",
+      "file": "app/data/cases/cache-drift.ts",
+      "chapter": "data",
+      "order": 2,
+      "originalHash": "8379edbd1b7793d3f78448bc319a3696798ed1f8c36366b716faa49316a25ad9",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 6,
+      "status": "pending"
+    },
+    {
+      "id": "slow-query",
+      "file": "app/data/cases/slow-query.ts",
+      "chapter": "data",
+      "order": 3,
+      "originalHash": "2272db943f0a1340c671b47e3cf07981041d2d33981e43648203dd926245e1cf",
+      "originalDifficulty": 2,
+      "originalExpertCost": 5,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "cache-review",
+      "file": "app/data/cases/cache-review.ts",
+      "chapter": "data",
+      "order": 4,
+      "originalHash": "26cefd199f4ed6567e3dc7d69eac78291e24a7b00f67c1f5354eb8a5ff83d768",
+      "originalDifficulty": 2,
+      "originalExpertCost": 8,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "midnight-rollback",
+      "file": "app/data/cases/midnight-rollback.ts",
+      "chapter": "data",
+      "order": 5,
+      "originalHash": "088df6986c3049c0bc15d01b4730aa2bcfee2daadd00df1136484e9ab3ef527e",
+      "originalDifficulty": 3,
+      "originalExpertCost": 5,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "double-strike",
+      "file": "app/data/cases/double-strike.ts",
+      "chapter": "data",
+      "order": 6,
+      "originalHash": "da38e840b3cf66e6096c1b53533ca55da7f9680e2ee6791fcec64618d8d1aa54",
+      "originalDifficulty": 3,
+      "originalExpertCost": 6,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "data-script-accident",
+      "file": "app/data/cases/data-script-accident.ts",
+      "chapter": "data",
+      "order": 7,
+      "originalHash": "016cea8b4509ae0e0281c256677f46cdc1cded19ed9fe5345f8ab16ca2d79f29",
+      "originalDifficulty": 2,
+      "originalExpertCost": 5,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "replica-lag",
+      "file": "app/data/cases/replica-lag.ts",
+      "chapter": "data",
+      "order": 8,
+      "originalHash": "7171eed91d383b2fc044d0dffce770100dd02664d65ac2cf48e1e4c7f4cb5669",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "implicit-cast",
+      "file": "app/data/cases/implicit-cast.ts",
+      "chapter": "data",
+      "order": 9,
+      "originalHash": "369bc576006cb8733e66b9bb91b06262f7bdc8c7a5e887fc36327bf57119f4e3",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "deep-pagination",
+      "file": "app/data/cases/deep-pagination.ts",
+      "chapter": "data",
+      "order": 10,
+      "originalHash": "76808120c0735be0d34bcd5f82abec5411c03345d851ed06c59b0734e63f330f",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "oom-leak",
+      "file": "app/data/cases/oom-leak.ts",
+      "chapter": "runtime",
+      "order": 1,
+      "originalHash": "7b8124f34d049543b182d4b5d083beb2da859a3a25589d39ecd2e75e7c6801a4",
+      "originalDifficulty": 2,
+      "originalExpertCost": 7,
+      "originalPathCost": 7,
+      "status": "pending"
+    },
+    {
+      "id": "event-loop-blocked",
+      "file": "app/data/cases/event-loop-blocked.ts",
+      "chapter": "runtime",
+      "order": 2,
+      "originalHash": "d1ee179184da8e5b0ff662f1c7118bf89d33762965def0ab0a79ec3a9aef8042",
+      "originalDifficulty": 2,
+      "originalExpertCost": 6,
+      "originalPathCost": 6,
+      "status": "pending"
+    },
+    {
+      "id": "closure-leak",
+      "file": "app/data/cases/closure-leak.ts",
+      "chapter": "runtime",
+      "order": 3,
+      "originalHash": "23f19648b7238d8fdec3fe306992f9db16c5c1c79fe597a96a1aa49f56092115",
+      "originalDifficulty": 2,
+      "originalExpertCost": 7,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "timewait-exhausted",
+      "file": "app/data/cases/timewait-exhausted.ts",
+      "chapter": "runtime",
+      "order": 4,
+      "originalHash": "9e01d13b2d2f92619108c0eaa9af684e6fe5f45a164ad422ca266149f34c683f",
+      "originalDifficulty": 2,
+      "originalExpertCost": 6,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "container-review",
+      "file": "app/data/cases/container-review.ts",
+      "chapter": "runtime",
+      "order": 5,
+      "originalHash": "07a4bf2b92f8b6392f2fc08b20e500d4caa1f409f2d1c887ba91c20752a373d5",
+      "originalDifficulty": 2,
+      "originalExpertCost": 7,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "cascade-timeout",
+      "file": "app/data/cases/cascade-timeout.ts",
+      "chapter": "runtime",
+      "order": 6,
+      "originalHash": "5ff4a4eaac07a90a767d08d13080a0b9b0f75ec46fd7adaa4381cb42f51c8eec",
+      "originalDifficulty": 3,
+      "originalExpertCost": 6,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "regex-catastrophe",
+      "file": "app/data/cases/regex-catastrophe.ts",
+      "chapter": "runtime",
+      "order": 7,
+      "originalHash": "0575dd52b891c4683e0b6d6c0a90fe61613bbacbffe8d214ee7c53e1102177fa",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    }
+  ]
+}
