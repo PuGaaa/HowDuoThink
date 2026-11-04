@@ -2,6 +2,7 @@
  * 本地进度存储（v0 无后端）。
  * 存储设计规避 uts 动态索引：每个案例独立 key，动物统计用固定字段。
  */
+import type { DiagnosisCase } from '../types/case'
 
 export interface CaseProgress {
   solved: boolean
@@ -63,6 +64,7 @@ export interface SessionRecord {
   events: SessionEvent[]
   mascotEvents: MascotEventRec[]
   hStates: HypothesisStateRec[]
+  caseSnapshot?: DiagnosisCase
 }
 
 export interface ProgressOperation {

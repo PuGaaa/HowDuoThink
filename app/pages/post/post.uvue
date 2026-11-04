@@ -77,7 +77,7 @@
 import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { ALL_CASES } from '../../data/cases'
+import { getEffectiveCases } from '../../data/cases'
 import { CHAPTERS, casesInChapter } from '../../data/chapters'
 import { getCaseProgress, getStreak, getChecklistUse, getTotals } from '../../utils/storage'
 import { rankOf } from '../../utils/scoring'
@@ -97,9 +97,10 @@ const today = ref('')
 const shareReady = PUBLIC_WEB_ORIGIN.length > 0
 
 function refresh() {
+  const cases = getEffectiveCases()
   const totals = getTotals(
-    ALL_CASES.map((c) => c.id),
-    ALL_CASES.map((c) => c.lessons.length)
+    cases.map((c) => c.id),
+    cases.map((c) => c.lessons.length)
   )
   solvedCount.value = totals.solved
   lessonCount.value = totals.lessons

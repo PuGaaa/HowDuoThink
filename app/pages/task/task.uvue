@@ -82,7 +82,7 @@ import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { DAILY_TASKS, WEEKLY_TASKS, GROWTH_TASKS } from '../../data/tasks'
 import { getTaskDaily, getTaskWeekly, getCaseProgress, getChecklistUse, getStreak } from '../../utils/storage'
-import { ALL_CASES } from '../../data/cases'
+import { getEffectiveCases } from '../../data/cases'
 
 class TaskVM {
   id: string = ''
@@ -144,14 +144,15 @@ function buildLists() {
 
   // 成长任务：由 data/tasks.ts 的 GROWTH_TASKS 驱动；allcases 的目标随案例注册表动态取
   const gl: TaskVM[] = []
+  const cases = getEffectiveCases()
   let solved = 0
-  for (let i = 0; i < ALL_CASES.length; i++) {
-    const p = getCaseProgress(ALL_CASES[i].id)
+  for (let i = 0; i < cases.length; i++) {
+    const p = getCaseProgress(cases[i].id)
     if (p != null && p.solved) solved++
   }
   for (let i = 0; i < GROWTH_TASKS.length; i++) {
     const t = GROWTH_TASKS[i]
-    const goal = t.metric === 'allcases' ? ALL_CASES.length : t.goal
+    const goal = t.metric === 'allcases' ? cases.length : t.goal
     const cur = solved > goal ? goal : solved
     var g = new TaskVM()
     g.id = t.id

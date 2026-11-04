@@ -3,6 +3,7 @@
  *  推送：任何玩法数据写入（storage 写穿透）→ 2s 防抖全量上传；
  *  手动同步 = 先推后拉。未登录（游客态）全部为本地，无网络行为。 */
 import { API_BASE } from '../config'
+import { preserveLegacyChapterUnlocks } from '../data/chapters'
 import { getToken, isLoggedIn } from './auth'
 import { clearProgressLocal, confirmProgressOperations, exportProgressBundle, getUnlockedChapterIds, importProgressBundle, pendingProgressOperations, progressIdentity, progressStorageGet, progressStorageKey, progressStorageSet, setProgressIdentity, setProgressListener } from './storage'
 
@@ -11,11 +12,13 @@ const KEY_LAST_SYNC = 'think_last_sync'
 export function prepareProgressIdentity(uid: string): void {
   const previous = progressIdentity()
   if (previous === 'guest') {
+    preserveLegacyChapterUnlocks()
     const bundle = exportProgressBundle()
     const guestOperations = pendingProgressOperations()
     setProgressIdentity('guest')
     clearProgressLocal()
     setProgressIdentity(uid)
+    preserveLegacyChapterUnlocks()
     const operations = pendingProgressOperations()
     if (Object.keys(bundle.cases).length > 0 || Object.keys(bundle.mascots).length > 0 || Object.keys(bundle.tasks).length > 0 || bundle.dailyDone.length > 0 || bundle.checkuse > 0 || bundle.solvedLayers.length > 0 || bundle.unlockedChapterIds.length > 0) {
       const archiveId = 'archive-' + String(Date.now()) + '-' + String(Math.random())

@@ -36,7 +36,7 @@
 import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { ALL_CASES } from '../../data/cases'
+import { getEffectiveCases } from '../../data/cases'
 import { getCaseProgress, getChecklistUse } from '../../utils/storage'
 import { getAvatar as resolveAvatar } from '../../utils/auth'
 
@@ -54,8 +54,9 @@ const avatarSrc = ref('')
 function refresh() {
   avatarSrc.value = resolveAvatar()
   const cards: LessonCard[] = []
-  for (let i = 0; i < ALL_CASES.length; i++) {
-    const c = ALL_CASES[i]
+  const cases = getEffectiveCases()
+  for (let i = 0; i < cases.length; i++) {
+    const c = cases[i]
     const p = getCaseProgress(c.id)
     if (p == null || !p.solved) continue
     for (let j = 0; j < c.lessons.length; j++) {

@@ -90,7 +90,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { CHAPTERS, PARTS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId, chapterUnlockHint } from '../../data/chapters'
 import chapterCube from '../../components/chapter-cube/chapter-cube.uvue'
 import { openConfirmDialog, ConfirmDialogOptions } from '../../utils/confirm-dialog'
-import { ALL_CASES, getCaseById } from '../../data/cases'
+import { getEffectiveCases, getCaseById } from '../../data/cases'
 import { getCaseProgress, getStreak, CaseProgress } from '../../utils/storage'
 import { pullServerProgress } from '../../utils/sync-progress'
 import { getTotals } from '../../utils/storage'
@@ -192,17 +192,18 @@ const dailyTitle = ref('')
 const dailyDoneToday = ref(false)
 const packCount = ref(0)
 const packSynced = ref(false)
-const totalLevels = ref(ALL_CASES.length)
+const totalLevels = ref(getEffectiveCases().length)
 
 // 数据装配（onShow 触发，首次显示也会执行）：破案/同步后回到首页保持最新
 function refreshHome() {
+  const cases = getEffectiveCases()
   headerAvatar.value = getAvatar()
   const dc = dailyCase()
   dailyTitle.value = dc.title
   dailyDoneToday.value = dailyDone()
   const totals = getTotals(
-    ALL_CASES.map((c) => c.id),
-    ALL_CASES.map((c) => c.lessons.length)
+    cases.map((c) => c.id),
+    cases.map((c) => c.lessons.length)
   )
   const rk = rankOf(totals.solved)
   rankName.value = rk.name
@@ -210,21 +211,21 @@ function refreshHome() {
   streakCount.value = getStreak().count
   packCount.value = getPackCount()
   // 关卡总数：本地注册表与已同步关卡包取大者（包内含社区关）
-  totalLevels.value = packCount.value > ALL_CASES.length ? packCount.value : ALL_CASES.length
+  totalLevels.value = packCount.value > cases.length ? packCount.value : cases.length
   fetchAppConfig((_ok) => {})  // 运行时配置（游客门禁等）：失败退内置默认，不阻塞首页
   fetchAppResources((_ok) => {})  // 吉祥物/头像资源预取：失败保留旧缓存，未拉到时 UI 走 emoji/空占位
   fetchCasepack((r) => {
     if (r.error.length === 0 && r.count > 0) {
       packCount.value = getPackCount()
       packSynced.value = true
-      totalLevels.value = packCount.value > ALL_CASES.length ? packCount.value : ALL_CASES.length
+      totalLevels.value = packCount.value > getEffectiveCases().length ? packCount.value : getEffectiveCases().length
     }
   })
 
   // 组装继续闯关：第一个"可玩且未破案"的关（锁定章的非挑战关会被跳过；挑战关未破时天然命中）
   let continueFound = false
-  for (let i = 0; i < ALL_CASES.length; i++) {
-    const c = ALL_CASES[i]
+  for (let i = 0; i < cases.length; i++) {
+    const c = cases[i]
     const p = getCaseProgress(c.id)
     const isSolved = p != null && p.solved
     if (!isSolved && isCasePlayable(c.id)) {

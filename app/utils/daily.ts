@@ -1,5 +1,5 @@
 /** 每日一题：按日期确定性选题（同一天全员同题），完成后当日去重。 */
-import { ALL_CASES } from '../data/cases'
+import { getEffectiveCases } from '../data/cases'
 import { isCasePlayable } from '../data/chapters'
 import { DiagnosisCase } from '../types/case'
 
@@ -26,9 +26,10 @@ function hashStr(s: string): number {
 /** 今日一题：日期 hash 对当前可玩官方池取模；游客与登录用户按各自资格选题。 */
 export function dailyCase(): DiagnosisCase {
   const h = hashStr('daily-' + todayKey())
+  const cases = getEffectiveCases()
   const playable: DiagnosisCase[] = []
-  for (let i = 0; i < ALL_CASES.length; i++) {
-    if (isCasePlayable(ALL_CASES[i].id)) playable.push(ALL_CASES[i])
+  for (let i = 0; i < cases.length; i++) {
+    if (isCasePlayable(cases[i].id)) playable.push(cases[i])
   }
   return playable[h % playable.length]
 }
