@@ -73,10 +73,16 @@ node ../content/tools/export-case.mjs && .venv/bin/python seed.py
 | 会话/来源 | `JWT_SECRET`（缺省=进程内随机，重启失效）、`ENV`（dev 开启绕行登录）、`WEB_ORIGIN`、`ADMIN_WEB_ORIGIN`（管理端独立域名时 CORS）、`COOKIE_SECURE=1`（HTTPS） |
 | 管理员 | `ADMIN_PASSWORD`（覆盖初始密码）、`GITHUB_CLIENT_ID/SECRET`、`GITHUB_ADMIN_LOGINS` |
 | 数据库 | `DB_PROVIDER`（mysql/sqlite）、`MYSQL_HOST/PORT/USER/PASSWORD/DATABASE` |
+| MySQL连接池 | `MYSQL_POOL_SIZE`（默认5，须≥1）、`MYSQL_POOL_MAX_OVERFLOW`（默认5，须≥0）、`MYSQL_POOL_TIMEOUT`（默认5秒，须>0） |
 | AI | `DEEPSEEK_API_KEY`、`AI_BASE_URL`、`AI_CHAT_MODEL`、`EMBED_PROVIDER`（fastembed/zhipu/local）、`EMBED_MODEL`、`FASTEMBED_CACHE_DIR`、`ZHIPU_API_KEY`、`DEEPSEEK_PRICE_IN/OUT`（成本估算单价，元/百万 tokens） |
 | 监控 | `SENTRY_DSN`（空=关闭）、`SENTRY_ENV`、`OPS_SNAPSHOT_INTERVAL`（默认 300s）、`OPS_RETENTION_DAYS`（默认 30） |
 
 AI 降级链是运行时容错：无 key 时对话/起草降级可用，但开发验收须带真实 key 走真实链路。
+
+MySQL连接池按进程创建，默认最多同时使用10个连接；`close()`归还并回滚未提交事务，池满等待到上限后报错。
+增加worker时，总连接预算为 `worker数 × (POOL_SIZE + MAX_OVERFLOW)`，还须留出迁移和运维连接。
+当前Uvicorn部署不在已建池后fork；若改为预加载后fork的进程模型，须先处理子进程连接池生命周期。
+模型缓存同样不跨进程共享，数据库连接和BGE驻留内存须一起预算。基准方法见 `benchmarks/README.md`。
 
 ## 测试
 

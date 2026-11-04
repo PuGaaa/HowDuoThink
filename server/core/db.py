@@ -18,6 +18,7 @@ import json
 import re
 import sqlite3
 from contextlib import contextmanager
+from functools import lru_cache
 from pathlib import Path
 from typing import Iterator
 
@@ -86,13 +87,27 @@ def _mysql_connect_kwargs() -> dict:
 if _provider == "mysql":
     import pymysql
     import pymysql.cursors
+    from sqlalchemy.dialects.mysql.pymysql import MySQLDialect_pymysql
+    from sqlalchemy.pool import QueuePool
 
     def _mysql_conn():
         return pymysql.connect(cursorclass=pymysql.cursors.DictCursor, **_mysql_connect_kwargs())
 
-    def connect():
-        """当前引擎的连接（MySQL：行按列名访问，DATETIME 字符串化）。"""
-        return _MySqlConn(_mysql_conn())
+    @lru_cache(maxsize=1)
+    def _mysql_pool(connection_settings: tuple, size: int, overflow: int, timeout: float) -> QueuePool:
+        """每个进程惰性建池；配置键防止测试/启动切库复用另一配置的连接。
+
+        close 归还连接并回滚未提交事务；checkout 检查闲置断连。
+        同时占用上限=size+overflow，耗尽时最多等待 timeout 秒。
+        """
+        return QueuePool(
+            _mysql_conn,
+            pool_size=size,
+            max_overflow=overflow,
+            timeout=timeout,
+            pre_ping=True,
+            dialect=MySQLDialect_pymysql(dbapi=pymysql),
+        )
 
     def _stringify_row(row: dict) -> dict:
         """DATETIME → 与 SQLite 同形的字符串（"YYYY-MM-DD HH:MM:SS"），
@@ -157,7 +172,13 @@ if _provider == "mysql":
 def connect():
     """当前引擎的连接：SQLite（Row 行工厂 + WAL）/ MySQL（Dict 行 + DATETIME 字符串化）。"""
     if _provider == "mysql":
-        return _MySqlConn(_mysql_conn())
+        pool = _mysql_pool(
+            tuple(_mysql_connect_kwargs().items()),
+            config.MYSQL_POOL_SIZE,
+            config.MYSQL_POOL_MAX_OVERFLOW,
+            config.MYSQL_POOL_TIMEOUT,
+        )
+        return _MySqlConn(pool.connect())
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
