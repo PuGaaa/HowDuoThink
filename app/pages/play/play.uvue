@@ -175,7 +175,7 @@ import { isLoggedIn } from '../../utils/auth'
 import { openGuestLoginDialog } from '../../utils/login-guide'
 import { scheduleProgressUpload } from '../../utils/sync-progress'
 import { CaseAction, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
-import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse, bumpTask } from '../../utils/storage'
+import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse, bumpTask, recordSolvedLayer } from '../../utils/storage'
 import { computeGrade, shuffleCauses, MAX_WRONG_IDENTIFIES } from '../../utils/scoring'
 import {
   MascotAppearance,
@@ -604,6 +604,10 @@ function finishAndSave() {
     hStates: hStates.value,
   }
   saveSession(rec)
+  const currentCase = getCaseById(caseId.value)
+  if (solved.value && currentCase != null && recordSolvedLayer(currentCase.layer)) {
+    bumpTask('layers2', 1)
+  }
   // 每日一题：今日题通关 → 标记完成 + 任务计数
   if (solved.value && isDailyCase(caseId.value)) {
     markDailyDone()

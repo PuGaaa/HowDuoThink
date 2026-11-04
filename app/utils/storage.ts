@@ -92,7 +92,7 @@ export function clearProgressLocal(): void {
   const info = uni.getStorageInfoSync()
   for (let i = 0; i < info.keys.length; i++) {
     const key = info.keys[i]
-    if (key.indexOf('think_case_') === 0 || key === 'think_session_v1' || key === 'think_mascots_v1' || key === 'think_streak_v1' || key === 'think_tasks_v1' || key === 'think_daily_done_v1' || key === 'think_checkuse_v1' || key === 'think_progress_ops_v1') {
+    if (key.indexOf('think_case_') === 0 || key === 'think_session_v1' || key === 'think_mascots_v1' || key === 'think_streak_v1' || key === 'think_tasks_v1' || key === 'think_solved_layers_v1' || key === 'think_daily_done_v1' || key === 'think_checkuse_v1' || key === 'think_progress_ops_v1') {
       uni.removeStorageSync(key)
     }
   }
@@ -122,6 +122,7 @@ export interface ProgressBundle {
   tasks: any
   dailyDone: string
   checkuse: number
+  solvedLayers: string[]
 }
 
 /** 导出本地全量进度（登录态上传用） */
@@ -144,6 +145,7 @@ export function exportProgressBundle(): ProgressBundle {
     tasks: loadTasks(),
     dailyDone: uni.getStorageSync('think_daily_done_v1') as string ?? '',
     checkuse: getChecklistUse(),
+    solvedLayers: uni.getStorageSync(KEY_SOLVED_LAYERS) == null ? [] : JSON.parse(uni.getStorageSync(KEY_SOLVED_LAYERS) as string) as string[],
   }
   return b
 }
@@ -158,6 +160,7 @@ export function importProgressBundle(b: ProgressBundle) {
   if (b.tasks != null) uni.setStorageSync('think_tasks_v1', JSON.stringify(b.tasks))
   uni.setStorageSync('think_daily_done_v1', b.dailyDone ?? '')
   uni.setStorageSync('think_checkuse_v1', String(b.checkuse ?? 0))
+  uni.setStorageSync(KEY_SOLVED_LAYERS, JSON.stringify(b.solvedLayers ?? []))
 }
 
 export function getCaseProgress(caseId: string): CaseProgress | null {
@@ -393,6 +396,7 @@ export interface TaskProgress {
 }
 
 const KEY_TASKS = 'think_tasks_v1'
+const KEY_SOLVED_LAYERS = 'think_solved_layers_v1'
 
 function dayStr(d: Date): string {
   const m = d.getMonth() + 1
@@ -446,6 +450,15 @@ export function bumpTask(metric: string, n: number): void {
   uni.setStorageSync(KEY_TASKS, JSON.stringify(t))
   enqueueOperation('task_increment', { metric: metric, amount: n })
   notifyProgressDirty()
+}
+
+export function recordSolvedLayer(layer: string): boolean {
+  const raw = uni.getStorageSync(KEY_SOLVED_LAYERS)
+  const layers: string[] = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as string[]
+  if (layers.indexOf(layer) >= 0) return false
+  layers.push(layer)
+  uni.setStorageSync(KEY_SOLVED_LAYERS, JSON.stringify(layers))
+  return true
 }
 
 export function getTaskDaily(metric: string): number {
