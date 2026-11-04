@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 学徒篇校准：用公开API和实际依赖图验证安装漂移。
  * 原型：Lodash3/4公开API差异与npm锁文件；教学重建，不冒充原始事故日志。
- * 六维：1/2/1/1/1/1，中位数半档向下取整，L1。
+ * 六维：1/2/2/1/1/1，中位数半档向下取整，L1。
  * 标准路径：a-impact → a-coderead → a-diff → a-lockfile；替代顺序：a-impact → a-diff → a-lockfile → a-coderead。
  * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */

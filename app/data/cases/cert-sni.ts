@@ -1,15 +1,16 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 2 章 · 接入层之夜 第三批（SNI 缺失回退默认证书 L2）
- * 教学点：全栈视野——同 IP 多域名的 TLS 靠 SNI 区分，不带 SNI 的客户端会拿到默认站点证书；
- * 兼容性矩阵是接入层变更的前置检查；"同一请求不同证书"按客户端分群定位。
- * 专家路径：impact(1) + clientprobe(2) + repro(1) = 4⚡︎
+ * 学徒篇校准：SNI选证与链/名称校验分离及完整兼容修复。
+ * 原型：无SNI客户端收到共享IP默认证书；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/2/3，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-clientprobe → a-repro；替代顺序：a-impact → a-repro → a-clientprobe。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const certSniCase: DiagnosisCase = {
   id: 'cert-sni',
   title: '老设备收到的证书，不是这个网站的',
-  intro: '新域名上线后老设备全部证书校验失败：同一 IP、不同客户端、拿到不同证书——SNI 缺失的回退坑。',
+  intro: '新域名上线后，一组兼容客户端收到另一个站点的证书；同一IP带不带SNI时返回不同证书。',
   domain: 'network',
   layer: '同 IP 多域名的 TLS 靠 SNI 区分——不带 SNI 的客户端拿到的是默认站点',
   part: 'apprentice',
@@ -17,34 +18,23 @@ export const certSniCase: DiagnosisCase = {
   order: 7,
   typeTags: ['config', 'dependency', 'security'],
   difficulty: 2,
-
   scene: {
     role: '你是「票到手」接入层负责人，新域名上线当天，老设备用户的报错截图刷了屏。',
     architecture: '客户端 → 网关(同 IP 多域名, SNI 分流: new.example.com 新域名 / 其他站点共用) → 业务后端',
-    tag: '故障现场',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '握手失败统计',
-        text: '失败客户端：老款 POS 终端、旧版 Java SDK、某厂商监控盒子。\n报错一致：certificate hostname mismatch——收到的是 *.example.net 的证书（同 IP 另一个站点）。',
-      },
-      {
-        type: 'text',
-        title: '分群差异',
-        text: '新客户端（浏览器/新版 App）访问同一域名：握手 100% 成功、证书正确。\n同一台网关、同一个 IP——不同客户端拿到不同证书。',
-      },
+      { type: 'error', title: '握手失败统计', text: '失败客户端：老款 POS 终端、旧版 Java SDK、某厂商监控盒子。\n报错一致：certificate hostname mismatch——收到的是 *.example.net 的证书（同 IP 另一个站点）。' },
+      { type: 'text', title: '分群差异', text: '新客户端（浏览器/新版 App）访问同一域名：握手 100% 成功、证书正确。\n同一台网关、同一个 IP——不同客户端拿到不同证书。' },
     ],
-    timeline: '新域名 new.example.com 今天上线（同 IP 多域名 SNI 分流架构）｜ 网关 default_server 配的是 *.example.net（历史遗留）｜ 失败客户端共性：2018 年前固件/SDK',
+    timeline: '新域名new.example.com今天上线 ｜ 同IP默认站点为legacy.example.net ｜ 失败样本使用未发送SNI的特定SDK配置，不能按固件年份一概判断',
     impactHint: '"同一请求不同证书"按客户端分群——差异在客户端发出的握手内容里，还是在网关的选择逻辑里？',
   },
-
   hypotheses: [
     { id: 'h-sni', text: '老客户端 TLS 握手不带 SNI：网关无法识别目标域名，回退默认站点证书（*.example.net）', excludeActionId: 'a-clientprobe' },
     { id: 'h-chain', text: '新域名证书链不完整（缺中间证书），部分客户端校验失败', excludeActionId: 'a-chaincheck' },
     { id: 'h-edge', text: 'CDN/边缘节点配置漂移，回源时返回了错误站点的证书', excludeActionId: 'a-edgecert' },
     { id: 'h-dns', text: 'DNS 解析异常，域名被解析到其他集群的 IP（证书自然不对）', excludeActionId: 'a-dnsprobe' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -54,13 +44,13 @@ export const certSniCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
-      result: {
-        type: 'code',
-        title: '客户端分群',
-        text: '失败群：POS 固件 2017、Java 6/7 SDK、老监控盒子——全部"不发送 SNI"的老实现\n成功群：现代浏览器、新版 App、curl/openssl（默认带 SNI）\n错误一致：收到 *.example.net 证书（同 IP 上另一个站点的）\n→ 分界线 = "TLS 握手时说不说目标域名"——这就是 SNI。',
-      },
+      tests: ['h-edge', 'h-dns', 'h-sni'],
+      hypotheses: [
+        { id: 'h-edge', status: 'excluded' },
+        { id: 'h-dns', status: 'excluded' },
+        { id: 'h-sni', status: 'up' },
+      ],
+      result: { type: 'text', title: '失败样本路径与实现分群', text: '本批实际失败样本均由DNS取得192.0.2.10并直接连到本集群，无CDN或其他TLS终止；成功样本也到同一IP。\n按SDK配置分桶：失败组收*.example.net，成功组收new.example.com。还需读ClientHello，不从年份或客户端名称推定是否带SNI。' },
     },
     {
       id: 'a-clientprobe',
@@ -71,12 +61,10 @@ export const certSniCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-sni'],
-      hypotheses: [{ id: 'h-sni', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: 'ClientHello 对比',
-        text: '成功客户端：ClientHello extension server_name = new.example.com → 网关按 SNI 匹配 → 返回正确证书 ✓\n失败客户端：ClientHello 无 server_name 扩展（老实现不支持 SNI）→\n网关无法知道"要哪个站点" → 回退 default_server → 返回 *.example.net ✗\n实锤：证书没有错发，是网关"没得到线索"——回退逻辑选中了历史遗留的默认站点。',
-      },
+      hypotheses: [
+        { id: 'h-sni', status: 'up' },
+      ],
+      result: { type: 'code', title: '握手字段与选择配置', text: '连接关联：成功组ClientHello含server_name=new.example.com，失败组无server_name；均TLS1.2并到同一入口。\n已加载Nginx配置：该IP默认server证书为*.example.net，new.example.com匹配server证书为new.example.com；行为与收到字段对应。\n只说明本次实现/config未发送SNI，不声称Java7或2018年前设备一概不支持。' },
     },
     {
       id: 'a-repro',
@@ -86,13 +74,12 @@ export const certSniCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
-      result: {
-        type: 'code',
-        title: 'SNI 隔离实验',
-        text: 'openssl s_client -connect gw:443 -servername new.example.com\n  → 证书：new.example.com ✓\nopenssl s_client -connect gw:443 -nosni\n  → 证书：*.example.net ✗（默认站点）\n唯一变量 SNI，证书随它切换——网关的选择逻辑被完整复现。',
-      },
+      tests: ['h-sni', 'h-chain'],
+      hypotheses: [
+        { id: 'h-sni', status: 'confirmed' },
+        { id: 'h-chain', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '仅改变SNI的验证', text: '固定同一IP、TLS1.2、受信root.pem，主机名校验始终为new.example.com：\nopenssl s_client -connect 192.0.2.10:443 -servername new.example.com -verify_hostname new.example.com -verify_return_error -CAfile root.pem -tls1_2\n→ 发new.example.com的叶子+所需中间链，校验通过。\n将-servername new.example.com替换为-noservername，其余条件不变：\n→ 发*.example.net，链本身可追到同一受信根，但new.example.com主机名不匹配。\n-noservername才是有效选项；握手能继续或链验证通过不等于目标主机名校验通过。' },
     },
     {
       id: 'a-chaincheck',
@@ -103,12 +90,10 @@ export const certSniCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-chain'],
-      hypotheses: [{ id: 'h-chain', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '证书链核对',
-        text: '带 SNI 抓取：证书链两级完整，openssl verify 通过。\n→ 排除链问题：新客户端全绿也旁证了这一点。',
-      },
+      hypotheses: [
+        { id: 'h-chain', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '证书链核对', text: '固定受信根、实际服务器发送叶子+所需中间链，分别校验链与目标名。新域名链完整；失败组拿到另一域名证书，问题在名称而非链长度。不能用“有两张就一定完整”。' },
     },
     {
       id: 'a-edgecert',
@@ -119,12 +104,10 @@ export const certSniCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-edge'],
-      hypotheses: [{ id: 'h-edge', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '路径核对',
-        text: '失败设备全部直连网关（不经 CDN）；CDN 路径用户零失败。\n→ 排除边缘层。',
-      },
+      hypotheses: [
+        { id: 'h-edge', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '路径核对', text: '本题实际失败样本直接到同一网关IP，无CDN终止；不是从CDN健康灯推断其无问题。' },
     },
     {
       id: 'a-dnsprobe',
@@ -135,139 +118,77 @@ export const certSniCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-dns'],
-      hypotheses: [{ id: 'h-dns', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: 'DNS 核对',
-        text: '全网点位解析一致，均指向本集群 IP。\n→ 排除 DNS：IP 没错，错的是 IP 上的"默认站点选择"。',
-      },
+      hypotheses: [
+        { id: 'h-dns', status: 'excluded' },
+      ],
+      result: { type: 'text', title: 'DNS 核对', text: '失败和成功样本实际解析/连接地址均192.0.2.10，与本集群台账一致；排除本题“解析到其他集群”候选，不声称全网每个解析器均相同。' },
     },
     {
       id: 'a-danger',
       name: '紧急把默认站点证书换成新域名通配',
       desc: '【状态变更】default_server 证书改为 *.example.com',
-      cost: 1,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '换证结果（陷阱动作）',
-        text: '老设备恢复了——它们拿到的默认证书恰好匹配新域名。\n代价：同 IP 上真正需要 *.example.net 的站点，无 SNI 访问时全部拿到错误证书——\n把错从一批客户端搬到另一批。兜底证书的选择要按"谁最可能不带 SNI"全局权衡，不能拍脑袋。',
-      },
+      result: { type: 'text', title: '换证结果（陷阱动作）', text: '老设备恢复了——它们拿到的默认证书恰好匹配新域名。\n代价：同 IP 上真正需要 *.example.net 的站点，无 SNI 访问时全部拿到错误证书——\n把错从一批客户端搬到另一批。兜底证书的选择要按"谁最可能不带 SNI"全局权衡，不能拍脑袋。' },
     },
     {
       id: 'a-fixsni',
-      name: '修复：兜底证书全局权衡 + 老设备治理',
-      desc: '【状态变更】default_server 证书按 SNI 缺失流量画像选定；老设备列入升级清单',
+      name: '修复：独立兼容入口并升级SDK',
+      desc: '为不带SNI客户端的新域名提供独立IP，避免替换共享默认证书误伤旧站点',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复结果',
-        text: '① 统计 SNI 缺失流量的目标域名分布：78% 打向新域名 → default_server 证书改为 *.example.com（兼顾同根其他站点）\n② 老设备分批升级固件/SDK（SNI 支持 2018 年后均为标配）\n③ 回归：nosni 握手返回的证书对 Top3 目标域名全部合法。',
-      },
+      result: { type: 'text', title: '修复结果', text: '同IP的legacy.example.net仍有不带SNI合法客户端，不能仅按78%多数更换默认证书。\n为new.example.com配置独立兼容IP与对应证书，DNS/客户端切换按发布流程验证；旧站默认保持原证书。分别以-noservername并-verify_hostname测试两个域名均通过，再推进SDK携带SNI升级。也可评估覆盖全部所需名称的合规SAN证书，但不能用只含*.example.com的证书声称覆盖*.example.net。' },
     },
     {
       id: 'a-fixmatrix',
       name: '沉淀：接入层兼容性矩阵',
       desc: '【状态变更】同 IP 域名×证书×客户端(SNI/协议版本)矩阵表；新域名上线必查矩阵',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '矩阵表',
-        text: '接入层登记：同 IP 每个域名的证书、default_server 归属、SNI 缺失时的回退结果。\n新域名上线检查单新增：nosni 握手实测（openssl -nosni）+ 兼容客户端清单（老固件/老 SDK）。',
-      },
+      result: { type: 'text', title: '矩阵表', text: '维护实际域名×IP×默认站点×SNI支持/SDK配置矩阵；测试用-noservername关闭SNI并独立指定-verify_hostname，记录名称校验结果。' },
     },
     {
       id: 'a-fixmon',
       name: '沉淀：握手失败按客户端版本监控',
-      desc: '【状态变更】TLS 握手失败率按 UA/SNI 有无维度上报，分群告警',
+      desc: 'TLS字段分群配合客户端SDK上报，握手失败时不能依赖HTTP UA',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '监控 v2',
-        text: '握手失败率按"是否携带 SNI"分群上报——失败群一出现即告警并自动归因到"默认证书回退"。\n上线当天就会亮灯，而不是等客服截图。',
-      },
+      result: { type: 'text', title: '监控 v2', text: 'TLS失败前没有HTTP请求，不能直接从网关HTTP UA分群。以握手SNI/目标IP、兼容入口和客户端SDK遥测关联；SNI缺失只是线索，需与所发证书和目标名核对后归因。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-sni', text: '老设备 TLS 握手不带 SNI 扩展，同 IP 多域名网关无法识别目标站点，回退 default_server 返回历史遗留的 *.example.net 证书——证书主机名校验失败；兜底证书从未按"SNI 缺失流量画像"权衡过', correct: true },
+    { id: 'rc-sni', text: '特定客户端未发SNI，在共享IP上取得default_server的*.example.net证书，无法匹配new.example.com；需保留旧站兼容性并治理新域名入口', correct: true },
     { id: 'rc-chain', text: '新域名证书链不完整（缺中间证书）', correct: false },
     { id: 'rc-edge', text: 'CDN 边缘配置漂移返回错误证书', correct: false },
     { id: 'rc-dns', text: 'DNS 解析到其他集群 IP', correct: false },
   ],
-
   expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
-    {
-      thought: '"同一 IP 不同证书"——先按客户端切分失败面：成功与失败的分界线是什么。',
-      update: '分界线 = 是否发送 SNI：老实现 ClientHello 无 server_name 扩展——分群即答案的一半。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 客户端分群把"随机失败"翻译成"实现差异"：2018 年这个年份线就是 SNI 普及的分水岭——分群特征直指协议字段。',
-      conclusion: '嫌疑锁定：SNI 缺失回退（h-sni 升权）。',
-    },
-    {
-      thought: '抓握手包对比 ClientHello——网关的选择逻辑由它收到的字段决定，看它收到了什么。',
-      update: '实锤：无 SNI → default_server → *.example.net；证书没发错，是"没得到线索"。',
-      actionId: 'a-clientprobe',
-      why: '2⚡︎ TLS 握手是协商过程：每一方的行为都由"收到的信息"决定——ClientHello 是网关视角的全部输入，对比它就把选择逻辑变成了确定性的 if-else。',
-      conclusion: '根因实锤 → 变量隔离实验钉死。',
-    },
-    {
-      thought: 'openssl 隔离 SNI 变量做最终确认——同一 IP 带/不带 server_name 各握手一次。',
-      update: '证书随 SNI 切换——网关逻辑 100% 复现；修复的验收标准（nosni 握手合法）同时产出。',
-      actionId: 'a-repro',
-      why: '1⚡︎ 变量隔离实验是协议类问题的收官动作：它把"抓包推断"升级为"可复现的因果"，也直接给出修复后的回归命令。',
-      conclusion: '因果钉死 → 排除旁支。',
-    },
-    {
-      thought: '证书链/边缘/DNS 三个常规嫌疑各 1⚡︎ 排除——尤其证书链，是"证书错误"最常见的真凶。',
-      update: '链完整、路径直连、解析正确——三个假设有证据排除。',
-      actionId: 'a-chaincheck',
-      why: '1⚡︎ "证书校验失败"的鉴别诊断有固定清单（链/主机名/过期/解析），逐项留证防止复盘时被"是不是证书过期"重新拖回泥潭。',
-      conclusion: '嫌疑收敛 → 兜底证书的全局权衡。',
-    },
-    {
-      thought: '止血（换默认证书有搬家风险）、修复（按流量画像定兜底+老设备升级）、防线（兼容矩阵+分群监控）。停止收集。',
-      update: '停止。',
-      actionId: '',
-      why: '【停止规则】机制（SNI 缺失回退）✓ 兜底缺陷（未权衡）✓ 防线（矩阵+监控）✓——机制、决策、防线三层闭合。',
-      conclusion: '沉淀：同 IP 多域名的世界靠 SNI 协商——不带 SNI 的客户端会落到默认站点。兜底证书是全局决策：按"谁最可能缺失"的流量画像选，而不是按谁最后配置。',
-    },
+    { actionId: 'a-impact', thought: '核对实际地址和TLS终止路径。', update: '失败与成功均到同一网关IP，无CDN。', why: '1⚡排除连到别集群/边缘终止，留下客户端字段差异。', conclusion: '不从客户端年份推断协议。' },
+    { actionId: 'a-clientprobe', thought: '比较实际ClientHello与加载配置。', update: '失败无SNI，配置默认证书与所收一致。', why: '2⚡把字段、选择规则与结果对齐，避免只看症状。', conclusion: '需要只改变SNI的最终验证。' },
+    { actionId: 'a-repro', thought: '链和主机名分别验证，只改SNI。', update: '带SNI目标名通过；无SNI链可用而名称不符。', why: '1⚡排除缺链并确认SNI选择的因果。', conclusion: '修复必须考虑同IP其他无SNI站点。' },
+    { actionId: '', thought: '已定位SNI缺失与默认站点名称不匹配，停止诊断。为新域名提供独立兼容入口或完整覆盖所需名称的证书方案，分别验旧/新站，不按多数比例直接搬走故障。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '已定位SNI缺失与默认站点名称不匹配，停止诊断。为新域名提供独立兼容入口或完整覆盖所需名称的证书方案，分别验旧/新站，不按多数比例直接搬走故障。' },
   ],
-
   lessons: [
-    {
-      text: '同 IP 多域名的 TLS 靠 SNI 区分：不带 SNI 的客户端（老固件/老 SDK）会拿到 default_server 的证书——无论它想访问谁。',
-      principle: '全栈视野：SNI 缺失的回退结果是一项全局决策——default_server 的证书要按"SNI 缺失流量的目标域名画像"选定。兼容性矩阵（域名×证书×客户端）是接入层变更的前置检查，nosni 握手实测是它的验收命令。',
-    },
-    {
-      text: '"同一请求不同结果"按客户端分群：分群特征（固件年份/SDK 版本/协议字段）就是根因的签名。',
-      principle: '假设思维：失败面切分的维度选对了，分界线本身就是证据——本例的分界线（是否发送 SNI）直接指向协议字段。协议类问题的排查路径：分群 → 抓协商包 → 变量隔离复现。',
-    },
-    {
-      text: '紧急修复可能把错误搬家：把默认证书换成新域名，老设备好了，同 IP 另一个站点坏了。',
-      principle: '止血权衡：状态变更前先问"这个改动影响的完整集合是什么"——兜底证书被所有"无线索请求"共享，动它就是动所有人。全局权衡的数据（SNI 缺失流量画像）应该先于止血动作。',
-    },
+    { text: 'SNI用于TLS阶段选站，HTTP Host尚不能替代当时证书选择。', principle: '本题无SNI时命中default_server；具体支持情况要读ClientHello，不以年份、语言或SDK大版本代替。' },
+    { text: '链可信、证书有效和主机名匹配应分别验证。', principle: '用正确的-noservername关闭SNI，同时保留-verify_hostname和受信根校验；不要把s_client连得上当作身份验证已通过。' },
+    { text: '共享默认证书改变会影响所有无SNI访问者。', principle: '若两个域名都必须服务，按多数换成仅覆盖其中一域名的证书无法全部修复。独立IP或合法覆盖全部所需名称的证书是可评估方案。' },
   ],
 }

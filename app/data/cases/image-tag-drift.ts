@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 学徒篇校准：用对象身份与Pod启动记录核实镜像漂移。
  * 原型：Kubernetes imagePullPolicy与可变标签；教学重建，不冒充原始事故日志。
- * 六维：2/2/2/2/2/2，中位数半档向下取整，L2。
+ * 六维：2/2/2/2/2/3，中位数半档向下取整，L2。
  * 标准路径：a-impact → a-pullpolicy → a-imageinspect；替代顺序：a-impact → a-imageinspect → a-pullpolicy。
  * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */

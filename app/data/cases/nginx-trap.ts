@@ -1,65 +1,55 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 2 章 · 接入层之夜（Nginx 配置陷阱 L2）
- * 教学点："偶发"常常是没找到分桶维度；请求没到应用，应用日志永远无辜；
- * 网关默认值是隐形合同；配置漂移 = 测试好的生产不行。
- * 专家路径：impact(1) + sizecorr(2) + nginxconf(2) + confdiff(1) = 6⚡︎
+ * 学徒篇校准：完整body边界、拒绝层与已加载配置核验。
+ * 原型：生产请求体上限缺省而测试放宽；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/2/2，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-sizecorr → a-nginxconf → a-confdiff；替代顺序：a-impact → a-nginxconf → a-sizecorr → a-confdiff。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const nginxTrapCase: DiagnosisCase = {
   id: 'nginx-trap',
   title: '上传失败率 8%，时好时坏',
   intro: '图片上传接口上线一周，失败率稳定在 8% 左右。运营说是"用户网络不好"，研发怀疑是"服务抖动"——但谁也拿不出证据。',
   domain: 'network',
-  layer: '网关配置是隐形的合同：请求没到应用，应用日志永远无辜',
+  layer: '完整请求体上限是一项跨层契约：用同请求关联确定拒绝点',
   part: 'apprentice',
   chapterId: 'access',
   order: 4,
   typeTags: ['config', 'dependency'],
   difficulty: 2,
-
   scene: {
     role: '你是内容平台的后端，图片上传接口是你发布的。周会上，8% 的失败率被点名了。',
-    architecture: 'App → CDN → WAF → Nginx 网关 → 上传服务(../upload) → 对象存储',
+    architecture: 'App → CDN → WAF → Nginx网关 → 上传服务 → 对象存储',
     symptoms: [
-      {
-        type: 'error',
-        title: '网关访问日志（失败样本）',
-        text: '[12:03:41] "POST /api/upload HTTP/1.1" 413  WAF-ok  12ms\n[12:04:02] "POST /api/upload HTTP/1.1" 413  WAF-ok  9ms\n[12:05:17] "POST /api/upload HTTP/1.1" 200  WAF-ok  820ms',
-      },
-      {
-        type: 'text',
-        title: '业务监控',
-        text: '失败率 8.2%，全天分布均匀、无高峰低谷；\n失败用户遍布各运营商、各地域——"弱网解释"站不住。',
-      },
+      { type: 'error', title: '网关访问日志（失败样本）', text: '[12:03:41] "POST /api/upload HTTP/1.1" 413  WAF-ok  12ms\n[12:04:02] "POST /api/upload HTTP/1.1" 413  WAF-ok  9ms\n[12:05:17] "POST /api/upload HTTP/1.1" 200  WAF-ok  820ms' },
+      { type: 'text', title: '业务监控', text: '失败率 8.2%，全天分布均匀、无高峰低谷；\n失败用户遍布各运营商、各地域——"弱网解释"站不住。' },
     ],
     timeline: '上线一周持续 8%，不好转也不恶化 ｜ 测试环境全量回归通过 ｜ 无发布、无配置变更（据平台组说）',
     impactHint: '"时好时坏"是真的随机，还是你没找对分桶的维度？',
+    tag: '教学重建',
   },
-
   hypotheses: [
     { id: 'h-size', text: '请求体大小超过网关层限制，超限的请求被直接拒绝', excludeActionId: 'a-sizecorr' },
     { id: 'h-net', text: '弱网用户上传超时，失败是网络问题', excludeActionId: 'a-netseg' },
     { id: 'h-svc', text: '上传服务处理失败（内存/磁盘/异常抖动）', excludeActionId: 'a-svclog' },
     { id: 'h-cdn', text: '前置 CDN/WAF 拦截了大请求', excludeActionId: 'a-layertrace' },
   ],
-
   actions: [
     {
       id: 'a-impact',
-      name: '按请求大小给失败分桶',
-      desc: '把失败率按上传文件大小分桶统计',
+      name: '按完整请求体大小分桶',
+      desc: '含multipart开销，用Content-Length及受控请求核对',
       cost: 1,
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [{ id: 'h-net', status: 'down' }],
-      result: {
-        type: 'text',
-        title: '分桶统计（按文件大小）',
-        text: '< 512KB   成功率 100%\n512KB~1MB 成功率 99.4%\n> 1MB     成功率 0%（全部失败）\n→ 哪里是"时好时坏"？失败与文件大小强相关：超过 1MB 必失败。',
-      },
+      tests: ['h-net', 'h-size'],
+      hypotheses: [
+        { id: 'h-net', status: 'excluded' },
+        { id: 'h-size', status: 'up' },
+      ],
+      result: { type: 'text', title: '请求体阈值', text: '按完整请求体（不是仅图片文件）分桶：≤1048576字节样本成功，>1048576字节样本均413；8.2%的请求超过此线。\nmultipart边界和字段也算请求体，因此接近1MiB的文件可能使完整body先越界。受控同网同内容仅改变body长度可稳定复现。' },
     },
     {
       id: 'a-sizecorr',
@@ -69,13 +59,13 @@ export const nginxTrapCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-size'],
-      hypotheses: [{ id: 'h-size', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '失败响应样本',
-        text: 'HTTP/1.1 413 Request Entity Too Large\nServer: nginx/1.24.0\n<html><head><title>413 Request Entity Too Large</title>…\n→ 413 是 Nginx 默认错误页，没有应用 trace-id：\n请求在网关就被拒了，根本没到上传服务。',
-      },
+      tests: ['h-svc', 'h-cdn', 'h-size'],
+      hypotheses: [
+        { id: 'h-svc', status: 'excluded' },
+        { id: 'h-cdn', status: 'excluded' },
+        { id: 'h-size', status: 'up' },
+      ],
+      result: { type: 'log', title: '逐层关联同一请求', text: '413和Server:nginx只能提供线索，不能单独确定拦截层。关联同一请求ID：CDN/WAF均放行；Nginx error.log记录client intended to send too large body，access.log的upstream_addr与upstream_status均为-。\n该请求未被代理至上传服务，排除本题前置CDN/WAF和应用处理异常。' },
     },
     {
       id: 'a-netseg',
@@ -86,12 +76,10 @@ export const nginxTrapCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-net'],
-      hypotheses: [{ id: 'h-net', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '网络分桶',
-        text: '三大运营商、Top5 省份、WiFi/蜂窝的失败率差异 < 0.5 个百分点，且都只随文件大小变化。\n→ 与网络质量无关。',
-      },
+      hypotheses: [
+        { id: 'h-net', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '网络分桶', text: '同一网络同内容仅改变完整body长度即可跨过成功/413边界；运营商差异不解释这个稳定长度阈值。' },
     },
     {
       id: 'a-svclog',
@@ -102,12 +90,10 @@ export const nginxTrapCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-svc'],
-      hypotheses: [{ id: 'h-svc', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '上传服务日志',
-        text: '413 时段服务日志干干净净：无异常、无慢请求，CPU/内存平稳。\n→ 应用是"无辜"的——它压根没收到那些请求。',
-      },
+      hypotheses: [
+        { id: 'h-svc', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '上传服务日志', text: '按已知request-id核对上传服务无该请求，同时Nginx upstream_addr=-。缺应用日志单独不证明没收到，需与接入层未代理记录对齐。' },
     },
     {
       id: 'a-layertrace',
@@ -118,28 +104,24 @@ export const nginxTrapCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-cdn'],
-      hypotheses: [{ id: 'h-cdn', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '链路核对',
-        text: 'CDN 回源记录：已放行；WAF 拦截日志：无 upload 相关拦截。\n→ 前两层都放行了，拦截发生在最后一层：Nginx。',
-      },
+      hypotheses: [
+        { id: 'h-cdn', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '链路核对', text: 'CDN 回源记录：已放行；WAF 拦截日志：无 upload 相关拦截。\n→ 前两层都放行了，拦截发生在最后一层：Nginx。' },
     },
     {
       id: 'a-nginxconf',
-      name: '导出生产 Nginx 生效配置',
-      desc: 'nginx -T 看实际生效的 client_max_body_size',
+      name: '核对已加载配置、继承与请求命中',
+      desc: 'nginx -T查看磁盘配置，再与最近成功reload清单和worker版本核对',
       cost: 2,
       gain: 'high',
       danger: false,
       effects: [],
       tests: ['h-size'],
-      hypotheses: [{ id: 'h-size', status: 'up' }],
-      result: {
-        type: 'code',
-        title: 'nginx -T | grep client_max_body_size',
-        text: '# 生产：无任何输出\n→ 生产配置里根本没有这条指令，\nNginx 默认值 client_max_body_size 1m 在生效——恰好等于分桶的失败线。',
-      },
+      hypotheses: [
+        { id: 'h-size', status: 'confirmed' },
+      ],
+      result: { type: 'code', title: '配置与加载状态', text: 'Nginx1.24.0；nginx -T所读文件与最近一次成功reload归档哈希一致，后续无文件修改。核对请求命中server/location及全部include，http/server/location均未设client_max_body_size。\n此时使用默认1m，即1048576字节；不是仅grep无输出就证明运行中的worker。' },
     },
     {
       id: 'a-confdiff',
@@ -150,12 +132,10 @@ export const nginxTrapCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-size'],
-      hypotheses: [{ id: 'h-size', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '配置 Diff',
-        text: '+ 测试环境 http 块: client_max_body_size 50m\n- 生产（sites-api.conf）: 该指令不存在\n→ 上线时模板里写过这条，重构配置目录时被挪进了"仅测试"的 conf 片段——配置漂移。',
-      },
+      hypotheses: [
+        { id: 'h-size', status: 'up' },
+      ],
+      result: { type: 'code', title: '已加载配置差异', text: '同版本同接口：测试加载的http块为50m，生产各层未声明而使用1m。配置归档及重构提交显示仅测试include了该片段。\n环境可以配置不同，但业务上传上限要求20MiB时，两环境均应有显式约束与同一边界验收。' },
     },
     {
       id: 'a-changegit',
@@ -167,11 +147,7 @@ export const nginxTrapCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '配置仓库历史',
-        text: '三个月前"配置目录重构"提交：把通用指令拆成 base.conf + sites/*.conf，\nclient_max_body_size 被归入 base-dev.conf（注释：联调期放宽用）。\n生产 include 的清单里没有它——默认值 1m 悄悄生效至今。',
-      },
+      result: { type: 'text', title: '配置仓库历史', text: '三个月前"配置目录重构"提交：把通用指令拆成 base.conf + sites/*.conf，\nclient_max_body_size 被归入 base-dev.conf（注释：联调期放宽用）。\n生产 include 的清单里没有它——默认值 1m 悄悄生效至今。' },
     },
     {
       id: 'a-scaleup',
@@ -183,94 +159,40 @@ export const nginxTrapCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '扩容结果',
-        text: '413 失败率纹丝不动（8.2% → 8.3%）。\n→ 预料之中：请求根本没到服务，扩容治不了"没到我这儿"的故障。',
-      },
+      result: { type: 'text', title: '扩容结果', text: '扩容应用不会改变Nginx请求体限制；本题失败请求没有被代理到应用。容量动作前先确定拒绝点。' },
     },
     {
       id: 'a-fixconf',
       name: '补齐网关限制并固化基线',
       desc: '【状态变更】生产补 client_max_body_size 20m，nginx -t 校验后 reload，并纳入配置基线模板',
-      cost: 4,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复结果',
-        text: 'nginx.conf 补 client_max_body_size 20m → nginx -t 通过 → 平滑 reload。\n>1MB 上传成功率 100%，接口总失败率回落到 0.1%。\n同时把该指令加入生产配置基线，CI 增加两环境配置 diff 门禁。',
-      },
+      result: { type: 'text', title: '修复结果', text: '按业务上限在正确location显式设置client_max_body_size 20m，nginx -t后reload并确认加载；连同CDN/WAF/应用/存储边界一起验。\n完整body在上限内恢复；超过上限仍应拒绝，不能宣称所有>1MiB无限制成功。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-size', text: '生产 Nginx 缺失 client_max_body_size 配置，默认 1m 生效——超过 1MB 的上传请求被网关直接 413 拒绝（测试环境配了 50m 所以测不出来）', correct: true },
+    { id: 'rc-size', text: '生产已加载配置未设client_max_body_size，默认1m(1048576字节)限制完整请求体；测试加载50m导致边界未覆盖，multipart开销同样计入', correct: true },
     { id: 'rc-net', text: '弱网用户上传超时导致失败', correct: false },
     { id: 'rc-svc', text: '上传服务处理异常抖动导致失败', correct: false },
     { id: 'rc-cdn', text: '前置 CDN/WAF 拦截了大请求', correct: false },
   ],
-
   expertCost: 6,
   restartActionId: 'a-fixconf',
-
   expertChain: [
-    {
-      thought: '"时好时坏"先别信——换个维度分桶，看看失败到底随什么变化。',
-      update: '按文件大小分桶：>1MB 必失败、<1MB 几乎全成 → 不是随机网络问题，是确定性的阈值。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 分桶是把"偶发"变"必现"的唯一手段：找对分桶维度，8% 的噪声立刻显形成 100% 的规则。',
-      conclusion: '失败与大小强相关，阈值在 1MB 附近 → 看失败响应是谁发的。',
-    },
-    {
-      thought: '看失败响应的细节：响应码、Server 头、有没有应用 trace-id，判断是谁拒绝的。',
-      update: '413 + Nginx 默认错误页 + 无 trace-id → 请求死在网关，应用无辜。',
-      actionId: 'a-sizecorr',
-      why: '2⚡︎ 响应详情一步定位"凶手层级"：默认错误页和缺失的 trace-id 是"没到应用"的铁证，省掉在应用里大海捞针。',
-      conclusion: 'Nginx 网关层拦截 → 查它生效的限制值。',
-    },
-    {
-      thought: '别看配置文件，看生效配置：nginx -T 导出运行时合并后的真实值。',
-      update: '生产没有任何 client_max_body_size 指令——默认 1m 生效，恰好等于失败阈值。',
-      actionId: 'a-nginxconf',
-      why: '2⚡︎ "文件里写了"和"运行时生效了"是两回事：include、继承、就近覆盖都会让静态阅读被骗。nginx -T 才是真相。',
-      conclusion: '默认值陷阱实锤 → 对比测试环境，找漂移的来源。',
-    },
-    {
-      thought: '测试为什么能过？Diff 两套配置，找出这条指令的去向。',
-      update: '测试环境 50m 在 http 块生效；生产的这条在重构时被挪进了仅测试的片段——配置漂移全程复盘。',
-      actionId: 'a-confdiff',
-      why: '1⚡︎ 找到漂移机制才能修得彻底：只补一行配置，下次重构还会丢；找到"怎么丢的"才能加防漂移门禁。',
-      conclusion: '机制闭环：重构丢指令 → 默认 1m 生效 → >1MB 全拒。停止收集。',
-    },
-    {
-      thought: '证据闭合：分桶规则 + 网关拦截实锤 + 默认值生效 + 漂移来源明确。停止收集。',
-      update: '停止。修复：补配置 + reload + 配置基线门禁防复发；扩容这类动作对这个故障毫无意义。',
-      actionId: '',
-      why: '根因、修复、防复发三件事都已明确；网络/应用/CDN 假设已排除，继续收集不改变行动。',
-      conclusion: '补 20m 并 reload 后失败率 0.1%。检查单：网关类配置要有环境 diff 门禁；"偶发"故障先找分桶维度。',
-    },
+    { actionId: 'a-impact', thought: '把随机上传失败按完整body分桶。', update: '阈值为1048576字节，单变量可复现。', why: '1⚡区分大小契约与弱网。', conclusion: '网络随机失败候选排除。' },
+    { actionId: 'a-sizecorr', thought: '不能只凭Server头定位。', update: '逐层关联证明Nginx拒绝且未向上游代理。', why: '2⚡买到拒绝点与前置层放行证据。', conclusion: '应用/CDN候选排除。' },
+    { actionId: 'a-nginxconf', thought: '核对命中位置和已加载配置。', update: '各层未设限制，默认1m对应阈值。', why: '2⚡避免把磁盘文件当内存运行真相。', conclusion: '根因确认。' },
+    { actionId: 'a-confdiff', thought: '解释为什么测试没复现。', update: '测试50m，生产1m，历史include不同。', why: '1⚡解释测试未覆盖的长度边界，并定位配置漂移来源。', conclusion: '处置应显式配置与跨层边界验收。' },
+    { actionId: '', thought: '完整请求体阈值、拒绝层、已加载配置与环境差异均闭合。停止诊断，按业务上限修复并验上下边界，不无条件取消限额。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '完整请求体阈值、拒绝层、已加载配置与环境差异均闭合。停止诊断，按业务上限修复并验上下边界，不无条件取消限额。' },
   ],
-
   lessons: [
-    {
-      text: '"偶发"常常是没找到分桶维度：按文件大小一分桶，8% 的噪声立刻显形成 100% 的规则。',
-      principle: '失败率从不均匀分布——找不到规律是因为分桶维度不对。大小/时段/地域/端版本/参数值，换维度重新切分，"随机问题"大多会现出原形。',
-    },
-    {
-      text: '请求没到应用，应用日志永远无辜：Nginx 默认错误页 + 无 trace-id 是"网关拦截"的铁证。',
-      principle: '先问"请求死在了哪一层"再问"为什么死"：响应头里的 Server 标识、默认错误页、缺失的 trace-id，都是判断凶手层级的免费证据。',
-    },
-    {
-      text: 'Nginx 的默认值是隐形合同：没写的指令也在生效，client_max_body_size 默认只有 1m。',
-      principle: '网关类组件的默认值往往极度保守（1m body、60s 超时、1024 连接）。上线涉及大请求/长连接前，必须核对生效配置而不是相信"没配就是没限制"。',
-    },
-    {
-      text: '配置漂移 = "测试好的生产不行"：文件里写了不等于运行时生效了，nginx -T 才是真相。',
-      principle: '多环境差异要靠门禁而不是记忆：CI 里加两环境配置 diff 检查；排查时用运行时导出（nginx -T / effective config）替代静态阅读。',
-    },
+    { text: '文件大小不等于完整请求体大小。', principle: 'multipart字段与边界也占字节，默认1m以1048576字节衡量。用Content-Length或受控body核对阈值，避免把KB/MB混成精确边界。' },
+    { text: 'Server头和默认错误页是线索，逐层同请求关联才定位拒绝点。', principle: '前置代理也可能使用Nginx或转发错误页；Nginx本地错误与未代理记录和应用日志一起判断。' },
+    { text: 'nginx -T读取当前磁盘配置，不直接转储运行worker内存。', principle: '配合启动/reload记录、配置归档哈希与请求命中位置核对，才能确定当时实际配置和继承默认值。' },
+    { text: '显式上传上限要跨接入层和业务层一致验收。', principle: '按真实业务容量配置并测完整body边界；生产与测试实现相同，配置差异必须有依据。' },
   ],
 }

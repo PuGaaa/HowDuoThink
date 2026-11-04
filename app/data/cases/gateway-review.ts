@@ -1,52 +1,40 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * B3-1 · access L2（接入层结业评审）
- * 主训思维：架构设计（限流是容量契约——一刀切的数字保护不了最弱的下游）
- * 次训思维：安全思维（证书轮换要监控，自动化 ≠ 可靠）
- * 真实原型：全局限流一刀切误伤 NAT 用户 + 证书续期失败无告警
- * 情绪兽设计：惊讶獭（惊讶）——"保护弱下游的限流，先误伤了自己的用户"
- * 检查单：思维型 3 + 知识型 1
+ * 学徒篇校准：四个独立契约的完整网关评审结论。
+ * 原型：容量与身份限流混淆、自动化盲点与内部明文；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/3/3，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-capacity → a-ipdim → a-certmon → a-tls；替代顺序：a-impact → a-certmon → a-tls → a-ipdim → a-capacity。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const gatewayReviewCase: DiagnosisCase = {
   id: 'gateway-review',
   title: '网关改造方案评审——一刀切的限流',
-  intro: '网关团队提交"统一接入网关 2.0"终审方案：全局限流 10000 QPS + 证书自动轮换 + 统一 TLS 终止。你的任务：找出它会在什么时候出事。',
+  intro: '网关2.0提案：总入口10000请求/秒、另按IP限20请求/秒、证书自动续期、内部明文。请给出覆盖全部阻断项的评审结论。',
   domain: 'network',
-  layer: '限流是容量契约：一刀切的数字保护不了最弱的下游——契约要按容量逐个签',
+  layer: '评审把吞吐、共享身份、自动化失败与信任边界分别核对，再给完整放行条件',
   part: 'apprentice',
   chapterId: 'access',
   order: 5,
   typeTags: ['access', 'architecture'],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」的架构评审委员。网关 2.0 方案明天定稿，评审会上你的职责：让每个"听起来很好"的数字交出依据。',
     architecture: 'App → 网关 2.0(限流/TLS 终止/证书) → 下游服务 ×12(容量差异极大)',
-    tag: '评审现场',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '方案文档 · 关键句',
-        text: '① 全局限流：令牌桶 10000 QPS（按 IP 维度）\n② 证书自动轮换：接入 ACME，全自动续期，"从此告别证书过期"\n③ 统一 TLS 终止：内部流量明文转发（内网可信）',
-      },
-      {
-        type: 'text',
-        title: '评审输入 · 现网事实',
-        text: '下游 12 个服务容量差异极大：库存服务实测仅 2000 QPS，商品服务可扛 15000。\n上月已有 47 单"正常用户被限流"的投诉（现有单机限流误伤 NAT 用户）。',
-      },
+      { type: 'error', title: '方案文档 · 关键句', text: '① 总入口令牌桶10000请求/秒，另有每IP20请求/秒，无按路由的下游限流\n② ACME自动续期，无失败或到期告警\n③ 网关终止TLS后向内部业务明文转发，理由为“内网可信”' },
+      { type: 'text', title: '评审输入 · 现网事实', text: '同一SLO与请求模型：库存路由上限2000请求/秒、商品15000；一条入口请求只调用一次对应下游。\n上月47单正常用户误限投诉；本组织既定规则要求跨共享网络传递会话令牌必须加密。' },
     ],
     timeline: '方案评审明天定稿 ｜ 计划大促前全量上线 ｜ 大促流量预估为日常 3 倍',
     impactHint: '"10000 QPS"这个数字，对 12 个容量各异的下游，意味着同一条保护线吗？',
   },
-
   hypotheses: [
-    { id: 'h-limit', text: '全局限流一刀切：弱下游（库存 2000 QPS）在总流量未触顶时就被打挂', excludeActionId: 'a-capacity' },
-    { id: 'h-ip', text: '限流按 IP 维度：NAT 后大量用户共享出口 IP，正常用户被误限', excludeActionId: 'a-ipdim' },
-    { id: 'h-cert', text: '证书自动轮换无监控：续期静默失败，过期即全站不可用', excludeActionId: 'a-certmon' },
-    { id: 'h-tls', text: 'TLS 终止后内网明文：需同步评估内部加密', excludeActionId: 'a-tls' },
+    { id: 'h-limit', text: '按路由容量、共享IP身份、续期可观测和内部令牌加密四项均补齐后再放行', excludeActionId: 'a-tls' },
+    { id: 'h-ip', text: '只把IP改为用户维度即可放行，其余方案无需修改', excludeActionId: 'a-capacity' },
+    { id: 'h-cert', text: '只补证书监控即可放行，现有全局限流足以保护全部下游', excludeActionId: 'a-capacity' },
+    { id: 'h-tls', text: '内部已隔离就可无条件明文，不需核对数据与信任边界', excludeActionId: 'a-tls' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -57,12 +45,10 @@ export const gatewayReviewCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-limit'],
-      hypotheses: [{ id: 'h-limit', status: 'up' }],
-      result: {
-        type: 'text',
-        title: '评审追问记录',
-        text: '"10000 怎么来的？"——"按总流量拍的，日常峰值 8000，留 25% 余量。"\n→ 依据是"总入口流量"，完全没有涉及"各下游能扛多少"——容量契约缺失。',
-      },
+      hypotheses: [
+        { id: 'h-limit', status: 'up' },
+      ],
+      result: { type: 'text', title: '数字、维度与评审范围', text: '总入口10000来自峰值8000乘1.25，尚未计算路由流量；每IP20是另一条规则，不把“全局”和“每IP”混成同一个计数器。\n本轮应对四个独立契约做证据核对，不能只找到一个问题就批准其余部分。' },
     },
     {
       id: 'a-capacity',
@@ -72,13 +58,13 @@ export const gatewayReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-limit'],
-      hypotheses: [{ id: 'h-limit', status: 'confirmed' }],
-      result: {
-        type: 'text',
-        title: '下游容量实测',
-        text: '压测归档：库存服务实测 2000 QPS（最弱）、商品服务 15000（最强）、其余 4000~9000。\n→ 全局限流 10000 = 库存服务的 5 倍容量：流量高峰时网关"合法地"把库存服务打挂。\n限流必须按下游容量分级，一刀切的数字是容量契约的缺席。',
-      },
+      tests: ['h-ip', 'h-cert', 'h-limit'],
+      hypotheses: [
+        { id: 'h-ip', status: 'excluded' },
+        { id: 'h-cert', status: 'excluded' },
+        { id: 'h-limit', status: 'up' },
+      ],
+      result: { type: 'text', title: '按路由计算可达负载', text: '同一请求模型下库存满足SLO的持续容量为2000请求/秒。归档流量回放：入口8000，其中库存路由40%，每入口库存请求调用下游一次，即3200>2000；全局尚未到10000时库存队列已持续增长。\n不能直接用总入口/最弱容量相除就声称一定过载，需路由比例及调用放大关系。' },
     },
     {
       id: 'a-ipdim',
@@ -88,13 +74,11 @@ export const gatewayReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-ip'],
-      hypotheses: [{ id: 'h-ip', status: 'confirmed' }],
-      result: {
-        type: 'text',
-        title: 'IP 维度的问题',
-        text: '按源 IP 限流 → 企业出口/校园网/运营商 NAT 下，数百用户共享 1~2 个 IP。\n上月 47 单误限投诉与该模式完全吻合。\n→ 维度应改为 user 维度（登录态）为主、IP 为辅。',
-      },
+      tests: ['h-limit'],
+      hypotheses: [
+        { id: 'h-limit', status: 'up' },
+      ],
+      result: { type: 'text', title: '身份与命中证据', text: '47单已关联限流日志及登录身份：41单企业出口、6单校园网；每个用户均≤1请求/秒，同一NAT出口合计40请求/秒，命中每IP20。\n按受信身份/租户设公平配额，IP保留粗粒度防滥用，并同时保留路由容量与全局保护；不是只换user就能解决全部问题。' },
     },
     {
       id: 'a-certmon',
@@ -104,29 +88,26 @@ export const gatewayReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-cert'],
-      hypotheses: [{ id: 'h-cert', status: 'confirmed' }],
-      result: {
-        type: 'text',
-        title: '证书轮换审计',
-        text: '"全自动续期"——但续期失败无告警、证书剩余有效期无监控、无演练。\n→ 自动化 ≠ 可靠：ACME 依赖外部 CA 可达性，续期静默失败后，证书过期 = 全站 TLS 握手失败。\n"从此告别证书过期"的正确实现 = 自动轮换 + 到期监控 + 告警。',
-      },
+      tests: ['h-limit'],
+      hypotheses: [
+        { id: 'h-limit', status: 'up' },
+      ],
+      result: { type: 'text', title: '失败演练与线上证书探测', text: '演练ACME挑战失败：续期任务失败但无人收到告警；线上证书剩余期限也未被独立探测。\n需要续期失败通知、实际服务证书期限监控、轮换部署验证与演练；阈值随证书寿命/业务恢复窗口设定，不固定所有证书提前30天。' },
     },
     {
       id: 'a-tls',
       name: '评估内网明文的取舍',
       desc: '统一 TLS 终止后内部流量怎么办',
       cost: 1,
-      gain: 'low',
+      gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-tls'],
-      hypotheses: [{ id: 'h-tls', status: 'down' }],
-      result: {
-        type: 'text',
-        title: '内网明文评估',
-        text: '内部网络已有隔离 + mTLS 在后续 roadmap。\n→ 取舍可接受（记入债务清单），非本轮阻断项。',
-      },
+      tests: ['h-limit', 'h-tls'],
+      hypotheses: [
+        { id: 'h-limit', status: 'confirmed' },
+        { id: 'h-tls', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '信任边界与完整结论', text: '数据流核对：会话令牌经共享内部网络明文传递；本组织已定规则要求这一跨信任域链路加密。网络隔离不能代替该规则或防止内部旁路读取。\n须为这条链路启用并验证TLS（需双向身份时使用mTLS），并与容量、身份公平性、续期监控三项共同验收。' },
     },
     {
       id: 'a-history',
@@ -137,108 +118,56 @@ export const gatewayReviewCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-ip'],
-      hypotheses: [{ id: 'h-ip', status: 'up' }],
-      result: {
-        type: 'text',
-        title: '误伤工单分析',
-        text: '47 单误限投诉：41 单来自同一企业客户（出口 IP 共享），6 单来自校园网。\n全部命中"IP 共享 + 高频访问"特征。\n→ 现网已经在用投诉验证"IP 维度"的问题——方案却原样继承。',
-      },
+      hypotheses: [
+        { id: 'h-ip', status: 'up' },
+      ],
+      result: { type: 'text', title: '误伤工单分析', text: '47单工单与实际限流记录、身份和出口聚合速率已关联，证明这些样本被共享出口规则误限；工单相似本身不能证明所有未来误限来自NAT。' },
     },
     {
       id: 'a-minspec',
       name: '开出最小修正清单',
       desc: '让方案达到可上线的必改项',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
-      tests: ['h-limit', 'h-cert', 'h-ip'],
-      hypotheses: [
-        { id: 'h-limit', status: 'confirmed' },
-        { id: 'h-cert', status: 'confirmed' },
-        { id: 'h-ip', status: 'confirmed' },
-      ],
-      result: {
-        type: 'text',
-        title: '评审结论 · 修正清单',
-        text: '① 限流改按下游分级：每下游按实测容量×0.8 设阈值，全局兜底\n② 维度改 user 为主 + IP 兜底\n③ 证书剩余有效期 < 30 天告警 + 续期失败即告警\n→ 三项补齐后评审通过；大促前完成全量压测验证。',
-      },
+      tests: [],
+      hypotheses: [],
+      result: { type: 'text', title: '评审结论 · 修正清单', text: '形成四项待验收条件：①按路由及实际调用关系设容量与并发保护，安全余量由压测/突发模型确定，非统一0.8公式；②受信身份公平配额，另保留IP/全局防护；③自动续期失败与线上期限/部署验证；④内部令牌链路加密。\n待条件通过后批准，不把写下清单等同实际完成。' },
     },
     {
       id: 'a-approve',
       name: '按原方案批准上线',
       desc: '【状态变更】不等修正，方案原样过审',
-      cost: 3,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '批准结果',
-        text: '方案原样过审。大促零点：库存服务率先被打挂（2000 QPS 上限），\n连带订单创建全链路阻塞——限流没有保护任何人。',
-      },
+      result: { type: 'text', title: '批准结果', text: '风险演练按已归档8000入口、库存40%模型：库存3200超过2000持续容量。另有独立误限、续期静默失败和明文令牌风险；是否演变事故受真实流量及故障触发影响，不写成必然全站死亡。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-limit', text: '核心阻断缺陷：全局限流一刀切 10000 QPS，未按下游容量分级——最弱下游（库存 2000）在大促高峰被"合法"流量打挂，限流没有保护任何人', correct: true },
-    { id: 'rc-ip', text: '真实风险：限流按 IP 维度，NAT 用户被误限（现网 47 单投诉已验证），需改 user 维度', correct: false },
-    { id: 'rc-cert', text: '真实风险：证书自动轮换无监控，续期静默失败将导致全站故障', correct: false },
-    { id: 'rc-tls', text: 'TLS 终止后内网明文传输', correct: false },
+    { id: 'rc-limit', text: '暂不按原方案放行：路由容量、公平身份配额、续期可观测与内部令牌加密四项均须按明确条件验收', correct: true },
+    { id: 'rc-ip', text: '只把IP改user即可，其余无需验证', correct: false },
+    { id: 'rc-cert', text: '只补证书监控即可，全局10000能保护所有下游', correct: false },
+    { id: 'rc-tls', text: '内网已隔离，所以任何敏感流量都可无条件明文', correct: false },
   ],
-
   expertCost: 7,
   restartActionId: 'a-approve',
-
   expertChain: [
-    {
-      thought: '评审第一问永远要数字的依据："10000 QPS 怎么来的"——答案暴露了容量契约的缺席。',
-      update: '依据是总入口流量，与 12 个下游的容量完全无关——一刀切的保护线保护不了最弱者。',
-      actionId: 'a-impact',
-      why: '1⚡ 追数字依据是评审的核心动作：一个没有依据的容量数字，在大促 3 倍流量下就是一枚定时炸弹。',
-      conclusion: '容量契约缺失确认 → 拉实测数据量化缺口。',
-    },
-    {
-      thought: '拉压测归档：12 个下游的容量实测——最弱的库存服务 2000 QPS，是全局限流的五分之一。',
-      update: '全局限流 10000 = 库存服务容量的 5 倍：高峰时网关会"合法地"打挂最弱下游。',
-      actionId: 'a-capacity',
-      why: '2⚡ 实测数据把"可能有问题"变成"量化缺口"：限流必须按下游容量分级（每下游实测×0.8），全局数字只做兜底。',
-      conclusion: '分级限流为核心阻断缺陷 → 连带审计 IP 维度与证书监控。',
-    },
-    {
-      thought: 'IP 维度与证书监控是两个次级但必改的项：47 单误伤投诉已经在现网验证了 IP 维度的问题。',
-      update: 'IP 误伤现网实锤 + 证书轮换零监控——三项修正清单齐了。',
-      actionId: 'a-ipdim',
-      why: '1⚡ 现网投诉是免费的评审证据：上月 47 单误限与方案的 IP 维度完全吻合——方案继承了一个已被现网验证的缺陷。',
-      conclusion: '修正清单：分级限流 + user 维度 + 证书监控。',
-    },
-    {
-      thought: '证书轮换审计确认：自动化 ≠ 可靠，续期失败无告警 = 全站故障的定时器——与大促时间线重叠。',
-      update: '停止评审。三项修正清单可交付，方案有条件通过。',
-      actionId: '',
-      why: '【评审停止规则】修正清单覆盖"容量契约缺失/IP 误伤/证书监控"三缺陷，且每项有明确改法。继续追问的边际收益为零——评审的产出是清单，不是完美。',
-      conclusion: '有条件通过：三项修正后定稿，大促前全量压测验证。',
-    },
+    { actionId: 'a-impact', thought: '先分清总入口和每IP两条规则。', update: '数字与四项评审契约明确。', why: '1⚡确定审阅范围，避免从一个缺陷跳到完整放行。', conclusion: '分别核对容量、身份、证书和内部边界。' },
+    { actionId: 'a-capacity', thought: '总量需换算路由下游负载。', update: '8000×40%×1=3200>2000。', why: '2⚡用同SLO容量和真实调用模型证明缺口。', conclusion: '只改身份/证书均不足以放行。' },
+    { actionId: 'a-ipdim', thought: '核对误限是否真由共享出口造成。', update: '同出口40命中20，而各用户≤1。', why: '2⚡用命中日志与身份分母证明公平性缺口。', conclusion: '需要身份配额及独立防滥用保护。' },
+    { actionId: 'a-certmon', thought: '验证自动化失败时谁能知道。', update: '挑战失败不告警，服务证书期限未探测。', why: '1⚡失败演练比口头自动续期承诺可验证。', conclusion: '轮换还需失败/期限/部署验收。' },
+    { actionId: 'a-tls', thought: '核对内部数据与既定信任边界。', update: '令牌明文违反本组织跨域加密规则。', why: '1⚡确认最后独立阻断项，形成完整有条件结论。', conclusion: '四项均有依据与验收，不能只选择其中真实风险的一项。' },
+    { actionId: '', thought: '停止补材料，输出四项验收后再放行的完整评审结论；写下清单不等于完成实施，阈值也必须由实际容量与突发模型确定。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '停止补材料，输出四项验收后再放行的完整评审结论；写下清单不等于完成实施，阈值也必须由实际容量与突发模型确定。' },
   ],
-
   lessons: [
-    {
-      text: '限流是容量契约：一刀切的全局数字保护不了容量各异的下游——契约要按容量逐个签。',
-      principle: '架构设计：限流阈值 = 下游实测容量 × 安全系数，逐个配置；全局数字只做兜底。"统一管理"的简化，不能以牺牲最弱下游为代价。',
-    },
-    {
-      text: '限流维度决定误伤面：按 IP 限流，NAT 后数百用户共享同一个"身份"。',
-      principle: '程序设计：限流维度优先用业务身份（user/租户），IP 只做兜底；共享出口 IP（企业/校园/运营商 NAT）是 IP 维度限流的天然误伤区——现网投诉就是最好的验证。',
-    },
-    {
-      text: '自动化 ≠ 可靠：证书自动轮换如果没有失败告警，"从此告别证书过期"就变成"证书过期时没人知道"。',
-      principle: '验证思维：自动化流程必须配"失败监控 + 到期预警 + 定期演练"。信任自动化之前，先确认它失败时会不会有人知道。',
-    },
-    {
-      text: '现网投诉是免费的评审证据：上月 47 单误限，已经把方案的缺陷演示过一遍。',
-      principle: '复盘思维：评审输入不只是方案文档——历史工单、误伤投诉、救火记录都是现网对设计的"预演结果"。方案评审前先读历史。',
-    },
+    { text: '入口总量与下游负载之间要写清路由比例和调用次数。', principle: '弱下游并不接收全部流量；只有在相同SLO和请求模型下计算可达负载，才能证明全局限流保护不足。' },
+    { text: '容量保护、公平配额与防滥用有不同目的。', principle: '共享IP会聚合多个合法用户，但改用用户维度也不能替代下游容量、全局和粗粒度IP保护。' },
+    { text: '自动续期还要验证失败通知、实际部署与线上证书期限。', principle: '续期任务成功不等于所有节点已用新证书，固定30天阈值也不适用于所有证书寿命。' },
+    { text: '评审答案应覆盖全部已证实的阻断项。', principle: '只在多项真实风险中把一项标唯一正确会误导取舍。按本组织数据边界给完整待验收条件，不从“内网”推断无条件可信。' },
   ],
 }

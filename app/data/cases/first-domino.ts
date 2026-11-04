@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 学徒篇校准：用事前事件和请求传播恢复错误风暴。
  * 原型：Hikari借连接超时与SQL执行计划退化；教学重建，不冒充原始事故日志。
- * 六维：2/2/2/2/2/2，中位数半档向下取整，L2。
+ * 六维：2/2/2/2/3/3，中位数半档向下取整，L2。
  * 标准路径：a-impact → a-firsterror → a-independence；替代顺序：a-impact → a-independence → a-firsterror。
  * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */

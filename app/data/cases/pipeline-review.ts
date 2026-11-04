@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 学徒篇校准：区分评审的独立缺口与已治理条件。
  * 原型：依赖审批、缓存信任与并行测试边界；教学重建，不冒充原始事故日志。
- * 六维：2/2/2/2/2/2，中位数半档向下取整，L2。
+ * 六维：2/2/2/2/3/3，中位数半档向下取整，L2。
  * 标准路径：a-supply → a-botpath → a-cache → a-parallel → a-keyfix；替代顺序：a-supply → a-cache → a-botpath → a-keyfix → a-parallel。
  * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */

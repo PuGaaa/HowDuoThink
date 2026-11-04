@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 学徒篇校准：从实际读者定位构建变量与运行时配置断点。
  * 原型：Vite静态替换与配置生效阶段；教学重建，不冒充原始事故日志。
- * 六维：2/2/2/2/1/2，中位数半档向下取整，L2。
+ * 六维：2/2/2/2/2/3，中位数半档向下取整，L2。
  * 标准路径：a-impact → a-bundlecheck → a-cdncheck；替代顺序：a-impact → a-cdncheck → a-bundlecheck。
  * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */

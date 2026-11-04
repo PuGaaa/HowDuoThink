@@ -1,14 +1,16 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 2 章 · 接入层之夜（DNS 劫持 L2）
- * 教学点：DNS 解析链路（本地缓存→运营商→权威）；"部分用户+特定地域"形状；TTL 决定恢复速度。
- * 专家路径：impact(1) + dnsquery(1) + compare(2) = 4⚡︎
+ * 学徒篇校准：错误DNS答案与网络故障的变量隔离。
+ * 原型：递归解析异常而权威区正确；教学重建，不冒充原始事故日志。
+ * 六维：2/2/2/2/2/2，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-dnsquery → a-compare；替代顺序：a-impact → a-compare → a-dnsquery。
+ * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
 export const dnsHijackCase: DiagnosisCase = {
   id: 'dns-hijack',
   title: '只有某省的用户进不来',
-  intro: '客服收到集中反馈：某省用户 App 全部提示网络异常，其他省份一切正常。',
+  intro: '客服集中反馈某省部分网络无法访问；解析成功，却连到了不属于服务的地址。',
   domain: 'network',
   layer: 'DNS 解析链路：域名到 IP 之间隔着缓存、运营商和权威服务器',
   part: 'apprentice',
@@ -16,32 +18,22 @@ export const dnsHijackCase: DiagnosisCase = {
   order: 1,
   typeTags: ['config', 'dependency', 'timing'],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」电商的运维，早上 9 点客服群开始集中反馈某省用户无法访问。',
-    architecture: '用户 → 本地 DNS → 权威 DNS → CDN 节点 → 服务',
+    architecture: '用户 → 本地缓存/递归解析器 → 权威DNS；取得IP后 → CDN HTTPS节点 → 服务',
     symptoms: [
-      {
-        type: 'error',
-        title: '用户反馈',
-        text: '某省用户 App 全部提示"网络异常"，网页版打不开。\n该省之外的用户零反馈。',
-      },
-      {
-        type: 'text',
-        title: '服务端监控',
-        text: '该省的 CDN 节点带宽跌零；服务器本身零报错——用户的请求根本没到达你这里。',
-      },
+      { type: 'error', title: '用户反馈', text: '该省使用递归解析器R的一批用户提示网络异常；该省其他解析器与外省探测点正常。不是该省所有用户都无法上网。' },
+      { type: 'text', title: '服务端监控', text: '该批用户到自有CDN的请求量接近零；应用没有收到对应请求。请求可能去了别处，不能据此声称客户端完全没有发起连接。' },
     ],
-    timeline: '09:00 反馈集中出现 ｜ 前一天无任何变更 ｜ 该省 CDN 节点上周刚做过调度调整',
+    timeline: '09:00 反馈集中出现 ｜ 权威区记录与CDN调度昨日以来未变 ｜ 失败样本共同使用递归解析器R',
     impactHint: '先确认：是这个省的网络问题，还是你的服务对这个省下线了？',
+    tag: '教学重建',
   },
-
   hypotheses: [
-    { id: 'h-dns', text: '该省 DNS 解析被污染/劫持，域名解析到错误 IP', excludeActionId: 'a-dnsquery' },
+    { id: 'h-dns', text: '递归解析器R返回错误地址，和当前权威记录不一致（原因待进一步调查）', excludeActionId: 'a-dnsquery' },
     { id: 'h-cdn', text: '该省 CDN 节点故障', excludeActionId: 'a-cdn' },
     { id: 'h-isp', text: '该省运营商骨干网络故障', excludeActionId: 'a-compare' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -51,13 +43,11 @@ export const dnsHijackCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
-      result: {
-        type: 'text',
-        title: '影响范围',
-        text: '仅某省受影响，且该省三大运营商都受影响；\n其他省份零反馈；服务端监控显示该省请求量跌零（不是变慢）。',
-      },
+      tests: ['h-dns'],
+      hypotheses: [
+        { id: 'h-dns', status: 'up' },
+      ],
+      result: { type: 'text', title: '影响面', text: '分桶按地域×解析器，而不是只看省份：使用R的样本失败，换用正常递归解析器的同省样本成功；外省正常。\n失败路径对自有CDN的到达量近零，尚不能排除CDN或出网故障。' },
     },
     {
       id: 'a-dnsquery',
@@ -68,12 +58,10 @@ export const dnsHijackCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-dns'],
-      hypotheses: [{ id: 'h-dns', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '各地解析结果对比',
-        text: '正常省份: cdn.example.com → 112.84.xx.xx（该省 CDN 节点）\n该省探测点: cdn.example.com → 61.147.xx.xx（一个陌生 IP，不属于自己的任何节点）\n→ 该省解析到了错误 IP：DNS 污染/劫持实锤',
-      },
+      hypotheses: [
+        { id: 'h-dns', status: 'confirmed' },
+      ],
+      result: { type: 'code', title: '权威与递归答案对照', text: '同一时刻同一域名cdn.example.com、无地域调度差异：\n权威服务器直接查询与正常递归解析均答192.0.2.10；受影响用户使用的R答198.51.100.20。区记录/变更审计确认后者不属于当前有效节点，TTL尚有240秒。\n这是错误DNS答案的证据，不能仅凭陌生IP就判定恶意劫持或广告变现。' },
     },
     {
       id: 'a-cdn',
@@ -83,13 +71,11 @@ export const dnsHijackCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-cdn'],
-      hypotheses: [{ id: 'h-cdn', status: 'down' }],
-      result: {
-        type: 'text',
-        title: 'CDN 节点状态',
-        text: '节点健康检查全绿，带宽跌零是因为没有流量进来——节点本身没挂。\n上周的调度调整只影响解析结果，不改变节点健康度。',
-      },
+      tests: ['h-dns'],
+      hypotheses: [
+        { id: 'h-dns', status: 'up' },
+      ],
+      result: { type: 'text', title: 'CDN 节点状态', text: '同一自有节点的业务健康探测与直达校验通过；单靠总览健康灯不能排除特定用户路径故障，仍需失败网络上的保留主机名对照。' },
     },
     {
       id: 'a-compare',
@@ -99,29 +85,24 @@ export const dnsHijackCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-isp'],
-      hypotheses: [{ id: 'h-isp', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '直连测试',
-        text: '该省探测点直连正确 IP（112.84.xx.xx:443）：通！\n→ 网络通路正常，问题只在"域名→IP"这一步。',
-      },
+      tests: ['h-cdn', 'h-isp'],
+      hypotheses: [
+        { id: 'h-cdn', status: 'excluded' },
+        { id: 'h-isp', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '保留TLS语义的单变量对照', text: '在同一失败设备与网络，用curl --resolve cdn.example.com:443:192.0.2.10 https://cdn.example.com/health：保留URL主机名、Host、SNI和证书校验，返回200及预期节点标识。\n普通域名访问仍连198.51.100.20并报主机名不匹配。绕开解析后同一CDN与链路正常，排除所列CDN故障和骨干中断。不是直接访问IP且忽略证书错误。' },
     },
     {
       id: 'a-switchdns',
       name: '切换权威 DNS 服务商',
       desc: '【状态变更】把域名解析切到备用 DNS 服务商',
-      cost: 7,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '切换结果',
-        text: '切换申请提交，但 TTL 还没到期，该省用户要等缓存过期才能恢复。\n→ 切换不能立即生效——TTL 是 DNS 世界的"缓存到期时间"。',
-      },
+      result: { type: 'text', title: '切换结果', text: '权威区本来就返回正确地址，替换权威服务商没有针对当前错误答案来源。正常缓存会随TTL到期，但递归端若持续注入错误答案，等待或切权威都不保证恢复。' },
     },
     {
       id: 'a-applog',
@@ -132,99 +113,54 @@ export const dnsHijackCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-dns', 'h-isp'],
-      hypotheses: [{ id: 'h-dns', status: 'up' }],
-      result: {
-        type: 'log',
-        title: '客户端日志采样',
-        text: 'UnknownHostException: cdn.example.com——域名解析失败的专属异常。\n→ 客户端日志再次指向 DNS。',
-      },
+      hypotheses: [
+        { id: 'h-dns', status: 'up' },
+      ],
+      result: { type: 'log', title: '失败设备客户端采样', text: '解析API成功返回198.51.100.20；随后HTTPS报证书主机名不匹配。\n不是UnknownHostException：错误地址与无法解析是不同分支。' },
     },
     {
       id: 'a-whois',
       name: '查陌生 IP 归属',
-      desc: '61.147.xx.xx 是谁家的',
+      desc: '登记外部IP的网络归属，不替代解析证据',
       cost: 1,
       gain: 'mid',
       danger: false,
       effects: [],
       tests: ['h-dns'],
-      hypotheses: [{ id: 'h-dns', status: 'up' }],
-      result: {
-        type: 'text',
-        title: 'IP 归属',
-        text: '归属：某广告公司的 CDN 缓存集群。\n→ 典型的 DNS 劫持流量变现：域名被解析到广告节点。',
-      },
+      hypotheses: [
+        { id: 'h-dns', status: 'up' },
+      ],
+      result: { type: 'text', title: 'IP 归属', text: 'RDAP/地址登记只能辅助查网络归属；它本身不能证明主机运营目的、恶意劫持者或广告变现。止血不必等待完成归责。' },
     },
     {
       id: 'a-hosts',
-      name: '应急：指导用户改 hosts / 切 HTTPDNS',
-      desc: '绕过被污染的本地 DNS',
+      name: '验证：受控切换正常解析路径',
+      desc: '单设备在保留主机名和证书校验条件下验证替代解析',
       cost: 3,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '应急效果',
-        text: '用 HTTPDNS 的测试用户立即恢复访问。\n→ 应急止血有效；长期方案是 App 接入 HTTPDNS + 多域名容灾。',
-      },
+      result: { type: 'text', title: '应急效果', text: '受控设备换用已验证的正常解析器后恢复。hosts只适合短时受控验证，CDN地址会变化；HTTPDNS是否加密、解析来源与缓存策略取决于实现，不能一概称为加密直问权威。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-dns', text: '该省本地 DNS 被污染/劫持，域名解析到广告公司 IP，用户请求根本没出发', correct: true },
+    { id: 'rc-dns', text: '递归解析器R返回与当前权威区不一致的错误地址；同设备保留主机名直达正确节点正常，故障定位于解析答案，恶意性和责任方尚未确认', correct: true },
     { id: 'rc-cdn', text: '该省 CDN 节点故障导致无响应', correct: false },
     { id: 'rc-isp', text: '该省运营商骨干网络中断', correct: false },
   ],
-
   expertCost: 4,
   restartActionId: '',
-
   expertChain: [
-    {
-      thought: '只有某省出问题——地域形状是最强的分叉信号。先确认是"服务对这个省下线"还是"这个省上不了网"。',
-      update: '监控显示该省请求量跌零：请求根本没到达服务器，问题在用户侧的链路上游。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 买形状：请求跌零（没出发）vs 变慢（在路上）vs 报错（到了但失败）——三种形状对应三个完全不同的排查方向。',
-      conclusion: '请求没到达 + 仅某省 → DNS 解析或该省出网链路，二选一。',
-    },
-    {
-      thought: '区分 DNS 和骨干网最便宜的方法：找该省的探测点直接查域名解析。',
-      update: '准备实锤。',
-      actionId: 'a-dnsquery',
-      why: '1⚡︎ 一步到位：解析结果对不对一眼可见，比逐段排查链路便宜得多。',
-      conclusion: '该省解析到陌生广告 IP → DNS 污染/劫持实锤。',
-    },
-    {
-      thought: '实锤后还要补两块：确认网络通路正常（排除叠加故障）+ 查陌生 IP 是谁（定性）。直连测试更便宜先做。',
-      update: '排他验证：绕过域名直连正常 IP。',
-      actionId: 'a-compare',
-      why: '2⚡︎ 确认"通路正常"很重要——如果直连也不通就是叠加故障，处置方案完全不同。',
-      conclusion: '直连通 → 排除叠加故障，纯 DNS 问题。应急方案（HTTPDNS/hosts）可行性确认。',
-    },
-    {
-      thought: '证据链闭合：解析到错误 IP（实锤）+ 直连正常（通路好）+ 该省独有（污染范围）。停止收集。',
-      update: '停止，进入应急与追责。',
-      actionId: '',
-      why: '根因、影响、应急方案都已明确；找谁追责（查 IP 归属）不阻塞止血。',
-      conclusion: '应急：HTTPDNS + 指导改 hosts；追责：向该省运营商投诉 DNS 污染；长期：App 接入 HTTPDNS 容灾。',
-    },
+    { actionId: 'a-impact', thought: '先按解析器与地域分桶。', update: '失败集中在R，不是整个省断网。', why: '1⚡得到可对照的影响集合。', conclusion: '错误答案和网络通路都待验证。' },
+    { actionId: 'a-dnsquery', thought: '把递归答案与当前权威记录核对。', update: 'R返回不在有效节点表中的地址。', why: '1⚡区分正常地域调度与解析错误。', conclusion: '错误答案成立，但尚未验证正确路径可用。' },
+    { actionId: 'a-compare', thought: '同设备只绕过解析，保留TLS语义。', update: '正确节点200，普通路径仍连错地址。', why: '2⚡同时检验自有节点与受影响网络。', conclusion: '所列CDN/骨干候选排除，解析答案故障闭合。' },
+    { actionId: '', thought: '已确认故障位于R的错误答案，可受控切换正常解析并向解析服务方提供证据；不把IP归属调查或TTL等待当作恢复保证。', update: '停止收集，转入有针对性的处置。', why: '必要证据已能区分主要假设；继续收集同类材料不会改变当前处置，修复后再按相同条件复验。', conclusion: '已确认故障位于R的错误答案，可受控切换正常解析并向解析服务方提供证据；不把IP归属调查或TTL等待当作恢复保证。' },
   ],
-
   lessons: [
-    {
-      text: '"只有某省/某运营商"的形状 → 优先怀疑 DNS 污染，而不是自己的服务。',
-      principle: 'DNS 解析链路经过本地缓存、运营商递归、权威服务器多层——任何一环被污染，该区域用户就会"集体迷路"，而你的服务端监控只会看到该区域流量归零。',
-    },
-    {
-      text: '请求量"跌零"和"变慢"是两种完全不同的故障形状。',
-      principle: '跌零 = 请求根本没出发（DNS/路由/客户端）；变慢 = 请求在路上或服务端处理慢。形状判断让假设空间在第一分钟就砍掉一半。',
-    },
-    {
-      text: 'DNS 劫持的应急是"绕过"（HTTPDNS/hosts），长期是"容灾"（多域名+多解析商）。',
-      principle: 'DNS 污染不在你的控制面内：你修不了运营商的 DNS，只能让 App 不依赖它——HTTPDNS 走加密通道直接问权威，是多租户 App 的标配备灾。',
-    },
+    { text: '地域只是分桶维度之一，解析器可能比省份更接近共同原因。', principle: 'CDN会有正常地域调度，需核对当时有效记录和调度策略；陌生IP不是恶意劫持的充分证据。' },
+    { text: '绕过DNS时保留主机名、SNI与证书校验，才能只改变一个变量。', principle: 'curl --resolve可指定连接地址同时保持URL主机名。直接访问IP再关闭证书校验会同时改变多个条件。' },
+    { text: 'TTL是正常缓存期限，不是所有解析污染的恢复承诺。', principle: '若错误答案持续被生成，等缓存过期仍可再次中招。HTTPDNS、替代解析和hosts都有各自实现与运维边界。' },
   ],
 }

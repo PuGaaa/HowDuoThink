@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 学徒篇校准：区分跨源凭证模式、同站属性和CORS。
  * 原型：Fetch credentials与Cookie接纳规则；教学重建，不冒充原始事故日志。
- * 六维：2/2/2/2/2/1，中位数半档向下取整，L2。
+ * 六维：2/2/2/2/2/3，中位数半档向下取整，L2。
  * 标准路径：a-impact → a-cookiedetail → a-fetchcode；替代顺序：a-impact → a-fetchcode → a-cookiedetail。
  * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */

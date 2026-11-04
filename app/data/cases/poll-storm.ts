@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 学徒篇校准：按调度器生命周期与正确单位核算前端负载。
  * 原型：Vue手工副作用清理与浏览器定时器；教学重建，不冒充原始事故日志。
- * 六维：2/2/2/2/2/2，中位数半档向下取整，L2。
+ * 六维：2/3/2/2/2/3，中位数半档向下取整，L2。
  * 标准路径：a-impact → a-timeraudit → a-backendlog；替代顺序：a-impact → a-backendlog → a-timeraudit。
  * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */

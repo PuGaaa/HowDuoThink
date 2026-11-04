@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 学徒篇校准：区分发布空窗与持续断引用并验证精确URL。
  * 原型：静态发布、懒加载hash与资源可达性；教学重建，不冒充原始事故日志。
- * 六维：2/2/2/2/2/2，中位数半档向下取整，L2。
+ * 六维：2/2/2/2/2/3，中位数半档向下取整，L2。
  * 标准路径：a-impact → a-deploylog → a-assetname → a-edgecheck；替代顺序：a-impact → a-edgecheck → a-deploylog → a-assetname。
  * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */

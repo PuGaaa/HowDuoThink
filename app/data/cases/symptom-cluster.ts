@@ -3,7 +3,7 @@ import { DiagnosisCase } from '../../types/case'
 /**
  * 学徒篇校准：用共享输入与对照验证多症状归一。
  * 原型：配置缺失与JDK字符串消费机制；教学重建，不冒充原始事故日志。
- * 六维：2/2/2/2/2/1，中位数半档向下取整，L2。
+ * 六维：2/2/2/2/3/2，中位数半档向下取整，L2。
  * 标准路径：a-impact → a-originstamp → a-cointoss；替代顺序：a-impact → a-cointoss → a-originstamp。
  * 技术依据与编审见 content/baselines/t04b-apprentice-calibration.md。
  */
