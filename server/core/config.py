@@ -35,8 +35,8 @@ DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.deepseek.com")
 AI_CHAT_MODEL = os.environ.get("AI_CHAT_MODEL", "deepseek-chat")
 
-# 数据库：sqlite（默认，零部署）/ mysql（生产多用户，配 MYSQL_* 五项）
-DB_PROVIDER = os.environ.get("DB_PROVIDER", "mysql")
+# 数据库：所有环境统一 MySQL 8，MYSQL_* 仅配置连接与容量。
+DB_PROVIDER = "mysql"
 MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
 MYSQL_PORT = int(os.environ.get("MYSQL_PORT", "3306"))
 MYSQL_USER = os.environ.get("MYSQL_USER", "hdt")

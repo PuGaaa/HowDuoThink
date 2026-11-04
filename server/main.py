@@ -69,22 +69,15 @@ def create_app() -> FastAPI:
     if sms_core.PROVIDER == "dev" and env not in ("", "dev"):
         raise RuntimeError(f"SMS_PROVIDER=dev 回显通道禁止用于 ENV={env} 环境")
 
-    # ③ MySQL 连通（仅 DB_PROVIDER=mysql）：连不上当场拒绝，不带病进入服务
-    if config.DB_PROVIDER == "mysql":
-        # db 的引擎选择在 import 时固化（coredb._provider），探测必须按当前 config 现场拨号：
-        # 不一致时（仅运行期/测试切配置）临时对齐，探完即还原
-        saved_provider = coredb._provider
-        coredb._provider = "mysql"
+    # ③ MySQL 连通：连不上当场拒绝，不带病进入服务
+    try:
+        conn = coredb.connect()
         try:
-            conn = coredb.connect()
-            try:
-                conn.execute("SELECT 1")
-            finally:
-                conn.close()
-        except Exception as e:
-            raise RuntimeError("MySQL 连不通：检查 MYSQL_* 配置与服务状态") from e
+            conn.execute("SELECT 1")
         finally:
-            coredb._provider = saved_provider
+            conn.close()
+    except Exception as e:
+        raise RuntimeError("MySQL 连不通：检查 MYSQL_* 配置与服务状态") from e
 
     # ④ boot-migrate 到 head 后断言 schema 版本一致：防"入口没跑迁移就服务"的旁路
     migrate.upgrade_head()

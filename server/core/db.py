@@ -1,6 +1,6 @@
-"""数据库访问层：双引擎（只做连接与查询，建库建表归 Alembic）。
+"""数据库访问层：MySQL 8（只做连接与查询，建库建表归 Alembic）。
 
-默认 SQLite（WAL，零部署，dev/测试/单机）；DB_PROVIDER=mysql 时切 MySQL 8（生产多用户）。
+开发、测试与生产均连接 MySQL 8，只允许连接配置和容量不同。
 feature 层 SQL 一律用 SQLite 方言书写（? 占位、datetime('now')、ON CONFLICT ... DO UPDATE SET
 col=excluded.col），MySQL 引擎在执行前统一翻译——方言规则集中在本文件，features 不感知。
 表结构由 server/alembic/ 基线迁移定义，入口统一 core.migrate.upgrade_head()（boot-migrate）。
@@ -16,17 +16,16 @@ col=excluded.col），MySQL 引擎在执行前统一翻译——方言规则集�
 import datetime
 import json
 import re
-import sqlite3
 from contextlib import contextmanager
 from functools import lru_cache
-from pathlib import Path
 from typing import Iterator
 
+import pymysql
+import pymysql.cursors
+from sqlalchemy.dialects.mysql.pymysql import MySQLDialect_pymysql
+from sqlalchemy.pool import QueuePool
+
 import core.config as config
-
-DB_PATH = Path(__file__).parent.parent / "data.db"
-
-_provider = config.DB_PROVIDER
 
 
 def _translate(sql: str) -> str:
@@ -90,107 +89,100 @@ def _mysql_connect_kwargs() -> dict:
     )
 
 
-if _provider == "mysql":
-    import pymysql
-    import pymysql.cursors
-    from sqlalchemy.dialects.mysql.pymysql import MySQLDialect_pymysql
-    from sqlalchemy.pool import QueuePool
 
-    def _mysql_conn():
-        return pymysql.connect(cursorclass=pymysql.cursors.DictCursor, **_mysql_connect_kwargs())
 
-    @lru_cache(maxsize=1)
-    def _mysql_pool(connection_settings: tuple, size: int, overflow: int, timeout: float) -> QueuePool:
-        """每个进程惰性建池；配置键防止测试/启动切库复用另一配置的连接。
+def _mysql_conn():
+    return pymysql.connect(cursorclass=pymysql.cursors.DictCursor, **_mysql_connect_kwargs())
 
-        close 归还连接并回滚未提交事务；checkout 检查闲置断连。
-        同时占用上限=size+overflow，耗尽时最多等待 timeout 秒。
-        """
-        return QueuePool(
-            _mysql_conn,
-            pool_size=size,
-            max_overflow=overflow,
-            timeout=timeout,
-            pre_ping=True,
-            dialect=MySQLDialect_pymysql(dbapi=pymysql),
-        )
 
-    def _stringify_row(row: dict) -> dict:
-        """DATETIME → 与 SQLite 同形的字符串（"YYYY-MM-DD HH:MM:SS"），
-        保证两引擎对上层暴露的行结构一致（auth 限频按字符串做时间差）。"""
-        for k, v in row.items():
-            if isinstance(v, datetime.datetime):
-                row[k] = v.strftime("%Y-%m-%d %H:%M:%S")
-            elif isinstance(v, datetime.date):
-                row[k] = v.isoformat()
-        return row
+@lru_cache(maxsize=1)
+def _mysql_pool(connection_settings: tuple, size: int, overflow: int, timeout: float) -> QueuePool:
+    """每个进程惰性建池；配置键防止测试/启动切库复用另一配置的连接。
 
-    class _MySqlCursor:
-        def __init__(self, cur):
-            self._cur = cur
+    close 归还连接并回滚未提交事务；checkout 检查闲置断连。
+    同时占用上限=size+overflow，耗尽时最多等待 timeout 秒。
+    """
+    return QueuePool(
+        _mysql_conn,
+        pool_size=size,
+        max_overflow=overflow,
+        timeout=timeout,
+        pre_ping=True,
+        dialect=MySQLDialect_pymysql(dbapi=pymysql),
+    )
 
-        def execute(self, sql: str, params: tuple = ()):
-            # pymysql 对非 None 参数做 % 格式化插值：SQL 文本含字面 %（如 LIKE 'x-%'）
-            # 且无参执行时会被误当格式符——空参传 None 跳过插值（DB-API 语义；sqlite 分支无此问题）
-            self._cur.execute(_translate(sql), params or None)
-            return self
 
-        def fetchall(self) -> list[dict]:
-            return [_stringify_row(dict(r)) for r in (self._cur.fetchall() or [])]
+def _stringify_row(row: dict) -> dict:
+    """DATETIME → 与 SQLite 同形的字符串（"YYYY-MM-DD HH:MM:SS"），
+    保证两引擎对上层暴露的行结构一致（auth 限频按字符串做时间差）。"""
+    for k, v in row.items():
+        if isinstance(v, datetime.datetime):
+            row[k] = v.strftime("%Y-%m-%d %H:%M:%S")
+        elif isinstance(v, datetime.date):
+            row[k] = v.isoformat()
+    return row
 
-        def fetchone(self):
-            row = self._cur.fetchone()
-            return _stringify_row(dict(row)) if row is not None else None
 
-        @property
-        def lastrowid(self):
-            return self._cur.lastrowid
+class _MySqlCursor:
+    def __init__(self, cur):
+        self._cur = cur
 
-        @property
-        def rowcount(self):
-            return self._cur.rowcount
+    def execute(self, sql: str, params: tuple = ()):
+        # pymysql 对非 None 参数做 % 格式化插值：SQL 文本含字面 %（如 LIKE 'x-%'）
+        # 且无参执行时会被误当格式符——空参传 None 跳过插值（DB-API 语义；sqlite 分支无此问题）
+        self._cur.execute(_translate(sql), params or None)
+        return self
 
-    class _MySqlConn:
-        def __init__(self, conn):
-            self._conn = conn
+    def fetchall(self) -> list[dict]:
+        return [_stringify_row(dict(r)) for r in (self._cur.fetchall() or [])]
 
-        def cursor(self):
-            return _MySqlCursor(self._conn.cursor())
+    def fetchone(self):
+        row = self._cur.fetchone()
+        return _stringify_row(dict(row)) if row is not None else None
 
-        def execute(self, sql: str, params: tuple = ()):
-            cur = self.cursor()
-            cur.execute(_translate(sql), params or None)
-            return cur
+    @property
+    def lastrowid(self):
+        return self._cur.lastrowid
 
-        def commit(self):
-            self._conn.commit()
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
 
-        def rollback(self):
-            self._conn.rollback()
 
-        def close(self):
-            self._conn.close()
+class _MySqlConn:
+    def __init__(self, conn):
+        self._conn = conn
 
-        def begin(self):
-            self._conn.begin()
+    def cursor(self):
+        return _MySqlCursor(self._conn.cursor())
+
+    def execute(self, sql: str, params: tuple = ()):
+        cur = self.cursor()
+        cur.execute(_translate(sql), params or None)
+        return cur
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
+    def begin(self):
+        self._conn.begin()
 
 
 def connect():
-    """当前引擎的连接：SQLite（Row 行工厂 + WAL）/ MySQL（Dict 行 + DATETIME 字符串化）。"""
-    if _provider == "mysql":
-        pool = _mysql_pool(
-            tuple(_mysql_connect_kwargs().items()),
-            config.MYSQL_POOL_SIZE,
-            config.MYSQL_POOL_MAX_OVERFLOW,
-            config.MYSQL_POOL_TIMEOUT,
-        )
-        return _MySqlConn(pool.connect())
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+    """MySQL 连接池连接；配置变化使用独立池。"""
+    pool = _mysql_pool(
+        tuple(_mysql_connect_kwargs().items()),
+        config.MYSQL_POOL_SIZE,
+        config.MYSQL_POOL_MAX_OVERFLOW,
+        config.MYSQL_POOL_TIMEOUT,
+    )
+    return _MySqlConn(pool.connect())
 
 
 def q(sql: str, params: tuple = ()) -> list:
@@ -218,10 +210,7 @@ def tx() -> Iterator:
     块内请用 conn.execute 而不是 q/ex（它们各自开连接，看不到未提交数据）。"""
     conn = connect()
     try:
-        if _provider == "mysql":
-            conn.begin()
-        else:
-            conn.execute("BEGIN IMMEDIATE")
+        conn.begin()
         yield conn
         conn.commit()
     except Exception:
