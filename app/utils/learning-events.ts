@@ -7,6 +7,7 @@ export interface LearningEventRecord {
   sessionId: string
   caseId: string
   source: string
+  contentRevision: number
   anonymousId: string
   occurredAt: string
 }
@@ -27,11 +28,11 @@ export function isLearningTestMode(): boolean {
   return uni.getStorageSync(KEY_TEST_MODE) === '1'
 }
 
-export function trackLearningEvent(kind: string, sessionId: string, caseId: string, source: string): void {
+export function trackLearningEvent(kind: string, sessionId: string, caseId: string, source: string, contentRevision: number = 0): void {
   if (isLearningTestMode()) return
   const raw = uni.getStorageSync(KEY_EVENTS)
   const events: LearningEventRecord[] = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as LearningEventRecord[]
-  events.push({ kind: kind, sessionId: sessionId, caseId: caseId, source: source, anonymousId: getLearningAnonymousId(), occurredAt: new Date().toISOString() })
+  events.push({ kind: kind, sessionId: sessionId, caseId: caseId, source: source, contentRevision: contentRevision, anonymousId: getLearningAnonymousId(), occurredAt: new Date().toISOString() })
   uni.setStorageSync(KEY_EVENTS, JSON.stringify(events))
 }
 
