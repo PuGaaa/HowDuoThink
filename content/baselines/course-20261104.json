@@ -1,0 +1,1170 @@
+{
+  "schemaVersion": 1,
+  "frozenAt": "2026-11-04",
+  "sourceCommit": "6523490",
+  "hashRule": "sha256(canonical full original TS case object)",
+  "chapters": [
+    {
+      "id": "error-reading",
+      "part": "apprentice",
+      "requiredCaseIds": [
+        "first-npe",
+        "caused-by",
+        "log-correlation",
+        "async-swallow",
+        "symptom-cluster",
+        "first-domino"
+      ],
+      "challengeCaseId": "first-npe"
+    },
+    {
+      "id": "access",
+      "part": "apprentice",
+      "requiredCaseIds": [
+        "dns-hijack",
+        "ssl-chain-missing",
+        "cors-101",
+        "nginx-trap",
+        "gateway-review",
+        "ws-upgrade",
+        "cert-sni",
+        "canary-decision"
+      ],
+      "challengeCaseId": "dns-hijack"
+    },
+    {
+      "id": "build",
+      "part": "apprentice",
+      "requiredCaseIds": [
+        "white-screen",
+        "dep-hell",
+        "ci-cache-pollution",
+        "image-tag-drift",
+        "buildtime-inject",
+        "chunk-overlap",
+        "pipeline-review"
+      ],
+      "challengeCaseId": "white-screen"
+    },
+    {
+      "id": "integration",
+      "part": "apprentice",
+      "requiredCaseIds": [
+        "field-mismatch",
+        "cookie-lost",
+        "waterfall-read",
+        "poll-storm",
+        "mock-canyon",
+        "tri-platform"
+      ],
+      "challengeCaseId": "field-mismatch"
+    },
+    {
+      "id": "contract",
+      "part": "engineer",
+      "requiredCaseIds": [
+        "required-field",
+        "doc-drift",
+        "timeout-contract",
+        "enum-drift",
+        "error-contract",
+        "contract-review"
+      ],
+      "challengeCaseId": "required-field"
+    },
+    {
+      "id": "data",
+      "part": "engineer",
+      "requiredCaseIds": [
+        "pool-exhausted",
+        "cache-drift",
+        "slow-query",
+        "cache-review",
+        "midnight-rollback",
+        "double-strike",
+        "data-script-accident",
+        "replica-lag",
+        "implicit-cast",
+        "deep-pagination"
+      ],
+      "challengeCaseId": "pool-exhausted"
+    },
+    {
+      "id": "config-boot",
+      "part": "engineer",
+      "requiredCaseIds": [
+        "config-typo",
+        "boot-order",
+        "hot-reload-gap",
+        "priority-clash",
+        "profile-maze",
+        "boot-storm"
+      ],
+      "challengeCaseId": "config-typo"
+    },
+    {
+      "id": "runtime",
+      "part": "engineer",
+      "requiredCaseIds": [
+        "oom-leak",
+        "event-loop-blocked",
+        "closure-leak",
+        "timewait-exhausted",
+        "container-review",
+        "cascade-timeout",
+        "regex-catastrophe"
+      ],
+      "challengeCaseId": "oom-leak"
+    },
+    {
+      "id": "concurrency",
+      "part": "master",
+      "requiredCaseIds": [
+        "oversell-race",
+        "idempotent-fail",
+        "msg-order",
+        "false-lead",
+        "pool-deadlock",
+        "lock-expiry",
+        "threadlocal-leak",
+        "pool-rejection",
+        "callback-mismatch"
+      ],
+      "challengeCaseId": "oversell-race"
+    },
+    {
+      "id": "observability",
+      "part": "master",
+      "requiredCaseIds": [
+        "log-sampling",
+        "avg-metric",
+        "alert-storm",
+        "histogram-bucket",
+        "metrics-review",
+        "error-budget",
+        "cardinality-blast",
+        "trace-break"
+      ],
+      "challengeCaseId": "log-sampling"
+    },
+    {
+      "id": "security",
+      "part": "master",
+      "requiredCaseIds": [
+        "leaked-keys",
+        "idor-orders",
+        "log-pii",
+        "ssrf-internal",
+        "withdraw-race",
+        "supply-poison",
+        "xss-decision",
+        "sqli-sort"
+      ],
+      "challengeCaseId": "leaked-keys"
+    },
+    {
+      "id": "evolution",
+      "part": "master",
+      "requiredCaseIds": [
+        "rate-limit-passthrough",
+        "fallback-drill-fail",
+        "retry-storm",
+        "hpa-lag",
+        "distributed-monolith",
+        "api-sunset",
+        "capacity-review",
+        "rule-sprawl"
+      ],
+      "challengeCaseId": "rate-limit-passthrough"
+    },
+    {
+      "id": "messaging",
+      "part": "master",
+      "requiredCaseIds": [
+        "mq-lost",
+        "mq-duplicate",
+        "mq-dlq",
+        "mq-delay",
+        "mq-slowpart",
+        "partition-split",
+        "mq-bus-review",
+        "rebalance-storm",
+        "replay-surge",
+        "mq-disk",
+        "mq-dualwrite"
+      ],
+      "challengeCaseId": "mq-lost"
+    },
+    {
+      "id": "deployment",
+      "part": "master",
+      "requiredCaseIds": [
+        "bg-split",
+        "flag-leak",
+        "mixversion",
+        "cdn-stale",
+        "deploy-migration",
+        "rollback-drift",
+        "graceful-shutdown",
+        "warmup-storm",
+        "config-drift",
+        "probe-mismatch",
+        "wrong-env"
+      ],
+      "challengeCaseId": "bg-split"
+    },
+    {
+      "id": "network",
+      "part": "master",
+      "requiredCaseIds": [
+        "tcp-retrans",
+        "h2-hol",
+        "cdn-penetration",
+        "proxy-headers",
+        "idle-reset",
+        "nagle-ack",
+        "happy-eyeballs",
+        "bandwidth-hog",
+        "ndots-trap",
+        "mtu-blackhole",
+        "geo-stale"
+      ],
+      "challengeCaseId": "tcp-retrans"
+    },
+    {
+      "id": "testing",
+      "part": "master",
+      "requiredCaseIds": [
+        "coverage-illusion",
+        "mock-leak",
+        "flaky-test",
+        "env-drift",
+        "loadtest-illusion",
+        "testing-review",
+        "env-contention",
+        "env-inherit",
+        "capacity-assumption"
+      ],
+      "challengeCaseId": "coverage-illusion"
+    }
+  ],
+  "cases": [
+    {
+      "id": "ssl-chain-missing",
+      "chapterId": "access",
+      "part": "apprentice",
+      "order": 2,
+      "contentHash": "8e27f602a7e1a012a125aadc18aebfb9b16f2957fb9011e9a8317b2c1e9b00cb"
+    },
+    {
+      "id": "dns-hijack",
+      "chapterId": "access",
+      "part": "apprentice",
+      "order": 1,
+      "contentHash": "3a293484b984c6cb94e3816a0defdce89f07801b848ebd050d152e117c4d5ab4"
+    },
+    {
+      "id": "cors-101",
+      "chapterId": "access",
+      "part": "apprentice",
+      "order": 3,
+      "contentHash": "1f2d0b3f31a9a7b5cd899721a0da5683cfe54644de47d24d10e2f86ead928c6e"
+    },
+    {
+      "id": "pool-exhausted",
+      "chapterId": "data",
+      "part": "engineer",
+      "order": 1,
+      "contentHash": "8783232dccb1df4de066e1e19cdb33680753e3f2835f5d937ffc93d6daaddbae"
+    },
+    {
+      "id": "cache-drift",
+      "chapterId": "data",
+      "part": "engineer",
+      "order": 2,
+      "contentHash": "d0dd191d7fff5ac457e5605bcefd27d8561aa1076b003f849585cd42f497ecac"
+    },
+    {
+      "id": "slow-query",
+      "chapterId": "data",
+      "part": "engineer",
+      "order": 3,
+      "contentHash": "22080772f80a53007c21303e25d50f0d3392b833409d9df8bd3ec68b862f1dcc"
+    },
+    {
+      "id": "oom-leak",
+      "chapterId": "runtime",
+      "part": "engineer",
+      "order": 1,
+      "contentHash": "73eb88823954ffa9a800493ce6e585fb3b75a8e0573fda35762f807676e4d0c5"
+    },
+    {
+      "id": "msg-order",
+      "chapterId": "concurrency",
+      "part": "master",
+      "order": 3,
+      "contentHash": "4c370de9011986a800afa4a0b54f5104c7bf7e3908ba61ecab59b487ba74f029"
+    },
+    {
+      "id": "nginx-trap",
+      "chapterId": "access",
+      "part": "apprentice",
+      "order": 4,
+      "contentHash": "97776716d5b91687bcdf591d9afe2468bf235c6e76aa05767ad2c548e7cd9cb9"
+    },
+    {
+      "id": "cache-review",
+      "chapterId": "data",
+      "part": "engineer",
+      "order": 4,
+      "contentHash": "90901d9cfcd4699bc0c1a232184d15a6e8f0555434317e80f573b4373ff7dca4"
+    },
+    {
+      "id": "event-loop-blocked",
+      "chapterId": "runtime",
+      "part": "engineer",
+      "order": 2,
+      "contentHash": "2c0f469256b09fa90104365b9f747db922ef3bd710963dce73fd5caaa300221b"
+    },
+    {
+      "id": "timewait-exhausted",
+      "chapterId": "runtime",
+      "part": "engineer",
+      "order": 4,
+      "contentHash": "c467e75169a6ef9cbd280c228054cd806f6f23b747bf60a31cc6950488af2a4a"
+    },
+    {
+      "id": "closure-leak",
+      "chapterId": "runtime",
+      "part": "engineer",
+      "order": 3,
+      "contentHash": "2512c2c367097c2d5b705960b3ba1772dc447353079f8c7ba0cf93906de5b67a"
+    },
+    {
+      "id": "ci-cache-pollution",
+      "chapterId": "build",
+      "part": "apprentice",
+      "order": 3,
+      "contentHash": "4695a5aea8d5d145c7c733a41217bd0571101bae9a23e8600f7640eb3e9e39af"
+    },
+    {
+      "id": "alert-storm",
+      "chapterId": "observability",
+      "part": "master",
+      "order": 3,
+      "contentHash": "52bb51b53cf9fd1eb1923c830854e8173dd5d1a3ad2bcb14e9aa4f3b33d99729"
+    },
+    {
+      "id": "histogram-bucket",
+      "chapterId": "observability",
+      "part": "master",
+      "order": 4,
+      "contentHash": "5696a0b7d5f0152b84fdc210c0671333d68467692d13e7a0055ec93b54eb0ae4"
+    },
+    {
+      "id": "leaked-keys",
+      "chapterId": "security",
+      "part": "master",
+      "order": 1,
+      "contentHash": "80164cb012ace82586ea028917d2d75dd2f84b3ce971c9d6ecc7be85d459f934"
+    },
+    {
+      "id": "idor-orders",
+      "chapterId": "security",
+      "part": "master",
+      "order": 2,
+      "contentHash": "993b2e37fd73409efb3f5ab3454f8751a293f48e3f188a56fbf389c7ec5321dd"
+    },
+    {
+      "id": "log-pii",
+      "chapterId": "security",
+      "part": "master",
+      "order": 3,
+      "contentHash": "aa2f162f2052363fa8ea329941659bf1d7a7dddb6fea7a428bfdf1b6b23a51b6"
+    },
+    {
+      "id": "ssrf-internal",
+      "chapterId": "security",
+      "part": "master",
+      "order": 4,
+      "contentHash": "4b2edd9cbec31179b5f9146e58403a3195d116a0ac2ba5b725e7bf80f940d956"
+    },
+    {
+      "id": "withdraw-race",
+      "chapterId": "security",
+      "part": "master",
+      "order": 5,
+      "contentHash": "ace894d04de38688c3ad923749490c5cd5eacc2836691fa5d43ba34d806fa1a1"
+    },
+    {
+      "id": "supply-poison",
+      "chapterId": "security",
+      "part": "master",
+      "order": 6,
+      "contentHash": "d5957a4210208fdda71f857813e8905e2423165a4ad8892039911ba3d34c6516"
+    },
+    {
+      "id": "gateway-review",
+      "chapterId": "access",
+      "part": "apprentice",
+      "order": 5,
+      "contentHash": "572f46b6c630e0087f2ee8ba37b15de7c90d229be9f431b443d4748ffb1676e8"
+    },
+    {
+      "id": "pipeline-review",
+      "chapterId": "build",
+      "part": "apprentice",
+      "order": 8,
+      "contentHash": "e14adac307443fdc695e42b17cb2c6818526c934941cfb0e417ac5ddb16f6e94"
+    },
+    {
+      "id": "container-review",
+      "chapterId": "runtime",
+      "part": "engineer",
+      "order": 5,
+      "contentHash": "de38c62f5e72f8b91a11303736a06bce49c0a49f15129b2f6c22a6bfda2ccb77"
+    },
+    {
+      "id": "metrics-review",
+      "chapterId": "observability",
+      "part": "master",
+      "order": 5,
+      "contentHash": "68000a07d2f2be436c02dedfddf525d1814668cd9d8f725d3f5eaaa5ff5ff9eb"
+    },
+    {
+      "id": "midnight-rollback",
+      "chapterId": "data",
+      "part": "engineer",
+      "order": 5,
+      "contentHash": "b8539682e3d547a6b9214f126c046e28e07e6dca7bc484cba8c7e41185495164"
+    },
+    {
+      "id": "canary-decision",
+      "chapterId": "access",
+      "part": "apprentice",
+      "order": 8,
+      "contentHash": "f40a2ace917c45f05a4fe127d7b5e5f9adeef64ff1a0eb72e10daf96ae3dbcbd"
+    },
+    {
+      "id": "xss-decision",
+      "chapterId": "security",
+      "part": "master",
+      "order": 7,
+      "contentHash": "b19cdf3144993e4ddb65174e84090b5cb54b278df5a9d8bb76695eca7786807a"
+    },
+    {
+      "id": "error-budget",
+      "chapterId": "observability",
+      "part": "master",
+      "order": 6,
+      "contentHash": "4c4c605324699b3168c4040eaf0c5d0ab9a861bc98a7cd29c3b2a208f9e0a186"
+    },
+    {
+      "id": "double-strike",
+      "chapterId": "data",
+      "part": "engineer",
+      "order": 6,
+      "contentHash": "0eb69cb5a4303dbe1faaeb33cce8e7ba660939f316ba0b6bf330af68f01fbfa9"
+    },
+    {
+      "id": "false-lead",
+      "chapterId": "concurrency",
+      "part": "master",
+      "order": 4,
+      "contentHash": "740fd9d4c096409788b0d4b4c42cfbc1a4eedb3c6aa6be1c085c54ffc209906a"
+    },
+    {
+      "id": "cascade-timeout",
+      "chapterId": "runtime",
+      "part": "engineer",
+      "order": 6,
+      "contentHash": "d2754d34f5f7344df0fd37a0c25ca240a212e36e613ec7e7753da93f0ac80db3"
+    },
+    {
+      "id": "data-script-accident",
+      "chapterId": "data",
+      "part": "engineer",
+      "order": 7,
+      "contentHash": "f44868562fd385b505d0e9902cd19f9cf2a3662005d970f1b9b09f0b351a4a57"
+    },
+    {
+      "id": "rate-limit-passthrough",
+      "chapterId": "evolution",
+      "part": "master",
+      "order": 1,
+      "contentHash": "f066e4caf8ed41f17df44efebf522ea437169ae6f06d7d47744dca09a6a11c48"
+    },
+    {
+      "id": "fallback-drill-fail",
+      "chapterId": "evolution",
+      "part": "master",
+      "order": 2,
+      "contentHash": "feafb0999639ba458b5405ec8dae3452c935f9c2104de0b0140552381d0df69d"
+    },
+    {
+      "id": "retry-storm",
+      "chapterId": "evolution",
+      "part": "master",
+      "order": 3,
+      "contentHash": "87e4cc7e798242f06906fcc658f77a02a95c939260b756b1fff6046549a539a9"
+    },
+    {
+      "id": "hpa-lag",
+      "chapterId": "evolution",
+      "part": "master",
+      "order": 4,
+      "contentHash": "6ea8b3483f565873ef39b32db82d76f2dccdf224a2d55644b8864149ff43ec48"
+    },
+    {
+      "id": "white-screen",
+      "chapterId": "build",
+      "part": "apprentice",
+      "order": 1,
+      "contentHash": "98f7ac80170fc243ac593a930c9b376a44e4db1c0d5b58ef03196720e7835109"
+    },
+    {
+      "id": "dep-hell",
+      "chapterId": "build",
+      "part": "apprentice",
+      "order": 2,
+      "contentHash": "b27e16f12c58850209dbf266b4cdd511a352eb1f1c6f1452865e02178cc12332"
+    },
+    {
+      "id": "oversell-race",
+      "chapterId": "concurrency",
+      "part": "master",
+      "order": 1,
+      "contentHash": "38e1587e5f1ecb3747a39ab08a7dea3dade5bd64b54b41ecffab1e280843a3cc"
+    },
+    {
+      "id": "idempotent-fail",
+      "chapterId": "concurrency",
+      "part": "master",
+      "order": 2,
+      "contentHash": "874719bfeb9a00c19da488b9dd12d402d21b90b87230c6e1761936c156099fbc"
+    },
+    {
+      "id": "log-sampling",
+      "chapterId": "observability",
+      "part": "master",
+      "order": 1,
+      "contentHash": "bdf09f1d6851f87e948df187398c881f186d74d579c2dc02f68b84e4c76ce728"
+    },
+    {
+      "id": "avg-metric",
+      "chapterId": "observability",
+      "part": "master",
+      "order": 2,
+      "contentHash": "23c94b2afee4381474436935fcb9455fc41d7cc3e5299acd110ffe1d0da722f6"
+    },
+    {
+      "id": "mq-lost",
+      "chapterId": "messaging",
+      "part": "master",
+      "order": 1,
+      "contentHash": "c60d0f53804184c064807d0d8949a9969d55331e013d351385e0497334d70ce9"
+    },
+    {
+      "id": "mq-duplicate",
+      "chapterId": "messaging",
+      "part": "master",
+      "order": 2,
+      "contentHash": "563547a59e6690b023502a1da39fde3ea30be2de554ab8d76e4d1ef5e421bea1"
+    },
+    {
+      "id": "mq-dlq",
+      "chapterId": "messaging",
+      "part": "master",
+      "order": 3,
+      "contentHash": "4182d49d083fd29f5c4e6def348d5317b138c685fbeda4926b77d6fe13ba7b69"
+    },
+    {
+      "id": "mq-delay",
+      "chapterId": "messaging",
+      "part": "master",
+      "order": 4,
+      "contentHash": "67ffdce0e6645fd0fc583eeb6b9200ba23216e93bc3a5f86a019a1ddee767c56"
+    },
+    {
+      "id": "bg-split",
+      "chapterId": "deployment",
+      "part": "master",
+      "order": 1,
+      "contentHash": "48c21a16a561f6ba104df6efb83f39d54f5d9edc9b3bbe64e3fce428f8b924fd"
+    },
+    {
+      "id": "flag-leak",
+      "chapterId": "deployment",
+      "part": "master",
+      "order": 2,
+      "contentHash": "8ff59f03ba5013cc9aeed41fb22bd650fb91cc3a2f1a048df212aec4a82bcf03"
+    },
+    {
+      "id": "mixversion",
+      "chapterId": "deployment",
+      "part": "master",
+      "order": 3,
+      "contentHash": "7885c0aa6f1cd8006c38f26dd9873ee7856fba771c8a8a3c4a578aaff1496351"
+    },
+    {
+      "id": "cdn-stale",
+      "chapterId": "deployment",
+      "part": "master",
+      "order": 4,
+      "contentHash": "91d7232578b19d3c13dfb94ea80ac328ed3e12dfdbd5fabb954d60460d629f8d"
+    },
+    {
+      "id": "tcp-retrans",
+      "chapterId": "network",
+      "part": "master",
+      "order": 1,
+      "contentHash": "e99f3b6fff9a2dcd57aeae171a0b6da5631791651d2a1dee588d3c56964c820f"
+    },
+    {
+      "id": "h2-hol",
+      "chapterId": "network",
+      "part": "master",
+      "order": 2,
+      "contentHash": "1af21b4131218dc7aa889ae1b7e3d392f312192439e5ca47bcf1d5e4526cb6f2"
+    },
+    {
+      "id": "cdn-penetration",
+      "chapterId": "network",
+      "part": "master",
+      "order": 3,
+      "contentHash": "024b03d48e99f6242f4f403179d593d3b284040700406449e701acdd87278811"
+    },
+    {
+      "id": "proxy-headers",
+      "chapterId": "network",
+      "part": "master",
+      "order": 4,
+      "contentHash": "ae8413bfdfbde7a26b11ff489eb0ceecd90e0a2dfd0a6827921bf098977d20d3"
+    },
+    {
+      "id": "coverage-illusion",
+      "chapterId": "testing",
+      "part": "master",
+      "order": 1,
+      "contentHash": "489fc3ecae439ed63dedb46f98a4a1d092b10b37135cfe8d16beb82fa4a4d422"
+    },
+    {
+      "id": "mock-leak",
+      "chapterId": "testing",
+      "part": "master",
+      "order": 2,
+      "contentHash": "361ea0798e16c090c51393247650200d3a5ffadce44de97717eed6cd3a190aa0"
+    },
+    {
+      "id": "flaky-test",
+      "chapterId": "testing",
+      "part": "master",
+      "order": 3,
+      "contentHash": "82cc816c41a4572d65a9188d88cc9efb9fa39177c756dd5dbf2c21ffb0877445"
+    },
+    {
+      "id": "env-drift",
+      "chapterId": "testing",
+      "part": "master",
+      "order": 4,
+      "contentHash": "66049ffec67904b1e392de032a71798b8f3041d2668953c73627ef3bedb64111"
+    },
+    {
+      "id": "mq-slowpart",
+      "chapterId": "messaging",
+      "part": "master",
+      "order": 5,
+      "contentHash": "5a9d134824c25fe008afe65b62b4fc02ccd4259da20fcb420c71b7d4f6644b82"
+    },
+    {
+      "id": "deploy-migration",
+      "chapterId": "deployment",
+      "part": "master",
+      "order": 5,
+      "contentHash": "ce6fa3c1d2a762726ae7a0921e3c549e3646a903a3d4702452812df6878fa3af"
+    },
+    {
+      "id": "pool-deadlock",
+      "chapterId": "concurrency",
+      "part": "master",
+      "order": 5,
+      "contentHash": "3f04283e1f030e82afe2dab20e58c09cfa965dd639d156bd08d1e5c9b92e5407"
+    },
+    {
+      "id": "lock-expiry",
+      "chapterId": "concurrency",
+      "part": "master",
+      "order": 6,
+      "contentHash": "c4ed5165783eef0f510c65cea1c1c14b4cbfcc305316dd55f7699f61718cda97"
+    },
+    {
+      "id": "idle-reset",
+      "chapterId": "network",
+      "part": "master",
+      "order": 5,
+      "contentHash": "a80fe120a19321ed2a0890320f4b916fa6277077b15c6857a66173349ebe7630"
+    },
+    {
+      "id": "mq-bus-review",
+      "chapterId": "messaging",
+      "part": "master",
+      "order": 6,
+      "contentHash": "885dc73b4758dc47f930d269694d17617682915b3dce443d2776ba66ea38f5a6"
+    },
+    {
+      "id": "threadlocal-leak",
+      "chapterId": "concurrency",
+      "part": "master",
+      "order": 7,
+      "contentHash": "49897aaf7e4dd2fddd1f78e647c155f606d24362b1ac3241e95a350b19309ef8"
+    },
+    {
+      "id": "image-tag-drift",
+      "chapterId": "build",
+      "part": "apprentice",
+      "order": 5,
+      "contentHash": "f37b704f5030c3487c6721e7a43afdf17f76e2740e3c906c2abb8c35cc0e6d21"
+    },
+    {
+      "id": "regex-catastrophe",
+      "chapterId": "runtime",
+      "part": "engineer",
+      "order": 7,
+      "contentHash": "feb837dadb8ddb33390e8fb71f03758c7195e9a3b5cf0d3005ce3a6dceab4f82"
+    },
+    {
+      "id": "cardinality-blast",
+      "chapterId": "observability",
+      "part": "master",
+      "order": 7,
+      "contentHash": "e7980680185fc44835e2d67e5054391c73305630225905c6d667aafc6ea388a9"
+    },
+    {
+      "id": "distributed-monolith",
+      "chapterId": "evolution",
+      "part": "master",
+      "order": 5,
+      "contentHash": "883bf7186a6135806b9266ab112aacf42f833cae9fc30d5e13f6f2112b5894ae"
+    },
+    {
+      "id": "loadtest-illusion",
+      "chapterId": "testing",
+      "part": "master",
+      "order": 5,
+      "contentHash": "3dd6af3139ed7fc02b732e06203e6b7117d6d621fbb10915200a33776b021ea8"
+    },
+    {
+      "id": "ws-upgrade",
+      "chapterId": "access",
+      "part": "apprentice",
+      "order": 6,
+      "contentHash": "d3d0e62ebfc5cc99be6d72e9eb0e940e4d638d0b5941780b42231089992aa9fb"
+    },
+    {
+      "id": "replica-lag",
+      "chapterId": "data",
+      "part": "engineer",
+      "order": 8,
+      "contentHash": "6f120e4185c7f83c51bb8e9620a917ad43e797d7adf94f5d86210c1738441cbc"
+    },
+    {
+      "id": "sqli-sort",
+      "chapterId": "security",
+      "part": "master",
+      "order": 8,
+      "contentHash": "fe20cb50bb40978d74c9c257d117e31b698446254d92eb69577f15c73d468325"
+    },
+    {
+      "id": "rebalance-storm",
+      "chapterId": "messaging",
+      "part": "master",
+      "order": 7,
+      "contentHash": "0f4fada6f748e05fb0b67ca6b17de09acbc507366e931bbd56a82624b8151e0f"
+    },
+    {
+      "id": "graceful-shutdown",
+      "chapterId": "deployment",
+      "part": "master",
+      "order": 6,
+      "contentHash": "91f13c53d42d4e016458e81add11291e6a052d8627398373ef3dc779e10cdaed"
+    },
+    {
+      "id": "nagle-ack",
+      "chapterId": "network",
+      "part": "master",
+      "order": 6,
+      "contentHash": "86abd774f44227e4bfcfbf89bf4623d79acfe4717ef60bd60f0818728392290d"
+    },
+    {
+      "id": "buildtime-inject",
+      "chapterId": "build",
+      "part": "apprentice",
+      "order": 6,
+      "contentHash": "fe1fe4b6cc99a717e56197eb00bf5121cbccf5dddb0e83f2fe029b8800aa81a9"
+    },
+    {
+      "id": "pool-rejection",
+      "chapterId": "concurrency",
+      "part": "master",
+      "order": 8,
+      "contentHash": "d0f6c687cfc4c02cdfa0d7b15150d86f43510f020712cbd41f72d2107a4d61a7"
+    },
+    {
+      "id": "trace-break",
+      "chapterId": "observability",
+      "part": "master",
+      "order": 8,
+      "contentHash": "4f7ff4710060a1e0ef1b9939e6dfe83a491dd9210b7fe463342b409256fcde74"
+    },
+    {
+      "id": "api-sunset",
+      "chapterId": "evolution",
+      "part": "master",
+      "order": 6,
+      "contentHash": "2dc15ea9e952afe3aca9c3a901683586c4acc920a83699fbc1c2445992d5855a"
+    },
+    {
+      "id": "implicit-cast",
+      "chapterId": "data",
+      "part": "engineer",
+      "order": 9,
+      "contentHash": "d72b993538ba92db1e904c443abe486309819339146c8b405819416e6bffc96c"
+    },
+    {
+      "id": "capacity-review",
+      "chapterId": "evolution",
+      "part": "master",
+      "order": 7,
+      "contentHash": "aed667a153399eda88054486d62d2e4d53f8b8df520e8a4993c9cba4d266b04d"
+    },
+    {
+      "id": "cert-sni",
+      "chapterId": "access",
+      "part": "apprentice",
+      "order": 7,
+      "contentHash": "b05c4c24d1e9c99b91fc547c298199b479c04329fd6b8397e8b21b4c327444be"
+    },
+    {
+      "id": "testing-review",
+      "chapterId": "testing",
+      "part": "master",
+      "order": 6,
+      "contentHash": "24cbf131177210348ded3a47ac8bc9453c7c266071905639b8ee93e093506183"
+    },
+    {
+      "id": "config-drift",
+      "chapterId": "deployment",
+      "part": "master",
+      "order": 7,
+      "contentHash": "87d55ea8d6dd593b74d100fd8f4ad2fc968f4f3ec746789f752cf3df32ee9735"
+    },
+    {
+      "id": "happy-eyeballs",
+      "chapterId": "network",
+      "part": "master",
+      "order": 7,
+      "contentHash": "d004458767145d18e70c582906ec268ad98e42fa4213bf8cb7b1866a06b1f1dc"
+    },
+    {
+      "id": "mq-disk",
+      "chapterId": "messaging",
+      "part": "master",
+      "order": 8,
+      "contentHash": "4ecee98163a00fbdbe872d2c49c9b4adfddcc3f0c421d7e632e9df9d00dd27f6"
+    },
+    {
+      "id": "chunk-overlap",
+      "chapterId": "build",
+      "part": "apprentice",
+      "order": 7,
+      "contentHash": "c7082eb340661feb718a9b029e363af4110ce52350d9545b60131ccc707bd063"
+    },
+    {
+      "id": "callback-mismatch",
+      "chapterId": "concurrency",
+      "part": "master",
+      "order": 9,
+      "contentHash": "605247bd45cef0213b211c9d5c69f70ccb378bc75d5ebe9808cb58c08a751077"
+    },
+    {
+      "id": "deep-pagination",
+      "chapterId": "data",
+      "part": "engineer",
+      "order": 10,
+      "contentHash": "18f0f9e4defe946052cd5ebde7bf0fff7ef08d5698fe17885ed079eb8a18e039"
+    },
+    {
+      "id": "rule-sprawl",
+      "chapterId": "evolution",
+      "part": "master",
+      "order": 8,
+      "contentHash": "122b999be5dad5343fe8e4b2bca7ec9ab2a65fa900b67a700f135d6ac1253d5d"
+    },
+    {
+      "id": "mq-dualwrite",
+      "chapterId": "messaging",
+      "part": "master",
+      "order": 9,
+      "contentHash": "913290e2b7eb0c6763a1c1e9ca42978fb2d5eabd95a8bd9573fcd9585d57a13d"
+    },
+    {
+      "id": "probe-mismatch",
+      "chapterId": "deployment",
+      "part": "master",
+      "order": 8,
+      "contentHash": "7436a89f73caac1cc827544a3e5d69b7a16023d4d5aeffcc76d9e0aa8c83115c"
+    },
+    {
+      "id": "wrong-env",
+      "chapterId": "deployment",
+      "part": "master",
+      "order": 9,
+      "contentHash": "93fb8805f112b68cdbe677db43eb5e06d40b99ab062aa1192c5bbe47d2c225ff"
+    },
+    {
+      "id": "bandwidth-hog",
+      "chapterId": "network",
+      "part": "master",
+      "order": 8,
+      "contentHash": "b719578099a0695852592e2d801d79d1792033e9caa66a8becce9380ec5130a1"
+    },
+    {
+      "id": "ndots-trap",
+      "chapterId": "network",
+      "part": "master",
+      "order": 9,
+      "contentHash": "5b48b0f4b4382f50f74a07b2845ec2466cb5f49f0ffcb10f8f7f68031092e144"
+    },
+    {
+      "id": "env-contention",
+      "chapterId": "testing",
+      "part": "master",
+      "order": 7,
+      "contentHash": "9b24614206ce43e500f3aeb002cee0a67deab1cc5b6a666a42ddc2e06d0dabcb"
+    },
+    {
+      "id": "first-npe",
+      "chapterId": "error-reading",
+      "part": "apprentice",
+      "order": 1,
+      "contentHash": "48dc54d5801f7ba190c7027066a6316486aab5c232ae07a4744d532b07050c9c"
+    },
+    {
+      "id": "caused-by",
+      "chapterId": "error-reading",
+      "part": "apprentice",
+      "order": 2,
+      "contentHash": "6cbd2a1ab1df1af4af87d2008a21812e494884b3828b6a7ffcf3e249ba09ec73"
+    },
+    {
+      "id": "field-mismatch",
+      "chapterId": "integration",
+      "part": "apprentice",
+      "order": 1,
+      "contentHash": "74e22a3459f7ca011526539fd4089760ba525d04ac166b678cbe1597b736280f"
+    },
+    {
+      "id": "cookie-lost",
+      "chapterId": "integration",
+      "part": "apprentice",
+      "order": 2,
+      "contentHash": "3507c20ceeaec26c6cdd7275852b30a57fd1911841ef663519bafc004f0ddbb6"
+    },
+    {
+      "id": "required-field",
+      "chapterId": "contract",
+      "part": "engineer",
+      "order": 1,
+      "contentHash": "ef98d3d39aa731c755912ee8c8962a91d4d2e66b9cdbd50025cb1d63b14e49ec"
+    },
+    {
+      "id": "doc-drift",
+      "chapterId": "contract",
+      "part": "engineer",
+      "order": 2,
+      "contentHash": "9f87178cf7a404ec565d184a315ff3e48fadd233a69341586c94f4a90b619428"
+    },
+    {
+      "id": "config-typo",
+      "chapterId": "config-boot",
+      "part": "engineer",
+      "order": 1,
+      "contentHash": "8f4f263b90250881d9a39860ee437307ae2c72f6a7a6c725f4e91913f03c4de8"
+    },
+    {
+      "id": "boot-order",
+      "chapterId": "config-boot",
+      "part": "engineer",
+      "order": 2,
+      "contentHash": "e6f4b71085ef8250fc0357eb2dc2b617b73646c5c2f6ce442f5fcb6a149ec7e4"
+    },
+    {
+      "id": "log-correlation",
+      "chapterId": "error-reading",
+      "part": "apprentice",
+      "order": 3,
+      "contentHash": "2635b1d13617414ca520b6fc6743f4fe9edeadd6c32173c97c3df2b6dee0b38b"
+    },
+    {
+      "id": "waterfall-read",
+      "chapterId": "integration",
+      "part": "apprentice",
+      "order": 3,
+      "contentHash": "562210f221d1d3098902b9cf9d01d4652a002fe07c927fa4a3fb51fafa31c8e6"
+    },
+    {
+      "id": "timeout-contract",
+      "chapterId": "contract",
+      "part": "engineer",
+      "order": 3,
+      "contentHash": "4c90c3255248aebda0b19c1e2e974d845a47164e4836b9b10ffd8d12ff2ab2a9"
+    },
+    {
+      "id": "hot-reload-gap",
+      "chapterId": "config-boot",
+      "part": "engineer",
+      "order": 3,
+      "contentHash": "760c5d9001a7e5e459e2132eeabfae44e2d3a91324dd5d6b6a2ea9820c4b54d2"
+    },
+    {
+      "id": "async-swallow",
+      "chapterId": "error-reading",
+      "part": "apprentice",
+      "order": 4,
+      "contentHash": "2c1a8e47c9bd7378912daa4303cda6818e4d41e1936074108609bfe215985ad8"
+    },
+    {
+      "id": "poll-storm",
+      "chapterId": "integration",
+      "part": "apprentice",
+      "order": 4,
+      "contentHash": "009d6935111670716220c48b5a61a0902ffda7b73891d46a562ca36028217166"
+    },
+    {
+      "id": "enum-drift",
+      "chapterId": "contract",
+      "part": "engineer",
+      "order": 4,
+      "contentHash": "4b78ca6e240be2009e92b87c2faa029b5700d404a8bb174fe7c41d778d43d904"
+    },
+    {
+      "id": "priority-clash",
+      "chapterId": "config-boot",
+      "part": "engineer",
+      "order": 4,
+      "contentHash": "e08fb1a4fc862342509d79e1c860c96524151f244184d9b5f4d3d953e4368c3a"
+    },
+    {
+      "id": "symptom-cluster",
+      "chapterId": "error-reading",
+      "part": "apprentice",
+      "order": 5,
+      "contentHash": "f994b20fedb32826caca7c2a3d0b163a6a403cb57ff9a7b6540cb1456ac298b0"
+    },
+    {
+      "id": "first-domino",
+      "chapterId": "error-reading",
+      "part": "apprentice",
+      "order": 6,
+      "contentHash": "232c1b1f684d186697b95d97caeb38b750f0da63a8a7b95cb8843098c6f2b175"
+    },
+    {
+      "id": "mock-canyon",
+      "chapterId": "integration",
+      "part": "apprentice",
+      "order": 5,
+      "contentHash": "24188c18e66bda14e4d95906ff91aa15a52c4cf6f759b9092dd1b8dd3acc1566"
+    },
+    {
+      "id": "tri-platform",
+      "chapterId": "integration",
+      "part": "apprentice",
+      "order": 6,
+      "contentHash": "b0a487b394d4d8b5de90b41c9db1df8ef58bac8bde981e4d945409381b4bc5ea"
+    },
+    {
+      "id": "error-contract",
+      "chapterId": "contract",
+      "part": "engineer",
+      "order": 5,
+      "contentHash": "de77e691bce76688344f22875f76df008912e7a26406ca2e8886b9206a2f99a6"
+    },
+    {
+      "id": "contract-review",
+      "chapterId": "contract",
+      "part": "engineer",
+      "order": 6,
+      "contentHash": "5325dd1dc63bab5e9547acfcde675f7fc3814912982bba76ef485428f1a2e696"
+    },
+    {
+      "id": "profile-maze",
+      "chapterId": "config-boot",
+      "part": "engineer",
+      "order": 5,
+      "contentHash": "e61170d0d94ea6160221fc6683ee45b2851c62278c71257cb0ad3b040c8c8a37"
+    },
+    {
+      "id": "boot-storm",
+      "chapterId": "config-boot",
+      "part": "engineer",
+      "order": 6,
+      "contentHash": "3e423149d76e6b582af330fc2a3c2a34a97983bc413981a89f7f1e6156ebb589"
+    },
+    {
+      "id": "rollback-drift",
+      "chapterId": "deployment",
+      "part": "master",
+      "order": 5,
+      "contentHash": "13a3e1e0c0f5219efc78cb45121cb13c0bb3f3488d3f7c8540f959e951c1cdfb"
+    },
+    {
+      "id": "warmup-storm",
+      "chapterId": "deployment",
+      "part": "master",
+      "order": 6,
+      "contentHash": "81cee68e71d24c16c79cc8b453d3f570372b69344c066a365bf1220913090d9c"
+    },
+    {
+      "id": "partition-split",
+      "chapterId": "messaging",
+      "part": "master",
+      "order": 5,
+      "contentHash": "8320d43bcbdeda7168c45608d591f70992b4d22bb5697e7649ec00bd59c2058a"
+    },
+    {
+      "id": "replay-surge",
+      "chapterId": "messaging",
+      "part": "master",
+      "order": 7,
+      "contentHash": "2f6573148d97ff3e28729124deefc3aa529beb5de1e8e8262641e187d4483a5e"
+    },
+    {
+      "id": "mtu-blackhole",
+      "chapterId": "network",
+      "part": "master",
+      "order": 10,
+      "contentHash": "bb085645032830199110355a115cdab39f26448bc73c07bd65c872ec09474319"
+    },
+    {
+      "id": "geo-stale",
+      "chapterId": "network",
+      "part": "master",
+      "order": 11,
+      "contentHash": "cd3fe7ce738979ef128734bc14d03e1eb2f7bebb89677646861a38efdc9fab56"
+    },
+    {
+      "id": "env-inherit",
+      "chapterId": "testing",
+      "part": "master",
+      "order": 8,
+      "contentHash": "35016cea9208af98f3c43c0efd51f4451e54f79a20282e60205904750f279d0c"
+    },
+    {
+      "id": "capacity-assumption",
+      "chapterId": "testing",
+      "part": "master",
+      "order": 10,
+      "contentHash": "2521b4c67bf976670f34a3109e7a158b6e140117e5a116a43b0334010d763d3e"
+    }
+  ]
+}

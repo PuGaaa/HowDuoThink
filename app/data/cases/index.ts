@@ -1,6 +1,7 @@
 import { CaseCatalogMeta, DiagnosisCase } from '../../types/case'
 import { getCaseProgress } from '../../utils/storage'
 import { getRemoteCases } from '../../utils/sync'
+import { MAINLINE_CASE_IDS } from '../course'
 import { sslChainCase } from './ssl-chain'
 import { poolExhaustedCase } from './pool-exhausted'
 import { corsCase } from './cors-101'
@@ -270,31 +271,32 @@ export const ALL_CASES: DiagnosisCase[] = [
 
 /** 稳定试玩与课程主线只由目录配置决定，不依赖 ALL_CASES 的注册顺序。 */
 export const TRIAL_CASE_IDS = ['first-npe', 'caused-by', 'log-correlation'] as const
-export const MAINLINE_CASE_IDS = TRIAL_CASE_IDS
+export { MAINLINE_CASE_IDS }
 
-/** 本地 TS 案例均为官方来源；只有首批试玩题进入当前稳定主线，其余均为选做。 */
+/** 官方来源与必修属性分开；冻结目录以外的新题默认选做。 */
 export const CASE_CATALOG: Record<string, CaseCatalogMeta> = {}
 for (let i = 0; i < ALL_CASES.length; i++) {
   const id = ALL_CASES[i].id
   CASE_CATALOG[id] = {
     source: 'official',
-    track: MAINLINE_CASE_IDS.indexOf(id as (typeof MAINLINE_CASE_IDS)[number]) >= 0 ? 'mainline' : 'optional',
+    track: MAINLINE_CASE_IDS.indexOf(id) >= 0 ? 'mainline' : 'optional',
   }
 }
 
+/** 所有玩法入口共享同一有效集合；同 ID 只采用更高内容修订，游标不参与比较。 */
+export function getEffectiveCases(): DiagnosisCase[] {
+  const byId = new Map<string, DiagnosisCase>()
+  for (const item of ALL_CASES) byId.set(item.id, item)
+  for (const item of getRemoteCases()) {
+    const local = byId.get(item.id)
+    if (local == null || (item.contentRevision ?? 1) > (local.contentRevision ?? 1)) byId.set(item.id, item)
+  }
+  return [...byId.values()]
+}
+
 export function getCaseById(id: string): DiagnosisCase | null {
-  for (let i = 0; i < ALL_CASES.length; i++) {
-    if (ALL_CASES[i].id === id) {
-      return ALL_CASES[i]
-    }
-  }
-  // 远端 casepack 兜底（社区同步的关卡）
-  const arr = getRemoteCases()
-  for (let i = 0; i < arr.length; i++) {
-    if (arr[i] != null && arr[i].id === id) {
-      return arr[i]
-    }
-  }
+  const cases = getEffectiveCases()
+  for (const item of cases) if (item.id === id) return item
   return null
 }
 
@@ -306,10 +308,7 @@ export class CollectedLesson {
 /** 已破案案例的全部检查单（本地 + 远端 casepack），可排除当前关 */
 export function getCollectedLessons(excludeCaseId: string): CollectedLesson[] {
   const out: CollectedLesson[] = []
-  const merged: DiagnosisCase[] = []
-  for (let i = 0; i < ALL_CASES.length; i++) merged.push(ALL_CASES[i])
-  const remote = getRemoteCases()
-  for (let i = 0; i < remote.length; i++) merged.push(remote[i])
+  const merged = getEffectiveCases()
   for (let i = 0; i < merged.length; i++) {
     const c = merged[i]
     if (c.id === excludeCaseId) continue
