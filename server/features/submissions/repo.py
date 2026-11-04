@@ -3,17 +3,18 @@
 from typing import Any
 
 import db
-from features.submissions.models import SubmissionCreate
+from features.submissions.models import ReviewBody, SubmissionCreate
 
 
 def lock_author(conn: Any, uid: str) -> None:
     conn.execute("UPDATE users SET id=id WHERE id=?", (uid,))
 
 
-def get(conn: Any, sid: str, lock: bool = False):
+def get(conn: Any, sid: str, lock: bool = False) -> Any:
     suffix = " /* FOR UPDATE */" if lock else ""
     return conn.execute(
-        "SELECT s.*,u.login AS author FROM submissions s LEFT JOIN users u ON u.id=s.user_id WHERE s.id=?" + suffix,
+        "SELECT s.*,u.login AS author,u.name AS author_name FROM submissions s LEFT JOIN users u ON u.id=s.user_id WHERE s.id=?"
+        + suffix,
         (sid,),
     ).fetchone()
 
@@ -33,14 +34,14 @@ def list_rows(conn: Any, uid: str | None = None, status: str | None = None) -> l
     ).fetchall()
 
 
-def existing_request(conn: Any, uid: str, request_id: str):
+def existing_request(conn: Any, uid: str, request_id: str) -> Any:
     return conn.execute(
         "SELECT r.submission_id,s.status FROM submission_requests r JOIN submissions s ON s.id=r.submission_id WHERE r.user_id=? AND r.request_id=?",
         (uid, request_id),
     ).fetchone()
 
 
-def existing_content(conn: Any, uid: str, fingerprint: str):
+def existing_content(conn: Any, uid: str, fingerprint: str) -> Any:
     return conn.execute(
         "SELECT id,status FROM submissions WHERE user_id=? AND content_fingerprint=?", (uid, fingerprint)
     ).fetchone()
@@ -82,7 +83,7 @@ def create(conn: Any, uid: str, sid: str, fingerprint: str, body: SubmissionCrea
     conn.execute("INSERT INTO submission_reviews(submission_id,candidate_ids) VALUES(?,'[]')", (sid,))
 
 
-def review(conn: Any, sid: str):
+def review(conn: Any, sid: str) -> Any:
     return conn.execute("SELECT * FROM submission_reviews WHERE submission_id=?", (sid,)).fetchone()
 
 
@@ -122,7 +123,7 @@ def confirm_material(conn: Any, sid: str, version: int) -> None:
     conn.execute("UPDATE submission_reviews SET confirmed_version=? WHERE submission_id=?", (version, sid))
 
 
-def save_review(conn: Any, sid: str, uid: str, body) -> None:
+def save_review(conn: Any, sid: str, uid: str, body: ReviewBody) -> None:
     conn.execute(
         "UPDATE submission_reviews SET decision=?,mechanism=?,evidence=?,reasoning=?,candidate_ids=?,reviewer_id=?,reviewed_material_version=material_version WHERE submission_id=?",
         (body.decision, body.mechanism, body.evidence, body.reasoning, db.jdump(body.candidate_ids), uid, sid),
@@ -131,8 +132,8 @@ def save_review(conn: Any, sid: str, uid: str, body) -> None:
         body.decision
     ]
     conn.execute(
-        "UPDATE submissions SET status=?,review_note=?,linked_case_id=?,parent_submission_id=?,reviewed_at=datetime('now') WHERE id=?",
-        (status, body.public_note, body.linked_case_id, body.parent_submission_id, sid),
+        "UPDATE submissions SET status=?,review_note=?,linked_case_id=CASE WHEN ?='merge' THEN ? ELSE linked_case_id END,parent_submission_id=CASE WHEN ?='merge' THEN ? ELSE parent_submission_id END,reviewed_at=datetime('now') WHERE id=?",
+        (status, body.public_note, body.decision, body.linked_case_id, body.decision, body.parent_submission_id, sid),
     )
 
 
@@ -143,10 +144,12 @@ def set_status(conn: Any, sid: str, status: str, note: str) -> None:
 
 
 def case_for_submission(conn: Any, submission) -> Any:
+    if submission["linked_case_id"]:
+        return conn.execute("SELECT id,status,title FROM cases WHERE id=?", (submission["linked_case_id"],)).fetchone()
     source_id = submission["parent_submission_id"] or submission["id"]
     return conn.execute(
-        "SELECT id,status,title FROM cases WHERE id=? OR submission_id=? ORDER BY CASE WHEN status='published' THEN 0 ELSE 1 END LIMIT 1",
-        (submission["linked_case_id"], source_id),
+        "SELECT id,status,title FROM cases WHERE submission_id=? ORDER BY CASE WHEN status='published' THEN 0 ELSE 1 END LIMIT 1",
+        (source_id,),
     ).fetchone()
 
 
@@ -168,7 +171,7 @@ def private_candidates(conn: Any, sid: str) -> tuple[list, list]:
     return cases, submissions
 
 
-def existing_case(conn: Any, cid: str, lock: bool = False):
+def existing_case(conn: Any, cid: str, lock: bool = False) -> Any:
     suffix = " /* FOR UPDATE */" if lock else ""
     return conn.execute("SELECT id,status FROM cases WHERE id=?" + suffix, (cid,)).fetchone()
 
@@ -196,9 +199,8 @@ def contributors(conn: Any, cid: str) -> list:
     return conn.execute(
         "SELECT s.user_id,u.name AS author,CASE WHEN s.id=c.submission_id THEN 'source' ELSE 'evidence' END AS role "
         "FROM cases c JOIN submissions s ON s.id=c.submission_id OR s.linked_case_id=c.id OR s.parent_submission_id=c.submission_id "
-        "JOIN users u ON u.id=s.user_id LEFT JOIN submission_reviews r ON r.submission_id=s.id "
-        "WHERE c.id=? AND c.status='published' AND (s.id=c.submission_id OR (r.decision='merge' AND r.confirmed_version>0 "
-        "AND r.confirmed_version=r.material_version AND r.material_source_revision=r.source_revision)) ORDER BY role DESC,s.created_at,s.id",
+        "JOIN users u ON u.id=s.user_id "
+        "WHERE c.id=? AND c.status='published' ORDER BY role DESC,s.created_at,s.id",
         (cid,),
     ).fetchall()
 
@@ -215,3 +217,19 @@ def supplement_texts(conn: Any, submission_ids: list[str]) -> dict[str, str]:
     for row in rows:
         grouped[row["submission_id"]] += " " + row["body"]
     return grouped
+
+
+def has_dependents(conn: Any, sid: str) -> bool:
+    return (
+        conn.execute("SELECT id FROM submissions WHERE parent_submission_id=? LIMIT 1", (sid,)).fetchone() is not None
+    )
+
+
+def owned_case(conn: Any, sid: str) -> Any:
+    return conn.execute(
+        "SELECT id,status,payload FROM cases WHERE submission_id=? LIMIT 1 /* FOR UPDATE */", (sid,)
+    ).fetchone()
+
+
+def archive_draft(conn: Any, cid: str) -> None:
+    conn.execute("UPDATE cases SET status='archived' WHERE id=?", (cid,))

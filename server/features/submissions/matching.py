@@ -103,7 +103,7 @@ def candidates(conn: Any, query: str, sid: str = "", editor: bool = False) -> li
     return rows[:10]
 
 
-def for_submission(conn: Any, submission) -> list[dict]:
+def for_submission(conn: Any, submission: Any) -> list[dict]:
     review = repo.review(conn, submission["id"])
     source = (
         json.loads(review["material"])

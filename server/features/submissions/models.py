@@ -148,3 +148,10 @@ class Contributor(BaseModel):
 
 class ContributorsResult(BaseModel):
     items: list[Contributor]
+
+
+class PublicationSource(BaseModel):
+    submission_id: str
+    author_name: str | None
+    author_login: str | None
+    material_version: int

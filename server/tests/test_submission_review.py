@@ -305,6 +305,30 @@ def test_merge_contributors_require_consent_and_remain_private_until_published(p
     assert {item["role"] for item in credits} == {"source", "evidence"}
     assert {item["authorId"] for item in credits} == {people[0][0], people[2][0]}
     assert "resolution" not in str(credits) and "internal" not in str(credits)
+    assert (
+        people[2][1]
+        .post(
+            f"/api/me/submissions/{evidence}/supplements", json={"text": "已发表后追加新的事实反馈，不撤回此前有效贡献"}
+        )
+        .status_code
+        == 200
+    )
+    assert service.contributors_for_case(cid) == credits
+    assert (
+        editor.post(
+            f"/api/admin/submissions/{evidence}/review",
+            json=review_body(service.editor_candidates(evidence), decision="needs_more"),
+        ).status_code
+        == 200
+    )
+    assert service.contributors_for_case(cid) == credits
+    assert (
+        editor.post(
+            f"/api/admin/submissions/{evidence}/review",
+            json=review_body(service.editor_candidates(evidence), decision="distinct"),
+        ).status_code
+        == 409
+    )
 
 
 def test_request_retry_returns_current_status(people):
@@ -369,4 +393,103 @@ def test_candidate_supplement_invalidates_previous_review(people):
     assert before[other_sid] != after[other_sid]
     with pytest.raises(HTTPException) as exc:
         service.require_publication_review(sid)
+    assert exc.value.status_code == 409
+
+
+def test_mother_submission_with_contributors_cannot_be_reparented(people):
+    author, editor, contributor = people[0][1], people[1][1], people[2][1]
+    mother = submit(author)
+    child = submit(contributor, title="关联母稿的新增实例证据")
+    other = submit(author, title="另一份独立事故投稿")
+    material = {key: value for key, value in body().items() if key != "requestId"}
+    version = editor.put(f"/api/admin/submissions/{child}/material", json={"material": material}).json()["version"]
+    assert contributor.post(f"/api/me/submissions/{child}/consent", json={"version": version}).status_code == 200
+    candidates = service.editor_candidates(child)
+    assert (
+        editor.post(
+            f"/api/admin/submissions/{child}/review",
+            json=review_body(candidates, decision="merge", parentSubmissionId=mother),
+        ).status_code
+        == 200
+    )
+    authorize(people, mother)
+    response = editor.post(
+        f"/api/admin/submissions/{mother}/review",
+        json=review_body(service.editor_candidates(mother), decision="merge", parentSubmissionId=other),
+    )
+    assert response.status_code == 409
+    assert (
+        db.q("SELECT parent_submission_id FROM submissions WHERE id=?", (child,))[0]["parent_submission_id"] == mother
+    )
+    assert db.q("SELECT parent_submission_id FROM submissions WHERE id=?", (mother,))[0]["parent_submission_id"] is None
+
+
+def test_merging_existing_draft_archives_it_and_retains_original_payload(people):
+    sid = submit(people[0][1])
+    authorize(people, sid)
+    draft = service.create_draft_from_submission(people[1][0], sid)
+    original = db.q("SELECT payload FROM cases WHERE id=?", (draft["caseId"],))[0]["payload"]
+    cid = "other-" + uuid4().hex[:12]
+    add_case(cid)
+    response = people[1][1].post(
+        f"/api/admin/submissions/{sid}/review",
+        json=review_body(service.editor_candidates(sid), decision="merge", linkedCaseId=cid),
+    )
+    assert response.status_code == 200, response.text
+    old = db.q("SELECT status,payload FROM cases WHERE id=?", (draft["caseId"],))[0]
+    assert old["status"] == "archived" and old["payload"] == original
+    view = people[0][1].get(f"/api/me/submissions/{sid}").json()
+    assert view["caseId"] == cid and view["resolution"] == body()["resolution"]
+    with pytest.raises(HTTPException) as exc:
+        service.require_publication_review(sid)
+    assert exc.value.status_code == 409
+
+
+def test_published_source_cannot_be_reparented_as_new_evidence(people):
+    sid = submit(people[0][1])
+    authorize(people, sid)
+    draft = service.create_draft_from_submission(people[1][0], sid)
+    db.ex("UPDATE cases SET status='published' WHERE id=?", (draft["caseId"],))
+    cid = "another-" + uuid4().hex[:12]
+    add_case(cid)
+    response = people[1][1].post(
+        f"/api/admin/submissions/{sid}/review",
+        json=review_body(service.editor_candidates(sid), decision="merge", linkedCaseId=cid),
+    )
+    assert response.status_code == 409
+    assert db.q("SELECT linked_case_id FROM submissions WHERE id=?", (sid,))[0]["linked_case_id"] is None
+
+
+def test_publication_validation_uses_callers_transaction_and_returns_source_metadata(people):
+    sid = submit(people[0][1])
+    authorize(people, sid)
+    with db.tx() as conn:
+        source = service.validate_publication(conn, sid)
+        assert source.model_dump() == {
+            "submission_id": sid,
+            "author_name": "作者",
+            "author_login": people[0][0],
+            "material_version": 1,
+        }
+        with db.tx() as writer:
+            from pymysql.err import OperationalError
+
+            original_timeout = writer.execute("SELECT @@SESSION.innodb_lock_wait_timeout AS timeout").fetchone()[
+                "timeout"
+            ]
+            writer.execute("SET SESSION innodb_lock_wait_timeout=1")
+            try:
+                with pytest.raises(OperationalError, match="Lock wait timeout"):
+                    writer.execute("UPDATE submissions SET review_note='并发修改' WHERE id=?", (sid,))
+            finally:
+                writer.execute("SET SESSION innodb_lock_wait_timeout=?", (original_timeout,))
+    assert (
+        people[0][1]
+        .post(f"/api/me/submissions/{sid}/supplements", json={"text": "完成发布事务后才允许添加新的事实补件"})
+        .status_code
+        == 200
+    )
+    with db.tx() as conn:
+        with pytest.raises(HTTPException) as exc:
+            service.validate_publication(conn, sid)
     assert exc.value.status_code == 409
