@@ -1,50 +1,67 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 读懂报错 第三批（跨服务日志关联 L2）
- * 教学点：全栈视野——一个请求跨三跳，没有关联 ID 就是三段平行宇宙；
- * requestId 透传（HTTP 头 → MDC → 日志）是分布式排查的毛细血管。
- * 专家路径：impact(1) + correlate(2) + tzcheck(1) = 4⚡︎
+ * 读懂报错：主训全栈视野；次训验证思维；排查现场。
+ * 原型：请求上下文、实例资源关联与JVM暂停，教学重建。
+ * 六维：2/2/2/2/2/2，L2；配置WARN由retrycount按请求ID收线。
+ * 标准：impact(1) → tzcheck(1) → correlate(2) = 4；替代：impact → correlate → tzcheck = 4。
+ * 技术依据与独立编审见 content/baselines/t04a-calibration.md。
  */
 export const logCorrelationCase: DiagnosisCase = {
   id: 'log-correlation',
-  title: '报错在 C 服务，日志却只在 A 服务搜得到',
-  intro: '下单失败跨了三个服务，三段日志"各自完整"却互不相认——没有关联 ID，排查就是三段平行宇宙。',
+  title: '日志各说各话：同一次下单去了哪台实例',
+  intro: '三段日志时间相近，却未必属于同一请求。先用关联键找到目标实例，再核对那台实例发生了什么。',
   domain: 'runtime',
   layer: '关联 ID 是分布式日志的毛细血管——透传到哪，因果就通到哪',
   part: 'apprentice',
   chapterId: 'error-reading',
   order: 3,
-  typeTags: ['observability', 'process'],
+  typeTags: [
+    'observability',
+    'process',
+  ],
   difficulty: 2,
-
   scene: {
-    role: '你是「鲜到家」的新人后端，第二个线上问题：下单失败的根因藏在你看不见的那段日志里。',
-    architecture: '网关(生成 requestId) → 订单服务 A → 优惠券服务 B → 库存服务 C ｜ 三段日志分散在各自的 ELK 索引',
-    tag: '故障现场',
+    role: '你是「鲜到家」的新任值班工程师，需要把一次失败下单的跨服务证据对齐。',
+    architecture: '网关生成requestId → A订单 → B优惠券 → C库存实例池；A/B输出关联ID，C业务日志未输出',
+    tag: '教学重建',
     symptoms: [
       {
         type: 'error',
-        title: '三段日志（各说各话）',
-        text: 'A 服务日志：10:00:09  "B 调用失败: timeout" —— 是 B 慢\nB 服务日志：10:00:09  "C 调用异常: read timeout" —— 是 C 慢\nC 服务日志：10:00:09  （什么都没找到——搜"下单失败"零命中）\n每一段都"逻辑自洽"，但拼不出因果。',
+        title: '失败截图中的两段日志',
+        text: 'A 10:00:06.280 B调用失败：HTTP 504\nB 10:00:06.250 C调用read timeout\nC业务日志搜索“下单失败”零命中。时间接近还不足以证明它们属于同一次请求。',
       },
       {
-        type: 'text',
-        title: '新人的困惑',
-        text: '时间都接近 10:00:09，可这是同一次下单吗？\n高峰期每秒几百单——三段"接近"的日志，可能来自三个完全不同的请求。',
+        type: 'log',
+        title: '混在附近的WARN',
+        text: 'A 10:00:06.260 promo-config refresh delayed requestId=req-other-18\n它与下单失败是否有关，需要按请求身份核对。',
       },
     ],
-    timeline: '故障持续 20 分钟（每天晚高峰出现 10~20 分钟）｜ A/B 服务日志带 requestId，C 服务没有 ｜ 用户贴来的截图只有 B 的报错',
-    impactHint: '高峰期"时间接近"不是证据——需要一根线把三段日志串成"同一个请求"。这根线在哪、断在哪？',
+    timeline: '晚高峰部分下单失败 ｜ A/B有requestId ｜ C业务日志有时间和实例名，但未接入requestId模板',
+    impactHint: '先找关联键和目标实例。相同时间、同一台机器上的告警，也可能属于别的请求。',
   },
-
   hypotheses: [
-    { id: 'h-chain', text: 'requestId 贯穿三段：用同一条 ID 拉齐日志，因果链可见（A 等 B、B 等 C、C 在 GC）', excludeActionId: 'a-correlate' },
-    { id: 'h-tz', text: '三服务时区配置不一致，"时间接近"是时区差造成的错觉', excludeActionId: 'a-tzcheck' },
-    { id: 'h-level', text: 'C 服务 ERROR-only 日志级别，成功/慢请求无痕迹，时间线天然断', excludeActionId: 'a-loglevel' },
-    { id: 'h-retry', text: 'A 的重试产生多份同参数日志，人肉搜索会串到别的请求', excludeActionId: 'a-retrycount' },
+    {
+      id: 'h-chain',
+      text: 'C业务日志缺关联ID，目标实例暂停造成超时，但排查因断链难以拼接',
+      excludeActionId: 'a-correlate',
+    },
+    {
+      id: 'h-tz',
+      text: '三服务时钟明显错位，时间线比较不成立',
+      excludeActionId: 'a-tzcheck',
+    },
+    {
+      id: 'h-level',
+      text: 'C把业务日志级别误设为ERROR，导致关联信息全被过滤',
+      excludeActionId: 'a-loglevel',
+    },
+    {
+      id: 'h-retry',
+      text: 'A重试产生多份同参数调用，人肉搜索串到别的请求',
+      excludeActionId: 'a-retrycount',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -55,43 +72,67 @@ export const logCorrelationCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: [],
-      hypotheses: [],
+      hypotheses: [
+        {
+          id: 'h-level',
+          status: 'excluded',
+        },
+      ],
       result: {
-        type: 'code',
-        title: '关联键存量盘点',
-        text: '网关：requestId=req-7712…（生成 + 打印）✓\nA 服务：日志带 requestId ✓（HTTP 头透传 + MDC）\nB 服务：日志带 requestId ✓（同上）\nC 服务：日志无 requestId ✗（老服务，接入 MDC 前的遗留）\n→ 三段里两段有钥匙——缺的是 C：恰好它是最深的嫌疑层。',
+        type: 'text',
+        title: '关联信息盘点',
+        text: '网关生成req-7712a；A/B业务日志包含该ID。\nB的出口日志另记录目标实例c-7；C的INFO业务日志存在，包含实例名但未输出requestId。\n失败样本均到c-7，相同版本的c-8对照请求正常。需要核对时间与c-7实例事件。',
       },
     },
     {
       id: 'a-correlate',
-      name: '用 requestId 拉齐三段日志',
-      desc: '同一条 req-7712，三段日志变成一个故事',
+      name: '关联请求、目标实例与暂停窗口',
+      desc: '按ID找到出口，再对照具体实例的GC',
       cost: 2,
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-chain'],
-      hypotheses: [{ id: 'h-chain', status: 'confirmed' }],
+      tests: [
+        'h-chain',
+        'h-retry',
+      ],
+      hypotheses: [
+        {
+          id: 'h-chain',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-retry',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
-        title: 'requestId=req-7712a 的完整故事',
-        text: 'A 10:00:01.200  调 B（超时设置 8s）\nB 10:00:01.250  收到，调 C（无超时设置！）\nC 10:00:01.270  ——（无日志；但主机监控：FullGC 停顿 7.8s）\nB 10:00:09.300  C 读超时，抛异常\nA 10:00:09.320  B 调用超时（累计 8s 触发）\n→ 因果链完整：C 的 FullGC 7.8s 拖住 B，B 拖垮 A。C 侧虽无业务日志，主机 GC 曲线补上最后一环。',
+        title: 'req-7712a与c-7对账',
+        text: 'A 10:00:01.200发起B，读取超时8秒。\nB 10:00:01.250向c-7发起一次调用，客户端明确配置读取超时5秒，无重试。\nC入口访问记录：req-7712a于01.255进入c-7，09.090处理完成，调用方已超时；入口记录独立于缺ID的业务日志。\nc-7同进程GC日志汇总：10:00:01.270开始Stop-The-World，10:00:09.070结束，暂停7.8秒。\nB 10:00:06.250到达5秒期限，返回HTTP 504；A在06.280收到504，尚未到自己的8秒期限。\n目标实例、暂停覆盖的等待窗口和超时配置一致；c-8同类对照请求正常。不是用邻近机器的GC曲线猜因果。',
       },
     },
     {
       id: 'a-tzcheck',
-      name: '核对三服务时区配置',
-      desc: '排除时区错觉',
+      name: '核对时区与时钟偏差',
+      desc: '统一时间表示，并检查实际对时误差',
       cost: 1,
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-tz'],
-      hypotheses: [{ id: 'h-tz', status: 'excluded' }],
+      tests: [
+        'h-tz',
+      ],
+      hypotheses: [
+        {
+          id: 'h-tz',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
-        title: '时区核对',
-        text: '三服务 JVM/容器时区统一 UTC+8（镜像统一模板）。\n→ 排除时区：时间戳可比。',
+        title: '时间可信度',
+        text: 'A/B/C日志都输出UTC+8，故障时NTP偏差均小于20毫秒；GC时间来自同一c-7进程。\n时区一致不等于时钟一致，这里两项都已核对；毫秒级误差无法解释秒级等待与暂停。',
       },
     },
     {
@@ -102,12 +143,19 @@ export const logCorrelationCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-level'],
-      hypotheses: [{ id: 'h-level', status: 'down' }],
+      tests: [
+        'h-level',
+      ],
+      hypotheses: [
+        {
+          id: 'h-level',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
-        title: '日志级别评估',
-        text: 'C 服务生产环境仅 ERROR + WARN（GC GC WARN 恰好在）——慢请求无业务日志。\n→ 降权为改进项：本次靠 GC 曲线补位破案；但"慢请求无 INFO"让下次更隐蔽。列入整改（耗时日志/慢请求采样）。',
+        title: '日志模板核对',
+        text: 'C业务日志级别为INFO，正常业务记录存在；模板只有时间、实例和消息，没有%X{requestId}，拦截器也未填MDC。\n缺的是关联字段，不是被ERROR阈值过滤。',
       },
     },
     {
@@ -118,19 +166,26 @@ export const logCorrelationCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-retry'],
-      hypotheses: [{ id: 'h-retry', status: 'excluded' }],
+      tests: [
+        'h-retry',
+      ],
+      hypotheses: [
+        {
+          id: 'h-retry',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
-        title: '重试核对',
-        text: 'A→B 无重试（单次调用）；同 requestId 日志唯一。\n→ 排除串线：req-7712a 的故事是独一份的。',
+        title: '请求分组与噪声收线',
+        text: 'A→B、B→C均只调用一次，同一requestId没有重试分支。\npromo-config的WARN属于req-other-18，不是req-7712a，排除该红鲱鱼。',
       },
     },
     {
       id: 'a-danger',
-      name: '临时把三服务日志合到一个索引混搜',
-      desc: '【状态变更】合并索引"方便搜索"',
-      cost: 1,
+      name: '重启三服务并清空本地日志',
+      desc: '【状态变更】先清现场，赌重启解决关联困难',
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
@@ -138,24 +193,24 @@ export const logCorrelationCase: DiagnosisCase = {
       hypotheses: [],
       result: {
         type: 'text',
-        title: '合并结果（陷阱动作）',
-        text: '三服务日志混入同一索引：搜索结果噪声 ×3，没有 requestId 依然无法关联——\n方便的感觉有了，破案能力没变，ELK 存储成本翻倍。\n→ 复盘点评：把日志放一起 ≠ 让日志关联。关联靠键，不靠邻居。',
+        title: '重启演练记录',
+        text: '重启不会自动给C日志补上requestId；清除本地日志还会破坏GC与调用窗口的现场。\n本题仍按原始快照排查，重启不构成关联证据。',
       },
     },
     {
       id: 'a-fixmdc',
       name: '修复：C 服务补 requestId（MDC 透传）',
-      desc: '【状态变更】C 服务接入 MDC：HTTP 头收 requestId → 全链路日志携带',
+      desc: '【状态变更】入口填MDC、日志输出，出口继续透传，结束时清理',
       cost: 1,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '透传补齐',
-        text: 'C 服务拦截器接收 X-Request-Id → MDC.put → logback 模板输出。\n回归：req-7712b 三段日志一键串联——"三段平行宇宙"合并。',
+        title: '关联修复',
+        text: 'C入口接收X-Request-Id并写入MDC，日志模板输出该字段；调用下游时继续透传，请求结束清理上下文。\n线程池或异步边界需要显式传播上下文，不能假设MDC自动跟随。',
       },
     },
     {
@@ -163,88 +218,100 @@ export const logCorrelationCase: DiagnosisCase = {
       name: '沉淀：关联键规范',
       desc: '【状态变更】规范：网关生成 → 头透传 → MDC 落日志；新服务接入 checklist 必查项',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '关联键规范',
-        text: 'requestId 规范：网关生成（无则自造）→ 每一跳透传 → MDC → 日志格式模板。\n新服务接入 checklist 新增："日志含 requestId"必查——关联键的断链在接入时拦下。',
+        title: '关联契约',
+        text: '网关生成ID，每一跳透传；业务日志同时携带请求身份与实例身份。\n检查跨线程上下文传递及请求结束清理，避免下一个请求串用旧ID。',
       },
     },
     {
       id: 'a-fixgc',
-      name: '沉淀：C 服务 GC 治理工单',
-      desc: '【状态变更】7.8s FullGC 另立 P2 工单（堆分析 + 分代调优）——本案的"下回分解"',
+      name: '处置：关联修复与GC治理分工',
+      desc: '【状态变更】校验容量后止血，再分析c-7暂停原因',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '工单拆分',
-        text: '本案（日志关联）与 GC 治理是两个问题：前者已修，后者立 P2 工单（堆 dump 分析 + 堆参数调优）。\n排查的边界感：找到根因 ≠ 顺手修完所有病——每个病有自己的工单与优先级。',
+        title: '处置边界',
+        text: '补齐关联ID提升排查能力，不会消除GC暂停。\n另由值班负责人校验剩余容量后处理异常实例，并分析堆、分配和GC证据。不能因为日志现在能串联，就宣布下单业务已恢复。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-chain', text: 'C 服务日志无 requestId（MDC 未接入）且 FullGC 停顿 7.8s 拖垮 B、B 拖垮 A——三段日志因关联键断链而"各自完整、互不相认"，排查退化为拼图', correct: true },
-    { id: 'rc-tz', text: '三服务时区不一致导致时间戳错位', correct: false },
-    { id: 'rc-level', text: 'C 服务日志级别过高无慢请求痕迹（改进项）', correct: false },
-    { id: 'rc-retry', text: '重试产生重复日志导致人肉搜索串线', correct: false },
+    {
+      id: 'rc-chain',
+      text: 'C业务日志缺关联ID造成排查断链；B出口锁定c-7，7.8秒STW覆盖5秒读取期限，B返回504给A',
+      correct: true,
+    },
+    {
+      id: 'rc-tz',
+      text: '明显时钟错位造成假时间线',
+      correct: false,
+    },
+    {
+      id: 'rc-level',
+      text: 'C日志级别误设ERROR，正常业务日志被过滤',
+      correct: false,
+    },
+    {
+      id: 'rc-retry',
+      text: '重试生成重复调用导致搜索串线',
+      correct: false,
+    },
   ],
-
   expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '高峰期"时间接近"不是证据——先盘点三段日志的关联键存量：线在哪里、断在哪里。',
-      update: 'A/B 有 requestId、C 没有——断链位置恰好是最深的嫌疑层。',
+      thought: '先找请求身份和目标实例。',
+      update: 'A/B有ID，B出口指向c-7，C业务日志缺ID。',
       actionId: 'a-impact',
-      why: '1⚡︎ 关联键盘点把"拼不了图"的原因可视化：不是缺拼图块，是缺拼法——C 的断链既是排查障碍，本身也是待修缺陷。',
-      conclusion: '修复与排查双线确立（h-chain 升权）。',
+      why: '1⚡先找到连接请求与实例的键，避免把相邻日志强行拼成一个故事。',
+      conclusion: '需要对时并核对c-7事件。',
     },
     {
-      thought: '用 requestId 拉齐三段——让"同一个请求"的三段日志讲一个完整的故事。',
-      update: '实锤：C FullGC 7.8s → B 超时 → A 超时；C 无业务日志，主机 GC 曲线补上最后一环。',
-      actionId: 'a-correlate',
-      why: '2⚡︎ 关联键拉齐是分布式日志排查的核心动作：三段"各自完整"的日志被一根线串成因果链——没有这根线，每段都是平行宇宙。',
-      conclusion: '因果链闭合。',
-    },
-    {
-      thought: '时区错觉假设 1⚡︎ 排除——"时间接近是不是假的"必须先验证，否则整条链可疑。',
-      update: '时区统一——时间戳可信，链条成立。',
+      thought: '时区一致且对时误差小于20毫秒。',
+      update: '秒级暂停与等待窗口可以比较。',
       actionId: 'a-tzcheck',
-      why: '1⚡︎ 时间戳的可信度是日志关联的地基：时区/时钟偏差没排除前，任何"先后关系"都可能是错觉。',
-      conclusion: '地基验证完毕。',
+      why: '1⚡先检验时间地基，统一时区还不够，实际时钟偏差也要有证据。',
+      conclusion: '排除明显时钟错位。',
     },
     {
-      thought: '日志级别降权（GC 曲线补位破案）、重试串线排除、止血陷阱点评、MDC 修复 + 规范。停止收集。',
-      update: '停止。',
+      thought: '同一ID的B出口指向c-7，7.8秒暂停覆盖5秒等待，A收到的是B的504。',
+      update: '请求、实例、暂停与期限闭合；不是A自己的8秒读取超时。',
+      actionId: 'a-correlate',
+      why: '2⚡联合出口路由、具体实例日志和明确超时配置，才把时间相关升级为机制解释。',
+      conclusion: '定位C暂停与业务日志断链两个问题。',
+    },
+    {
+      thought: '已经知道请求去哪、在那里发生什么、为何到期。',
+      update: '停止收集，分别处理业务暂停与关联缺口。',
       actionId: '',
-      why: '【停止规则】断链（C 无 requestId）✓ 因果（GC 链）✓ 防线（MDC 规范）✓——机制、因果、防线三层闭合；GC 治理按边界感另立工单。',
-      conclusion: '沉淀：关联 ID 是分布式日志的毛细血管——透传到哪，因果就通到哪；把日志放一起不等于让日志关联。',
+      why: '继续混搜其他请求不会改变当前处置；身份、实例和时间窗口已经闭合。',
+      conclusion: '补关联不能替代GC治理；按证据分工处理，不宣称日志修好就等于业务恢复。',
     },
   ],
-
   lessons: [
     {
-      text: '一个请求跨三跳，没有关联 ID 就是三段平行宇宙：requestId 透传到哪，因果就通到哪。',
-      principle: '全栈视野：关联键规范（网关生成 → HTTP 头透传 → MDC 落日志）是分布式系统的毛细血管。新服务接入 checklist 必查"日志含 requestId"——断链的代价是每次跨服务故障都退化为人肉拼图。',
+      text: '关联请求靠身份，关联主机指标还要有目标实例；相近时间只能提供候选。',
+      principle: '请求ID连接分布式调用，实例或容器身份连接资源事件。缺少其中一层时，别把别台机器的GC曲线当成当前请求的原因。',
     },
     {
-      text: '把日志放一起 ≠ 让日志关联：合并索引只带来噪声翻倍——关联靠键（requestId/traceId），不靠邻居。',
-      principle: '验证思维：日志类止血动作要回答"它提升了关联能力吗"。合并索引是"物理相邻"的伪解法；真正让三段日志互认的是那根键——修复前先问：缺的是位置，还是身份？',
+      text: '对时要同时检查时间表示和实际偏差；超时要说明是哪一跳的期限。',
+      principle: '同为UTC+8不保证时钟一致。下游5秒超时产生504，与上游8秒自行超时是不同事件，必须用起止时间对账。',
     },
     {
-      text: '排查找到根因 ≠ 顺手修完所有病：GC 治理是独立的 P2 工单——边界感让每个病有自己的优先级。',
-      principle: '沉淀思维：一次排查常牵出多个问题（日志断链 + GC 停顿）。主案修主线，连带病立工单记档——把"下回分解"制度化，比在主案里越修越散更专业。',
+      text: 'MDC是线程上下文，不会自动跨异步边界；日志关联修复也不会消除业务暂停。',
+      principle: '每跳和每个线程边界都需要正确传播、输出并清理上下文。可观测性缺陷与业务故障要分开处置，不能用补日志代替恢复服务。',
     },
   ],
 }

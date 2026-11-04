@@ -1,50 +1,67 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 读懂报错 首批（堆栈阅读入门 L1）
- * 教学点：全栈视野——堆栈阅读四步：读异常类型与消息、找第一行自己的代码帧、
- * 行号定位解引用、Caused by 链（本关只练前三步）。
- * 专家路径：impact(1) + frameread(2) + logcheck(1) + rpctime(1) = 5⚡︎
+ * 读懂报错：主训全栈视野；次训验证思维；排查现场。
+ * 原型：JDK17增强NPE与异步资源生命周期，教学重建，非原始线上工单。
+ * 六维：1/1/1/1/1/1，L1；无噪声入门关。
+ * 标准：impact(1) → frameread(2) → rpctime(1) = 4；替代：impact → rpctime → frameread = 4。
+ * 技术依据与独立编审见 content/baselines/t04a-calibration.md。
  */
 export const firstNpeCase: DiagnosisCase = {
   id: 'first-npe',
   title: '第一份线上堆栈：一屏红字从哪读起',
-  intro: '你人生第一份线上堆栈：NullPointerException 一屏红字——好消息是，答案就写在里面，只等你读。',
+  intro: '第一份线上堆栈：先找出哪个引用为空，再核对它为什么还没有创建。',
   domain: 'runtime',
   layer: '堆栈是地图：异常类型、消息、第一行自己的代码帧，三层信息读完就有方向',
   part: 'apprentice',
   chapterId: 'error-reading',
   order: 1,
-  typeTags: ['config', 'data'],
+  typeTags: [
+    'config',
+    'data',
+  ],
   difficulty: 1,
-
   scene: {
     role: '你是「鲜到家」的新入职后端，入职第一周，客服把你的第一个线上问题送到了面前。',
-    architecture: 'App → 积分查询服务(PointsService) → 用户服务(RPC) → 积分 DB',
-    tag: '故障现场',
+    architecture: 'App → 积分查询服务 PointsService → 用户档案与积分 DB；注册成功事件异步创建积分账户',
+    tag: '教学重建',
     symptoms: [
       {
         type: 'error',
-        title: '线上堆栈（ELK 截取）',
-        text: 'java.lang.NullPointerException: Cannot invoke\n  "com.xj.points.PointAccount.getBalance()" because "userPoint.getAccount()" is null\n  at com.xj.points.PointsService.getUserPoints(PointsService.java:88)\n  at com.xj.points.PointsController.query(PointsController.java:31)\n  at java.base.Thread.run(Unknown Source) ……（还有 30 行框架帧）',
+        title: '积分查询堆栈（关键行）',
+        text: 'java.lang.NullPointerException: Cannot invoke "com.xj.points.PointAccount.getBalance()" because the return value of "com.xj.points.UserPoint.getAccount()" is null\n  at com.xj.points.PointsService.getUserPoints(PointsService.java:88)\n  at com.xj.points.PointsController.query(PointsController.java:31)\n  ...（省略框架调用帧）',
       },
       {
         type: 'text',
         title: '客服描述',
-        text: '积分页面空白。老用户刷新几次偶尔能出来，新注册用户 100% 空白。\n这是你入职第一周的"见面礼"——师傅说：答案就在堆栈里，先学会读它。',
+        text: '部分刚注册用户第一次打开积分页时空白，稍后刷新恢复。客服想先确认：空的是用户档案，还是积分账户？',
       },
     ],
-    timeline: '今天上午开始 ｜ 积分服务上周五刚发布过"新用户积分引导"功能 ｜ 你还没有该服务的代码权限（只有只读仓库）',
-    impactHint: '一屏 40 行堆栈，只有 2 行属于你自己的代码——异常消息里那个 "is null" 已经在说话了。',
+    timeline: '周五发布注册提速：积分账户改为异步创建 ｜ 周一首次打开积分页的用户反馈 ｜ 你能查看只读仓库和现有诊断日志',
+    impactHint: '先圈出受影响用户与发生时机，再读异常消息和第一行业务代码。',
   },
-
   hypotheses: [
-    { id: 'h-usernull', text: '88 行链式解引用中 user 为 null：上游没返回这个用户，代码没判空', excludeActionId: 'a-frameread' },
-    { id: 'h-accountnull', text: 'user 存在但积分账户为 null：用户有档案、没开积分账户', excludeActionId: 'a-logcheck' },
-    { id: 'h-db', text: '积分 DB 故障，查询失败被上层转成 null', excludeActionId: 'a-dbcheck' },
-    { id: 'h-dataloss', text: '个别用户数据被误删（脏数据）', excludeActionId: 'a-datacheck' },
+    {
+      id: 'h-usernull',
+      text: '用户档案对象本身为空，调用 getAccount() 时发生空引用',
+      excludeActionId: 'a-frameread',
+    },
+    {
+      id: 'h-accountnull',
+      text: '异步建账还未完成，查询代码直接对缺失的积分账户取余额',
+      excludeActionId: 'a-rpctime',
+    },
+    {
+      id: 'h-db',
+      text: '积分数据库查询失败，被上层误当成没有账户',
+      excludeActionId: 'a-dbcheck',
+    },
+    {
+      id: 'h-dataloss',
+      text: '原本存在的积分账户被误删',
+      excludeActionId: 'a-datacheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -58,8 +75,8 @@ export const firstNpeCase: DiagnosisCase = {
       hypotheses: [],
       result: {
         type: 'text',
-        title: '特征圈定',
-        text: '新注册用户 100% 空白；老用户偶尔空白（刷新可恢复）。\n"新用户必现"是最值钱的特征——它指向某个"新用户才走得到的分支"。\n→ 带着这个特征去读堆栈，读到的信息才能对上号。',
+        title: '影响面抽样',
+        text: '20个失败样本均为注册后1秒内首次打开积分页；账户建好后再次查询均正常。\n同一版本中，已有积分账户的老用户100次查询均正常。\n当前证据指向“账户尚未就绪”的时间窗口，不是所有用户持续失败。',
       },
     },
     {
@@ -70,28 +87,52 @@ export const firstNpeCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-usernull'],
-      hypotheses: [{ id: 'h-usernull', status: 'confirmed' }],
+      tests: [
+        'h-usernull',
+        'h-accountnull',
+      ],
+      hypotheses: [
+        {
+          id: 'h-usernull',
+          status: 'excluded',
+        },
+        {
+          id: 'h-accountnull',
+          status: 'up',
+        },
+      ],
       result: {
         type: 'code',
-        title: '堆栈阅读（四步前两步）',
-        text: '① 异常类型：NullPointerException —— 某个"引用"是 null 还调了方法\n② 异常消息（JDK14+ 友好提示）：\n   "userPoint.getAccount() is null" —— 空的是 getAccount() 的返回值！\n③ 第一行业务帧：PointsService.java:88 —— 你的代码从这里开始\n→ 消息已经替你做了半个判断：不是 user 为 null，是 userPoint.getAccount() 为 null。\n88 行（只读仓库）：int balance = userPoint.getAccount().getBalance();',
+        title: '异常消息与88行业务代码',
+        text: '增强NPE消息指出：返回null的是 UserPoint.getAccount()，不是接收这次方法调用的userPoint。\n88行：int balance = userPoint.getAccount().getBalance();\n代码直接调用账户的getBalance()，没有表达“账户尚在创建中”这一业务状态。\n断点已定位；为什么没有账户，还要核对创建流水。',
       },
     },
     {
       id: 'a-logcheck',
-      name: '加判别日志复现一次',
-      desc: 'user 和 account 各自是什么——让日志替你回答',
-      cost: 1,
+      name: '查看已有的对象判别记录',
+      desc: '只读核对同一失败请求中的用户与账户',
+      cost: 2,
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-accountnull'],
-      hypotheses: [{ id: 'h-accountnull', status: 'excluded' }],
+      tests: [
+        'h-usernull',
+        'h-accountnull',
+      ],
+      hypotheses: [
+        {
+          id: 'h-usernull',
+          status: 'excluded',
+        },
+        {
+          id: 'h-accountnull',
+          status: 'up',
+        },
+      ],
       result: {
         type: 'code',
-        title: '判别日志',
-        text: '复现（新注册测试账号）命中 88 行：\nlog.info("user={}, account={}", user != null, userPoint.getAccount())\n→ user=true（用户查到了），account=null（积分账户没开）\n→ 排除"user 为 null"：用户存在，缺的是积分账户——上游用户服务返回了用户，但该用户没有积分档案。',
+        title: '同一请求的诊断记录',
+        text: 'requestId=req-points-27：userPointPresent=true，accountPresent=false，积分SELECT成功、返回0行。\n用户档案存在，缺的是积分账户；这条记录本身还不能区分“尚未创建”与“曾被删除”。',
       },
     },
     {
@@ -102,12 +143,29 @@ export const firstNpeCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-usernull'],
-      hypotheses: [],
+      tests: [
+        'h-accountnull',
+        'h-db',
+        'h-dataloss',
+      ],
+      hypotheses: [
+        {
+          id: 'h-accountnull',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-db',
+          status: 'excluded',
+        },
+        {
+          id: 'h-dataloss',
+          status: 'excluded',
+        },
+      ],
       result: {
-        type: 'text',
-        title: '创建链路',
-        text: '上周五发布的功能：积分账户改为"注册后异步创建"（提升注册速度）。\n异步任务创建账户前，查询接口读到的就是 null——\n"新用户必现"与"老用户偶尔（偶发异步延迟）"全部对上了。机制闭合。',
+        type: 'code',
+        title: '同一用户的建账流水',
+        text: 'userId=U-27：10:00:00.000注册成功；10:00:00.100积分查询成功但无账户；10:00:01.200建账INSERT成功；10:00:01.500重查正常。\n只读diff确认：注册成功先返回，积分账户由事件消费者稍后创建。\n生命周期审计中，这次INSERT是该用户首次建账，期间无DELETE。\n与88行对照，异步窗口内的合法缺失被直接解引用，解释失败与稍后恢复。',
       },
     },
     {
@@ -118,12 +176,19 @@ export const firstNpeCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-db'],
-      hypotheses: [{ id: 'h-db', status: 'excluded' }],
+      tests: [
+        'h-db',
+      ],
+      hypotheses: [
+        {
+          id: 'h-db',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
-        title: 'DB 核对',
-        text: '积分 DB 正常，查询成功率 100%——查到的确实是"没有账户记录"，不是"查不了"。\n→ 排除 DB。',
+        title: '查询结果核对',
+        text: '失败requestId对应的SELECT均执行成功、返回0行，没有连接错误或超时；数据库可查询。\n排除“查询失败被转成null”，不能仅用全库健康率代替请求级证据。',
       },
     },
     {
@@ -134,44 +199,51 @@ export const firstNpeCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-dataloss'],
-      hypotheses: [{ id: 'h-dataloss', status: 'excluded' }],
+      tests: [
+        'h-dataloss',
+      ],
+      hypotheses: [
+        {
+          id: 'h-dataloss',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
-        title: '数据核对',
-        text: '受影响用户在用户服务档案完好——只是"积分账户"这一层没建。\n不是数据被删，是数据"还没出生"（异步任务还没跑）。\n→ 排除脏数据。',
+        title: '账户生命周期核对',
+        text: '受影响账户在失败前从未创建；首次INSERT发生在失败后，无DELETE审计。\n排除“原账户被删”，并支持“账户尚未创建”。',
       },
     },
     {
       id: 'a-fixnull',
-      name: '修复：88 行判空 + 默认空账户',
-      desc: '【状态变更】getAccount() 为 null 时返回余额 0 + "开通中"提示',
+      name: '修复：显式返回账户开通中',
+      desc: '【状态变更】账户未创建时返回PENDING，页面展示开通中',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '修复结果',
-        text: '88 行改为判空：账户未开通 → 返回默认视图（余额 0 + "积分开通中"）。\n页面不再空白——新用户看到友好提示，异步账户建好后自然刷新。\n→ 对"未出生的数据"给出友好的中间态，是接口的礼貌。',
+        title: '业务状态修复',
+        text: '查询区分PENDING与READY：账户尚未创建时展示“积分账户开通中”；READY才读取余额。\n不把未知余额伪装成0，也不再让空引用替代业务状态。',
       },
     },
     {
       id: 'a-fixasync',
-      name: '沉淀：异步创建加同步兜底',
-      desc: '【状态变更】查询时若账户不存在则同步创建（幂等），异步任务保留作加速',
+      name: '沉淀：建账完成后开放积分操作',
+      desc: '【状态变更】由建账完成事件更新READY状态',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '兜底上线',
-        text: '查询路径发现"无账户"→ 同步创建（带唯一约束防并发重复）→ 返回正常数据。\n异步创建保留（加速注册），同步兜底保证"查询永远有答案"。',
+        title: '生命周期契约',
+        text: '注册成功与积分账户就绪是两个时刻。客户端收到READY后再开放积分操作；异步消费者保留唯一约束，重复事件不重复建账。',
       },
     },
     {
@@ -179,79 +251,84 @@ export const firstNpeCase: DiagnosisCase = {
       name: '沉淀：堆栈阅读四步法进新人手册',
       desc: '【状态变更】①读类型 ②读消息 ③找第一行业务帧 ④行号看解引用（Caused by 链下关细讲）',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '四步法',
-        text: '① 读异常类型与消息——JDK 的友好提示经常直接给出答案\n② 找第一行"自己的代码"帧——框架帧先跳过\n③ 按行号看代码：链式解引用逐个判别\n④ 这次是你的第一课：答案一直在堆栈里，一屏 40 行只有 2 行属于你。',
+        title: '堆栈阅读清单',
+        text: '先读异常类型与具体空引用，再找第一行业务帧和对应代码；有Caused by时继续读完整链。\n异常指出失败位置；为什么出现该状态，需要业务流水解释。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-usernull', text: '上周五"积分账户异步创建"功能上线：新用户查询时账户尚未异步建成，88 行链式解引用 getAccount() 返回 null 未判空——NPE 页面空白（老用户偶发=异步延迟）', correct: true },
-    { id: 'rc-accountnull', text: '用户存在但积分账户为 null（本例的实际断点，非独立假设）', correct: false },
-    { id: 'rc-db', text: '积分 DB 故障导致查询失败返回 null', correct: false },
-    { id: 'rc-dataloss', text: '用户数据被误删形成脏数据', correct: false },
+    {
+      id: 'rc-usernull',
+      text: '用户档案本身为空，调用getAccount()就失败',
+      correct: false,
+    },
+    {
+      id: 'rc-accountnull',
+      text: '注册成功先返回，积分账户异步创建尚未完成；查询代码直接解引用缺失账户，导致首次查询NPE',
+      correct: true,
+    },
+    {
+      id: 'rc-db',
+      text: '数据库查询失败，被误当作无账户',
+      correct: false,
+    },
+    {
+      id: 'rc-dataloss',
+      text: '已存在的积分账户被误删',
+      correct: false,
+    },
   ],
-
-  expertCost: 5,
-  restartActionId: 'a-fixnull',
-
+  expertCost: 4,
+  restartActionId: '',
   expertChain: [
     {
-      thought: '先从客服描述里圈特征——"新用户必现"这个短语比堆栈更早缩小了范围。',
-      update: '新用户必现 + 老用户偶发可恢复——某个"新用户才走得到的分支"有问题。',
+      thought: '先看谁失败、何时恢复。',
+      update: '失败集中在注册后首次打开，账户建好后恢复。',
       actionId: 'a-impact',
-      why: '1⚡︎ 读堆栈前先读"人的描述"：特征让堆栈里的每一行都有了对号入座的坐标——带着特征读，读到的才不是噪音。',
-      conclusion: '特征就位 → 开始四步法。',
+      why: '1⚡先画出时间窗口，比先查整库更能缩小候选范围。',
+      conclusion: '用户生命周期是关键线索。',
     },
     {
-      thought: '四步法前两步：读异常类型与消息、找第一行业务帧——消息里那句 "getAccount() is null" 已经是半个答案。',
-      update: '实锤方向：空的不是 user，是 userPoint.getAccount()——88 行的链式解引用有一个环节断了。',
+      thought: '消息指出getAccount()的返回值为空，第一行业务帧指向88行。',
+      update: '排除用户对象为空；查询代码未表达账户尚未就绪。',
       actionId: 'a-frameread',
-      why: '2⚡︎ 教学核心：现代 JVM 的友好 NPE 消息会把"哪个解引用断了"直接写出来——新人最大的误区是"堆栈很长好可怕"，其实异常消息往往就是答案本体。',
-      conclusion: '断点定位到 88 行的解引用链。',
+      why: '2⚡同时核对消息与业务代码，分清空的是哪一环，避免对错对象下结论。',
+      conclusion: '断点是缺失账户被直接解引用。',
     },
     {
-      thought: '用判别日志代替猜测：user 和 account 各自是什么——一次日志让两个假设分出胜负。',
-      update: 'user=true、account=null——"用户存在、账户未建"，方向从"上游没给"转为"上游给了但缺一层"。',
-      actionId: 'a-logcheck',
-      why: '1⚡︎ 链式解引用的判别不要靠眼睛瞪代码——一行日志让每个候选对象自己报身份。假设思维：让证据替你选择，而不是让直觉替你站队。',
-      conclusion: '假设收敛：账户未创建。',
-    },
-    {
-      thought: '把"账户为什么没建"对上时间线——上周五的异步创建功能与"新用户必现"严丝合缝。',
-      update: '机制闭合：异步创建延迟窗口 × 查询未判空 = 页面空白；老用户偶发 = 异步偶发延迟。',
+      thought: '同一用户在失败后才首次建账，查询成功且期间没有删除。',
+      update: '异步建账窗口解释缺失、失败与稍后恢复，数据库和误删假设排除。',
       actionId: 'a-rpctime',
-      why: '1⚡︎ 机制找到后要与"特征"互相对号：新用户必现（窗口内必然）+ 老用户偶发（偶尔延迟）——全部对上，才是真闭合。',
-      conclusion: '根因完整 → 修复与兜底。',
+      why: '1⚡用同一身份的完整流水区分尚未创建、被删除和查询失败，补齐机制。',
+      conclusion: '断点与生命周期证据闭合。',
     },
     {
-      thought: 'DB 与脏数据两个常规嫌疑各 1⚡︎ 排除留证；修复（判空+兜底）+ 沉淀（四步法）。停止收集。',
-      update: '停止。',
+      thought: '位置、机制和影响面已经能解释同一批失败。',
+      update: '停止收集，转为修复账户未就绪的业务状态。',
       actionId: '',
-      why: '【停止规则】机制（异步窗口）✓ 断点（88 行未判空）✓ 特征（新用户必现）✓——三层证据与现象全部对上。',
-      conclusion: '沉淀：堆栈是地图——异常类型、消息、第一行业务帧、行号解引用，四步读完就有方向。你的第一份堆栈，答案一直写在里面。',
+      why: '继续核对同样的对象日志不会改变处置；只读流水与代码已相互验证。',
+      conclusion: '返回PENDING并在READY后开放积分操作；不把修复动作算入定位成本。',
     },
   ],
-
   lessons: [
     {
-      text: '堆栈阅读四步法：①读异常类型与消息 ②找第一行自己的代码帧 ③按行号看解引用 ④Caused by 链找根因——一屏 40 行，只有 2 行属于你。',
-      principle: '全栈视野：现代 JVM/运行时的异常消息会直接指出"哪个解引用断了"——新人最大的误区是被堆栈长度吓住。框架帧跳过、业务帧精读：你的代码从第一行业务帧开始，答案从异常消息开始。',
+      text: '增强NPE消息帮助定位哪个引用为空；第一行业务代码帮助理解它为何会被使用。',
+      principle: '消息定位失败的解引用，不负责解释业务数据为什么缺失。将异常、代码和同一用户的生命周期流水拼起来，才从位置走到原因。',
     },
     {
-      text: '链式解引用逐个判别：a.b().c() 报 NPE 时，用判别日志确认是 a 为 null 还是 b() 返回 null——让证据选择假设。',
-      principle: '假设思维：链式调用每一环都是独立嫌疑。一行判别日志（每个候选打 is null 标记）比盯着代码瞪十分钟快得多——尤其当你只有只读权限时，日志是你最好的搭档。',
+      text: '异步创建的资源可能尚未就绪，要把PENDING与READY设计成明确状态。',
+      principle: '注册成功不代表所有附属资源已经创建。调用方需要遵守资源就绪契约，不能把暂时缺失当成数据库故障或已知的零余额。',
     },
     {
-      text: '对"未出生的数据"给出友好中间态：查询遇到"还没创建好"的资源时，返回默认视图 + 开通中提示，而不是让 NPE 替你回答。',
-      principle: '程序设计：异步创建的数据在窗口期内是"合法的缺失"——查询方要为它设计中间态，而不是假定它必然存在。判空兜底 + 同步补建（幂等）是这对组合的标准姿势。',
+      text: '看到“数据没有”时，区分未创建、被删除和查询失败。',
+      principle: '三种情况可出现相似页面，但首次INSERT、DELETE审计和请求级查询结果分别提供可区分的证据；不要靠同一个null猜出所有原因。',
     },
   ],
 }

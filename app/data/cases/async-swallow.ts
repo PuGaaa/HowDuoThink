@@ -1,50 +1,68 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 读懂报错 第四批（异步异常蒸发 L2）
- * 教学点：程序设计——异步线程抛出的异常没人接：Future 丢弃 + 无 UncaughtHandler = 三无任务；
- * 状态机必须有失败分支；"生成中"超时巡检是三无任务的哨兵。
- * 专家路径：impact(1) + taskaudit(2) + osslog(1) = 4⚡︎
+ * 读懂报错：主训程序设计；次训验证思维；排查现场。
+ * 原型：JDK17 submit/FutureTask异常保存与业务终态，教学重建。
+ * 六维：2/2/2/2/1/2，L2；OSS慢告警由osslog按taskId收线。
+ * 标准：impact(1) → taskaudit(2) → osslog(1) = 4；替代：impact → osslog → taskaudit = 4。
+ * 技术依据与独立编审见 content/baselines/t04a-calibration.md。
  */
 export const asyncSwallowCase: DiagnosisCase = {
   id: 'async-swallow',
-  title: '报表"生成中"了三天：异常连堆栈都没来得及写',
-  intro: '异步报表任务 5% 凭空消失：无回调、无日志、无终态——异步线程里抛的异常，连堆栈都没来得及写。',
+  title: '报表永远生成中：Future里保存了什么',
+  intro: '部分异步报表没有终态。任务异常可能被Future保存，线程仍健康；先查谁负责观察结果和写入失败状态。',
   domain: 'runtime',
-  layer: '异步异常要有人接——没接住的异常是三无任务：无日志无回调无终态',
+  layer: 'submit把任务异常保存到Future；必须明确异常观察和业务失败终态的责任',
   part: 'apprentice',
   chapterId: 'error-reading',
   order: 4,
-  typeTags: ['resource', 'data', 'observability'],
+  typeTags: [
+    'resource',
+    'data',
+    'observability',
+  ],
   difficulty: 2,
-
   scene: {
-    role: '你是「鲜到家」报表平台的新人，用户的三张"永久生成中"报表是你的第三课。',
-    architecture: '导出请求 → 异步任务池(生成报表 → 上传 OSS → 回调置状态) ｜ 状态机：生成中 → 完成/失败',
-    tag: '故障现场',
+    role: '你是「鲜到家」报表平台的值班工程师，需要定位永久生成中的任务。',
+    architecture: '请求建任务GENERATING → JDK17 ExecutorService.submit(render→upload→markDone)；实现缺markFailed路径',
+    tag: '教学重建',
     symptoms: [
       {
         type: 'error',
-        title: '三无任务',
-        text: '5% 的任务：无完成回调、无失败回调、无任何日志——状态永远停在"生成中"。\n用户三天后追问："我的报表呢？"——运营只能手动重发。',
+        title: '永久生成中的任务',
+        text: '5%的任务没有完成或失败终态；搜索“导出失败”没有业务错误日志。\n任务提交记录可查，但render()之后才写第一条业务日志。',
       },
       {
-        type: 'text',
-        title: '反常之处',
-        text: '接口层正常返回"生成中"✓、线程池指标健康 ✓、ELK 搜"导出失败"零命中 ✓。\n三处都"没出错"，任务却消失了——与联调的"三无现场"神似，但这次在服务端。',
+        type: 'log',
+        title: '附近的一条OSS告警',
+        text: '[WARN] upload slow taskId=SUCCESS-9 duration=2100ms\n还不能确认这条告警属于永久生成中的任务。',
       },
     ],
-    timeline: '导出改异步架构两周 ｜ 三无任务自上线出现 ｜ 同期成功任务 95% 全链路日志完整',
-    impactHint: '成功的任务有完整日志，失败的任务连日志都没有——失败的路径上，少装了什么仪器？',
+    timeline: '导出改为submit异步两周 ｜ 成功任务95%有后续业务日志 ｜ 失败样本输入包含未初始化的模板配置',
+    impactHint: '没有失败日志不代表没有执行。先核对任务生命周期，再找异步结果由谁观察。',
   },
-
   hypotheses: [
-    { id: 'h-swallow', text: '异步任务异常未被捕获：submit 的 Future 被丢弃、无 UncaughtHandler——异常被线程池静默吞掉，状态不更新', excludeActionId: 'a-taskaudit' },
-    { id: 'h-oss', text: 'OSS 上传失败但回调也失败（成功上传、失败通知双丢）', excludeActionId: 'a-osslog' },
-    { id: 'h-oom', text: '任务 OOM 被内核杀死，线程死亡', excludeActionId: 'a-threadstate' },
-    { id: 'h-queue', text: '任务在队列堆积未执行（还没轮到）', excludeActionId: 'a-queuestate' },
+    {
+      id: 'h-swallow',
+      text: 'render异常被Future保存，但无人读取，任务又没有写失败终态',
+      excludeActionId: 'a-taskaudit',
+    },
+    {
+      id: 'h-oss',
+      text: '报表已生成并上传成功，只是完成通知或状态更新丢失',
+      excludeActionId: 'a-osslog',
+    },
+    {
+      id: 'h-oom',
+      text: '进程被内核OOM killer杀死，在途任务丢失',
+      excludeActionId: 'a-threadstate',
+    },
+    {
+      id: 'h-queue',
+      text: '任务仍在排队，还没有执行',
+      excludeActionId: 'a-queuestate',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -57,25 +75,42 @@ export const asyncSwallowCase: DiagnosisCase = {
       tests: [],
       hypotheses: [],
       result: {
-        type: 'code',
-        title: '消失坐标',
-        text: '三无任务：提交后立即消失（无执行记录）\n线程池：活跃度正常（其余任务在跑）\n成功任务：全链路日志完整 ✓\n→ 不是"执行失败"（那会有失败日志），是"执行前/执行中无声蒸发"——失败路径上少装了仪器。',
+        type: 'text',
+        title: '生命周期盘点',
+        text: '受影响taskId均已提交；GENERATING由请求线程写入，后续没有终态。\n第一条业务日志在render()返回之后，失败样本连这条都没有。\n因此生成阶段提前退出值得优先检查，但“没日志”本身不能证明没执行。',
       },
     },
     {
       id: 'a-taskaudit',
-      name: '解剖任务提交与异常路径',
-      desc: 'submit 的返回值去哪了、异常抛给谁',
+      name: '审计submit与同输入诊断重放',
+      desc: '保留Future，观察get()的异常与工作线程',
       cost: 2,
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-swallow'],
-      hypotheses: [{ id: 'h-swallow', status: 'confirmed' }],
+      tests: [
+        'h-swallow',
+        'h-queue',
+        'h-oom',
+      ],
+      hypotheses: [
+        {
+          id: 'h-swallow',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-queue',
+          status: 'excluded',
+        },
+        {
+          id: 'h-oom',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
-        title: '代码解剖',
-        text: 'executor.submit(() => { render(); uploadOss(); markDone(); })\n三处缺陷叠加：\n① 返回的 Future 被丢弃——get() 没人调，异常没人读\n② 任务体内无 try-catch——render() 抛 NPE 直接传出\n③ 线程池无 UncaughtExceptionHandler——异常进线程池的黑洞\n④ 状态机只有"生成中→完成"路径——失败分支根本不存在\n实验：提交一个必抛异常的任务 → 三无复现 100%。\n实锤：异常进黑洞，状态机没有"死"的选项。',
+        title: '代码与诊断重放',
+        text: '代码：executor.submit(() -> { render(); uploadOss(); markDone(); }); 返回Future被丢弃，无任务失败记录分支。\n同版本同失败输入重放并保留Future：get()抛ExecutionException，cause为render()内的NullPointerException，发生在uploadOss之前。\nFuture已完成为异常；工作线程继续执行下一任务。即使安装UncaughtExceptionHandler，本次计数仍为0。\nsubmit使用FutureTask保存异常，异常没有逃出工作线程；handler不能代替观察Future。',
       },
     },
     {
@@ -86,28 +121,42 @@ export const asyncSwallowCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-oss'],
-      hypotheses: [{ id: 'h-oss', status: 'excluded' }],
+      tests: [
+        'h-oss',
+      ],
+      hypotheses: [
+        {
+          id: 'h-oss',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
-        title: 'OSS 核对',
-        text: '三无任务在 OSS 侧连上传尝试的记录都没有——任务死在生成阶段，没走到上传。\n→ 排除 OSS 回调双丢。',
+        title: '上传阶段与噪声核对',
+        text: '失败样本render异常堆栈在uploadOss调用之前，诊断重放上传调用计数为0；对象清单无对应输出。\n附近的upload slow属于已成功的SUCCESS-9，不是失败taskId。\n排除“上传已成功但通知丢失”；不能只凭OSS侧无日志就断言任务未执行。',
       },
     },
     {
       id: 'a-threadstate',
-      name: '核对线程池线程状态',
-      desc: '排除 OOM 杀线程',
+      name: '核对进程身份与OOM记录',
+      desc: '区分进程被杀和任务内异常',
       cost: 1,
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-oom'],
-      hypotheses: [{ id: 'h-oom', status: 'excluded' }],
+      tests: [
+        'h-oom',
+      ],
+      hypotheses: [
+        {
+          id: 'h-oom',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
-        title: '线程核对',
-        text: '工作线程全部健康（RUNNABLE/WAITING），无死亡无重建风暴；dmesg 无 OOM kill。\n→ 排除 OOM。',
+        title: '进程与线程核对',
+        text: '故障前后进程启动时间、容器实例身份相同，内核无对应OOM kill记录；其他任务持续完成。\n结合Future中明确的render NPE，排除本案进程被杀；内核OOM killer不是只杀一个Java任务线程。',
       },
     },
     {
@@ -118,19 +167,26 @@ export const asyncSwallowCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-queue'],
-      hypotheses: [{ id: 'h-queue', status: 'excluded' }],
+      tests: [
+        'h-queue',
+      ],
+      hypotheses: [
+        {
+          id: 'h-queue',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
-        title: '队列核对',
-        text: '队列水位 12%——不存在堆积；三无任务连"开始执行"的日志都没有（区别于执行中断）。\n→ 排除排队：它们被执行过一瞬间，然后无声死亡。',
+        title: '出队与结果核对',
+        text: '调度审计中失败taskId已有出队记录，不在当前队列；同输入诊断重放的Future已异常完成。\n排除“还没轮到”。低队列水位本身不能证明某个任务已执行，关键是任务身份与完成状态。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急清空任务池并重启',
       desc: '【状态变更】排空队列 + 重启任务池，赌一次干净初始化',
-      cost: 1,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
@@ -138,24 +194,24 @@ export const asyncSwallowCase: DiagnosisCase = {
       hypotheses: [],
       result: {
         type: 'text',
-        title: '清空结果',
-        text: '队列中 6 个疑似三无任务被丢弃（用户侧重新提交），线程池重启。\n新提交任务依旧三无（根因未修）——止血动作只清了"疑似的现场"，\n且丢弃任务让 6 个用户白等——止血代价记账，修复必须跟上。',
+        title: '重启演练记录',
+        text: '重启会丢弃仍排队的6个其他任务；同一失败输入重新提交后，render NPE仍被无人观察的Future保存。\n它不修复失败终态责任，还会破坏在途现场。本题其他动作仍读取同一份快照。',
       },
     },
     {
       id: 'a-fixhandler',
-      name: '修复：失败路径补全 + 异常兜底',
-      desc: '【状态变更】任务体 try-catch → 失败回调 + 状态机"失败"分支；线程池挂 UncaughtExceptionHandler 兜底',
+      name: '修复：明确任务边界的失败处理',
+      desc: '【状态变更】记录异常、markFailed；Future由指定后台观察者读取',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '修复结果',
-        text: '① 任务体统一 try-catch：任何异常 → markFailed(reason) + 失败回调\n② 线程池 UncaughtExceptionHandler：漏网异常兜底记录 + 告警\n③ 状态机补"失败"分支：生成中 → 完成 ∨ 失败（不可能再有三无）\n回归：必抛异常任务 → 状态"失败" + 失败回调 + ERROR 日志——三无绝迹。',
+        title: '失败责任修复',
+        text: '任务边界捕获业务Exception，写错误日志和markFailed；结果观察由后台收集者get()或afterExecute检查Future承担。\n不在提交请求里同步等待get()，也不依赖UncaughtExceptionHandler捕获submit内部异常。\n普通异常重放得到FAILED和错误记录；进程崩溃等未落终态情况另由超时巡检发现。',
       },
     },
     {
@@ -163,104 +219,116 @@ export const asyncSwallowCase: DiagnosisCase = {
       name: '沉淀：状态机巡检哨兵',
       desc: '【状态变更】"生成中"超 10 分钟自动标 STUCK + 告警——三无任务的最后哨兵',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '哨兵上线',
-        text: '巡检任务：超时未终态的任务标记 STUCK 并告警。\n它不是修复（任务仍需人工或重跑），是"发现"的兜底——任何未来的三无，10 分钟内现形。',
+        title: '巡检哨兵',
+        text: '根据实际任务耗时设定阈值，发现超时仍GENERATING的任务并标记STUCK、告警。\n巡检用于发现进程崩溃、状态写入失败等遗留任务；不能单靠一次catch保证永不失联。',
       },
     },
     {
       id: 'a-fixlint',
       name: '沉淀：异步提交规范',
-      desc: '【状态变更】lint：submit 返回值禁止丢弃；异步任务必须有失败路径；线程池必须配 UncaughtHandler',
+      desc: '【状态变更】submit明确结果观察责任，任务必须有失败终态',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '规范进工具',
-        text: '静态检查三条：Future 丢弃拦截 / 异步任务失败路径必填 / 线程池构建器强制 handler。\n全仓扫描另揪出 2 处同款黑洞（通知服务/归档服务）——一次学费，三处偿还。',
+        title: '异步代码审查',
+        text: 'submit必须说明谁观察成功与异常结果；任务边界必须落实失败日志与状态。\nFuture可以由后台收集者或afterExecute检查，不要求请求线程阻塞get()。\nUncaughtExceptionHandler处理真正逃出线程的异常，不是submit结果观察器。',
       },
     },
     {
       id: 'a-fixmon',
-      name: '沉淀：线程池异常计数指标',
-      desc: '【状态变更】每分钟"被池吞掉的异常数"指标上线——吞异常不再无声',
+      name: '沉淀：任务失败与超时指标',
+      desc: '【状态变更】由失败处理或Future观察器计数，避免双记',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '计数指标',
-        text: 'UncaughtExceptionHandler 同时打点：swallowed_exceptions_total。\n指标 > 0 即告警——黑洞从"绝对静默"变成"有仪表的陷阱"。',
+        title: '指标来源',
+        text: '任务边界或Future观察器记录task_failed_total，同一taskId只结算一次；巡检另记task_stuck_total。\n不把UncaughtExceptionHandler的零计数当成“submit任务没有异常”。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-swallow', text: '异步任务异常无人接：submit 的 Future 被丢弃、任务体无 try-catch、线程池无 UncaughtExceptionHandler——异常进黑洞，状态机无失败分支，5% 任务三无消失', correct: true },
-    { id: 'rc-oss', text: 'OSS 上传成功但回调双丢', correct: false },
-    { id: 'rc-oom', text: '任务 OOM 被内核杀死', correct: false },
-    { id: 'rc-queue', text: '任务队列堆积未执行', correct: false },
+    {
+      id: 'rc-swallow',
+      text: 'render异常被submit的Future保存，调用方未观察结果，任务也无失败终态路径；线程仍健康但任务永久GENERATING',
+      correct: true,
+    },
+    {
+      id: 'rc-oss',
+      text: '报表上传成功，完成通知或状态更新丢失',
+      correct: false,
+    },
+    {
+      id: 'rc-oom',
+      text: '进程被内核OOM killer杀死',
+      correct: false,
+    },
+    {
+      id: 'rc-queue',
+      text: '任务仍在队列等待执行',
+      correct: false,
+    },
   ],
-
   expertCost: 4,
-  restartActionId: 'a-fixhandler',
-
+  restartActionId: 'a-danger',
   expertChain: [
     {
-      thought: '成功的任务有完整日志、失败的任务零日志——先画"消失"的坐标：死在生命周期的哪一段。',
-      update: '提交后立即消失、无执行记录、线程池健康——不是执行失败，是"失败路径上没装仪器"。',
+      thought: 'GENERATING在提交时写入，第一条业务日志却在render后。',
+      update: '缺日志可能是render提前失败，尚不能断言任务没执行。',
       actionId: 'a-impact',
-      why: '1⚡︎ "成功有日志、失败无日志"的不对称本身就是证据：失败路径的观测缺失——它解释了为什么 ELK 零命中。',
-      conclusion: '嫌疑锁定：异常无人接（h-swallow 升权）。',
+      why: '1⚡先确认生命周期和观测点位置，比继续搜一个从未写出的错误关键字更有效。',
+      conclusion: '优先审计异步结果与失败路径。',
     },
     {
-      thought: '解剖提交与异常路径——submit 的返回值、任务体的 catch、线程池的 handler，三个环节逐一查。',
-      update: '实锤：Future 丢弃 + 无 catch + 无 handler + 状态机无失败分支——四重缺陷叠加的黑洞。',
+      thought: '同输入重放的Future保存render NPE，线程继续工作，handler没有触发。',
+      update: '异常被Future观察契约保存，无人读取且没有失败状态，是永久生成中的机制。',
       actionId: 'a-taskaudit',
-      why: '2⚡︎ 教学核心：异步异常的"蒸发机制"是四重缺陷的乘积——任何一环在岗都会留下痕迹。必抛异常任务的复现实验是终极证明：黑洞可以被抓个现行。',
-      conclusion: '根因实锤：异常进黑洞。',
+      why: '2⚡代码审计结合受控重放，直接区分排队、线程退出与异常完成，不能靠线程池健康猜任务成功。',
+      conclusion: '找到异常保存位置及终态责任缺口。',
     },
     {
-      thought: 'OSS/线程/队列三个"任务去了哪"的假设各 1⚡︎ 排除——三种"死亡方式"逐个清场。',
-      update: 'OSS 无尝试、线程健康、队列无堆积——三无任务死于"执行的第一瞬间"。',
+      thought: '异常发生在上传前；OSS告警属于另一个成功任务。',
+      update: '排除上传后通知丢失，并给噪声收线。',
       actionId: 'a-osslog',
-      why: '1⚡︎ "任务去了哪"的三种假说（没执行/执行死/执行完没回话）排除顺序由证据成本决定——OSS 记录与线程状态都是现成数据。',
-      conclusion: '嫌疑收敛单点。',
+      why: '1⚡将阶段顺序与同taskId证据对齐，避免把邻近的供应商告警错当成本任务原因。',
+      conclusion: '失败阶段与机制闭合。',
     },
     {
-      thought: '修复（失败路径+兜底）、哨兵（STUCK 巡检）、门禁（lint 三条）、指标（吞异常计数）。停止收集。',
-      update: '停止。',
+      thought: '异常位置、Future语义和业务状态缺口已互相验证。',
+      update: '停止，补任务失败处理与结果观察责任。',
       actionId: '',
-      why: '【停止规则】机制（四重黑洞）✓ 哨兵（STUCK 巡检）✓ 门禁（lint+指标）✓——修复、发现、防复发三层闭合。',
-      conclusion: '沉淀：异步异常要有人接——Future 不丢、异常有 handler、状态机有失败分支；吞异常的线程池是有仪表的陷阱。',
+      why: 'Future重放已证明任务执行后异常完成，上传前证据排除另一主要路径；无需靠重启猜测。',
+      conclusion: 'submit异常要观察Future或任务边界；handler不能接住已被FutureTask保存的异常。',
     },
   ],
-
   lessons: [
     {
-      text: '异步线程抛出的异常没人接就会蒸发：Future 丢弃 + 任务体无 catch + 线程池无 handler = 无日志无回调无终态的三无任务。',
-      principle: '程序设计：异步任务的异常契约三件套——任务体 try-catch（失败回调+状态更新）、线程池 UncaughtExceptionHandler（兜底）、Future 处理（或明确丢弃的理由）。状态机必须有"失败"分支：只有成功路径的状态机，注定生产三无任务。',
+      text: 'submit任务异常保存在Future中；工作线程仍可继续，UncaughtExceptionHandler未触发不代表任务成功。',
+      principle: 'FutureTask捕获计算异常并在get()时以ExecutionException呈现。真正逃出线程的异常与保存在异步结果中的异常是两种交付路径，不能混用处理器。',
     },
     {
-      text: '"成功有日志、失败无日志"的不对称 = 失败路径的观测缺失：它解释了 ELK 零命中，也指出仪器该装在哪。',
-      principle: '可观测性设计：失败路径的日志/回调/状态更新是观测体系的另一半——只给成功路径装仪器，等于只监控"没坏的东西"。吞异常计数指标让黑洞有仪表，STUCK 巡检让三无任务 10 分钟现形。',
+      text: '异步任务要明确结果观察与失败终态责任；不要为了观察异常把提交请求改成同步等待。',
+      principle: '任务边界可以记录业务失败，后台结果收集者或afterExecute也可检查Future。无论谁承担，必须保证失败可见，并设计状态写入失败与进程崩溃后的巡检。',
     },
     {
-      text: '三无现场与三无任务的对照：前端"无错无数据"、服务端"无日志无终态"——凡是"没有痕迹"的故障，先怀疑"失败路径没装仪器"。',
-      principle: '假设思维："零日志"不是"没发生"，是"发生的证据也被吞了"。排查思路从"搜索失败"转向"审计失败路径的仪器配置"——catch 块、回调注册、状态机分支，逐个点验。',
+      text: '没有日志只说明观测缺失；阶段、任务身份和结果状态才区分没执行、执行失败与通知丢失。',
+      principle: '把日志放在render之后就看不到render提前抛出的异常。先检查观测点，再用同一taskId的出队、异常与上传证据重建生命周期，避免由缺失证据武断排除执行。',
     },
   ],
 }

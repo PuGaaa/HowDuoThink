@@ -1,55 +1,72 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 1 章 · 读懂报错 第二批（Caused by 异常链阅读 L2）
- * 教学点：假设思维——异常链从上往下读：最上层是症状，最底层的 Caused by 才是根因；
- * 按表层异常修（加重试）是安慰剂；池水位监控让"耗尽"提前可见。
- * 专家路径：impact(1) + chainread(1) + chaindeep(2) + poolmetrics(1) = 5⚡︎
+ * 读懂报错：主训假设思维；次训验证思维；排查现场。
+ * 原型：HikariCP 5.1.0 getConnection超时与保留cause的业务包装，教学重建。
+ * 六维：2/2/2/2/1/2，L2；磁盘告警由sizecheck收线。
+ * 标准：impact(1) → chaindeep(2) → poolmetrics(1) = 4；替代：impact → poolmetrics → chaindeep = 4。
+ * 技术依据与独立编审见 content/baselines/t04a-calibration.md。
  */
 export const causedByCase: DiagnosisCase = {
   id: 'caused-by',
-  title: 'Connection reset 只是最后一根稻草',
-  intro: '报表导出偶发失败，异常写着 Connection reset——按表层原因加重试无效：真凶在 Caused by 链的最深处。',
+  title: '导出失败的包装异常：借连接卡在哪里',
+  intro: '表层只写报表生成失败。读完整异常链，再用资源指标确认是借连接超时，还是数据库失联。',
   domain: 'runtime',
-  layer: '异常链从上往下读——最上层是症状，最底层的 Caused by 才是根因',
+  layer: '异常链保留失败线索，资源证据解释业务根因；链底异常不自动等于根因',
   part: 'apprentice',
   chapterId: 'error-reading',
   order: 2,
-  typeTags: ['resource', 'capacity'],
+  typeTags: [
+    'resource',
+    'capacity',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」报表服务的新任负责人，前任留下一句"偶发失败，加了重试就行"的交接语。',
-    architecture: '报表导出服务 → 数据库连接池(20 连接) → MySQL ｜ 高峰时段: 月结批量导出并发 30+',
-    tag: '故障现场',
+    architecture: '导出接口 → ExportService（保留cause包装SQLException）→ HikariCP(20连接) → MySQL8',
+    tag: '教学重建',
     symptoms: [
       {
         type: 'error',
-        title: '失败日志（表层异常）',
-        text: 'java.net.SocketException: Connection reset\n  at java.base/java.net.SocketInputStream.read(…)\n  at com.xj.report.ExportDao.queryBigReport(ExportDao.java:140)\n前任的修复：这一层加重试 3 次——失败率从 2% 降到 1.8%，约等于没用。',
+        title: '接口错误日志（当前只展示第一层）',
+        text: 'com.xj.report.ExportException: Report generation failed\n  at com.xj.report.ExportService.export(ExportService.java:140)\n前任增加重试后，月结高峰仍有请求失败。',
       },
       {
-        type: 'text',
-        title: '完整堆栈（这次学乖了，翻到底）',
-        text: 'Caused by: java.net.SocketTimeoutException: Read timed out\nCaused by: com.mysql.cj.exceptions.CJCommunicationsException …\nCaused by: java.sql.SQLTransientConnectionException: HikariPool-1 -\n  Connection is not available, request timed out after 30000ms ← 最底层！',
+        type: 'log',
+        title: '同时出现的告警',
+        text: '[WARN] export-temp disk_usage=72% threshold=70%\n这条磁盘容量告警是否与报表失败有关，还没有证据。',
       },
     ],
-    timeline: '失败集中在月结周（批量导出并发 30+）｜ 重试"修复"已存在三个月 ｜ 失败率 1.8% 雷打不动',
-    impactHint: '表层写"网络断了"，最底层写"等连接等了 30 秒"——两个故事，信哪一个？',
+    timeline: '月结高峰持续到达导出请求 ｜ 上周查询改为大结果集读取 ｜ 已有重试没有稳定消除失败',
+    impactHint: '先核对失败分布；保留cause的异常链可能告诉你失败发生在借连接还是执行SQL。',
   },
-
   hypotheses: [
-    { id: 'h-pool', text: '连接池耗尽：请求等连接 30s 超时，被底层包装成 Connection reset——Caused by 最深处才是根因', excludeActionId: 'a-chaindeep' },
-    { id: 'h-surface', text: '表层就是真相：网络抖动导致 reset，重试是对的方向（加强版）', excludeActionId: 'a-chainread' },
-    { id: 'h-remote', text: '对端 MySQL 真的在重启/抖动，连接被远端重置', excludeActionId: 'a-remoteuptime' },
-    { id: 'h-size', text: '大报表数据量触发链路限制，传输被掐断', excludeActionId: 'a-sizecheck' },
+    {
+      id: 'h-pool',
+      text: '慢查询长期占满池中连接，后续请求借连接超时',
+      excludeActionId: 'a-poolmetrics',
+    },
+    {
+      id: 'h-surface',
+      text: '应用到数据库链路故障，连接不可用',
+      excludeActionId: 'a-remoteuptime',
+    },
+    {
+      id: 'h-remote',
+      text: 'MySQL进程重启，现有连接失效',
+      excludeActionId: 'a-remoteuptime',
+    },
+    {
+      id: 'h-size',
+      text: '导出临时目录空间不足，文件写入失败',
+      excludeActionId: 'a-sizecheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
       name: '核对失败与重试的关系',
-      desc: '影响面：重试三个月为什么无效——失败 shape 复核',
+      desc: '影响面：失败集中哪些时段、等待多久',
       cost: 1,
       gain: 'high',
       danger: false,
@@ -57,41 +74,53 @@ export const causedByCase: DiagnosisCase = {
       tests: [],
       hypotheses: [],
       result: {
-        type: 'code',
-        title: '重试无效性分析',
-        text: '失败分布：100% 集中在月结周高峰（并发 30+）；\n重试后再失败率：仍 60%——重试等 30s 还是等不到连接。\n瞬时网络抖动通常会让一部分重试成功；这里重试后仍有 60% 失败，且失败只在高峰出现。\n→ "重试无效"与高峰分布共同支持资源持续不足，不足以单凭表层异常断定网络故障。',
+        type: 'text',
+        title: '失败分布',
+        text: '失败集中月结高峰；同样的导出参数在低峰成功。\n失败请求总耗时接近30秒，重试后部分成功、部分再次失败。\n这只能提高持续资源等待的优先级，还不能单凭重试效果排除网络或数据库故障。',
       },
     },
     {
       id: 'a-chainread',
-      name: '把表层异常当根因的代价',
-      desc: '验证"网络抖动"叙事：它解释不了什么',
+      name: '核对表层异常的包装代码',
+      desc: '看它是否保留原始cause',
       cost: 1,
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-surface'],
-      hypotheses: [{ id: 'h-surface', status: 'excluded' }],
+      tests: [],
+      hypotheses: [],
       result: {
-        type: 'text',
-        title: '表层叙事的反驳',
-        text: 'Connection reset 的表层解读：网络断了。\n反驳三连：①同机其他连接正常（不是网络断）②失败 100% 集中高峰（不是随机抖动）③重试无效（不是瞬时故障）。\n→ 排除表层叙事：异常的最上层只是"最后的死法"，死因在链条更深处。',
+        type: 'code',
+        title: '包装代码',
+        text: 'catch (SQLException e) {\n  throw new ExportException("Report generation failed", e);\n}\n表层是业务包装，不是SocketException。继续读cause才能区分连接获取、SQL执行与结果处理失败。',
       },
     },
     {
       id: 'a-chaindeep',
-      name: '读完整 Caused by 链：最底层见根因',
-      desc: '异常链从上往下读——每一层都是上一层的"为什么"',
+      name: '展开完整cause链与失败位置',
+      desc: '确定等待发生在哪个调用',
       cost: 2,
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-pool'],
-      hypotheses: [{ id: 'h-pool', status: 'confirmed' }],
+      tests: [
+        'h-pool',
+        'h-size',
+      ],
+      hypotheses: [
+        {
+          id: 'h-pool',
+          status: 'up',
+        },
+        {
+          id: 'h-size',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
-        title: '异常链全文（从上往下读）',
-        text: 'L1 SocketException: Connection reset            ← 症状：读响应时连接被重置\nCaused by L2 SocketTimeoutException: Read timed out ← 为什么 reset：等响应超时\nCaused by L3 SQLTransientConnectionException:      ← 为什么超时：等连接等了 30s\n   HikariPool-1 - Connection is not available,\n   request timed out after 30000ms\n→ 因果链完整：池耗尽 → 等连接 30s → 读超时 → reset。\n最底层是"因"，最上层是"果"——按最上层修 = 治疗症状。',
+        title: '完整异常链',
+        text: 'com.xj.report.ExportException: Report generation failed\nCaused by: java.sql.SQLTransientConnectionException: HikariPool-1 - Connection is not available, request timed out after 30000ms.\n  at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(...)\n  at com.zaxxer.hikari.pool.HikariPool.getConnection(...)\n业务帧停在dataSource.getConnection()；失败请求尚未拿到连接，未发送它自己的SQL。\n这说明借连接等待超时，但池被慢查询占满或无法建立新连接，仍需指标区分。',
       },
     },
     {
@@ -102,12 +131,29 @@ export const causedByCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
+      tests: [
+        'h-pool',
+        'h-surface',
+        'h-remote',
+      ],
+      hypotheses: [
+        {
+          id: 'h-pool',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-surface',
+          status: 'excluded',
+        },
+        {
+          id: 'h-remote',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
-        title: '池水位证据',
-        text: '月结高峰：活跃连接 20/20（满）、等待线程峰值 34、平均等待 12s（超 30s 即失败）\n慢查询陪伴：单报表查询 8~15s（大结果集）——20 连接 × 10s 级占用 = 吞吐天花板极低\n→ 证据与异常链互相印证：池太小 × 查询太慢 = 高峰必耗尽。',
+        title: '池与同一MySQL实例对账',
+        text: '同一故障窗口：total=20、active=20、idle=0，等待线程峰值34，借连接超时计数上升。\n这20个连接在同一MySQL实例上持续执行导出SQL，单次占用8~15秒；无建连/通信错误，MySQL uptime未重置。\n持续到达速度超过这些长查询释放连接的速度，等待累积到30秒。\n不是“连接数看着少”就扩池：先缩短占用并验证数据库容量。',
       },
     },
     {
@@ -118,35 +164,54 @@ export const causedByCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-remote'],
-      hypotheses: [{ id: 'h-remote', status: 'excluded' }],
+      tests: [
+        'h-surface',
+        'h-remote',
+      ],
+      hypotheses: [
+        {
+          id: 'h-surface',
+          status: 'excluded',
+        },
+        {
+          id: 'h-remote',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
-        title: '对端核对',
-        text: 'MySQL 90 天零重启；失败时刻连接其他库正常。\n→ 排除对端。',
+        title: '对端与链路核对',
+        text: '同一MySQL实例uptime连续；现有20个导出会话仍在执行SQL，新建诊断连接成功。\n故障窗口无通信错误或连接重置，排除本案的进程重启与断链假设。',
       },
     },
     {
       id: 'a-sizecheck',
-      name: '核对报表数据量与链路限制',
-      desc: '排除数据量触发限制',
+      name: '核对临时目录与写入错误',
+      desc: '给磁盘告警收线',
       cost: 1,
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-size'],
-      hypotheses: [{ id: 'h-size', status: 'excluded' }],
+      tests: [
+        'h-size',
+      ],
+      hypotheses: [
+        {
+          id: 'h-size',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
-        title: '数据量核对',
-        text: '失败样本里也有小报表（几 MB）——数据量与失败无强相关；\n强相关的是"并发数"（高峰 30+）。\n→ 排除数据量：凶手是并发等待，不是单包大小。',
+        title: '磁盘告警收线',
+        text: '目录仍有28%可用空间，失败请求尚在getConnection()，没有进入文件写入。\n无ENOSPC或I/O错误；72%仅超过预警阈值，不是本次失败原因。',
       },
     },
     {
       id: 'a-danger',
-      name: '前任方案加强版：重试 3 次改 5 次',
-      desc: '【状态变更】加重重试次数与间隔',
-      cost: 1,
+      name: '立即重启导出服务',
+      desc: '【状态变更】丢弃等待队列，赌一次干净启动',
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
@@ -154,120 +219,125 @@ export const causedByCase: DiagnosisCase = {
       hypotheses: [],
       result: {
         type: 'text',
-        title: '重试加强结果（陷阱动作）',
-        text: '失败率 1.8% → 1.7%（重试的线程继续占着池的等待队列，反而加剧竞争）。\n→ 复盘点评：往症状上加重药，病没好，药副作用先来了——按表层修 = 安慰剂，还可能有毒。',
+        title: '重启演练记录',
+        text: '重启丢失在途导出现场。相同月结负载再次压来后，长查询仍占满连接，借连接超时重现。\n重启没有缩短查询或释放连接的占用周期；本题其他动作仍读取同一份事前快照。',
       },
     },
     {
       id: 'a-fixpool',
-      name: '修复：池参数 + 慢查询治理',
-      desc: '【状态变更】池 20→40（对齐并发峰值）、连接回收 30s→5min、大报表改流式分页',
+      name: '修复：缩短占用并限制导出并发',
+      desc: '【状态变更】优化慢SQL、按页归还连接，再用同负载验证容量',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '修复结果',
-        text: '① 池 20 → 40（对齐月结并发峰值 30+ 留余量）\n② 大报表查询改流式+分页（单连接占用 10s → 2s）\n③ 重试保留但降为 2 次（作为兜底而非主策略）\n月结周回归：失败率 1.8% → 0%，高峰等待队列峰值 4。',
+        title: '修复验证',
+        text: '先优化慢SQL，每页查询后归还连接，生成文件阶段不持有数据库连接；并限制导出并发。\n保留池上限20，在相同负载下复测：单次连接占用降至约1秒，等待与超时下降。\n是否调整池大小要结合数据库容量实测；借连接超时、连接寿命与查询超时是不同参数。',
       },
     },
     {
       id: 'a-fixchain',
       name: '沉淀：异常链阅读规范',
-      desc: '【状态变更】规范：读异常先翻到最底 Caused by；"表层加重试"前必须完成归因',
+      desc: '【状态变更】日志保留完整cause，归因时对照资源指标',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '规范条目',
-        text: '① 异常链从上往下读：最上层是症状，最底层 Caused by 才是根因\n② 任何"加急重试"的处置必须先回答"失败的机制是什么"\n③ code review 检查项：catch 里只打最上层异常（丢链）视为缺陷——丢 Caused by = 丢证据。',
+        title: '异常阅读规范',
+        text: '读完整cause链并定位失败调用；再查为什么该调用失败。\n最深异常是证据，不保证就是业务根因；包装异常必须保留cause，不能只留下泛化报错。',
       },
     },
     {
       id: 'a-fixmon',
       name: '沉淀：池水位告警',
-      desc: '【状态变更】活跃连接 ≥ 80% 或等待线程 > 0 告警——耗尽提前 30 秒可见',
+      desc: '【状态变更】同时观测active、idle、等待和借连接超时',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
-        title: '监控 v2',
-        text: '池水位三级：活跃 ≥ 80% 预警 / 等待线程 > 0 告警 / 拒绝发生 P1。\n下次池要耗尽时，告警比异常早 30 秒——从"事后读链"进化到"事中拦截"。',
+        title: '监控条目',
+        text: '将连接占用时长、等待线程和借连接超时一起观察。\n提前量取决于采样与负载；不能承诺“等待阈值30秒，所以告警必定提前30秒”。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-pool', text: '连接池耗尽（20 连接 × 月结并发 30+ × 单查询 10s 级）：请求等连接 30s 超时，被底层包装为 Connection reset——表层加重试三个月无效，Caused by 最底层才是根因', correct: true },
-    { id: 'rc-surface', text: '网络抖动导致 reset，重试方向正确（表层叙事）', correct: false },
-    { id: 'rc-remote', text: '对端 MySQL 重启/抖动重置连接', correct: false },
-    { id: 'rc-size', text: '大报表数据量触发链路限制', correct: false },
+    {
+      id: 'rc-pool',
+      text: '大结果集慢查询长期占用20个连接，持续高峰使借连接等待累积至30秒，业务层保留cause包装了超时',
+      correct: true,
+    },
+    {
+      id: 'rc-surface',
+      text: '数据库网络断链导致连接不可用',
+      correct: false,
+    },
+    {
+      id: 'rc-remote',
+      text: 'MySQL进程重启使连接失效',
+      correct: false,
+    },
+    {
+      id: 'rc-size',
+      text: '临时目录写满导致文件生成失败',
+      correct: false,
+    },
   ],
-
-  expertCost: 5,
+  expertCost: 4,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '重试三个月无效——"无效"本身就是证据：先核对失败分布与重试成功率的关系。',
-      update: '失败集中月结高峰、重试后再失败 60%——不是瞬时故障，是"资源持续不够"。',
+      thought: '失败集中高峰且耗时接近固定30秒。',
+      update: '资源等待优先，网络与数据库故障尚未排除。',
       actionId: 'a-impact',
-      why: '1⚡︎ 历史修复的无效性是最便宜的证据：它反向排除了整个"瞬时故障"假设族——前任的三个月不是白干，是给你排除了一个方向。',
-      conclusion: '表层叙事动摇 → 证据链往深处挖。',
+      why: '1⚡先找分布和耗时形状，比直接提高重试次数更能指引下一步。',
+      conclusion: '需要定位等待发生在哪个调用。',
     },
     {
-      thought: '表层叙事单独反驳——Connection reset ≠ 网络断：三连反驳（同机其他连接正常/高峰集中/重试无效）。',
-      update: '排除表层：reset 只是"最后的死法"。转入异常链深读。',
-      actionId: 'a-chainread',
-      why: '1⚡︎ 排除最流行的误读要显式做：表层异常太有迷惑性，"网络断了加重试"几乎是条件反射——三连反驳把它关进笼子。',
-      conclusion: '表层清场 → 异常链深读。',
-    },
-    {
-      thought: '读完整 Caused by 链——从上往下，每一层都是上一层的"为什么"，最底层才是根因。',
-      update: '实锤：reset ← 读超时 ← 等连接 30s ← 池耗尽。因果链四层完整。',
+      thought: '完整cause指向HikariCP.getConnection()，失败请求尚未取得连接。',
+      update: '确定是借连接超时，不是该请求的SQL读超时。',
       actionId: 'a-chaindeep',
-      why: '2⚡︎ 异常链阅读是本关的教学核心：异常的包装是"洋葱"——外层是死法，内层是死因；按最外层修就是安慰剂。池耗尽藏在链底，只有翻到底的人才能看见。',
-      conclusion: '根因实锤 → 用池监控互相印证。',
+      why: '2⚡展开被包装的原始异常，才能区分获取连接与执行查询，避免修错阶段。',
+      conclusion: '慢占用和建连失败仍需区分。',
     },
     {
-      thought: '池水位证据与异常链互相印证——两条独立证据链指向同一结论时，因果才可信。',
-      update: '活跃 20/20 + 等待 34 线程 + 单查询 10s 级——耗尽机制完全闭合，修复参数也由此得出（池 40/占用 2s）。',
+      thought: '池20个连接全部在同一数据库上执行8~15秒的导出SQL，没有断链或重启。',
+      update: '长占用与持续到达导致排队，等待超时机制闭合。',
       actionId: 'a-poolmetrics',
-      why: '1⚡︎ 双证据链原则：异常链（软件视角）与池监控（资源视角）独立指向同一根因——交叉验证让修复方案一次到位，修复参数直接从证据里读出。',
-      conclusion: '因果闭环 → 修复 + 规范 + 监控。',
+      why: '1⚡将借连接异常与实际资源占用对账，解释池为何没有空闲，而不把链底异常当终点。',
+      conclusion: '优先缩短占用和控制导出并发。',
     },
     {
-      thought: '排除对端与数据量、止血陷阱点评、修复三层落地。停止收集。',
-      update: '停止。',
+      thought: '失败调用、占用来源和时间窗口相互印证。',
+      update: '停止；磁盘预警可另行核实，不改变当前定位。',
       actionId: '',
-      why: '【停止规则】根因（池耗尽）✓ 链条（四层因果）✓ 防线（规范+水位监控）✓——机制、证据、防线三层闭合。',
-      conclusion: '沉淀：异常链从上往下读，最底层的 Caused by 才是根因——按最上层修，是给症状发糖。',
+      why: '完整异常链与池/数据库指标已经区分主要假设，继续搜同样报错不会改变处置。',
+      conclusion: '保留cause，治理长占用并按相同负载复测；不从并发数直接推导池应扩到40。',
     },
   ],
-
   lessons: [
     {
-      text: '异常链从上往下读：最上层是"死法"，最底层的 Caused by 才是"死因"——Connection reset 的背后可以藏着池耗尽。',
-      principle: '假设思维：读异常必须翻到 Caused by 链最底层。包装型异常（框架/驱动层层转译）让表层叙事偏离根因好几层——"读到第一层就动手"是新人最贵的习惯。code review 同理：catch 里丢 Caused by 链 = 丢证据。',
+      text: 'cause链帮助定位失败调用；业务根因仍要靠资源与时间线证明。',
+      principle: '借连接超时只说明在规定时间内没有可用连接。慢查询、泄漏和建连失败都可能导致它，不能把最深异常自动当成最终根因。',
     },
     {
-      text: '"修复无效"是免费的排除证据：重试三个月失败率不动，说明问题不是瞬时的——历史修复的无效性反证故障类别。',
-      principle: '假设思维：接手遗留问题时，先审"已有的修复为什么没用"。瞬时故障重试必有效；持续资源不足重试必无效——重试的无效性把假设空间从"抖动类"整体切到"容量类"。',
+      text: '重试效果只能调整假设优先级，不能单独排除网络或确认容量问题。',
+      principle: '瞬时与持续故障都可能出现重试成败。结合影响分布、失败调用和同窗口资源证据，才能决定重试是否有益。',
     },
     {
-      text: '往症状上加重药，副作用可能先到：重试 3 改 5 让更多线程挤进等待队列——治标方案要做副作用推演。',
-      principle: '程序设计：任何"缓解类"措施（重试/限流/超时加长）都要推演它对瓶颈资源的二次影响。本例的重试线程本身在占用等待位——缓解措施加剧竞争，是容量问题特有的反直觉。',
+      text: '先缩短连接占用并验证并发，再决定池大小；不要把连接等待与连接寿命混成一个参数。',
+      principle: '增加连接可能把瓶颈推到数据库。池大小要按实际数据库容量测试；connectionTimeout限制借连接等待，并不回收正在执行查询的连接。',
     },
   ],
 }

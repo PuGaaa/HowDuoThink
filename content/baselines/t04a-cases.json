@@ -30,7 +30,7 @@
       "id": "first-npe",
       "file": "app/data/cases/first-npe.ts",
       "contentHash": "8180a42e497b6f84351e82f0ba02d86fad5265059288547f63c43fd602d13ea7",
-      "calibratedHash": "a73539a75cd765d9fe7838554e84feb7951b2dee74ca280d91a6549f17f7aa95",
+      "calibratedHash": "68f7310e562f0e48d18892dcf9f5727ee0d8accd0974df62df175f271f10e2fa",
       "metadata": {
         "part": "apprentice",
         "chapterId": "error-reading",
@@ -42,18 +42,40 @@
         "difficulty": 1
       },
       "expertCost": 4,
-      "expertPathCost": 5,
+      "expertPathCost": 4,
       "status": "calibrated",
       "reasons": [
-        "已核定 userPoint 存在、getAccount 返回 null；异步建档窗口解释新用户必现与老用户偶发",
-        "标准路径动作成本 1+2+1+1=5，停止条件为断点、机制、影响面三层证据闭合"
+        "纠正用户与账户假设效应，明确老用户正常、失败发生于首次建账之前",
+        "增强NPE、88行代码和同一用户建账流水闭合，标准/替代路径均为4"
+      ],
+      "reviewedAt": "2026-11-04",
+      "reviewRecord": "content/baselines/t04a-calibration.md",
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-frameread",
+            "a-rpctime"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-rpctime",
+            "a-frameread"
+          ],
+          "cost": 4
+        }
       ]
     },
     {
       "id": "caused-by",
       "file": "app/data/cases/caused-by.ts",
       "contentHash": "5de242edb5421c08b5806a6363e218693a402f54e3791ae7d4398d452d1878df",
-      "calibratedHash": "3dfabc0715c97205f5b8e803d90a0d1a051edb08b4bfd189e10e5070e0c11446",
+      "calibratedHash": "bea41e263b8b0b72407535ab910726ba0908dffa0fbfde735e45d499b69dc46c",
       "metadata": {
         "part": "apprentice",
         "chapterId": "error-reading",
@@ -65,11 +87,33 @@
         "difficulty": 2
       },
       "expertCost": 4,
-      "expertPathCost": 5,
+      "expertPathCost": 4,
       "status": "calibrated",
       "reasons": [
-        "已核定连接池等待超时是最底层异常，表层 reset 仅为包装结果；重试与高峰分布不足以支持网络根因",
-        "标准路径动作成本 1+1+2+1=5，停止条件为异常链、池水位与防线证据闭合"
+        "移除不成立的池等待→Socket读取超时→reset链，改为保留cause的明确业务包装",
+        "getConnection等待、长查询占用和同一数据库指标闭合，不从并发数直接推导扩池"
+      ],
+      "reviewedAt": "2026-11-04",
+      "reviewRecord": "content/baselines/t04a-calibration.md",
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-chaindeep",
+            "a-poolmetrics"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-poolmetrics",
+            "a-chaindeep"
+          ],
+          "cost": 4
+        }
       ]
     },
     {
@@ -88,9 +132,33 @@
       },
       "expertCost": 4,
       "expertPathCost": 4,
-      "status": "uncalibrated",
+      "status": "calibrated",
       "reasons": [
-        "补齐 requestId 到具体实例的关联证据，避免以时间相关替代因果"
+        "以请求ID、B出口和C入口访问记录锁定c-7，按同实例GC与5秒期限对账",
+        "核对时区及实际偏差，区分B的504与A自己的读取超时；两条路径均为4"
+      ],
+      "calibratedHash": "2998bfa4f0d8caa88c3576ff16b9ccff97cebe6219799215a174b5b1cbe8bfbe",
+      "reviewedAt": "2026-11-04",
+      "reviewRecord": "content/baselines/t04a-calibration.md",
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-tzcheck",
+            "a-correlate"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-correlate",
+            "a-tzcheck"
+          ],
+          "cost": 4
+        }
       ]
     },
     {
@@ -110,9 +178,33 @@
       },
       "expertCost": 4,
       "expertPathCost": 4,
-      "status": "uncalibrated",
+      "status": "calibrated",
       "reasons": [
-        "核实 Future、异常处理器与状态机失败分支的技术事实"
+        "核实submit/FutureTask保存异常，handler不会观察该任务异常；工作线程可继续执行",
+        "同输入诊断的Future异常与上传前阶段对账；失败终态和结果观察各有责任，两条路径均为4"
+      ],
+      "calibratedHash": "86f6b3819081aef491d0d27dda3778eaf39c044872bea44abf0f9756ac321f01",
+      "reviewedAt": "2026-11-04",
+      "reviewRecord": "content/baselines/t04a-calibration.md",
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-taskaudit",
+            "a-osslog"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-osslog",
+            "a-taskaudit"
+          ],
+          "cost": 4
+        }
       ]
     }
   ]
