@@ -79,7 +79,7 @@ def change_password(body: models.PasswordChange, uid: str = Depends(current_user
 
 @router.post("/api/auth/sms/send")
 def sms_send(body: models.SmsSendBody):
-    """下发手机验证码；dev 模式响应带 devEcho 供联调（生产由短信服务下发）。"""
+    """下发手机验证码；短信服务不可用时返回 503，不回显验证码。"""
     out = service.send_sms_code(body.phone)
     return out
 

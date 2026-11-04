@@ -163,10 +163,9 @@ export function logout() {
 
 export interface SmsResult {
   error: string
-  devEcho: string
 }
 
-/** 发送验证码（dev 通道响应带 devEcho 供自动填入）。 */
+/** 发送验证码；验证码只通过短信通道发送。 */
 export function sendSmsCode(phone: string, cb: (r: SmsResult) => void) {
   uni.request({
     url: API_BASE + '/api/auth/sms/send',
@@ -176,14 +175,13 @@ export function sendSmsCode(phone: string, cb: (r: SmsResult) => void) {
     success: (res) => {
       if (res.statusCode !== 200) {
         const detail = (res.data as any)?.detail
-        cb({ error: typeof detail === 'string' ? detail : '发送失败，稍后再试', devEcho: '' })
+        cb({ error: typeof detail === 'string' ? detail : '发送失败，稍后再试' })
         return
       }
-      const d = res.data as any
-      cb({ error: '', devEcho: typeof d.devEcho === 'string' ? d.devEcho as string : '' })
+      cb({ error: '' })
     },
     fail: () => {
-      cb({ error: '无法连接社区服务', devEcho: '' })
+      cb({ error: '无法连接社区服务' })
     },
   })
 }

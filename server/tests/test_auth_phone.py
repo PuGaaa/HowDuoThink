@@ -9,11 +9,11 @@ _seq = {"n": 0}
 
 
 @pytest.fixture(autouse=True)
-def _dev_mode(monkeypatch):
-    """短信 dev 回显仅 ENV=dev 生效：本文件用例统一在 dev 形态下跑。"""
-    from core import config
+def _sms_provider(monkeypatch):
+    """隔离阿里云 SDK；测试不伪造短信回显。"""
+    from core import sms
 
-    monkeypatch.setattr(config, "DEV_MODE", True)
+    monkeypatch.setattr(sms, "_send_aliyun", lambda phone, code: {"ok": True})
 
 
 def _phone() -> str:
@@ -29,7 +29,7 @@ def _send(client, phone: str) -> dict:
 
 
 def _read_code(client, phone: str) -> str:
-    """测试直读库里的验证码（dev 通道回显亦可，但直读更稳）。"""
+    """测试从隔离数据库读取待消费验证码。"""
     import db as dbmod
 
     row = dbmod.q("SELECT code FROM sms_codes WHERE phone=?", (phone,))
@@ -37,11 +37,11 @@ def _read_code(client, phone: str) -> str:
     return row[0]["code"]
 
 
-def test_sms_send_dev_echo():
+def test_sms_send_does_not_echo_code():
     with make_client() as client:
         out = _send(client, _phone())
         assert out["ok"] is True
-        assert out["devEcho"].isdigit() and len(out["devEcho"]) == 6
+        assert "devEcho" not in out
 
 
 def test_sms_resend_rate_limited():

@@ -23,8 +23,7 @@ DEV_MODE = os.environ.get("ENV", "").lower() == "dev"
 # 生产 HTTPS 部署时设 COOKIE_SECURE=1，会话 cookie 仅经 HTTPS 传输
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "") == "1"
 
-# 短信：所有环境使用同一 provider 实现，仅配置项随部署环境变化。
-SMS_PROVIDER = os.environ.get("SMS_PROVIDER", "dev")
+# 短信：所有环境统一使用阿里云 SDK，仅配置项随部署环境变化。
 ALIYUN_SMS_ACCESS_KEY = os.environ.get("ALIYUN_SMS_ACCESS_KEY", "")
 ALIYUN_SMS_SECRET = os.environ.get("ALIYUN_SMS_SECRET", "")
 ALIYUN_SMS_SIGN = os.environ.get("ALIYUN_SMS_SIGN", "")

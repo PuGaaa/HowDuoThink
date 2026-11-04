@@ -8,7 +8,6 @@ import pytest
 import main  # noqa: F401  (conftest 已先行建库并导入)
 from core import config, migrate
 from core import db as coredb
-from core import sms as sms_core
 
 
 def test_refuse_ephemeral_jwt_secret_in_prod(monkeypatch):
@@ -16,21 +15,6 @@ def test_refuse_ephemeral_jwt_secret_in_prod(monkeypatch):
     monkeypatch.setattr(config, "JWT_SECRET_EPHEMERAL", True)
     with pytest.raises(RuntimeError, match="JWT_SECRET"):
         main.create_app()
-
-
-def test_refuse_dev_sms_channel_when_env_set(monkeypatch):
-    """ENV=staging 且 SMS_PROVIDER=dev：拒绝（文案含 'SMS_PROVIDER'）；ENV 缺省与 ENV=dev 不拒。"""
-    monkeypatch.setattr(sms_core, "PROVIDER", "dev")
-    # staging：dev 回显通道当场拒绝
-    monkeypatch.setenv("ENV", "staging")
-    with pytest.raises(RuntimeError, match="SMS_PROVIDER"):
-        main.create_app()
-    # ENV 缺省（本地默认形态）：不拒
-    monkeypatch.delenv("ENV", raising=False)
-    main.create_app()
-    # ENV=dev（联调形态）：不拒
-    monkeypatch.setenv("ENV", "dev")
-    main.create_app()
 
 
 def test_refuse_when_mysql_unreachable(monkeypatch):
