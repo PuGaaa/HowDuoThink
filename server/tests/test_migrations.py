@@ -217,16 +217,29 @@ def test_0009_preserves_published_payload_without_guessing_author(new_database):
                 },
             )
         command.upgrade(migrate._cfg(), "head")
-        body = {key: value for key, value in payload.items() if key not in {
-            "baseRevision", "contentRevision", "sourceType", "sourceCommit", "sourceHash", "submissionId", "authorName"
-        }}
+        body = {
+            key: value
+            for key, value in payload.items()
+            if key
+            not in {
+                "baseRevision",
+                "contentRevision",
+                "sourceType",
+                "sourceCommit",
+                "sourceHash",
+                "submissionId",
+                "authorName",
+            }
+        }
         expected_hash = hashlib.sha256(
             json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
         with engine.connect() as conn:
-            revision = conn.execute(
-                sa.text("SELECT * FROM case_revisions WHERE case_id='legacy-case' AND content_revision=1")
-            ).mappings().one()
+            revision = (
+                conn.execute(sa.text("SELECT * FROM case_revisions WHERE case_id='legacy-case' AND content_revision=1"))
+                .mappings()
+                .one()
+            )
             assert revision["payload"] == payload_json
             assert revision["content_hash"] == expected_hash
             assert revision["published_by"] is None
@@ -234,9 +247,7 @@ def test_0009_preserves_published_payload_without_guessing_author(new_database):
             assert revision["source_type"] == "official"
             assert revision["source_commit"] == "6523490cc6b418070c9efbb7045f47761c7c8aa8"
             assert revision["legacy_snapshot"] == 1
-            cursor = conn.execute(
-                sa.text("SELECT value FROM meta WHERE meta_key='casepack_version'")
-            ).scalar_one()
+            cursor = conn.execute(sa.text("SELECT value FROM meta WHERE meta_key='casepack_version'")).scalar_one()
             assert cursor == "7"
         command.upgrade(migrate._cfg(), "head")
         with engine.connect() as conn:
@@ -257,9 +268,7 @@ def test_0009_preserves_existing_casepack_cursor(new_database):
             conn.execute(sa.text("INSERT INTO meta(meta_key,value) VALUES('casepack_version','19')"))
         command.upgrade(migrate._cfg(), "head")
         with engine.connect() as conn:
-            cursor = conn.execute(
-                sa.text("SELECT value FROM meta WHERE meta_key='casepack_version'")
-            ).scalar_one()
+            cursor = conn.execute(sa.text("SELECT value FROM meta WHERE meta_key='casepack_version'")).scalar_one()
             assert cursor == "19"
     finally:
         engine.dispose()

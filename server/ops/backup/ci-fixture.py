@@ -119,7 +119,7 @@ db.ex(
         0,
     ),
 )
-assert db.q("SELECT content_revision FROM case_revisions WHERE case_id=?", ("backup-fixture",))[0][
-    "content_revision"
-] == 3
+assert (
+    db.q("SELECT content_revision FROM case_revisions WHERE case_id=?", ("backup-fixture",))[0]["content_revision"] == 3
+)
 print("Synthetic backup fixture ready at migration head; no external service invoked.")
