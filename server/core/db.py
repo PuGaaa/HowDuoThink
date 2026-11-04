@@ -34,6 +34,7 @@ def _translate(sql: str) -> str:
     ON CONFLICT 的赋值子句均为 col=excluded.col 的简单形态（本仓库约定），
     逐个改写为 col=VALUES(col)；时间函数与占位符做全文替换。
     """
+    sql = sql.replace("/* FOR UPDATE */", "FOR UPDATE")
     sql = sql.replace("datetime('now')", "NOW()")
 
     def _dup(m: re.Match) -> str:
