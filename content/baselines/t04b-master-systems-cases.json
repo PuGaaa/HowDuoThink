@@ -644,7 +644,71 @@
       "originalDifficulty": 1,
       "originalExpertCost": 5,
       "originalPathCost": 2,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "3766f9d60223bb5a0b4f64c5917f131cc2bb5953cc89a548b487f00cec5a4677",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "同批ID→两处丢失窗口；原文依据（a-confirmcheck）：“Node amqplib使用createChannel而非createConfirmChannel，无confirm回调或waitForConfirms；publish boolean只表示客户端背压。false也不是投递失败，应等待drain；true更不是持久化成功。”",
+        "唯一ID账本与重启关联；原文依据（a-durablecheck）：“队列durable:false，消息persistent:false；重启会丢该队列及尚未消费的瞬态消息。即使publisher confirm收到，也不使非持久化消息自动跨重启保留。”",
+        "confirm/route/persistence语义；原文依据（a-durablecheck）：“本案可靠性缺陷包含成功边界和重启保留两项，不能把持久化这个真实缺口另标为假根因。”",
+        "true不等于可靠送达；原文依据（a-impact）：“固定10000条唯一业务ID，应用都宣称成功；消费结果9700，缺300。按ID而非混合日计数关联，暂不从“没收到”推断到底丢在哪一段。”",
+        "发送端/Broker/消费者；原文依据（scene.architecture）：“库存服务(生产者) → RabbitMQ(exchange→queue) → 物流服务(消费者)”",
+        "热改durable可能属性冲突；原文依据（a-rollbackmq）：“回滚前先核对队列声明兼容性；同名队列从durable:false直接声明为true会发生属性不等价错误，不能仅热改配置承诺恢复。迁移需处理已有队列和待重发意图，并验证新流量确认。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-confirmcheck",
+            "a-durablecheck",
+            "a-msgcount",
+            "a-brokerlog",
+            "a-routecheck",
+            "a-ackcheck"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-ackcheck",
+            "a-routecheck",
+            "a-msgcount",
+            "a-durablecheck",
+            "a-confirmcheck",
+            "a-brokerlog"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-confirm",
+        "h-durable"
+      ],
+      "review": "人工裁定7⚡（原5、重复动作旧链仅2）。SDK统一amqplib、L1升L2；重建一次崩溃3%而非每天固定3%，区分confirm背压/路由/持久化，消除多真因却false。",
+      "sources": [
+        "https://amqp-node.github.io/amqplib/channel_api.html",
+        "https://www.rabbitmq.com/docs/confirms",
+        "https://www.rabbitmq.com/docs/queues#queue-properties"
+      ],
+      "noise": [
+        {
+          "title": "管理页图标失败",
+          "text": "[WARN] RabbitMQ console favicon 404。",
+          "closeActionId": "a-routecheck",
+          "closure": "图标请求不进入AMQP交换机或队列，业务路由重放与该静态资源失败独立。"
+        }
+      ]
     },
     {
       "id": "mq-duplicate",
@@ -655,7 +719,67 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "08ef5e80cd08cb0851a73bf8ea1c21b726a7847a81f5d525482f765b6f962810",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        3,
+        2,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "交易→入队→delivery→提交；原文依据（a-paylog）：“订单 P20260929001 在支付服务只有一次支付请求（11:01:58，带防重令牌）。”",
+        "channel/连接与业务关联；原文依据（a-logcheck）：“同一入队事件/P1：11:02:11首次开始，17.2秒业务副作用已提交；17.3秒连接关闭，ack未到Broker。19秒重投；第二次完成后ack帧在中断网络未到Broker，45秒连接失效被关闭，47秒第三投递。”",
+        "ack及跨系统副作用；原文依据（a-logcheck）：“RabbitMQ消费者basic.ack通常是单向方法，没有“等Broker回ack确认超时”的二次确认。这里是连接关闭仍有unacked导致重投，8/28秒来自具体断线/重连，不是Broker内置指数退避。”",
+        "处理成功仍会重投；原文依据（a-impact）：“同一支付业务键出现2~3次流水和短信意图。8秒/28秒间隔只是形状，用户也可能隔秒重试，不能单靠间隔排除付款重复。需要相同键与Broker投递关联。”",
+        "Broker/业务DB/短信；原文依据（scene.architecture）：“RabbitMQ同一工作队列→2个竞争消费者→本地流水和短信投递；单支付业务键P1，副作用各自不幂等。”",
+        "停消费增加积压；原文依据（a-rollback）：“消费者暂停，积压消息暂存队列；财务按对账名单冲正多记流水，补发安抚短信。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-paylog",
+            "a-publish",
+            "a-topology",
+            "a-logcheck",
+            "a-idemsearch"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-topology",
+            "a-paylog",
+            "a-publish",
+            "a-idemsearch",
+            "a-logcheck"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-redeliver"
+      ],
+      "review": "人工裁定7⚡（原4），补付款/拓扑反证；移除RabbitMQ消费ack等待Broker确认、内置8/28s退避及messageId自动幂等假象。",
+      "sources": [
+        "https://www.rabbitmq.com/docs/confirms",
+        "https://www.rabbitmq.com/docs/reliability"
+      ],
+      "noise": [
+        {
+          "title": "模板预览失败",
+          "text": "[WARN] SMS template preview image 404。",
+          "closeActionId": "a-logcheck",
+          "closure": "预览图不创建短信投递意图或业务流水；三次同P1提交与连接关闭已独立关联。"
+        }
+      ]
     },
     {
       "id": "mq-dlq",
@@ -666,7 +790,69 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "837f507778697564642424a683080433165e25a66b587e965b9916a402eb4c7e",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "快照→样例→兼容对照；原文依据（a-sample）：“不同日期样例为ValidationError: pushTemplateId Field required；旧基线样例是手机号格式无效。JSON文本可正常解析，缺业务必填字段不是JSONDecodeError。样例说明字段校验方向，不代表全部80412条同死因。”",
+        "分层样本与累计账；原文依据（a-version）：“Python消费schema新增pushTemplateId必填，上游旧合法消息无此字段。受控旧消息在旧消费者可处理、新版在字段校验拒绝；仅提供兼容映射或撤销新增必填后同输入通过。”",
+        "schema/DLX领域机制；原文依据（a-version）：“这支持契约破坏，不以第一个错误日志或单次版本相关性判根因。”",
+        "主队列正常仍隔离失败；原文依据（a-impact）：“快照累计80412：前4天历史基线共480；D-17跳变9800；随后16天共70132（约4383/天），合计80412。时间单位与总量一致。”",
+        "生产契约/消费/通道/治理；原文依据（scene.architecture）：“订单服务 → MQ(订单通知) → 通知消费者(发短信/Push) —失败重试3次→ 死信队列 DLQ（无消费者、无监控）”",
+        "回放可能过期或重复；原文依据（a-rollback）：“回滚到旧版消费者（无新字段校验），增量通知恢复发送，DLQ 停止增长。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-sample",
+            "a-version",
+            "a-ratio",
+            "a-smslog",
+            "a-retry",
+            "a-monitor"
+          ],
+          "cost": 8
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-monitor",
+            "a-retry",
+            "a-smslog",
+            "a-ratio",
+            "a-version",
+            "a-sample"
+          ],
+          "cost": 8
+        }
+      ],
+      "expectedConfirmed": [
+        "h-format"
+      ],
+      "review": "人工裁定8⚡（原4、旧链5漏3类反证）。修复21/17天与80412总量、500条98.7%非整数、缺字段非JSON解码错误及重放条数不等于成功通知。",
+      "sources": [
+        "https://www.rabbitmq.com/docs/dlx",
+        "https://docs.pydantic.dev/latest/errors/errors/#error-messages"
+      ],
+      "noise": [
+        {
+          "title": "通道账单归档延期",
+          "text": "[WARN] SMS billing archive upload retry。",
+          "closeActionId": "a-smslog",
+          "closure": "账单归档是离线文件，字段校验失败消息尚未调用SDK；配额与请求阶段核验不依赖归档成功。"
+        }
+      ]
     },
     {
       "id": "mq-delay",
@@ -677,7 +863,79 @@
       "originalDifficulty": 3,
       "originalExpertCost": 4,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "e5dd80fc2ba335fec39caa96767a305340c03ae789bbe30e3fe7f9463742e762",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        2,
+        3
+      ],
+      "dimensionEvidence": [
+        "多时刻→变偏差→重复扣除机制；原文依据（a-queuelog）：“三个记录delayMs为1020000/1320000/1500000（17/22/25分钟），dueAt为18:47/18:52/18:55；正确剩余均1800000。MQ是在对应dueAt后收到，提前已发生在调度字段。”",
+        "提前量与elapsed函数对账；原文依据（a-tzaudit）：“实际代码：const remaining = targetEpoch - nowEpoch;”",
+        "epoch/持续时间领域机制；原文依据（a-tzaudit）：“const delayMs = remaining - (nowEpoch - createdEpoch);”",
+        "时区看似可疑但三个epoch正确；原文依据（a-impact）：“同目标19:00、同写表18:30：创建18:17→执行18:47（提前13）；18:22→18:52（提前8）；18:25→18:55（提前5）。提前量恰等于写表前已经经过的13/8/5分钟。变化形状提示输入依赖，不足以单独排除任何机器漂移。”",
+        "调度表到消息投递两跳；原文依据（scene.architecture）：“运营创建活动→延迟服务写应用调度表dueAt→扫描dueAt<=now后发布MQ→开售执行器；时间统一为带时区解析后的epoch。”",
+        "只统一UTC看似正确却未修重复扣；原文依据（a-haltdeliver）：“延迟开售入口下线，未执行的活动转人工定时；队列中未到期消息全部废弃重建。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-queuelog",
+            "a-tzaudit",
+            "a-poller",
+            "a-ntp",
+            "a-settime"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-settime",
+            "a-ntp",
+            "a-poller",
+            "a-queuelog",
+            "a-tzaudit"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-tz"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5却遗漏queuelog/多项排错）；原时区因果无法产生不定分钟偏差，重建可复算重复扣elapsed机制。四维L3保留L3。",
+      "sources": [
+        "https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-date.parse",
+        "https://docs.python.org/3/library/datetime.html#datetime.timedelta"
+      ],
+      "noise": [
+        {
+          "title": "日历资源失败",
+          "text": "[WARN] activity calendar icon 404。",
+          "closeActionId": "a-settime",
+          "closure": "图标不改变提交的带偏移目标字符串，业务确认与epoch已核对。"
+        },
+        {
+          "title": "指标投递重试",
+          "text": "[WARN] scheduler metrics export retry。",
+          "closeActionId": "a-queuelog",
+          "closure": "调度表dueAt已从数据库快照取得，外送指标不参与delay公式或更新dueAt。"
+        },
+        {
+          "title": "通知附件重试",
+          "text": "[WARN] campaign notice attachment retry。",
+          "closeActionId": "a-poller",
+          "closure": "附件任务独立，扫描谓词只看已写dueAt；它不提前发布活动消息。"
+        }
+      ]
     },
     {
       "id": "mq-slowpart",
@@ -688,7 +946,78 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "86650334d47ab1b507a06143c834da3aa95388543168dfe70afd04212aa318cc",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "局部/全局→成本分布→顺序等待；原文依据（a-skewstat）：“按同一窗口入队消息数量和key分布核对，16分区无显著量倾斜；但类型/耗时倾斜确实存在。排除“只有消息数量过多”的解释，不把数量均匀当内容也均匀。”",
+        "服务时间加权与积压模型；原文依据（a-handlereval）：“正常handler持有约0.48s（含I/O）；慢4分区每250条中1条人工审核约480s，无期限；同分区后续不启动。阻塞栈在风控HTTP，非fetch或CPU。”",
+        "分区串行领域机制；原文依据（a-handlereval）：“本案单分区串行处理造成应用队头阻塞，不把所有Kafka客户端都描述成Broker强制等业务回调才允许后续读取。”",
+        "CPU闲却长审核占进度；原文依据（a-impact）：“消息数量各分区偏差<6%，但慢4分区约0.4%触发8分钟人工审核，其余分区该类型接近0。局部下降80%，按4/16权重只导致全局下降约20%；不能在12/16正常且均量时说全局掉80%。”",
+        "Kafka/handler/风控与业务待审；原文依据（scene.architecture）：“Kafka16分区，应用明确按分区单任务串行处理；8实例×2处理线程，按分区追踪分配；handler同步等待风控结果。”",
+        "回滚审核会改变业务承诺；原文依据（a-rollbackmq）：“不能擅自把事前风控改成事后补审并当订单通过。止血可对待审核订单明确挂起、限制进入该路径，保留业务审核承诺；任何临时放行需业务明确接受风险。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-skewstat",
+            "a-conccfg",
+            "a-brokerio",
+            "a-handlereval",
+            "a-poisoncount"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-brokerio",
+            "a-conccfg",
+            "a-skewstat",
+            "a-poisoncount",
+            "a-handlereval"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-slowcall"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5漏并发/Broker反证）。重建250条/480秒自洽模型，局部五分之一与全局八成分开；不擅自事后风控。四维L3，中位数3，L2升L3。",
+      "sources": [
+        "https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html"
+      ],
+      "noise": [
+        {
+          "title": "归档文件失败",
+          "text": "[WARN] Kafka audit archive upload retry。",
+          "closeActionId": "a-brokerio",
+          "closure": "归档外送不在故障fetch路径，慢trace已经取得消息后才等待风控。"
+        },
+        {
+          "title": "监控标签缺失",
+          "text": "[WARN] consumer metrics label deprecated。",
+          "closeActionId": "a-conccfg",
+          "closure": "旧标签只影响展示命名，assignment与handler进度从消费者本身读取，16通道并未消失。"
+        },
+        {
+          "title": "通知图标失败",
+          "text": "[WARN] order notification thumbnail 404。",
+          "closeActionId": "a-skewstat",
+          "closure": "图像错误不改变消息入队数量/key；长审核类型与普通通知分开统计，不把图像404当量倾斜。"
+        }
+      ]
     },
     {
       "id": "partition-split",
@@ -699,7 +1028,77 @@
       "originalDifficulty": 3,
       "originalExpertCost": 4,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "856176f626490bec33fa28f9b33bf46d3e726db984a1c8286e45b4a095bd1fb1",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "实体跨切换→路由→旧积压→投影；原文依据（a-rebalanceaudit）：“本案显式key分区算法positiveHash(key)%N；一个样本hash余24为19，则余12为7。均匀hash下12→24约一半落点不变、一半变为旧p+12，不是所有key都换家。”",
+        "hash余数与offset/业务序列对账；原文依据（a-rebalanceaudit）：“本案显式key分区算法positiveHash(key)%N；一个样本hash余24为19，则余12为7。均匀hash下12→24约一半落点不变、一半变为旧p+12，不是所有key都换家。”",
+        "分区路由领域机制；原文依据（a-rebalanceaudit）：“旧记录不会自动搬迁，新记录按新N定位，两分区各自有序仍无跨分区先后保证；该实体跨切换序列可乱序，不代表一定每次都会乱。”",
+        "扩容正常却打破实体顺序；原文依据（a-impact）：“同keyK的支付事件14:00前写p7/offset801，仍积压；14:02发货按新分区数写p19/offset5且先完成，14:06才处理p7旧事件。同事件ID无双发。跨分区offset不能直接比较大小，应关联实体业务序列。”",
+        "生产/Broker/消费者/投影；原文依据（scene.architecture）：“订单服务 → 订单事件 topic(原 12 分区, key=orderId, 分区内 FIFO) → 状态服务(按事件顺序维护订单状态机) ｜ 大促扩容: 分区 12→24, 消费者 6→12”",
+        "缩分区/双写看似回退但不保证；原文依据（a-danger）：“Kafka标准分区管理不能把已增加分区直接减回12；该调用会被拒绝，不是自动第二次重排。若删除/新建主题或改自定义路由则是另一次迁移，存在数据和顺序风险，不能把它冒充简单回滚。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-rebalanceaudit",
+            "a-consumerspeed",
+            "a-producercheck",
+            "a-ordercheck"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-ordercheck",
+            "a-producercheck",
+            "a-consumerspeed",
+            "a-rebalanceaudit"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-resplit"
+      ],
+      "review": "人工裁定6⚡（原4）补生产/源序列反证；纠正所有key重排、Kafka缩分区、6→12必须24及时间戳重放/无差别丢旧增量。五维L3保留L3。",
+      "sources": [
+        "https://kafka.apache.org/41/documentation/#basic_ops_modify_topic",
+        "https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html"
+      ],
+      "noise": [
+        {
+          "title": "控制台预览失败",
+          "text": "[WARN] topic console diagram preview unavailable。",
+          "closeActionId": "a-impact",
+          "closure": "分区/offset来自实际记录元数据，不依赖控制台示意图渲染。"
+        },
+        {
+          "title": "旧审计格式告警",
+          "text": "[WARN] producer audit formatter deprecated。",
+          "closeActionId": "a-producercheck",
+          "closure": "审计字段虽标记旧格式，事件ID和单一Broker落点仍完整；格式告警不等于业务事件双发。"
+        },
+        {
+          "title": "指标外送重试",
+          "text": "[WARN] consumer metrics push retry。",
+          "closeActionId": "a-consumerspeed",
+          "closure": "分区内offset顺序取自处理提交审计；指标外送不修改消费顺序。"
+        }
+      ]
     },
     {
       "id": "mq-bus-review",

@@ -211,3 +211,141 @@
 
 技术机制依据：[官方资料1](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Closures)、[官方资料2](https://tc39.es/ecma262/multipage/ecmascript-language-statements-and-declarations.html#sec-for-in-and-for-of-statements)。
 
+## mq-lost（messaging/1）
+
+学习目标：消息链路三段：生产者→Broker→消费者——丢在哪一段，排查方向完全不同。
+
+编审：人工裁定7⚡（原5、重复动作旧链仅2）。SDK统一amqplib、L1升L2；重建一次崩溃3%而非每天固定3%，区分confirm背压/路由/持久化，消除多真因却false。
+
+难度：L1→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 同批ID→两处丢失窗口；原文依据（a-confirmcheck）：“Node amqplib使用createChannel而非createConfirmChannel，无confirm回调或waitForConfirms；publish boolean只表示客户端背压。false也不是投递失败，应等待drain；true更不是持久化成功。”
+2. 唯一ID账本与重启关联；原文依据（a-durablecheck）：“队列durable:false，消息persistent:false；重启会丢该队列及尚未消费的瞬态消息。即使publisher confirm收到，也不使非持久化消息自动跨重启保留。”
+3. confirm/route/persistence语义；原文依据（a-durablecheck）：“本案可靠性缺陷包含成功边界和重启保留两项，不能把持久化这个真实缺口另标为假根因。”
+4. true不等于可靠送达；原文依据（a-impact）：“固定10000条唯一业务ID，应用都宣称成功；消费结果9700，缺300。按ID而非混合日计数关联，暂不从“没收到”推断到底丢在哪一段。”
+5. 发送端/Broker/消费者；原文依据（scene.architecture）：“库存服务(生产者) → RabbitMQ(exchange→queue) → 物流服务(消费者)”
+6. 热改durable可能属性冲突；原文依据（a-rollbackmq）：“回滚前先核对队列声明兼容性；同名队列从durable:false直接声明为true会发生属性不等价错误，不能仅热改配置承诺恢复。迁移需处理已有队列和待重发意图，并验证新流量确认。”
+
+标准路径：a-impact → a-confirmcheck → a-durablecheck → a-msgcount → a-brokerlog → a-routecheck → a-ackcheck，7⚡，零错S；终态确认h-confirm/h-durable，其余全部excluded。
+
+替代路径：a-impact → a-ackcheck → a-routecheck → a-msgcount → a-durablecheck → a-confirmcheck → a-brokerlog，7⚡，零错S；终态确认h-confirm/h-durable，其余全部excluded。
+
+停止点：【停止规则】同批ID两段缺口与瞬态队列崩溃证据吻合，路由和消费者先ack解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://amqp-node.github.io/amqplib/channel_api.html)、[官方资料2](https://www.rabbitmq.com/docs/confirms)、[官方资料3](https://www.rabbitmq.com/docs/queues#queue-properties)。
+
+## mq-duplicate（messaging/2）
+
+学习目标：at-least-once 语义下，重复不是异常，是常态。
+
+编审：人工裁定7⚡（原4），补付款/拓扑反证；移除RabbitMQ消费ack等待Broker确认、内置8/28s退避及messageId自动幂等假象。
+
+难度：L2→L2；六维[2, 3, 3, 2, 3, 2]。
+
+1. 交易→入队→delivery→提交；原文依据（a-paylog）：“订单 P20260929001 在支付服务只有一次支付请求（11:01:58，带防重令牌）。”
+2. channel/连接与业务关联；原文依据（a-logcheck）：“同一入队事件/P1：11:02:11首次开始，17.2秒业务副作用已提交；17.3秒连接关闭，ack未到Broker。19秒重投；第二次完成后ack帧在中断网络未到Broker，45秒连接失效被关闭，47秒第三投递。”
+3. ack及跨系统副作用；原文依据（a-logcheck）：“RabbitMQ消费者basic.ack通常是单向方法，没有“等Broker回ack确认超时”的二次确认。这里是连接关闭仍有unacked导致重投，8/28秒来自具体断线/重连，不是Broker内置指数退避。”
+4. 处理成功仍会重投；原文依据（a-impact）：“同一支付业务键出现2~3次流水和短信意图。8秒/28秒间隔只是形状，用户也可能隔秒重试，不能单靠间隔排除付款重复。需要相同键与Broker投递关联。”
+5. Broker/业务DB/短信；原文依据（scene.architecture）：“RabbitMQ同一工作队列→2个竞争消费者→本地流水和短信投递；单支付业务键P1，副作用各自不幂等。”
+6. 停消费增加积压；原文依据（a-rollback）：“消费者暂停，积压消息暂存队列；财务按对账名单冲正多记流水，补发安抚短信。”
+
+标准路径：a-impact → a-paylog → a-publish → a-topology → a-logcheck → a-idemsearch，7⚡，零错S；终态确认h-redeliver，其余全部excluded。
+
+替代路径：a-impact → a-topology → a-paylog → a-publish → a-idemsearch → a-logcheck，7⚡，零错S；终态确认h-redeliver，其余全部excluded。
+
+停止点：【停止规则】入队、连接、投递与业务提交关联，重复生产/广播/付款均排除，副作用无幂等已确认。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://www.rabbitmq.com/docs/confirms)、[官方资料2](https://www.rabbitmq.com/docs/reliability)。
+
+## mq-dlq（messaging/3）
+
+学习目标：死信队列是隔离区不是垃圾桶——只进不出的兜底等于没有兜底。
+
+编审：人工裁定8⚡（原4、旧链5漏3类反证）。修复21/17天与80412总量、500条98.7%非整数、缺字段非JSON解码错误及重放条数不等于成功通知。
+
+难度：L2→L2；六维[2, 3, 2, 2, 3, 2]。
+
+1. 快照→样例→兼容对照；原文依据（a-sample）：“不同日期样例为ValidationError: pushTemplateId Field required；旧基线样例是手机号格式无效。JSON文本可正常解析，缺业务必填字段不是JSONDecodeError。样例说明字段校验方向，不代表全部80412条同死因。”
+2. 分层样本与累计账；原文依据（a-version）：“Python消费schema新增pushTemplateId必填，上游旧合法消息无此字段。受控旧消息在旧消费者可处理、新版在字段校验拒绝；仅提供兼容映射或撤销新增必填后同输入通过。”
+3. schema/DLX领域机制；原文依据（a-version）：“这支持契约破坏，不以第一个错误日志或单次版本相关性判根因。”
+4. 主队列正常仍隔离失败；原文依据（a-impact）：“快照累计80412：前4天历史基线共480；D-17跳变9800；随后16天共70132（约4383/天），合计80412。时间单位与总量一致。”
+5. 生产契约/消费/通道/治理；原文依据（scene.architecture）：“订单服务 → MQ(订单通知) → 通知消费者(发短信/Push) —失败重试3次→ 死信队列 DLQ（无消费者、无监控）”
+6. 回放可能过期或重复；原文依据（a-rollback）：“回滚到旧版消费者（无新字段校验），增量通知恢复发送，DLQ 停止增长。”
+
+标准路径：a-impact → a-sample → a-version → a-ratio → a-smslog → a-retry → a-monitor，8⚡，零错S；终态确认h-format，其余全部excluded。
+
+替代路径：a-impact → a-monitor → a-retry → a-smslog → a-ratio → a-version → a-sample，8⚡，零错S；终态确认h-format，其余全部excluded。
+
+停止点：【停止规则】同输入版本对照及DLX原因吻合，孤立毒消息、配额和误转移解释均排除，长期静默有监控证据。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://www.rabbitmq.com/docs/dlx)、[官方资料2](https://docs.pydantic.dev/latest/errors/errors/#error-messages)。
+
+## mq-delay（messaging/4）
+
+学习目标：时刻与时长要分开，已从目标减去当前时间后不能再次扣创建后经过时长。
+
+编审：人工裁定7⚡（原4、旧链5却遗漏queuelog/多项排错）；原时区因果无法产生不定分钟偏差，重建可复算重复扣elapsed机制。四维L3保留L3。
+
+难度：L3→L3；六维[3, 3, 2, 3, 2, 3]。
+
+1. 多时刻→变偏差→重复扣除机制；原文依据（a-queuelog）：“三个记录delayMs为1020000/1320000/1500000（17/22/25分钟），dueAt为18:47/18:52/18:55；正确剩余均1800000。MQ是在对应dueAt后收到，提前已发生在调度字段。”
+2. 提前量与elapsed函数对账；原文依据（a-tzaudit）：“实际代码：const remaining = targetEpoch - nowEpoch;”
+3. epoch/持续时间领域机制；原文依据（a-tzaudit）：“const delayMs = remaining - (nowEpoch - createdEpoch);”
+4. 时区看似可疑但三个epoch正确；原文依据（a-impact）：“同目标19:00、同写表18:30：创建18:17→执行18:47（提前13）；18:22→18:52（提前8）；18:25→18:55（提前5）。提前量恰等于写表前已经经过的13/8/5分钟。变化形状提示输入依赖，不足以单独排除任何机器漂移。”
+5. 调度表到消息投递两跳；原文依据（scene.architecture）：“运营创建活动→延迟服务写应用调度表dueAt→扫描dueAt<=now后发布MQ→开售执行器；时间统一为带时区解析后的epoch。”
+6. 只统一UTC看似正确却未修重复扣；原文依据（a-haltdeliver）：“延迟开售入口下线，未执行的活动转人工定时；队列中未到期消息全部废弃重建。”
+
+标准路径：a-impact → a-queuelog → a-tzaudit → a-poller → a-ntp → a-settime，7⚡，零错S；终态确认h-tz，其余全部excluded。
+
+替代路径：a-impact → a-settime → a-ntp → a-poller → a-queuelog → a-tzaudit，7⚡，零错S；终态确认h-tz，其余全部excluded。
+
+停止点：【停止规则】13/8/5分钟公式复算与实际dueAt吻合，扫描提前、目标误解和时钟漂移均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-date.parse)、[官方资料2](https://docs.python.org/3/library/datetime.html#datetime.timedelta)。
+
+## mq-slowpart（messaging/5）
+
+学习目标：分区内保序的代价是队头阻塞——一条慢消息卡住整个分区。
+
+编审：人工裁定7⚡（原4、旧链5漏并发/Broker反证）。重建250条/480秒自洽模型，局部五分之一与全局八成分开；不擅自事后风控。四维L3，中位数3，L2升L3。
+
+难度：L2→L3；六维[3, 3, 2, 3, 3, 2]。
+
+1. 局部/全局→成本分布→顺序等待；原文依据（a-skewstat）：“按同一窗口入队消息数量和key分布核对，16分区无显著量倾斜；但类型/耗时倾斜确实存在。排除“只有消息数量过多”的解释，不把数量均匀当内容也均匀。”
+2. 服务时间加权与积压模型；原文依据（a-handlereval）：“正常handler持有约0.48s（含I/O）；慢4分区每250条中1条人工审核约480s，无期限；同分区后续不启动。阻塞栈在风控HTTP，非fetch或CPU。”
+3. 分区串行领域机制；原文依据（a-handlereval）：“本案单分区串行处理造成应用队头阻塞，不把所有Kafka客户端都描述成Broker强制等业务回调才允许后续读取。”
+4. CPU闲却长审核占进度；原文依据（a-impact）：“消息数量各分区偏差<6%，但慢4分区约0.4%触发8分钟人工审核，其余分区该类型接近0。局部下降80%，按4/16权重只导致全局下降约20%；不能在12/16正常且均量时说全局掉80%。”
+5. Kafka/handler/风控与业务待审；原文依据（scene.architecture）：“Kafka16分区，应用明确按分区单任务串行处理；8实例×2处理线程，按分区追踪分配；handler同步等待风控结果。”
+6. 回滚审核会改变业务承诺；原文依据（a-rollbackmq）：“不能擅自把事前风控改成事后补审并当订单通过。止血可对待审核订单明确挂起、限制进入该路径，保留业务审核承诺；任何临时放行需业务明确接受风险。”
+
+标准路径：a-impact → a-skewstat → a-conccfg → a-brokerio → a-handlereval → a-poisoncount，7⚡，零错S；终态确认h-slowcall，其余全部excluded。
+
+替代路径：a-impact → a-brokerio → a-conccfg → a-skewstat → a-poisoncount → a-handlereval，7⚡，零错S；终态确认h-slowcall，其余全部excluded。
+
+停止点：【停止规则】慢handler栈、同窗分配和量化模型吻合，量倾斜、少配线程和Broker取数慢均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html)。
+
+## partition-split（messaging/5）
+
+学习目标：保序承诺的边界 = 分区拓扑——改分区数就是重排所有 key 的家。
+
+编审：人工裁定6⚡（原4）补生产/源序列反证；纠正所有key重排、Kafka缩分区、6→12必须24及时间戳重放/无差别丢旧增量。五维L3保留L3。
+
+难度：L3→L3；六维[3, 3, 2, 3, 3, 3]。
+
+1. 实体跨切换→路由→旧积压→投影；原文依据（a-rebalanceaudit）：“本案显式key分区算法positiveHash(key)%N；一个样本hash余24为19，则余12为7。均匀hash下12→24约一半落点不变、一半变为旧p+12，不是所有key都换家。”
+2. hash余数与offset/业务序列对账；原文依据（a-rebalanceaudit）：“本案显式key分区算法positiveHash(key)%N；一个样本hash余24为19，则余12为7。均匀hash下12→24约一半落点不变、一半变为旧p+12，不是所有key都换家。”
+3. 分区路由领域机制；原文依据（a-rebalanceaudit）：“旧记录不会自动搬迁，新记录按新N定位，两分区各自有序仍无跨分区先后保证；该实体跨切换序列可乱序，不代表一定每次都会乱。”
+4. 扩容正常却打破实体顺序；原文依据（a-impact）：“同keyK的支付事件14:00前写p7/offset801，仍积压；14:02发货按新分区数写p19/offset5且先完成，14:06才处理p7旧事件。同事件ID无双发。跨分区offset不能直接比较大小，应关联实体业务序列。”
+5. 生产/Broker/消费者/投影；原文依据（scene.architecture）：“订单服务 → 订单事件 topic(原 12 分区, key=orderId, 分区内 FIFO) → 状态服务(按事件顺序维护订单状态机) ｜ 大促扩容: 分区 12→24, 消费者 6→12”
+6. 缩分区/双写看似回退但不保证；原文依据（a-danger）：“Kafka标准分区管理不能把已增加分区直接减回12；该调用会被拒绝，不是自动第二次重排。若删除/新建主题或改自定义路由则是另一次迁移，存在数据和顺序风险，不能把它冒充简单回滚。”
+
+标准路径：a-impact → a-rebalanceaudit → a-consumerspeed → a-producercheck → a-ordercheck，6⚡，零错S；终态确认h-resplit，其余全部excluded。
+
+替代路径：a-impact → a-ordercheck → a-producercheck → a-consumerspeed → a-rebalanceaudit，6⚡，零错S；终态确认h-resplit，其余全部excluded。
+
+停止点：【停止规则】取模、旧积压与跨分区完成顺序一致，单分区倒序、新事件双发和源业务序列错误均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://kafka.apache.org/41/documentation/#basic_ops_modify_topic)、[官方资料2](https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html)。
+

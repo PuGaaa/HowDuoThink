@@ -1,50 +1,78 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 5 章 · 消息与异步 第二批（慢消费队头阻塞 L2）
- * 教学点：程序设计——分区内 FIFO 保序的代价是队头阻塞：一条慢消息卡住整个分区；
- * 外部调用必须有超时与隔离舱（bulkhead）；保序与吞吐是一对需要显式设计的权衡。
- * 专家路径：impact(1) + skewstat(1) + conccfg(1) + brokerio(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const mqSlowPartCase: DiagnosisCase = {
   id: 'mq-slowpart',
-  title: '消费速率掉到五分之一——很闲地卡着',
-  intro: '订单队列消费速率从 2000/分掉到 400/分，积压持续增长。所有实例都活着，CPU 很闲——像有什么东西把队伍卡住了。',
+  title: '四个分区掉到五分之一，整体却只掉两成',
+  intro: '16分区中4个出现长审核，积压增长但CPU低。把局部吞吐、全局吞吐和处理时长放到同一口径核算。',
   domain: 'runtime',
   layer: '分区内保序的代价是队头阻塞——一条慢消息卡住整个分区',
   part: 'master',
   chapterId: 'messaging',
   order: 5,
-  typeTags: ['messaging', 'resource', 'capacity'],
-  difficulty: 2,
-
+  typeTags: [
+    'messaging',
+    'resource',
+    'capacity',
+  ],
+  difficulty: 3,
   scene: {
     role: '你是「鲜到家」订单平台的消息链路负责人，积压告警在群里已经刷了一上午。',
-    architecture: '订单服务 → MQ(16 分区, 分区内 FIFO 保序) → 消费者集群(8 实例×2 并发) → 下游(积分/通知/风控)',
+    architecture: 'Kafka16分区，应用明确按分区单任务串行处理；8实例×2处理线程，按分区追踪分配；handler同步等待风控结果。',
     tag: '故障现场',
     symptoms: [
       {
         type: 'error',
         title: '积压监控',
-        text: '消费速率：2000 条/分 → 400 条/分，持续 6 小时\n分区差异：12 个分区消费正常，4 个分区积压 8 万+ 条且持续增长',
+        text: '整体消费2000→1600条/分；正常12分区各125/分，慢4分区各约25/分（当地降到五分之一）。输入仍2000/分，6小时净积压约144000条。',
       },
       {
         type: 'text',
         title: '消费者实例状态',
-        text: '8 个实例全部健康：CPU 15%、内存正常、零报错、零重启。\n"很闲"地在卡着——不是算不动，是没东西可算。',
+        text: 'CPU15%、内存平稳。慢4分区样本每250条约1条触发8分钟审核，其余单条持handler约480ms；其他12分区没有该长审核类型。',
+      },
+      {
+        type: 'log',
+        title: '归档文件失败',
+        text: '[WARN] Kafka audit archive upload retry。',
+      },
+      {
+        type: 'log',
+        title: '监控标签缺失',
+        text: '[WARN] consumer metrics label deprecated。',
+      },
+      {
+        type: 'log',
+        title: '通知图标失败',
+        text: '[WARN] order notification thumbnail 404。',
       },
     ],
-    timeline: '上周三风控服务接入消费链路（大额订单同步回调人工审核）｜ 积压从上周四开始缓慢增长 ｜ 消费代码与配置未变',
+    timeline: '风控接入后暴露长审核；本窗口消息数量分布近似均匀，类型构成不同；没有消费者重启或分配变化。',
     impactHint: '只有个别分区卡——分区是保序单位，谁把"顺序"变成了"排队"？',
   },
-
   hypotheses: [
-    { id: 'h-slowcall', text: '消费 handler 内同步调用外部服务无超时：个别消息触发慢调用，卡住整个分区', excludeActionId: 'a-handlereval' },
-    { id: 'h-skew', text: '分区键倾斜：大卖家订单集中在少数分区，单分区负载过高', excludeActionId: 'a-skewstat' },
-    { id: 'h-thread', text: '消费者并发度配置错误，实例数或并发数不足', excludeActionId: 'a-conccfg' },
-    { id: 'h-broker', text: 'Broker 磁盘 IO/页缓存劣化，拉取变慢', excludeActionId: 'a-brokerio' },
+    {
+      id: 'h-slowcall',
+      text: '消费 handler 内同步调用外部服务无超时：个别消息触发慢调用，卡住整个分区',
+      excludeActionId: 'a-handlereval',
+    },
+    {
+      id: 'h-skew',
+      text: '分区键倾斜：大卖家订单集中在少数分区，单分区负载过高',
+      excludeActionId: 'a-skewstat',
+    },
+    {
+      id: 'h-thread',
+      text: '消费者并发度配置错误，实例数或并发数不足',
+      excludeActionId: 'a-conccfg',
+    },
+    {
+      id: 'h-broker',
+      text: 'Broker 磁盘 IO/页缓存劣化，拉取变慢',
+      excludeActionId: 'a-brokerio',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +87,7 @@ export const mqSlowPartCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '分区消息构成对比',
-        text: '卡住的 4 个分区：大额订单消息（走风控同步回调）占比 38%\n正常的 12 个分区：大额订单占比 < 1%\n同一时期、同一消费者集群、同一 Broker——唯一差异是消息类型构成。\n→ 问题跟着"某类消息"走，不跟着"某个分区"或"某台机器"走。',
+        text: '消息数量各分区偏差<6%，但慢4分区约0.4%触发8分钟人工审核，其余分区该类型接近0。局部下降80%，按4/16权重只导致全局下降约20%；不能在12/16正常且均量时说全局掉80%。',
       },
     },
     {
@@ -70,12 +98,19 @@ export const mqSlowPartCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-skew'],
-      hypotheses: [{ id: 'h-skew', status: 'excluded' }],
+      tests: [
+        'h-skew',
+      ],
+      hypotheses: [
+        {
+          id: 'h-skew',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '分区键分布',
-        text: '分区键 = hash(orderId)，16 分区消息量最大偏差 6%——分布均匀。\n→ 排除倾斜：卡的分区不是"消息多"，是"消息特殊"。',
+        text: '按同一窗口入队消息数量和key分布核对，16分区无显著量倾斜；但类型/耗时倾斜确实存在。排除“只有消息数量过多”的解释，不把数量均匀当内容也均匀。\n噪声收线：图像错误不改变消息入队数量/key；长审核类型与普通通知分开统计，不把图像404当量倾斜。',
       },
     },
     {
@@ -86,12 +121,19 @@ export const mqSlowPartCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-thread'],
-      hypotheses: [{ id: 'h-thread', status: 'excluded' }],
+      tests: [
+        'h-thread',
+      ],
+      hypotheses: [
+        {
+          id: 'h-thread',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '并发配置',
-        text: '8 实例 × 2 并发 = 16 消费线程 = 分区数，一一对应。\n单分区单线程是保序的正确姿势——配置没错。\n→ 排除并发问题：保序机制本身是对的，它的代价被某类消息引爆了。',
+        text: '实际assignment与handler跟踪确认16分区各有一个独立串行处理通道，空闲线程没有被错误停用。8×2这个算式本身不证明配置正确；本题以具体分配/进度核对排除少配线程。\n噪声收线：旧标签只影响展示命名，assignment与handler进度从消费者本身读取，16通道并未消失。',
       },
     },
     {
@@ -102,12 +144,19 @@ export const mqSlowPartCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-broker'],
-      hypotheses: [{ id: 'h-broker', status: 'excluded' }],
+      tests: [
+        'h-broker',
+      ],
+      hypotheses: [
+        {
+          id: 'h-broker',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'Broker 状态',
-        text: '磁盘 util 22%、页缓存命中 99%、无慢盘告警。\n→ 排除 Broker：存储层很健康。',
+        text: '慢分区fetch延迟与正常分区接近，拿到消息后才停在风控HTTP；Broker磁盘/网络无相应等待。平均磁盘util22%不能单独证明所有分区I/O健康，关键是本trace已取到消息。\n噪声收线：归档外送不在故障fetch路径，慢trace已经取得消息后才等待风控。',
       },
     },
     {
@@ -118,12 +167,19 @@ export const mqSlowPartCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-slowcall'],
-      hypotheses: [{ id: 'h-slowcall', status: 'confirmed' }],
+      tests: [
+        'h-slowcall',
+      ],
+      hypotheses: [
+        {
+          id: 'h-slowcall',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '单消息耗时剖析（卡住分区）',
-        text: 'P50：52ms（正常消息）\nP99：28,400ms ← 28 秒！\n慢消息 trace：全部停在"风控同步回调"——\nhttp.call(risk-review, timeout=NONE)\n大额订单触发人工审核模式，风控响应 20~30s；\n分区内 FIFO：一条慢 30s，后面排队的全是"受害者"。\n实锤：无超时的同步慢调用卡死分区队头。',
+        text: '正常handler持有约0.48s（含I/O）；慢4分区每250条中1条人工审核约480s，无期限；同分区后续不启动。阻塞栈在风控HTTP，非fetch或CPU。\n本案单分区串行处理造成应用队头阻塞，不把所有Kafka客户端都描述成Broker强制等业务回调才允许后续读取。',
       },
     },
     {
@@ -139,14 +195,14 @@ export const mqSlowPartCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '吞吐杀伤模型',
-        text: '大额订单占比：0.4%（每 250 条 1 条）\n单分区节奏：250×52ms ≈ 13s 正常工作 + 1 条阻塞 25s ≈ 38s 只消化 251 条\n理论速率：251/38s ≈ 400 条/分 ✓ 与实测完全吻合\n→ 数学闭合：0.4% 的慢消息吃掉 80% 吞吐。修复对象是"慢"，不是"多"。',
+        text: '同一250条批：正常基线250×0.48=120s→125条/分；有1条480s后为249×0.48+480=599.52s→约25.02条/分。12×125+4×25≈1600。\n输入2000−处理1600≈400/分，6小时≈144000。模型量化当前机制，不证明所有其他原因不可能存在。',
       },
     },
     {
       id: 'a-rollbackmq',
       name: '紧急摘除风控同步调用',
       desc: '【状态变更】消费链路暂时跳过风控回调，消息全部直通',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -155,7 +211,7 @@ export const mqSlowPartCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '止血结果',
-        text: '大额订单的风控审核改为"事后人工补审"，消费速率回升到 1900 条/分。\n积压开始消化，预计 3 小时清空。\n→ 风控规则被临时绕行——止血有业务代价，正式修复必须尽快跟上。',
+        text: '不能擅自把事前风控改成事后补审并当订单通过。止血可对待审核订单明确挂起、限制进入该路径，保留业务审核承诺；任何临时放行需业务明确接受风险。',
       },
     },
     {
@@ -171,7 +227,7 @@ export const mqSlowPartCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① handler 内全部外部调用统一 500ms 超时（配置中心可调）\n② 风控超时的消息转入独立"复核队列"，人工审核结果回流补账\n③ 主链路恢复 2000 条/分，P99 单消息耗时 85ms。',
+        text: '按业务期限将长审核登记为持久待处理意图，再安全提交/移动主队列位置，并在独立审核通道处理；未决订单保持待审而非通过。\n原分区可继续处理哪些实体/事件要按顺序契约决定，超时本身不等于业务已完成；不能一律500ms就承诺P99 85ms。',
       },
     },
     {
@@ -187,7 +243,7 @@ export const mqSlowPartCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '规范条目',
-        text: '消费链路设计规范新增：任何超过 200ms 的外部依赖必须进隔离舱——\n独立线程池（耗尽不波及主链路）或独立消费者组（慢消费不堵快消费）。\n保序 FIFO 的队列里，慢是一种传染。',
+        text: '独立线程池只隔离执行资源，若原分区仍等待它完成，队头阻塞还在。Kafka另起同topic消费者组会复制消费，不自动只接慢事件；需明确路由到独立主题/任务并定义主消费提交和补偿边界。',
       },
     },
     {
@@ -207,67 +263,93 @@ export const mqSlowPartCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-slowcall', text: '风控同步回调无超时：大额订单（0.4%）触发 20~30s 人工审核响应，分区内 FIFO 下一条慢消息阻塞整个分区——0.4% 的慢消息吃掉 80% 吞吐', correct: true },
-    { id: 'rc-skew', text: '分区键倾斜导致少数分区负载过高', correct: false },
-    { id: 'rc-thread', text: '消费者并发度配置不足', correct: false },
-    { id: 'rc-broker', text: 'Broker 磁盘 IO 劣化导致拉取变慢', correct: false },
+    {
+      id: 'rc-slowcall',
+      text: '4个分区的串行handler约0.4%事件同步等待480秒审核，平均服务时间显著上升；局部125→25/分，使均量16分区全局2000→1600/分并积压',
+      correct: true,
+    },
+    {
+      id: 'rc-skew',
+      text: '分区键倾斜导致少数分区负载过高',
+      correct: false,
+    },
+    {
+      id: 'rc-thread',
+      text: '消费者并发度配置不足',
+      correct: false,
+    },
+    {
+      id: 'rc-broker',
+      text: 'Broker 磁盘 IO 劣化导致拉取变慢',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 7,
   restartActionId: 'a-rollbackmq',
-
   expertChain: [
     {
-      thought: '"个别分区卡"不是"全部卡"——先对比卡住与正常分区的消息构成：差异跟着谁走。',
-      update: '差异跟着"大额订单（风控回调）"走：卡住分区该类消息占 38%，正常分区 < 1%。',
+      thought: '分开局部与全局吞吐。',
+      update: '4/16慢80%，全局约慢20%。',
       actionId: 'a-impact',
-      why: '1⚡︎ 构成对比把"分区"从地理概念还原成"消息集合"——卡的不是位置，是内容。',
-      conclusion: '嫌疑锁定：某类消息的处理路径（h-slowcall 升权）。',
+      why: '1⚡先统一指标权重，避免算出不可能的整体下降。',
+      conclusion: '核对数量和类型。',
     },
     {
-      thought: '倾斜/并发/Broker 三个环境性解释用 1⚡︎ 各排一次——便宜且必须留证。',
-      update: '分区分布均匀、并发配置正确、Broker 健康——环境层全部清白。',
+      thought: '比较分区入队量。',
+      update: '数量均匀，类型耗时不同。',
       actionId: 'a-skewstat',
-      why: '1⚡︎ 三个排除买一个干净的实验环境：剩下的解释只有"消息处理本身"，且排除证据在复盘里支撑"为什么不是别的"。',
-      conclusion: '嫌疑收敛单点：handler 内部。',
+      why: '1⚡量均匀不代表成本均匀。',
+      conclusion: '排除量倾斜。',
     },
     {
-      thought: '逐消息计时——不满足于"它慢"，要找到"慢在哪一行"。',
-      update: '实锤：P99 28s，全部停在无超时的风控同步调用；FIFO 让一条慢消息卡住整分区。',
+      thought: '读取实际assignment与处理通道。',
+      update: '各分区都有串行通道。',
+      actionId: 'a-conccfg',
+      why: '1⚡线程数乘法不等于有效工作分配。',
+      conclusion: '排除少配线程。',
+    },
+    {
+      thought: '对照fetch与handler时间。',
+      update: '消息已拿到，fetch不慢。',
+      actionId: 'a-brokerio',
+      why: '1⚡阶段证据优于平均I/O利用率。',
+      conclusion: '排除Broker先行慢。',
+    },
+    {
+      thought: '读取慢消息栈和处理契约。',
+      update: '0.4%等480s阻塞同分区后续。',
       actionId: 'a-handlereval',
-      why: '2⚡︎ 耗时剖析给到行级：修复从"优化消费"缩小到"给一个调用加超时"——精确归因让修复成本从周降到小时。',
-      conclusion: '根因实锤：无超时的同步慢调用 × 分区保序。',
+      why: '2⚡定位应用串行等待而非Kafka泛化保证。',
+      conclusion: '确认队头阻塞。',
     },
     {
-      thought: '量化杀伤模型验证机制完备性：0.4% 慢消息 ÷ 250 条节奏 → 预测 400 条/分。',
-      update: '数学与实测完全吻合——机制闭环，修复收益可预判（回滚验证也印证）。',
+      thought: '复算每250条和整体积压。',
+      update: '约25/分局部、1600/分整体。',
       actionId: 'a-poisoncount',
-      why: '1⚡︎ 量化闭合防止"修了就好"的玄学：模型对上了，说明因果理解完备；修完能不能恢复 2000，模型提前给了答案。',
-      conclusion: '进入修复：超时 + 异步化 + 隔离舱。',
+      why: '1⚡单位和权重闭合支持机制，但不宣称数学证明唯一因。',
+      conclusion: '证据闭合。',
     },
     {
-      thought: '止血（摘除慢调用）、修复（超时+异步复核）、沉淀（隔离舱规范+监控）。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（无超时慢调用）✓ 放大器（FIFO 保序）✓ 量化（杀伤模型闭合）✓——三层证据齐备。',
-      conclusion: '沉淀：保序队列里，慢是一种传染——隔离舱不是优化项，是保序架构的生存条件。',
+      why: '【停止规则】慢handler栈、同窗分配和量化模型吻合，量倾斜、少配线程和Broker取数慢均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '4个分区的串行handler约0.4%事件同步等待480秒审核，平均服务时间显著上升；局部125→25/分，使均量16分区全局2000→1600/分并积压',
     },
   ],
-
   lessons: [
     {
-      text: '分区内 FIFO 保序的代价是队头阻塞：一条慢消息卡住整个分区，一条毒消息毒倒整个队列。',
-      principle: '程序设计：保序与吞吐是显式权衡——选择了 FIFO 就必须回答"一条消息最多能慢多久"。慢依赖必须进隔离舱（独立线程池/独立消费者组/独立队列），让"慢"的半径被架构圈住。',
+      text: '局部80%降速乘4/16权重是全局约20%，不能把局部指标直接冒充全局。',
+      principle: '核对消息量、处理时长与分区权重；正常12分区若均量且正常，不支持整体只剩五分之一。',
     },
     {
-      text: '消费 handler 内的外部调用必须有超时：无超时的同步调用是队列里的定时炸弹，触发概率再低也会在分区内被放大。',
-      principle: '任何跨网络调用默认配超时（配置中心可调）；超时后的处理路径（转异步队列/降级/补偿）与超时值一起设计。"不会这么慢的"不是工程判断——风控人工审核 20 秒就是现实。',
+      text: '249×0.48+480=599.52秒，250条约25/分；0.4%慢消息影响取决于真实服务时间分布。',
+      principle: '模型说明数量级，需与同窗口计数比对；不能拿0.4%和25秒在52ms基线硬算出80%损失并宣布唯一因果。',
     },
     {
-      text: '吞吐杀伤要算数学账：0.4% 的慢消息 × 25s 阻塞 ÷ 52ms 单条节奏 = 80% 吞吐损失。',
-      principle: '量化验证思维：杀伤模型（占比×阻塞时长÷正常节奏）与实测速率吻合时，因果理解才算完备——它同时证明了根因的唯一性和修复收益的可预期性。',
+      text: '资源隔离与顺序解耦不同：异步提交后仍等待，同分区照样停滞。',
+      principle: '慢审核需可靠待处理状态与明确路由，不能未审先通过。独立Kafka组不是自动隔离慢消息，消费提交与业务完成之间必须有持久恢复路径。',
     },
   ],
 }

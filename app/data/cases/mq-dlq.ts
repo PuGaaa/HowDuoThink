@@ -1,22 +1,21 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 5 章 · 消息与异步（死信积压 L2）
- * 教学点：死信队列是"隔离区"不是"垃圾桶"——只进不出等于故障被静默吞掉；监控缺失让小故障发酵成大事故。
- * 专家路径：impact(1) + sample(1) + version(2) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const mqDlqCase: DiagnosisCase = {
   id: 'mq-dlq',
   title: '死信队列堆了八万条——没人看',
-  intro: '季度盘点时发现：订单通知队列旁的 DLQ 里积压了 80,000+ 条消息，最老的三周前就进去了，期间没有任何告警。',
+  intro: 'DLQ快照80412条，最老21天。核对入队原因、消息契约和告警归属，再决定哪些记录仍有补发意义。',
   domain: 'runtime',
   layer: '死信队列是隔离区不是垃圾桶——只进不出的兜底等于没有兜底',
   part: 'master',
   chapterId: 'messaging',
   order: 3,
-  typeTags: ['messaging', 'sre'],
+  typeTags: [
+    'messaging',
+    'sre',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」电商的通知服务后端，订单通知（短信/Push）由你的消费链路发出。',
     architecture: '订单服务 → MQ(订单通知) → 通知消费者(发短信/Push) —失败重试3次→ 死信队列 DLQ（无消费者、无监控）',
@@ -31,18 +30,37 @@ export const mqDlqCase: DiagnosisCase = {
         title: '业务侧感知',
         text: '三周内陆续有用户投诉"下单了但没收到任何通知"，客服以"系统繁忙"话术打发——投诉量小而分散，未触发升级。',
       },
+      {
+        type: 'log',
+        title: '通道账单归档延期',
+        text: '[WARN] SMS billing archive upload retry。',
+      },
     ],
-    timeline: '积压始于 21 天前的一次发版 ｜ DLQ 上线于半年前的"消息可靠性改造"，之后无人再看过它',
-    impactHint: '80,000 条死信背后是 80,000 次服务承诺的失约——先弄清它们为什么死，再看它们死得多安静。',
+    timeline: '前21~18天沿用低基线，17天前消费者升级后跳变；DLQ半年未配监控/owner。',
+    impactHint: '条数不自动等于独立用户或失约次数，要按业务ID、重试副本和时效分组。',
   },
-
   hypotheses: [
-    { id: 'h-format', text: '新版本改了消息格式，旧格式消息反序列化失败被反复拒绝进死信', excludeActionId: 'a-sample' },
-    { id: 'h-quota', text: '短信通道配额用尽/欠费，发送全部失败进死信', excludeActionId: 'a-smslog' },
-    { id: 'h-poison', text: '个别"毒消息"（特殊内容触发代码异常）混入，正常消息其实正常', excludeActionId: 'a-ratio' },
-    { id: 'h-typo', text: 'DLQ 本身配置错误，正常消息被误判失败转入死信', excludeActionId: 'a-retry' },
+    {
+      id: 'h-format',
+      text: '新版本改了消息格式，旧格式消息反序列化失败被反复拒绝进死信',
+      excludeActionId: 'a-sample',
+    },
+    {
+      id: 'h-quota',
+      text: '短信通道配额用尽/欠费，发送全部失败进死信',
+      excludeActionId: 'a-smslog',
+    },
+    {
+      id: 'h-poison',
+      text: '个别"毒消息"（特殊内容触发代码异常）混入，正常消息其实正常',
+      excludeActionId: 'a-ratio',
+    },
+    {
+      id: 'h-typo',
+      text: 'DLQ 本身配置错误，正常消息被误判失败转入死信',
+      excludeActionId: 'a-retry',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -57,7 +75,7 @@ export const mqDlqCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '死信入队速率（按天）',
-        text: '21天前～18天前：  日均 ~120 条（历史基线：偶发脏数据）\n17天前：          日增 9,800 条 ← 跳变！\n之后至今：        日均 ~5,600 条 持续堆积\n→ 17 天前发生跳变且持续至今：不是偶发毒消息，是持续性故障，起点与发版时间吻合。',
+        text: '快照累计80412：前4天历史基线共480；D-17跳变9800；随后16天共70132（约4383/天），合计80412。时间单位与总量一致。\n新增加记录集中新消费者上线后；曲线提示变更，不单凭同日发生断因果。',
       },
     },
     {
@@ -68,12 +86,19 @@ export const mqDlqCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-format'],
-      hypotheses: [{ id: 'h-format', status: 'confirmed' }],
+      tests: [
+        'h-format',
+      ],
+      hypotheses: [
+        {
+          id: 'h-format',
+          status: 'up',
+        },
+      ],
       result: {
         type: 'code',
         title: '死信样本（17天前 vs 现在）',
-        text: '样本1（17天前）：JsonDecodeError: missing field "pushTemplateId"\n样本2（3天前）：  JsonDecodeError: missing field "pushTemplateId"\n样本3（旧基线）： SMSChannelError: 手机号格式非法 ← 历史正常死因\n→ 跳变后的死因清一色是反序列化失败：消费代码期望 pushTemplateId 字段，消息体里没有。',
+        text: '不同日期样例为ValidationError: pushTemplateId Field required；旧基线样例是手机号格式无效。JSON文本可正常解析，缺业务必填字段不是JSONDecodeError。样例说明字段校验方向，不代表全部80412条同死因。',
       },
     },
     {
@@ -84,12 +109,19 @@ export const mqDlqCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-quota'],
-      hypotheses: [{ id: 'h-quota', status: 'excluded' }],
+      tests: [
+        'h-quota',
+      ],
+      hypotheses: [
+        {
+          id: 'h-quota',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '短信通道',
-        text: '通道余额充足、发送成功率 99.2%——能走到发送这一步的消息都成功了。\n→ 排除配额问题：消息死在更早的反序列化阶段，根本没到发送。',
+        text: '字段校验失败的494样例未调用短信SDK；同时独立通道配额充足。99.2%发送成功率不等于全部成功，且只覆盖到达发送阶段的消息，不能拿幸存者比例证明字段消息已发。\n噪声收线：账单归档是离线文件，字段校验失败消息尚未调用SDK；配额与请求阶段核验不依赖归档成功。',
       },
     },
     {
@@ -100,12 +132,19 @@ export const mqDlqCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
+      tests: [
+        'h-format',
+      ],
+      hypotheses: [
+        {
+          id: 'h-format',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '17天前的 diff',
-        text: '消费端（新版）：message.pushTemplateId 必填 —— 新增字段校验\n生产端（未升级）：仍按旧契约发送，消息体无 pushTemplateId\n→ 消费者升级引入了"必填新字段"，但没有和上游约定灰度兼容期：新代码消费旧消息，格式不兼容。',
+        text: 'Python消费schema新增pushTemplateId必填，上游旧合法消息无此字段。受控旧消息在旧消费者可处理、新版在字段校验拒绝；仅提供兼容映射或撤销新增必填后同输入通过。\n这支持契约破坏，不以第一个错误日志或单次版本相关性判根因。',
       },
     },
     {
@@ -116,12 +155,19 @@ export const mqDlqCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-poison'],
-      hypotheses: [{ id: 'h-poison', status: 'excluded' }],
+      tests: [
+        'h-poison',
+      ],
+      hypotheses: [
+        {
+          id: 'h-poison',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '死因占比',
-        text: '抽样 500 条：98.7% 是格式不兼容，1.3% 是历史脏数据（基线水平）。\n→ 排除毒消息假设：不是个别消息有毒，是新代码对旧格式全员拒绝。',
+        text: '固定500条按时间/主题分层抽样：494条字段不兼容（98.8%），6条其他历史脏数据（1.2%）。样本不等于全量比例，但足以反证只有孤立内容毒消息；全量清洗仍需逐ID分类。',
       },
     },
     {
@@ -132,12 +178,19 @@ export const mqDlqCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-typo'],
-      hypotheses: [{ id: 'h-typo', status: 'excluded' }],
+      tests: [
+        'h-typo',
+      ],
+      hypotheses: [
+        {
+          id: 'h-typo',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '重试链路',
-        text: '重试 3 次 × 指数退避，配置正确；转入 DLQ 的都是重试耗尽的消息，无误判。\n→ 排除配置问题：DLQ 干得很好——它把失败消息全接住了。问题在没人看它。',
+        text: '本案应用重试计数和x-death/路由审计关联：校验失败后经历配置的3次尝试，最后nack(requeue=false)进入绑定DLX；无TTL/长度上限误触发。RabbitMQ不会无配置自动把重试3次变DLQ。',
       },
     },
     {
@@ -153,14 +206,14 @@ export const mqDlqCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '监控盘点',
-        text: '主队列：深度/消费速率有告警 ✓\nDLQ：无深度监控、无增长率告警、无归属 owner ✗\n→ 可靠性改造建了 DLQ 却没给它装仪表盘——兜底设施本身成了盲区，故障被静默吞掉 17 天。',
+        text: '主队列有告警，DLQ没有深度/年龄/增长告警、owner或处理SLA。缺少DLQ业务ID对账使该契约失败长期不可见；条数仍需去重和过期语义解释。',
       },
     },
     {
       id: 'a-rollback',
       name: '回滚消费者到兼容版本并恢复消费',
       desc: '【状态变更】先让链路转起来：兼容版本消化增量消息',
-      cost: 2,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -185,71 +238,104 @@ export const mqDlqCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '重放结果',
-        text: '80,412 条中：78,900 条补全字段后重放成功，1,512 条真实脏数据归档。\n用户通知补发完成（部分过期订单标记"不再补发"）。\n→ 存量清零，DLQ 恢复基线水位。',
+        text: '先只读分类、确认时效与业务幂等，再有界重放。本题全量分组示例：78900条可做字段兼容，其中70000仍需通知、8900已过期不补发；1512条其他脏数据处置，共80412。\n“转出DLQ”不等于80412次短信已成功，也不能不看时效批量轰炸用户。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-format', text: '17 天前消费者升级新增必填字段 pushTemplateId，但生产端未同步升级——新代码拒绝旧格式消息，全部重试失败进 DLQ；而 DLQ 无监控无 owner，静默积压 17 天', correct: true },
-    { id: 'rc-quota', text: '短信通道配额耗尽导致发送全部失败', correct: false },
-    { id: 'rc-poison', text: '个别毒消息触发代码异常混入队列', correct: false },
-    { id: 'rc-typo', text: '重试/死信配置错误，正常消息被误转死信', correct: false },
+    {
+      id: 'rc-format',
+      text: '消费者新增必填pushTemplateId破坏旧消息兼容，样例控制对照在字段校验前失败并按配置进入DLQ；DLQ缺监控/归属延长发现时间',
+      correct: true,
+    },
+    {
+      id: 'rc-quota',
+      text: '短信通道配额耗尽导致发送全部失败',
+      correct: false,
+    },
+    {
+      id: 'rc-poison',
+      text: '个别毒消息触发代码异常混入队列',
+      correct: false,
+    },
+    {
+      id: 'rc-typo',
+      text: '重试/死信配置错误，正常消息被误转死信',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 8,
   restartActionId: 'a-rollback',
-
   expertChain: [
     {
-      thought: '80,000 条不是一次事故，是一条曲线。先看入队速率随时间的变化——匀速、跳变还是脉冲，形状直接指向故障类型。',
-      update: '17 天前日增跳变 80 倍且持续至今 → 持续性故障 + 精确的起点时间。',
+      thought: '统一快照和日增口径。',
+      update: '480+9800+70132=80412。',
       actionId: 'a-impact',
-      why: '1⚡︎ 速率曲线是最便宜的时间机器：跳变日 = 故障起点 = 发版日，"变更必进时间线"在这里直接给出嫌疑人。',
-      conclusion: '持续性 + 起点 17 天前 → 不是偶发问题，是兼容性/配置类变更故障。',
+      why: '1⚡先对账总量，再看变化窗口。',
+      conclusion: '排查失败类型。',
     },
     {
-      thought: '验尸：抽样不同日期的死信，看它们的具体死因——异常类型是最诚实的证词。',
-      update: '实锤：跳变后死因清一色 JsonDecodeError（缺 pushTemplateId），基线死因是手机号非法——两种死因完全不同。',
+      thought: '抽取跨时间样例。',
+      update: 'JSON可解析，失败为业务必填校验。',
       actionId: 'a-sample',
-      why: '1⚡︎ 抽样验尸一锤定音：死因从"脏数据"变成了"格式不兼容"，且新旧样本对照排除了"一直如此"的解释。',
-      conclusion: '消息格式不兼容 → 锁定消费者与生产者的契约变更。',
+      why: '1⚡错误层级须真实，不把缺字段叫JSON语法错。',
+      conclusion: '兼容候选升权。',
     },
     {
-      thought: '看 17 天前的 diff：谁引入了字段校验？上游为什么没有这个字段？',
-      update: '实锤机制：消费端加了必填校验，生产端还在发旧契约——单向升级破坏了兼容。',
+      thought: '同输入旧新版对照。',
+      update: '新版必填拒绝旧合法消息。',
       actionId: 'a-version',
-      why: '2⚡︎ diff 给出完整因果链：不是谁写错了代码，是升级顺序没设计——消息契约的变更必须双向兼容、灰度过渡。',
-      conclusion: '根因机制闭合：单向契约升级 + DLQ 盲区 = 大规模静默失败。',
+      why: '2⚡对照证明变更机制，不凭日志先后归因。',
+      conclusion: '确认字段兼容缺口。',
     },
     {
-      thought: '为什么 17 天没人发现？检查 DLQ 的监控——兜底设施本身是否在视野内。',
-      update: 'DLQ 无监控无告警无 owner：可靠性改造建了兜底，没建兜底的观察手段。',
+      thought: '分层抽样核对分布。',
+      update: '494/500非孤立毒内容。',
+      actionId: 'a-ratio',
+      why: '1⚡样本整数与分母要可复算。',
+      conclusion: '排除个别毒消息解释。',
+    },
+    {
+      thought: '关联实际SDK调用前后。',
+      update: '字段失败未到短信。',
+      actionId: 'a-smslog',
+      why: '1⚡阶段证据反证配额耗尽，避免幸存者成功率误导。',
+      conclusion: '排除配额。',
+    },
+    {
+      thought: '核对每次重试与DLX原因。',
+      update: '应用配置3次后拒绝并死信。',
+      actionId: 'a-retry',
+      why: '1⚡不存在无配置自动3次DLQ保证。',
+      conclusion: '排除错误转移。',
+    },
+    {
+      thought: '核对发现与处理归属。',
+      update: 'DLQ无告警或owner。',
       actionId: 'a-monitor',
-      why: '产品视角的关键一问：故障不可避免，但"故障被吞 17 天"是监控设计的失败。DLQ 的深度就是"用户失约数"，它值得一条告警。',
-      conclusion: '两个根因都要修：契约升级流程（防再犯）+ DLQ 可观测性（防静默）。',
+      why: '1⚡解释长期静默需要独立治理证据。',
+      conclusion: '影响延长原因闭合。',
     },
     {
-      thought: '止血（回滚恢复消费）、清创（重放存量）、防复发（监控+契约流程）三步走完，停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（格式不兼容）✓ 起点（发版日）✓ 放大器（DLQ 盲区）✓ ——三层证据闭合，行动方案覆盖当下与未来。',
-      conclusion: '沉淀：死信队列的深度就是"服务承诺的欠账数"。给它装仪表盘，像盯主队列一样盯它。',
+      why: '【停止规则】同输入版本对照及DLX原因吻合，孤立毒消息、配额和误转移解释均排除，长期静默有监控证据。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '消费者新增必填pushTemplateId破坏旧消息兼容，样例控制对照在字段校验前失败并按配置进入DLQ；DLQ缺监控/归属延长发现时间',
     },
   ],
-
   lessons: [
     {
-      text: '死信队列是隔离区不是垃圾桶：只进不出的 DLQ 等于把故障静默吞掉。',
-      principle: 'DLQ 的存在让系统"看起来还在跑"，但每条死信都是一次服务承诺的失约。DLQ 必须有深度告警、增长率告警和明确 owner，纳入日常巡检——兜底设施不在监控里，等于没有兜底。',
+      text: 'DLQ是隔离记录，不是自动恢复；深度也不直接等于独立用户、短信数量或承诺失约。',
+      principle: '按业务ID、进入原因、去重及有效期分组，配深度/年龄/增长监控、owner和处理时限；重放前验证幂等与时效。',
     },
     {
-      text: '消息契约变更必须双向兼容：新消费者要能吃旧消息，新生产者的消息旧消费者要能忽略新字段。',
-      principle: '消息队列两端无法原子升级，任何契约变更都要设计兼容窗口：新增字段只加不改、消费端宽松校验、必要时字段带版本号。"先发版再说"在异步链路里等于埋雷，且雷的引线可以长达数周。',
+      text: '跨版本消息要验证实际老消息、新schema和迁移顺序；新增字段是否可选由业务兼容策略决定。',
+      principle: '并非所有未知字段都可忽略，严格schema可能拒绝。旧消息可能长期驻留或重放，因此兼容测试不只覆盖新生产者。',
     },
     {
-      text: '用户投诉小而分散 ≠ 影响小：投诉到不了决策层，监控必须替用户说话。',
-      principle: '80,000 次失约只产生了零星投诉，因为单个用户只遭遇一次。产品视角的教训：不能依赖用户反馈做故障发现，受影响面监控（消息失败数、通知失败数）才是用户的代言人。',
+      text: '样本比例和全量条数要分开；500条的98.7%不是整数样本，本题494/500=98.8%。',
+      principle: '曲线仅提示变更窗口，控制同输入旧/新消费者才支持因果。通道成功率只覆盖已经调用通道者，不能掩盖更早校验失败。',
     },
   ],
 }

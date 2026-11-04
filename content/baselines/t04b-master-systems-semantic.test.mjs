@@ -85,3 +85,12 @@ test('并发案例的事务顺序与拒绝容量算术一致',()=>{
 test('已校准题的六维原文、危险成本和噪声在两条路径完整收线',()=>{
  for(const r of baseline.cases.filter(r=>r.status==='calibrated')){const c=load(r.file);assert.ok(r.dimensionEvidence.every(e=>e.includes('原文依据')));if(c.difficulty===1)continue;assert.equal(r.noise.length,c.difficulty===3?3:1);for(const n of r.noise){assert.ok(c.scene.symptoms.some(s=>s.title===n.title&&s.text===n.text));assert.ok(c.actions.find(a=>a.id===n.closeActionId).result.text.includes(n.closure));for(const p of r.paths)assert.ok(p.actions.includes(n.closeActionId))}}
 })
+test('延迟题直接执行真实题内公式，正确带偏移epoch可直接相减',()=>{
+ const c=load('app/data/cases/mq-delay.ts'),code=c.actions.find(a=>a.id==='a-tzaudit').result.text.split('\n').slice(0,2).join('\n').replace('实际代码：',''),bad=new Function('targetEpoch','nowEpoch','createdEpoch',code+';return delayMs');const target=Date.parse('2026-09-29T19:00:00+08:00'),now=Date.parse('2026-09-29T18:30:00+08:00');assert.equal((target-now)/60000,30);assert.deepEqual(['18:17','18:22','18:25'].map(t=>bad(target,now,Date.parse(`2026-09-29T${t}:00+08:00`))/60000),[17,22,25]);assert.equal(target,Date.parse('2026-09-29T11:00:00Z'))
+})
+test('消费局部吞吐与全局权重、DLQ抽样和Kafka分区数学可对账',()=>{
+ assert.equal(480+9800+70132,80412);assert.equal(494/500,0.988);assert.ok(Math.abs(250/(249*.48+480)*60-25.02)<.01);assert.equal(12*125+4*25,1600);assert.equal((2000-1600)*60*6,144000);assert.equal(Array.from({length:24},(_,hash)=>(hash%12)!==(hash%24)).filter(Boolean).length,12)
+})
+test('消息确认与持久化各有边界，不把DLQ或消费ack当端到端确认',()=>{
+ const c=load('app/data/cases/mq-lost.ts');assert.match(c.actions.find(a=>a.id==='a-confirmcheck').result.text,/createConfirmChannel/);assert.match(c.actions.find(a=>a.id==='a-fixconfirm').result.text,/不能补回从未到达Broker/);assert.match(load('app/data/cases/mq-duplicate.ts').actions.find(a=>a.id==='a-logcheck').result.text,/单向方法/)
+})

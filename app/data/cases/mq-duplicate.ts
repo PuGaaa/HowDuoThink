@@ -1,10 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 5 章 · 消息与异步（重复消费 L2）
- * 教学点：MQ 的 at-least-once 语义意味着重复是常态；幂等不是 MQ 的责任，是消费者的责任。
- * 专家路径：impact(1) + logcheck(1) + redeliver(2) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const mqDuplicateCase: DiagnosisCase = {
   id: 'mq-duplicate',
   title: '同一条消息被消费了三次',
@@ -14,12 +11,14 @@ export const mqDuplicateCase: DiagnosisCase = {
   part: 'master',
   chapterId: 'messaging',
   order: 2,
-  typeTags: ['messaging', 'idempotency'],
+  typeTags: [
+    'messaging',
+    'idempotency',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「票到手」票务平台的订单服务后端，负责订单消息的消费链路。',
-    architecture: '支付服务 → MQ(订单消息) → 订单消费者(创建订单/发短信/记流水) → 财务系统',
+    architecture: 'RabbitMQ同一工作队列→2个竞争消费者→本地流水和短信投递；单支付业务键P1，副作用各自不幂等。',
     symptoms: [
       {
         type: 'error',
@@ -31,18 +30,37 @@ export const mqDuplicateCase: DiagnosisCase = {
         title: '用户反馈',
         text: '一个订单收到三条一模一样的"扣款成功"短信——用户以为被重复扣款，已经在投诉。',
       },
+      {
+        type: 'log',
+        title: '模板预览失败',
+        text: '[WARN] SMS template preview image 404。',
+      },
     ],
-    timeline: '今天 11 点起集中出现 ｜ 上午 10:30 消费者实例曾因内存不足重启过一次 ｜ 消费代码三个月未变更',
+    timeline: '11:02窗口两次消费者channel/connection关闭；10:30的旧OOM只是背景，不作为本窗口未确认投递重排的证明。',
     impactHint: '重复的是"消息"还是"副作用"？短信和流水都是消息引发的动作——哪个环节在放大？',
   },
-
   hypotheses: [
-    { id: 'h-redeliver', text: '消费者处理成功但 ack 失败/超时，Broker 认为未消费成功而重发', excludeActionId: 'a-redeliver' },
-    { id: 'h-publish', text: '生产者发送重复：支付服务因超时重试，同一条消息被发了多次', excludeActionId: 'a-publish' },
-    { id: 'h-broadcast', text: '队列配置变更后变成广播/多消费者模式，消息被多个实例各消费一次', excludeActionId: 'a-topology' },
-    { id: 'h-userbug', text: '用户重复点击支付按钮，本来就发起了三笔支付', excludeActionId: 'a-paylog' },
+    {
+      id: 'h-redeliver',
+      text: '消费者处理成功但 ack 失败/超时，Broker 认为未消费成功而重发',
+      excludeActionId: 'a-redeliver',
+    },
+    {
+      id: 'h-publish',
+      text: '生产者发送重复：支付服务因超时重试，同一条消息被发了多次',
+      excludeActionId: 'a-publish',
+    },
+    {
+      id: 'h-broadcast',
+      text: '队列配置变更后变成广播/多消费者模式，消息被多个实例各消费一次',
+      excludeActionId: 'a-topology',
+    },
+    {
+      id: 'h-userbug',
+      text: '用户重复点击支付按钮，本来就发起了三笔支付',
+      excludeActionId: 'a-paylog',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -57,7 +75,7 @@ export const mqDuplicateCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '重复模式统计',
-        text: '受影响订单：10:30（消费者重启）之后的订单，约 4% 出现重复。\n重复次数：绝大多数 2 次，少数 3 次。\n时间分布：11:02:11 / 11:02:19 / 11:02:47——间隔 8s 和 28s，不是毫秒级连发。\n→ 有明显时间间隔的重复 + 与消费者重启时间吻合 → 指向消费侧重发，不是用户连点。',
+        text: '同一支付业务键出现2~3次流水和短信意图。8秒/28秒间隔只是形状，用户也可能隔秒重试，不能单靠间隔排除付款重复。需要相同键与Broker投递关联。',
       },
     },
     {
@@ -68,8 +86,15 @@ export const mqDuplicateCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-userbug'],
-      hypotheses: [{ id: 'h-userbug', status: 'excluded' }],
+      tests: [
+        'h-userbug',
+      ],
+      hypotheses: [
+        {
+          id: 'h-userbug',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '支付发起记录',
@@ -84,12 +109,19 @@ export const mqDuplicateCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-publish'],
-      hypotheses: [{ id: 'h-publish', status: 'excluded' }],
+      tests: [
+        'h-publish',
+      ],
+      hypotheses: [
+        {
+          id: 'h-publish',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '生产者发送日志',
-        text: '支付服务 11:02:09 只 publish 了一次，无重试记录。\n但注意：发送时未开启 confirm，也没有设置 messageId 幂等键——\n生产者"只发一次"不能证明 Broker "只投一次"。',
+        text: '生产审计和Broker入口关联同一payload hash/支付业务键P1只有一次入队，后续为同一入队事件重投；是否启用confirm与此样本发送次数是两件事。',
       },
     },
     {
@@ -100,12 +132,19 @@ export const mqDuplicateCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-broadcast'],
-      hypotheses: [{ id: 'h-broadcast', status: 'excluded' }],
+      tests: [
+        'h-broadcast',
+      ],
+      hypotheses: [
+        {
+          id: 'h-broadcast',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '队列拓扑',
-        text: '队列仍是工作队列模式（非广播），消费者组只有一个，实例 2 个。\n→ 排除拓扑问题：同一条消息只会投给其中一个实例。',
+        text: '单工作队列，两消费者竞争；每次delivery分配给一个消费者，但channel关闭后的重投可以改投另一消费者。没有fanout到三个独立队列，排除广播拷贝解释。',
       },
     },
     {
@@ -116,12 +155,19 @@ export const mqDuplicateCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-redeliver'],
-      hypotheses: [{ id: 'h-redeliver', status: 'confirmed' }],
+      tests: [
+        'h-redeliver',
+      ],
+      hypotheses: [
+        {
+          id: 'h-redeliver',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '消费日志 vs ack 日志',
-        text: '11:02:11  收到 msg#8899 → 创建订单 → 记流水 → 发短信 ✓（耗时 6.2s）\n11:02:17  ack 确认……超时未收到 Broker 应答（网络抖动）\n11:02:19  Broker 重发 msg#8899 → 消费者再次全量执行\n11:02:47  第三次重发（重试退避）→ 再次全量执行\n→ 处理成功但 ack 丢失：Broker 视为未消费，at-least-once 重发。消息体里没有幂等键，三次都被当成"新订单"。',
+        text: '同一入队事件/P1：11:02:11首次开始，17.2秒业务副作用已提交；17.3秒连接关闭，ack未到Broker。19秒重投；第二次完成后ack帧在中断网络未到Broker，45秒连接失效被关闭，47秒第三投递。\nRabbitMQ消费者basic.ack通常是单向方法，没有“等Broker回ack确认超时”的二次确认。这里是连接关闭仍有unacked导致重投，8/28秒来自具体断线/重连，不是Broker内置指数退避。\n噪声收线：预览图不创建短信投递意图或业务流水；三次同P1提交与连接关闭已独立关联。',
       },
     },
     {
@@ -132,12 +178,19 @@ export const mqDuplicateCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-redeliver'],
-      hypotheses: [{ id: 'h-redeliver', status: 'confirmed' }],
+      tests: [
+        'h-redeliver',
+      ],
+      hypotheses: [
+        {
+          id: 'h-redeliver',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: 'Broker 投递记录',
-        text: 'msg#8899 投递记录：deliver#1(11:02:11, ack timeout) → redeliver#2(11:02:19) → redeliver#3(11:02:47)。\nredelivered 标记为 true，但消费者代码从不检查它，也无幂等去重表。\n→ Broker 行为符合 at-least-once 契约：它保证了"至少一次"，不保证"恰好一次"。',
+        text: '相同入队事件与P1，后两次redelivered=true，delivery tag属于各自channel、不能当全局消息ID。标志提供重投线索，不表示首次false永不重复，也不能看到true就丢弃未处理业务。',
       },
     },
     {
@@ -153,14 +206,14 @@ export const mqDuplicateCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '代码审查',
-        text: '消费者代码中搜"幂等/dedupe/unique/messageId"：零命中。\n流水表只有普通索引，无唯一约束；短信发送无去重窗口。\n→ 消费者完全裸奔：把 at-least-once 当成 exactly-once 在写代码。',
+        text: '流水表无支付业务唯一约束，相同P1三次执行都可插入；短信无唯一投递意图。此处业务键P1已在体中，不是因为没有messageId属性就必然不能幂等。',
       },
     },
     {
       id: 'a-rollback',
       name: '紧急止血：停消费者 + 冲正错误流水',
       desc: '【状态变更】停掉消费者防止继续重复，财务冲正多记的流水',
-      cost: 2,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -185,71 +238,97 @@ export const mqDuplicateCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 流水表对 pay_order_no 加唯一约束（数据库层兜底）\n② 消费入口先查"该支付单是否已处理"，已处理则直接 ack 跳过\n③ 生产者为每条消息设置 messageId，消费日志可追溯\n重发测试：手动 kill 消费者模拟 ack 超时 → 重复投递被幂等层拦截，业务零影响。',
+        text: '同事务创建唯一业务流水和唯一短信投递意图，随后可靠派发；短信若供应商支持同业务键幂等则复用，否则结果不确定时仍需对账，不能保证外部恰好一次。\n入口先查再做有竞态，应靠业务约束。messageId便于追踪但不会自动让Broker或消费者去重；ack在承诺的持久业务状态完成后发送。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-redeliver', text: '消费者处理成功但 ack 丢失（重启+网络抖动），Broker 按 at-least-once 契约重发；消费者无幂等设计，重复消息被全量执行', correct: true },
-    { id: 'rc-publish', text: '生产者超时重试导致同一条消息被发送多次', correct: false },
-    { id: 'rc-broadcast', text: '队列误配为广播模式，消息被多个实例重复消费', correct: false },
-    { id: 'rc-userbug', text: '用户重复点击支付，本来就发起了三笔支付', correct: false },
+    {
+      id: 'rc-redeliver',
+      text: '副作用提交后连接关闭导致未确认消息重投，消费者又按同一P1重复插流水和投短信；本地及外部副作用均缺稳定业务唯一边界',
+      correct: true,
+    },
+    {
+      id: 'rc-publish',
+      text: '生产者超时重试导致同一条消息被发送多次',
+      correct: false,
+    },
+    {
+      id: 'rc-broadcast',
+      text: '队列误配为广播模式，消息被多个实例重复消费',
+      correct: false,
+    },
+    {
+      id: 'rc-userbug',
+      text: '用户重复点击支付，本来就发起了三笔支付',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 7,
   restartActionId: 'a-fixidem',
-
   expertChain: [
     {
-      thought: '短信重复、流水重复——先分清是"消息重复"还是"消息正常但副作用重复"。看重复的时间间隔和分布。',
-      update: '间隔 8s/28s 的重复 + 与消费者重启时间吻合 → 不是用户连点（毫秒级），指向消费链路。',
+      thought: '按稳定支付键观察重复。',
+      update: '一键多流水，间隔只作线索。',
       actionId: 'a-impact',
-      why: '1⚡︎ 圈范围先给出重复的"形状"：时间间隔和触发时间是最便宜的证据，直接排除了最像的用户连点。',
-      conclusion: '重复集中在消费者重启后 → 假设升权：ack/重发机制问题。',
+      why: '1⚡先区分重复付款和重复副作用。',
+      conclusion: '核对源交易。',
     },
     {
-      thought: '两条路：生产者发了多次，或 Broker 投了多次。先看生产者日志——它是最上游。',
-      update: '生产者只发一次。但要小心：它没开 confirm 也没设 messageId，"发送一次"的上游证据链并不牢。',
+      thought: '核对支付记录。',
+      update: '仅一次付款。',
+      actionId: 'a-paylog',
+      why: '1⚡真实付款账本才能排除重复下单/支付。',
+      conclusion: '排除用户重复付款。',
+    },
+    {
+      thought: '关联生产与Broker入队。',
+      update: '同一入队事件，非多次生产。',
       actionId: 'a-publish',
-      why: '1⚡︎ 排除最上游，同时发现一个隐藏问题：无 confirm 无幂等键，说明整个链路都没按异步契约设计。',
-      conclusion: '生产者排除 → 重复发生在 Broker 投递或消费侧。',
+      why: '1⚡体hash和业务键比messageId缺失推理可靠。',
+      conclusion: '排除重复生产。',
     },
     {
-      thought: '对比"处理日志"和"ack 日志"——如果处理成功但 ack 失败，Broker 必然重发，这是 at-least-once 的契约行为。',
-      update: '实锤：处理成功 6.2s 后 ack 超时，Broker 重发两次，消费者每次都全量执行。',
+      thought: '核对工作队列拓扑。',
+      update: '竞争消费，非广播拷贝。',
+      actionId: 'a-topology',
+      why: '2⚡重投换消费者不等于广播语义。',
+      conclusion: '排除广播。',
+    },
+    {
+      thought: '关联提交、断线与unacked。',
+      update: '提交后连接关闭，消息重投两次。',
       actionId: 'a-logcheck',
-      why: '1⚡︎ 一锤定音的对比：同一条消息的处理记录出现三次，而 Broker 重发标记 true——机制完整闭环。',
-      conclusion: 'at-least-once 重发 + 消费者无幂等 = 三次流水。问题不是"消息为什么重复"，是"重复了为什么没拦住"。',
+      why: '1⚡不能编造等待消费ack的二次确认。',
+      conclusion: '确认触发机制。',
     },
     {
-      thought: '为什么没拦住？搜代码——幂等键、去重表、唯一约束，一个都没有。',
-      update: '消费者把 at-least-once 当 exactly-once 写：无唯一约束、无查重、短信无去重窗口。',
+      thought: '核对唯一约束及外部投递。',
+      update: '同P1可重复写和发。',
       actionId: 'a-idemsearch',
-      why: '根因确认在消费侧设计缺陷。注意因果分两层：ack 丢失是诱因（不可消除），无幂等是缺陷（必须修）——修的是后者，前者是常态。',
-      conclusion: '修复方向：不追求"消灭重复"（做不到），而是"重复了也无害"（幂等）。',
+      why: '1⚡幂等要覆盖各副作用，不是看到redelivered就丢。',
+      conclusion: '缺陷闭合。',
     },
     {
-      thought: '止血（停消费+冲正）和修复（幂等）并行。证据已闭合，停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】诱因（ack 超时）✓ 放大器（无幂等）✓ 影响面（4% 订单）✓ ——三要素齐了，继续排查不改变行动。',
-      conclusion: '沉淀：异步链路设计的第一问不是"会不会重复"，是"重复了会怎样"。at-least-once 是契约，幂等是义务。',
+      why: '【停止规则】入队、连接、投递与业务提交关联，重复生产/广播/付款均排除，副作用无幂等已确认。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '副作用提交后连接关闭导致未确认消息重投，消费者又按同一P1重复插流水和投短信；本地及外部副作用均缺稳定业务唯一边界',
     },
   ],
-
   lessons: [
     {
-      text: 'at-least-once 语义下重复投递是常态不是故障——把"可能重复"写进设计，而不是寄希望于它不发生。',
-      principle: 'MQ 的投递语义只有 at-most-once / at-least-once 两种可选，exactly-once 需要端到端自建。选择 at-least-once 就等于承诺了消费者的幂等义务：ack 丢失、重试、重平衡都会触发重发。',
+      text: '消费者basic.ack与publisher confirm不同，RabbitMQ消费ack没有再等Broker返回“ack的ack”。',
+      principle: '连接关闭且delivery仍unacked会重投；通过channel归属、连接事件和业务ID关联，不能用全局delivery tag或单侧日志推导。',
     },
     {
-      text: '幂等三层兜底：入口查重（业务）→ 唯一约束（数据库）→ 去重窗口（副作用）。',
-      principle: '幂等不能只做一层：入口查重有并发窗口，唯一约束是最终兜底，短信/邮件等外部副作用还要独立去重。检查每一条"不可重复"的路径是否有硬约束兜底。',
+      text: 'redelivered是线索，不是业务去重键；messageId属性也不自动提供去重。',
+      principle: '用稳定业务键与事务唯一约束保护本地效果，对短信等外部副作用另定义可靠投递与结果不确定处理。',
     },
     {
-      text: '排查重复问题先画"重复的形状"：时间间隔、次数分布、与变更的相关性。',
-      principle: '毫秒级连发指向用户/调用方重试；秒级间隔重发指向 Broker 重投；实例数×重复指向广播拓扑。形状本身就是证据，比逐段加日志快得多。',
+      text: '一次入队可多次投递到同队列不同竞争消费者；这不等于广播到多队列。',
+      principle: '分别核对生产次数、路由拷贝、delivery次数和业务提交次数。间隔和实例数只能提示方向，不能单独裁决原因。',
     },
   ],
 }
