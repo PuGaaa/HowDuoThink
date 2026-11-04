@@ -76,3 +76,12 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+
+  app-content:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: node --test app/tests/*.test.mjs content/pipeline/*.test.mjs content/baselines/*.test.mjs
+      - run: node content/pipeline/validate.mjs app/data/cases/first-npe.ts app/data/cases/caused-by.ts app/data/cases/log-correlation.ts app/data/cases/async-swallow.ts
