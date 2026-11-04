@@ -58,9 +58,35 @@ export interface SessionRecord {
   hStates: HypothesisStateRec[]
 }
 
+export interface ProgressOperation {
+  opId: string
+  kind: string
+  occurredAt: string
+  payload: any
+}
+
 const KEY_SESSION = 'think_session_v1'
 const KEY_MASCOTS = 'think_mascots_v1'
 const KEY_CASE = 'think_case_'
+const KEY_OPS = 'think_progress_ops_v1'
+
+function enqueueOperation(kind: string, payload: any): void {
+  const raw = uni.getStorageSync(KEY_OPS)
+  const ops: ProgressOperation[] = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as ProgressOperation[]
+  ops.push({ opId: String(Date.now()) + '-' + String(Math.random()), kind: kind, occurredAt: new Date().toISOString(), payload: payload })
+  uni.setStorageSync(KEY_OPS, JSON.stringify(ops))
+}
+
+export function pendingProgressOperations(): ProgressOperation[] {
+  const raw = uni.getStorageSync(KEY_OPS)
+  return raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as ProgressOperation[]
+}
+
+export function confirmProgressOperations(ids: string[]): void {
+  const done = new Set(ids)
+  const left = pendingProgressOperations().filter((op) => !done.has(op.opId))
+  uni.setStorageSync(KEY_OPS, JSON.stringify(left))
+}
 
 function emptyMascotStats(): MascotStats {
   const m: MascotStats = { frog: 0, snail: 0, otter: 0, rabbit: 0, dino: 0 }
@@ -194,6 +220,13 @@ export function saveSession(record: SessionRecord): void {
     }
   }
   uni.setStorageSync(KEY_MASCOTS, JSON.stringify(stats))
+  enqueueOperation('session_end', {
+    caseId: record.caseId,
+    solved: record.solved,
+    grade: record.grade,
+    playerCost: record.playerCost,
+    mascotEvents: record.mascotEvents,
+  })
   notifyProgressDirty()
 }
 
@@ -242,6 +275,7 @@ const KEY_CHECKUSE = 'think_checkuse_v1'
 export function bumpChecklistUse(): number {
   const n = getChecklistUse() + 1
   uni.setStorageSync(KEY_CHECKUSE, String(n))
+  enqueueOperation('checklist_use', {})
   notifyProgressDirty()
   return n
 }

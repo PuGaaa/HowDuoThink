@@ -4,7 +4,7 @@
  *  手动同步 = 先推后拉。未登录（游客态）全部为本地，无网络行为。 */
 import { API_BASE } from '../config'
 import { getToken, isLoggedIn } from './auth'
-import { exportProgressBundle, setProgressListener } from './storage'
+import { confirmProgressOperations, pendingProgressOperations, setProgressListener } from './storage'
 
 const KEY_LAST_SYNC = 'think_last_sync'
 
@@ -20,20 +20,24 @@ function markSynced() {
   uni.setStorageSync(KEY_LAST_SYNC, '今天 ' + hh + ':' + mm)
 }
 
-/** 全量推送（登录态；游客态为空操作） */
+/** 操作同步（登录态；游客态为空操作） */
 export function pushProgress(cb?: (r: { error: string }) => void) {
   if (!isLoggedIn()) {
     if (cb != null) cb({ error: '登录后可用' })
     return
   }
   uni.request({
-    url: API_BASE + '/api/me/progress',
+    url: API_BASE + '/api/me/progress/sync',
     method: 'POST',
     header: { Authorization: 'Bearer ' + getToken() } as any,
-    data: exportProgressBundle() as any,
+    data: { operations: pendingProgressOperations() } as any,
     timeout: 8000,
     success: (res) => {
-      if (res.statusCode === 200) markSynced()
+      if (res.statusCode === 200) {
+        const d = res.data as any
+        confirmProgressOperations(d.confirmedOperationIds as string[])
+        markSynced()
+      }
       if (cb != null) cb({ error: res.statusCode === 200 ? '' : '上传失败' })
     },
     fail: () => {

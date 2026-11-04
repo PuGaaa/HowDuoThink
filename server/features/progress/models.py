@@ -1,5 +1,4 @@
-"""progress 域模型：进度云同步的载荷。
-v1 同步范围：案例进度 + streak + 动物统计 + 任务计数 + 每日一题 + 检查单使用数。"""
+"""progress 域模型：进度投影与事实操作。"""
 
 from typing import Any
 
@@ -25,3 +24,16 @@ class ProgressBlob(BaseModel):
     checkuse: int = Field(default=0, ge=0)
 
     model_config = {"populate_by_name": True}
+
+
+class ProgressOperation(BaseModel):
+    op_id: str = Field(alias="opId")
+    kind: str
+    occurred_at: str = Field(alias="occurredAt")
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = {"populate_by_name": True}
+
+
+class ProgressSyncBody(BaseModel):
+    operations: list[ProgressOperation] = Field(default_factory=list)

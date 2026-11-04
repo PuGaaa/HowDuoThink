@@ -28,3 +28,29 @@ def test_legacy_progress_put_is_rejected_without_mutation():
         assert r.status_code == 426
         g = client.get("/api/me/progress").json()
         assert g["cases"] == {}
+
+
+def test_progress_sync_is_idempotent_and_account_scoped():
+    with make_client() as client:
+        login_admin(client)
+        op = {
+            "opId": "session-1",
+            "kind": "session_end",
+            "occurredAt": "2026-11-04T10:00:00.000Z",
+            "payload": {
+                "caseId": "dns-hijack",
+                "solved": True,
+                "grade": "A",
+                "playerCost": 4,
+                "mascotEvents": [{"id": "frog"}],
+            },
+        }
+        first = client.post("/api/me/progress/sync", json={"operations": [op]})
+        assert first.status_code == 200
+        assert first.json()["revision"] == 1
+        assert first.json()["cases"]["dns-hijack"]["plays"] == 1
+        second = client.post("/api/me/progress/sync", json={"operations": [op]})
+        assert second.status_code == 200
+        assert second.json()["revision"] == 1
+        assert second.json()["cases"]["dns-hijack"]["plays"] == 1
+        assert second.json()["mascots"]["frog"] == 1
