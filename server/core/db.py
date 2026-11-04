@@ -89,8 +89,6 @@ def _mysql_connect_kwargs() -> dict:
     )
 
 
-
-
 def _mysql_conn():
     return pymysql.connect(cursorclass=pymysql.cursors.DictCursor, **_mysql_connect_kwargs())
 
