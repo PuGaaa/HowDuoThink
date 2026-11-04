@@ -85,11 +85,8 @@ def ensure_active(uid: str) -> None:
 
 
 def uses_default_password() -> bool:
-    """登录页提示探测：pw-admin 是否还在用初始密码（改过密即 False）。"""
-    rows = db.q("SELECT password_hash FROM users WHERE id='pw-admin'")
-    if not rows or not rows[0]["password_hash"]:
-        return False
-    return security.verify_password(config.DEFAULT_ADMIN_PASSWORD, rows[0]["password_hash"])
+    """默认管理员密码已禁用，登录页不显示默认凭据提示。"""
+    return False
 
 
 def dev_upsert_user(login: str) -> str:

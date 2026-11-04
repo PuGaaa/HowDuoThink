@@ -26,10 +26,7 @@ def _cfg() -> Config:
 def _database_url() -> str:
     """与 alembic/env.py 的 database_url() 保持一致；测试把守两处不漂移。"""
     if config.DB_PROVIDER == "mysql":
-        return (
-            f"mysql+pymysql://{config.MYSQL_USER}:{config.MYSQL_PASSWORD}"
-            f"@{config.MYSQL_HOST}:{config.MYSQL_PORT}/{config.MYSQL_DATABASE}?charset=utf8mb4"
-        )
+        return config.mysql_database_url()
     return f"sqlite:///{coredb.DB_PATH.resolve()}"
 
 

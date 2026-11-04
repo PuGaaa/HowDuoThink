@@ -69,17 +69,18 @@ def _restore_pw_admin(password="test-admin-pw"):
     )
 
 
-def test_default_admin_seeded_without_env_password(monkeypatch):
-    """未配 ADMIN_PASSWORD 时：startup 自动种子 admin / HaoDuo@2026。"""
+def test_new_database_requires_admin_password(monkeypatch):
+    """新库未配 ADMIN_PASSWORD 时启动失败，不创建已知默认凭据。"""
+    import pytest
+
     from core import config
 
     monkeypatch.setattr(config, "ADMIN_PASSWORD", "")
     _remove_admins()
     try:
-        with make_client() as client:  # startup 重新种子
-            r = client.post("/api/auth/login", json={"login": "admin", "password": "HaoDuo@2026"})
-            assert r.status_code == 200, r.text
-            assert r.json()["role"] == "admin"
+        with pytest.raises(RuntimeError, match="ADMIN_PASSWORD"):
+            with make_client():
+                pass
     finally:
         _restore_pw_admin()
 
@@ -95,31 +96,16 @@ def test_admin_password_env_overrides_default(monkeypatch):
             # 默认密码必须失效
             assert client.post("/api/auth/login", json={"login": "admin", "password": "HaoDuo@2026"}).status_code == 401
     finally:
-        _restore_pw_admin("custom-pw-1")
+        _restore_pw_admin()
 
 
-def test_default_account_hint_flips_after_password_change(monkeypatch):
+def test_default_account_hint_is_false_without_default_password(monkeypatch):
     from core import config
 
     monkeypatch.setattr(config, "ADMIN_PASSWORD", "")
     monkeypatch.setattr(config, "DEV_MODE", True)  # 提示端点只在 dev 暴露（生产 404，见下方收紧用例）
-    _remove_admins()
-    try:
-        with make_client() as client:
-            assert client.get("/api/auth/default-account").json() == {"default": True}
-            # 登录并改密 → 提示消失
-            token = client.post("/api/auth/login", json={"login": "admin", "password": "HaoDuo@2026"}).json()["token"]
-            h = {"Authorization": "Bearer " + token}
-            r = client.post(
-                "/api/me/password", headers=h, json={"oldPassword": "HaoDuo@2026", "newPassword": "new-pw-123"}
-            )
-            assert r.status_code == 200, r.text
-            assert client.get("/api/auth/default-account").json() == {"default": False}
-            # 旧默认密码失效，新密码可登录
-            assert client.post("/api/auth/login", json={"login": "admin", "password": "HaoDuo@2026"}).status_code == 401
-            assert client.post("/api/auth/login", json={"login": "admin", "password": "new-pw-123"}).status_code == 200
-    finally:
-        _restore_pw_admin()
+    with make_client() as client:
+        assert client.get("/api/auth/default-account").json() == {"default": False}
 
 
 def test_bootstrap_endpoints_removed():

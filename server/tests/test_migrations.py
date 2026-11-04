@@ -113,6 +113,24 @@ def test_upgrade_uses_current_config(monkeypatch, tmp_path):
         conn.close()
 
 
+def test_mysql_url_keeps_special_characters_in_credentials(monkeypatch):
+    """URL 使用结构化字段，密码特殊字符不能改变连接目标或参数。"""
+    monkeypatch.setattr(config, "MYSQL_USER", "user@name")
+    monkeypatch.setattr(config, "MYSQL_PASSWORD", "p@ss:/?#[]")
+    monkeypatch.setattr(config, "MYSQL_HOST", "127.0.0.1")
+    monkeypatch.setattr(config, "MYSQL_PORT", 3306)
+    monkeypatch.setattr(config, "MYSQL_DATABASE", "hdt_test")
+
+    url = config.mysql_database_url()
+
+    assert url.username == "user@name"
+    assert url.password == "p@ss:/?#[]"
+    assert url.host == "127.0.0.1"
+    assert url.port == 3306
+    assert url.database == "hdt_test"
+    assert url.query["charset"] == "utf8mb4"
+
+
 @pytest.mark.skipif(not FIXTURE.exists(), reason="快照在对拍测试通过后生成（任务步骤 6）")
 def test_baseline_matches_fixture(monkeypatch, tmp_path):
     """upgrade 后的库：sqlite_master 中全部 table/index SQL 按名称排序拼接 ==

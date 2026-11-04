@@ -122,7 +122,12 @@ def create_app() -> FastAPI:
         rid = uuid.uuid4().hex[:8]
         request.state.rid = rid
         start = time.perf_counter()
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = (time.perf_counter() - start) * 1000
+            metrics.record(500, duration_ms)
+            raise
         duration_ms = (time.perf_counter() - start) * 1000
         metrics.record(response.status_code, duration_ms)
         logger.info(
@@ -136,7 +141,9 @@ def create_app() -> FastAPI:
         """全局兜底：内部细节（堆栈/SQL）只进服务端日志，响应只给通用文案。"""
         rid = getattr(request.state, "rid", "-")
         logger.exception("[%s] %s %s 未处理异常", rid, request.method, request.url.path)
-        return JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
+        response = JSONResponse(status_code=500, content={"detail": "服务器内部错误"})
+        response.headers["X-Request-Id"] = rid
+        return response
 
     app.include_router(auth_router)
     app.include_router(ai_router)
@@ -182,17 +189,17 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     def seed_admin():
-        """管理员引导（初始账号惯例：种子自带，README 注明，上线前改密）：
+        """管理员引导：
         - ADMIN_PASSWORD 已设置：用它（部署自动化）；ENV=dev 时每次重置，方便本地联调；
-        - 未设置且库中无管理员：创建默认账号 admin / HaoDuo@2026（启动日志与登录页都会提示改密）。"""
+        - 未设置且库中无管理员：拒绝启动，避免新库带出已知凭据。"""
         if config.JWT_SECRET_EPHEMERAL:
             logger.warning("未设置 JWT_SECRET，本次运行为进程内随机密钥（重启后所有会话失效；生产必须设置）")
         has_admin = db.q("SELECT id FROM users WHERE role='admin' LIMIT 1")
+        if not has_admin and not config.ADMIN_PASSWORD:
+            raise RuntimeError("新库初始化必须显式配置 ADMIN_PASSWORD")
         if has_admin and not config.DEV_MODE:
             return
-        if has_admin and not config.ADMIN_PASSWORD:
-            return  # dev 且未配密码：不动已有管理员
-        pw = config.ADMIN_PASSWORD or config.DEFAULT_ADMIN_PASSWORD
+        pw = config.ADMIN_PASSWORD
         from core import security
 
         db.ex(
@@ -200,10 +207,6 @@ def create_app() -> FastAPI:
             "ON CONFLICT(id) DO UPDATE SET password_hash=excluded.password_hash, role='admin'",
             (security.hash_password(pw),),
         )
-        if not config.ADMIN_PASSWORD:
-            logger.warning(
-                "已创建初始管理员 admin / %s —— 仅限首次引导，上线前务必登录修改密码", config.DEFAULT_ADMIN_PASSWORD
-            )
 
     return app
 
