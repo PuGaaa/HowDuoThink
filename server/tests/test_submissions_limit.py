@@ -1,12 +1,18 @@
 """submissions 域·投稿频控：按用户日限额（DB 计数）防刷审核队列。"""
 
 import time
+from uuid import uuid4
 
 from tests.conftest import login_admin, make_client
 
 
 def _body() -> dict:
-    return {"title": "测试投稿标题", "symptom": "服务启动后接口批量超时", "resolution": "扩容连接池并回滚发布"}
+    return {
+        "requestId": uuid4().hex,
+        "title": "测试投稿标题",
+        "symptom": "服务启动后接口批量超时",
+        "resolution": "扩容连接池并回滚发布",
+    }
 
 
 def test_submission_daily_limit():

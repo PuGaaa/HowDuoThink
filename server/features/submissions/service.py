@@ -1,5 +1,4 @@
-"""submissions 域业务逻辑：投稿创建、我的投稿、审核状态、投稿→Case 草稿转换。
-转稿会编排写入 cases 表（依赖规则允许 submissions → cases 数据归属的编排流）。"""
+"""投稿编排：请求幂等、作者结果投影和受限素材转稿。"""
 
 import time
 import uuid
@@ -7,254 +6,178 @@ import uuid
 from fastapi import HTTPException
 
 import db
+from features.submissions import matching, repo
+from features.submissions.models import SubmissionCreate
+from features.submissions.review import (  # 跨feature只使用本模块公开接口。
+    add_supplement,
+    authorized_draft_source,
+    confirm_material,
+    require_publication_review,
+    save_material,
+    save_review,
+)
 
-# 每用户每日投稿上限：防脚本刷爆管理端审核队列（DB 计数，跨重启/进程一致）
 SUBMISSION_DAILY_LIMIT = 20
+__all__ = [
+    "add_supplement",
+    "authorized_draft_source",
+    "confirm_material",
+    "require_publication_review",
+    "save_material",
+    "save_review",
+]
 
 
-def create_submission(uid: str, body) -> dict:
-    today = time.strftime("%Y-%m-%d", time.gmtime())
-    rows = db.q(
-        "SELECT COUNT(*) AS n FROM submissions WHERE user_id=? AND substr(created_at,1,10)=?",
-        (uid, today),
-    )
-    if int(rows[0]["n"] or 0) >= SUBMISSION_DAILY_LIMIT:
-        raise HTTPException(429, "今日投稿次数已达上限，明天再来")
-    sid = "s-" + uuid.uuid4().hex[:12]
-    db.ex(
-        "INSERT INTO submissions(id, user_id, title, symptom, resolution, key_error, timeline, lessons, stack_tags, domain_hint) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?)",
-        (
-            sid,
-            uid,
-            body.title,
-            body.symptom,
-            body.resolution,
-            body.key_error,
-            body.timeline,
-            db.jdump(body.lessons),
-            db.jdump(body.stack_tags),
-            body.domain_hint,
-        ),
-    )
-    return {"id": sid, "status": "pending"}
+def create_submission(uid: str, body: SubmissionCreate) -> dict:
+    digest = matching.fingerprint(body)
+    with db.tx() as conn:
+        repo.lock_author(conn, uid)
+        previous = repo.existing_request(conn, uid, body.request_id)
+        if previous:
+            return {"id": previous["submission_id"], "status": previous["status"], "duplicate": True}
+        previous = repo.existing_content(conn, uid, digest)
+        if previous:
+            repo.register_request(conn, uid, body.request_id, previous["id"])
+            return {"id": previous["id"], "status": previous["status"], "duplicate": True}
+        if repo.count_today(conn, uid, time.strftime("%Y-%m-%d", time.gmtime())) >= SUBMISSION_DAILY_LIMIT:
+            raise HTTPException(429, "今日投稿次数已达上限，明天再来")
+        sid = "s-" + uuid.uuid4().hex[:12]
+        repo.create(conn, uid, sid, digest, body)
+        repo.register_request(conn, uid, body.request_id, sid)
+    return {"id": sid, "status": "pending", "duplicate": False}
+
+
+def _view(conn, row, editor: bool = False) -> dict:
+    case = repo.case_for_submission(conn, row)
+    if case and case["status"] == "published":
+        display = "published"
+    elif row["status"] in ("rejected", "archived"):
+        display = "rejected"
+    elif row["status"] == "needs_more":
+        display = "needs_more"
+    elif row["status"] == "accepted" or case:
+        display = "producing"
+    else:
+        display = "received"
+    review = repo.review(conn, row["id"])
+    result = {
+        "id": row["id"],
+        "title": row["title"],
+        "symptom": row["symptom"],
+        "resolution": row["resolution"],
+        "keyError": row["key_error"],
+        "timeline": row["timeline"],
+        "lessons": db.jload(row["lessons"], []),
+        "stackTags": db.jload(row["stack_tags"], []),
+        "domainHint": row["domain_hint"],
+        "status": row["status"],
+        "displayStatus": display,
+        "reviewNote": row["review_note"],
+        "createdAt": row["created_at"],
+        "author": row["author"],
+        "caseId": case["id"] if case else None,
+        "playPath": "/pages/play/play?id=" + case["id"] if display == "published" else None,
+        "articlePath": "/solutions/a-" + case["id"] if display == "published" else None,
+        "linkedCaseId": row["linked_case_id"],
+        "parentSubmissionId": row["parent_submission_id"],
+        "materialVersion": review["material_version"],
+        "materialConfirmed": review["material_version"] > 0
+        and review["confirmed_version"] == review["material_version"]
+        and review["material_source_revision"] == review["source_revision"],
+        "material": db.jload(review["material"], None),
+        "messages": [dict(message) for message in repo.messages(conn, row["id"], editor)],
+    }
+    if editor:
+        result["review"] = dict(review)
+    return result
 
 
 def my_submissions(uid: str) -> list[dict]:
-    rows = db.q(
-        "SELECT id, title, status, review_note, created_at FROM submissions WHERE user_id=? ORDER BY created_at DESC",
-        (uid,),
-    )
-    return [
-        {
-            "id": r["id"],
-            "title": r["title"],
-            "status": r["status"],
-            "reviewNote": r["review_note"],
-            "createdAt": r["created_at"],
-        }
-        for r in rows
-    ]
+    with db.tx() as conn:
+        return [_view(conn, row) for row in repo.list_rows(conn, uid=uid)]
+
+
+def submission_detail(uid: str, sid: str, editor: bool = False) -> dict:
+    with db.tx() as conn:
+        row = repo.get(conn, sid)
+        if row is None:
+            raise HTTPException(404, "投稿不存在")
+        if not editor and row["user_id"] != uid:
+            raise HTTPException(403, "只能查看自己的投稿")
+        return _view(conn, row, editor)
 
 
 def admin_list(status: str | None = None) -> list[dict]:
-    where, params = "1=1", []
-    if status:
-        where, params = "status=?", [status]
-    rows = db.q(
-        f"SELECT s.*, u.login AS author_login FROM submissions s LEFT JOIN users u ON u.id=s.user_id "
-        f"WHERE {where} ORDER BY s.created_at DESC",
-        tuple(params),
-    )
-    return [
-        {
-            "id": r["id"],
-            "title": r["title"],
-            "symptom": r["symptom"],
-            "resolution": r["resolution"],
-            "keyError": r["key_error"],
-            "timeline": r["timeline"],
-            "lessons": db.jload(r["lessons"], []),
-            "stackTags": db.jload(r["stack_tags"], []),
-            "domainHint": r["domain_hint"],
-            "status": r["status"],
-            "reviewNote": r["review_note"],
-            "author": r["author_login"],
-            "createdAt": r["created_at"],
-        }
-        for r in rows
-    ]
+    with db.tx() as conn:
+        return [_view(conn, row, True) for row in repo.list_rows(conn, status=status)]
 
 
-def set_status(sid: str, status: str, review_note: str) -> dict:
-    rows = db.q("SELECT id FROM submissions WHERE id=?", (sid,))
-    if not rows:
-        raise HTTPException(404, "投稿不存在")
-    db.ex(
-        "UPDATE submissions SET status=?, review_note=?, reviewed_at=datetime('now') WHERE id=?",
-        (status, review_note, sid),
-    )
+def set_status(sid: str, status: str, review_note: str, operator: str) -> dict:
+    with db.tx() as conn:
+        if repo.get(conn, sid, lock=True) is None:
+            raise HTTPException(404, "投稿不存在")
+        repo.set_status(conn, sid, status, review_note)
+        if review_note:
+            repo.add_message(conn, sid, operator, "author", "feedback", review_note)
     return {"id": sid, "status": status}
 
 
-def draft_skeleton_from_submission(sid: str) -> dict:
-    """投稿 → Case 草稿骨架：必填字段自动映射，重字段填占位（编辑器里可见待补）。"""
-    rows = db.q("SELECT * FROM submissions WHERE id=?", (sid,))
-    if not rows:
-        raise HTTPException(404, "投稿不存在")
-    s = rows[0]
-    title = s["title"]
-    symptoms = [{"type": "text", "title": "现象描述", "text": s["symptom"]}]
-    if s["key_error"]:
-        symptoms.insert(0, {"type": "error", "title": "关键报错", "text": s["key_error"]})
-    timeline = s["timeline"] or "时间线待补充"
-    # 解决过程按行拆分为专家链骨架：每行 → 观察( thought )，动作占位
-    chain = []
-    lines = [ln.strip() for ln in s["resolution"].replace("；", "\n").replace("。", "\n").split("\n") if ln.strip()]
-    for ln in lines[:8]:
-        chain.append(
-            {
-                "thought": ln[:120],
-                "update": "（待补充：这一步假设如何更新）",
-                "actionId": "",
-                "why": "（待补充：为什么这一步值这个成本）",
-                "conclusion": "（待补充：排除了什么/确认了什么）",
-            }
-        )
-    if not chain:
-        chain.append(
-            {
-                "thought": "（待补充）",
-                "update": "（待补充）",
-                "actionId": "",
-                "why": "（待补充）",
-                "conclusion": "（待补充）",
-            }
-        )
-    while len(chain) < 4:
-        chain.append(
-            {
-                "thought": "（待补充）",
-                "update": "（待补充）",
-                "actionId": "",
-                "why": "（待补充）",
-                "conclusion": "（待补充）",
-            }
-        )
-    lessons = db.jload(s["lessons"], [])
-    lesson_list = [{"text": it, "principle": "（待补充：这一层的契约）"} for it in lessons]
-    lesson_list.append({"text": "（待补充检查单）", "principle": "（待补充原理）"})
-    pid = "c-" + sid.replace("s-", "")
-    part_guess = {
-        "network": "access",
-        "data": "data",
-        "build": "build",
-        "runtime": "runtime",
-        "concurrency": "concurrency",
-        "deploy": "access",
-    }.get(s["domain_hint"] or "", "")
-    return {
-        "id": pid,
-        "title": title,
-        "intro": title,
-        "domain": s["domain_hint"] or "network",
-        "layer": "（待补充层契约）",
-        "part": part_guess or "apprentice",
-        "chapterId": part_guess or "",
-        "order": 99,
-        "typeTags": [],
-        "difficulty": 1,
-        "scene": {
-            "role": "（待补充：玩家角色代入）",
-            "architecture": "（待补充：链路图）",
-            "symptoms": symptoms,
-            "timeline": timeline,
-            "impactHint": "（待补充）",
-        },
-        "hypotheses": [
-            {"id": "h-a", "text": "（待补充假设A）", "excludeActionId": ""},
-            {"id": "h-b", "text": "（待补充假设B）", "excludeActionId": ""},
-            {"id": "h-c", "text": "（待补充假设C）", "excludeActionId": ""},
-        ],
-        "actions": [
-            {
-                "id": "act-1",
-                "name": "（待补充动作）",
-                "desc": "（待补充）",
-                "cost": 1,
-                "gain": "high",
-                "danger": False,
-                "effects": [],
-                "tests": [],
-                "hypotheses": [],
-                "result": {"type": "text", "title": "（待补充）", "text": "（待补充）"},
-            },
-        ],
-        "rootCauses": [
-            {"id": "rc-a", "text": "（待补充根因A）", "correct": False},
-            {"id": "rc-b", "text": "（待补充根因B）", "correct": False},
-            {"id": "rc-c", "text": "（待补充根因C）", "correct": False},
-        ],
-        "expertCost": 5,
-        "restartActionId": "",
-        "expertChain": chain,
-        "lessons": lesson_list,
-    }
-
-
-def _int_or(v, default: int) -> int:
-    try:
-        return int(v)
-    except (TypeError, ValueError):
-        return default
-
-
-def create_draft_with_payload(uid: str, sid: str, payload: dict) -> dict:
-    """给定成品 payload 的转稿落库（cases + submissions 同事务）。
-    机械骨架（create_draft_from_submission）与 AI 起草（ai.service）共用此唯一写入口。
-    status 守卫带条件谓词：预检与写入之间案例被并发发布时，UPDATE ... AND status='draft'
-    的 rowcount=0 仍然拒绝；元数据列随 payload 同步。"""
+def similar(query: str, sid: str = "", editor: bool = False) -> list[dict]:
     with db.tx() as conn:
-        exists = conn.execute("SELECT status FROM cases WHERE id=?", (payload["id"],)).fetchone()
-        if exists:
-            if exists["status"] != "draft":
-                raise HTTPException(409, "该案例已发布：不能经转稿覆盖，请走重新发布流程")
-            cur = conn.execute(
-                "UPDATE cases SET payload=?, title=?, domain=?, layer=?, difficulty=? WHERE id=? AND status='draft'",
-                (
-                    db.jdump(payload),
-                    str(payload.get("title", "")),
-                    str(payload.get("domain", "runtime")),
-                    str(payload.get("layer", "")),
-                    _int_or(payload.get("difficulty"), 2),
-                    payload["id"],
-                ),
-            )
-            if cur.rowcount != 1:
-                raise HTTPException(409, "案例状态已变化（已发布或已删除）：不能经转稿覆盖")
-        else:
-            conn.execute(
-                "INSERT INTO cases(id, submission_id, author_id, title, domain, layer, difficulty, version, status, payload) "
-                "VALUES(?,?,?,?,?,?,?,?,?,?)",
-                (
-                    payload["id"],
-                    sid,
-                    uid,
-                    payload.get("title", ""),
-                    payload.get("domain", "runtime"),
-                    payload.get("layer", ""),
-                    _int_or(payload.get("difficulty"), 2),
-                    0,
-                    "draft",
-                    db.jdump(payload),
-                ),
-            )
-        conn.execute(
-            "UPDATE submissions SET status='accepted', reviewed_at=datetime('now') WHERE id=? AND status='pending'",
-            (sid,),
-        )
+        return matching.candidates(conn, query, sid, editor)
+
+
+def draft_skeleton_from_submission(sid: str) -> dict:
+    from features.submissions.skeleton import skeleton
+
+    material = authorized_draft_source(sid)
+    return skeleton(sid, material)
+
+
+def create_draft_with_payload(uid: str, sid: str, payload: dict, *, source_material: dict) -> dict:
+    with db.tx() as conn:
+        case = repo.existing_case(conn, payload["id"], lock=True)
+        if case and case["status"] != "draft":
+            raise HTTPException(409, "该案例已发布：不能经转稿覆盖，请走重新发布流程")
+    require_publication_review(sid)
+    with db.tx() as conn:
+        source = repo.get(conn, sid, lock=True)
+        from features.submissions.models import DraftMaterial
+        from features.submissions.review import _authorized
+
+        current_material = _authorized(conn, sid)
+        if matching.fingerprint(current_material) != matching.fingerprint(
+            DraftMaterial.model_validate(source_material)
+        ):
+            raise HTTPException(409, "起草期间素材已变化，请根据新授权版本重新起草")
+        if source["linked_case_id"] or source["parent_submission_id"]:
+            raise HTTPException(409, "该稿为补证贡献，不能重复创建关卡")
+        case = repo.existing_case(conn, payload["id"], lock=True)
+        if case and case["status"] != "draft":
+            raise HTTPException(409, "该案例已发布，不能经转稿覆盖")
+        repo.save_draft(conn, uid, sid, payload)
     return {"caseId": payload["id"], "submissionId": sid, "status": "draft"}
 
 
 def create_draft_from_submission(uid: str, sid: str) -> dict:
-    return create_draft_with_payload(uid, sid, draft_skeleton_from_submission(sid))
+    from features.submissions.skeleton import skeleton
+
+    material = authorized_draft_source(sid)
+    return create_draft_with_payload(uid, sid, skeleton(sid, material), source_material=material)
+
+
+def editor_candidates(sid: str) -> list[dict]:
+    with db.tx() as conn:
+        source = repo.get(conn, sid)
+        if source is None:
+            raise HTTPException(404, "投稿不存在")
+        return matching.for_submission(conn, source)
+
+
+def contributors_for_case(cid: str) -> list[dict]:
+    """公开署名：已发布主要来源与已确认有效补证，不公开私密原稿。"""
+    with db.tx() as conn:
+        return [
+            {"authorId": row["user_id"], "author": row["author"], "role": row["role"]}
+            for row in repo.contributors(conn, cid)
+        ]
