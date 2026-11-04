@@ -40,7 +40,13 @@ export function dailyDone(): boolean {
 }
 
 export function markDailyDone() {
-  uni.setStorageSync(KEY_DONE, todayKey())
+  if (dailyDone()) return
+  const day = todayKey()
+  uni.setStorageSync(KEY_DONE, day)
+  const raw = uni.getStorageSync('think_progress_ops_v1')
+  const ops = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as any[]
+  ops.push({ opId: 'daily-' + day, kind: 'daily_done', occurredAt: new Date().toISOString(), payload: { day: day } })
+  uni.setStorageSync('think_progress_ops_v1', JSON.stringify(ops))
   notifyProgressDirty()
 }
 

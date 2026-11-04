@@ -1,5 +1,8 @@
 """progress 域业务逻辑：事实操作入账，服务端维护用户投影。"""
 
+import datetime
+from zoneinfo import ZoneInfo
+
 import db
 from features.progress.models import ProgressOperation
 
@@ -40,6 +43,8 @@ def sync_operations(uid: str, operations: list[ProgressOperation]) -> dict:
         bundle.setdefault("mascots", {})
         bundle.setdefault("streak", {})
         bundle.setdefault("checkuse", 0)
+        bundle.setdefault("tasks", {})
+        bundle.setdefault("dailyDone", "")
         revision = int(row["revision"]) if row else 0
         can_bootstrap = row is None
         confirmed = []
@@ -76,6 +81,8 @@ def _apply_operation(bundle: dict, operation: ProgressOperation) -> None:
         bundle.setdefault("mascots", {})
         bundle.setdefault("streak", {})
         bundle.setdefault("checkuse", 0)
+        bundle.setdefault("tasks", {})
+        bundle.setdefault("dailyDone", "")
     elif operation.kind == "session_end":
         case_id = p["caseId"]
         current = bundle["cases"].setdefault(
@@ -92,7 +99,31 @@ def _apply_operation(bundle: dict, operation: ProgressOperation) -> None:
             bundle["mascots"][mascot["id"]] = bundle["mascots"].get(mascot["id"], 0) + 1
     elif operation.kind == "checklist_use":
         bundle["checkuse"] = bundle.get("checkuse", 0) + 1
+    elif operation.kind == "task_increment":
+        tasks = bundle["tasks"]
+        occurred = _beijing_time(operation.occurred_at)
+        today = occurred.strftime("%Y-%m-%d")
+        week = _week_key(occurred)
+        tasks.setdefault("day", today)
+        tasks.setdefault("week", week)
+        tasks.setdefault("daily", {})
+        tasks.setdefault("weekly", {})
+        if tasks["day"] == today:
+            tasks["daily"][p["metric"]] = tasks["daily"].get(p["metric"], 0) + p["amount"]
+        if tasks["week"] == week:
+            tasks["weekly"][p["metric"]] = tasks["weekly"].get(p["metric"], 0) + p["amount"]
+    elif operation.kind == "daily_done":
+        if p["day"] > bundle.get("dailyDone", ""):
+            bundle["dailyDone"] = p["day"]
 
 
 def _grade_rank(grade: str) -> int:
     return {"S": 0, "A": 1, "B": 2}.get(grade, 3)
+
+
+def _beijing_time(value: str) -> datetime.datetime:
+    return datetime.datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(ZoneInfo("Asia/Shanghai"))
+
+
+def _week_key(value: datetime.datetime) -> str:
+    return (value - datetime.timedelta(days=value.weekday())).strftime("%Y-%m-%d")

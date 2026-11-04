@@ -444,6 +444,7 @@ export function bumpTask(metric: string, n: number): void {
   if (t.weekly[metric] == null) t.weekly[metric] = 0
   t.weekly[metric] = t.weekly[metric] + n
   uni.setStorageSync(KEY_TASKS, JSON.stringify(t))
+  enqueueOperation('task_increment', { metric: metric, amount: n })
   notifyProgressDirty()
 }
 

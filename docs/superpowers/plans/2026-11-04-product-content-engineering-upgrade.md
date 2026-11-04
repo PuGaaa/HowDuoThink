@@ -674,7 +674,7 @@ A批适用A01至A16、A22、A24至A25，按该批实际交付边界验收；A15�
 | T04A | 已实现，待批次独立评审 | 主实施会话 | `531cb18` | 四题 validate、基线、目录测试通过；first-npe/caused-by 已按专家路径完成校准并冻结 `calibratedHash`；log-correlation/async-swallow 明确保持 `uncalibrated` | 后两题仍需人工事实/双路径/评分走验；未校准题不得扩量 |
 | T05 | 固定主线门槛第一阶段已实现 | 主实施会话 | 工作区 | 试玩目录固定；章节完成/挑战关优先使用显式 `MAINLINE_CASE_IDS`，避免首批主线被同章选做题扩张 | 仍需接入 T03 历史解锁资格迁移，并核定其余章节的冻结必修集合 |
 | T09A | 最小版本与发布分发已实现，待批次独立评审 | 主实施会话 | `531cb18` | `content_revision/source_*` 新迁移、发布幂等与 stale baseRevision 冲突、文章投影、索引任务均在同一事务；固定 head 同步；MySQL8 定向 38 passed | 仍需补齐 App 真实有效版本读取与开局快照验收；完整内容维护归 T09B |
-| T03 | 操作账本与账号空间第一阶段已实现，待继续补齐历史迁移 | 主实施会话 | `faf6bfc` + 工作区 | `progress_ops` + revision、`session_end/checklist_use/bootstrap` 幂等同步、用户维度去重、首次登录游客基线、切号清理本地空间、旧全量 POST 426；MySQL8 全套后端 127 passed | 仍需把 streak/tasks/daily 完整拆成事实操作并补服务端投影；客户端版本快照依赖 T09A 收口；App 需在 HBuilderX 做最终编译验收 |
+| T03 | 操作账本与账号空间第一阶段已实现，待继续补齐历史迁移 | 主实施会话 | `faf6bfc` + 工作区 | `progress_ops` + revision、`session_end/checklist_use/bootstrap/task_increment/daily_done` 幂等同步、按北京时间投影任务周期、用户维度去重、首次登录游客基线、切号清理本地空间、旧全量 POST 426；MySQL8 定向进度 4 passed | 仍需把 streak 与历史 bundle 迁移完整纳入事实操作；客户端版本快照依赖 T09A 收口；App 需在 HBuilderX 做最终编译验收 |
 | T06、T07、T08A、T04B、T09B、T10、T11、T12、T13、T14、T15 | 未开始或待前置 | 主实施会话 | — | — | 按 A 批依赖链继续推进 |
 
 执行记录（2026-11-04）：已读取全局/项目约束、研发流程和完整计划；未部署、未推送远端、未读取或输出 `.env*` 值。完成案例正文校准记录、案例内容修订/来源元数据/索引任务迁移、发布幂等与同步上界修复；完成进度事实操作账本第一阶段及旧全量写入停用。Web 手机验证码入口已实际检查桌面与 393×852 截图。内容 validate、基线/目录测试通过；MySQL 8 一次性独立容器全套后端复验 `127 passed`，Ruff 通过。当前开发账号因权限不足无法创建隔离测试库，不能用项目业务库替代；T03 历史基线与完整客户端账号空间隔离、T05/T06/T07/T08A/T12/T14/T15 仍未完成。

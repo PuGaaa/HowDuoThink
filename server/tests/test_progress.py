@@ -54,3 +54,26 @@ def test_progress_sync_is_idempotent_and_account_scoped():
         assert second.json()["revision"] == 1
         assert second.json()["cases"]["dns-hijack"]["plays"] == 1
         assert second.json()["mascots"]["frog"] == 1
+
+
+def test_progress_sync_projects_tasks_by_operation_time():
+    with make_client() as client:
+        login_admin(client)
+        ops = [
+            {
+                "opId": "task-1",
+                "kind": "task_increment",
+                "occurredAt": "2026-11-04T15:00:00.000Z",
+                "payload": {"metric": "win", "amount": 1},
+            },
+            {
+                "opId": "daily-1",
+                "kind": "daily_done",
+                "occurredAt": "2026-11-04T15:00:00.000Z",
+                "payload": {"day": "2026-11-04"},
+            },
+        ]
+        response = client.post("/api/me/progress/sync", json={"operations": ops})
+        assert response.status_code == 200
+        assert response.json()["tasks"]["daily"]["win"] == 1
+        assert response.json()["dailyDone"] == "2026-11-04"
