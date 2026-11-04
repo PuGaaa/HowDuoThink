@@ -195,7 +195,7 @@ export const configTypoCase: DiagnosisCase = {
     {
       id: 'a-fixbind',
       name: '沉淀：绑定校验 fail-fast',
-      desc: '【状态变更】@ConfigurationProperties 替代散落 @Value；未知配置键启动告警；必填键缺失启动失败',
+      desc: '【状态变更】显式拒绝未知键并配置必填字段校验，再验证错误拼写会失败',
       cost: 2,
       gain: 'mid',
       danger: false,

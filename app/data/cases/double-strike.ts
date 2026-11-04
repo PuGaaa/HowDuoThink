@@ -7,7 +7,7 @@ export const doubleStrikeCase: DiagnosisCase = {
   title: '每条线都还行，DB 却挂了',
   intro: '缓存miss比例只变了一点，回源查询也没达到慢日志阈值，连接池却耗尽。把回源速率和持有时间放在同一时间窗核算。',
   domain: 'data',
-  layer: '多因叠加的排错：每条线单独看都"还行"，是因为它们互相掩盖——必须拉全链路同时看',
+  layer: '到达速率与持有时间共同决定资源需求，分开聚合指标和故障窗口',
   part: 'engineer',
   chapterId: 'data',
   order: 6,
@@ -30,6 +30,11 @@ export const doubleStrikeCase: DiagnosisCase = {
         type: 'text',
         title: '逐条排查结果',
         text: '全站聚合命中率不能代表故障key；连接池200/200已是饱和，绝非正常。查询执行350ms小于1秒日志阈值，只说明日志未收录，不代表性能充分。',
+      },
+      {
+        type: 'log',
+        title: '监控采集重试',
+        text: '[WARN] metrics push retry；池饱和时也出现。',
       },
     ],
     timeline: '昨天新增JOIN；压测同一10秒窗口两个热点key到期且无请求合并；今天复放三个受控组合。',
@@ -104,7 +109,7 @@ export const doubleStrikeCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '叠加验证',
-        text: '同构固定10秒输入窗口：A保留3000QPS、查询5ms，所需并发约15；B回源50QPS、查询350ms，约17.5；C同时3000QPS与350ms，约1050需求，实际200执行、队列上升并超时。\n速率QPS×秒才得到并发需求，不能把3000个已并发请求再乘耗时。C在两个因素叠加时超出池预算。',
+        text: '同构固定10秒输入窗口：A保留3000QPS、查询5ms，所需并发约15；B回源50QPS、查询350ms，约17.5；C同时3000QPS与350ms，约1050需求，实际200执行、队列上升并超时。\n速率QPS×秒才得到并发需求，不能把3000个已并发请求再乘耗时。C在两个因素叠加时超出池预算。\n噪声收线：对照输入和连接持有数由本地计数器完整记录，监控上送在独立进程，不参与Redis回源或SQL执行。',
       },
     },
     {
@@ -133,7 +138,7 @@ export const doubleStrikeCase: DiagnosisCase = {
     {
       id: 'a-cacheonly',
       name: '评估只加击穿保护',
-      desc: '互斥锁 + 预热能不能解决',
+      desc: '核对同速率不同耗时的对照，判断查询是否也是因子',
       cost: 1,
       gain: 'low',
       danger: false,
@@ -156,7 +161,7 @@ export const doubleStrikeCase: DiagnosisCase = {
     {
       id: 'a-slowonly',
       name: '评估只优化慢查询',
-      desc: 'JOIN 优化到 5ms 能不能解决',
+      desc: '核对同耗时不同速率的对照，判断回源是否也是因子',
       cost: 1,
       gain: 'low',
       danger: false,
@@ -179,7 +184,7 @@ export const doubleStrikeCase: DiagnosisCase = {
     {
       id: 'a-fixcombo',
       name: '同时修击穿 + 慢查询',
-      desc: '【状态变更】互斥锁 + JOIN 优化 + 连接池微调，三管齐下',
+      desc: '【状态变更】先消除当前过载的充分条件，再按预算补长期保护',
       cost: 2,
       gain: 'high',
       danger: false,

@@ -32,6 +32,11 @@ export const midnightRollbackCase: DiagnosisCase = {
         title: '已知信息（不完整）',
         text: 'v2.6.0 两小时前发布（含支付渠道路由重构——大促核心功能）。\n上游无变更；依赖渠道侧无变更确认（渠道方值班未回复）。\n堆栈指向新路由代码，但复现条件复杂，初步判断完整定位需 1~2 小时。',
       },
+      {
+        type: 'log',
+        title: '发票附件失败',
+        text: '[WARN] invoice archive upload failed；同一分钟业务看板记录。',
+      },
     ],
     timeline: '23:40发布，00:10全量及错误抬升，01:40告警；要求15分钟内完成处置决策，执行回滚另需8分钟；功能原计划D-11，修复后D-9重发。',
     impactHint: '决策依据不是"确定根因后才行动"——是"行动与不行动的代价对比"。先把两边的代价算清楚。',
@@ -79,7 +84,7 @@ export const midnightRollbackCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '业务影响量化',
-        text: '接口每分钟7000次尝试，错误率3%即约210次失败尝试/分钟，不等于210个独立订单或确定金额资损。90分钟仍处于2%~4%，没有持续下降到0.1%基线。',
+        text: '接口每分钟7000次尝试，错误率3%即约210次失败尝试/分钟，不等于210个独立订单或确定金额资损。90分钟仍处于2%~4%，没有持续下降到0.1%基线。\n噪声收线：发票附件是独立异步任务，未进入结算签名调用；210次失败尝试按结算trace单独统计，没有把附件失败混入分母。',
       },
     },
     {
@@ -136,19 +141,12 @@ export const midnightRollbackCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: [
-        'h-channel',
-      ],
-      hypotheses: [
-        {
-          id: 'h-channel',
-          status: 'down',
-        },
-      ],
+      tests: [],
+      hypotheses: [],
       result: {
         type: 'text',
         title: '上游排查',
-        text: '上游网关/鉴权/风控：零变更。\n支付渠道方：值班未回复（渠道侧是否变更无法确认——这本身就是信息盲区）。\n→ 排除上游；渠道侧是信息盲区——无法排除也无法确认。',
+        text: '上游没有已知发布，渠道尚未回复仍属未知；这不能排除渠道故障，也不构成禁止受控回退的规则。',
       },
     },
     {
@@ -226,7 +224,7 @@ export const midnightRollbackCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '排期约束',
-        text: '大促功能排期：D-11 预热前上线（当前 D-11，即明天是最后期限）。\n回滚 = 功能推迟至少 1 天 + 团队连夜修复。\n→ 回滚的时间代价：功能晚 1 天 + 团队加班。不回滚的代价：错误率 3% 持续整夜 + 明天可能更高流量。',
+        text: '排期负责人给定回退会让功能延迟约1天；本次教学时间线为D-11回退、D-9修复重发，两日期相差2天，不是7天。实际复发与返工代价仍需另评估。',
       },
     },
     {

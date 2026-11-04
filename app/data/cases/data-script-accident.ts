@@ -7,7 +7,7 @@ export const dataScriptCase: DiagnosisCase = {
   title: '修数据的脚本，修出了五万个新错误',
   intro: '原计划修正一行库存，实际执行后五万行都变为负数。先核对执行文本和事务状态，别只看编辑器里的文件。',
   domain: 'data',
-  layer: '数据操作脚本的三道防线：测试环境验证 + 备份 + 双人复核——缺一道就是全表灾难',
+  layer: '实际执行文本、影响范围与事务提交状态共同决定误更新处置',
   part: 'engineer',
   chapterId: 'data',
   order: 7,
@@ -30,6 +30,11 @@ export const dataScriptCase: DiagnosisCase = {
         type: 'text',
         title: '业务影响',
         text: '5 万个商品库存全部变为 -50 → 前端显示"库存不足" → 全站无法下单。\n涉及品牌方 300+，影响大促预热。',
+      },
+      {
+        type: 'log',
+        title: 'CLI显示告警',
+        text: 'pager: less: command not found；终端执行前还出现此行。',
       },
     ],
     timeline: '脚本编写：5 分钟 ｜ 脚本执行：直接在生产执行（无测试环境验证、无备份）｜ 发现全表更新：执行后 30 秒（affected rows 异常）',
@@ -77,7 +82,7 @@ export const dataScriptCase: DiagnosisCase = {
     {
       id: 'a-sqlcheck',
       name: '读执行的实际 SQL',
-      desc: '从 MySQL general log 看实际执行的 SQL',
+      desc: '读取已留存执行审计，不以编辑器文件或行数替代',
       cost: 1,
       gain: 'high',
       danger: false,
@@ -104,7 +109,7 @@ export const dataScriptCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: 'general log',
-        text: '已留存数据库审计的connectionId与执行时间对应：UPDATE inventory SET stock=-50；没有WHERE。CLI原样执行，无ORM。\n编辑器文件是SET stock=50 WHERE sku_id=12345，实际输入却是旧模板的第一行；因此不是带WHERE但类型/值错误。',
+        text: '已留存数据库审计的connectionId与执行时间对应：UPDATE inventory SET stock=-50；没有WHERE。CLI原样执行，无ORM。\n编辑器文件是SET stock=50 WHERE sku_id=12345，实际输入却是旧模板的第一行；因此不是带WHERE但类型/值错误。\n噪声收线：pager失败只影响结果展示；数据库审计已记录完整实际UPDATE，CLI没有通过pager改写提交SQL，不能把显示问题当成WHERE丢失原因。',
       },
     },
     {
@@ -214,7 +219,7 @@ export const dataScriptCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: 'RCA 报告',
-        text: '① 时间线：15:43 写脚本 → 15:48 执行 → 15:49 发现全表更新 → 16:10 备份恢复\n② 根因：复制脚本模板丢失 WHERE + 直接生产执行无验证\n③ 教训：三道防线写入团队规范\n④ 行动项：所有历史数据操作脚本入库审计',
+        text: '复盘计划文件与实际输入的差异、自动提交时点、受影响主键和恢复验证。恢复及后续写入对账尚需执行，不能在点击RCA时声称已恢复。',
       },
     },
     {

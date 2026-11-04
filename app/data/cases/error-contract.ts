@@ -31,6 +31,11 @@ export const errorContractCase: DiagnosisCase = {
         title: '牵出的旧账',
         text: '前端代码搜索：message.includes(...) 做逻辑分支的写法共 14 处（余额不足/超时/风控…）。\n错误响应结构：{ "message": "…" }——从设计之初就没有 code 字段。',
       },
+      {
+        type: 'log',
+        title: '帮助页资源告警',
+        text: '[WARN] help-page locale resource 404；控制台还显示此条。',
+      },
     ],
     timeline: '文案微调昨天上线（合规整改）｜ 前端分支失效今天客服报上来 ｜ 错误码表：设计稿里有，从未实现',
     impactHint: '这次影响余额不足分支；全仓14处文案判断是潜在风险，不能都算本次已坏。',
@@ -127,7 +132,7 @@ export const errorContractCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '编码核对',
-        text: '同一请求的服务端响应字节、网关出口和浏览器解码字符串相同，均为UTF-8的“可用资金不足，请先充值”。网关未改body；JS直接执行includes得到false。排除编码损坏与网关改写。',
+        text: '同一请求的服务端响应字节、网关出口和浏览器解码字符串相同，均为UTF-8的“可用资金不足，请先充值”。网关未改body；JS直接执行includes得到false。排除编码损坏与网关改写。\n噪声收线：404属于帮助页的另一条请求；本次支付响应字节已完整接收，当前分支直接读该响应message，不读取帮助页资源。',
       },
     },
     {

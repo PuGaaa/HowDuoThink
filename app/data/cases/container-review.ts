@@ -7,7 +7,7 @@ export const containerReviewCase: DiagnosisCase = {
   title: '容器治理评审——一刀切的限额与失明的扩容',
   intro: '17个服务拟统一requests/limits与CPU扩容目标。核对峰值画像、HPA分母和探针语义，再决定能否直接全量推行。',
   domain: 'runtime',
-  layer: '资源限额是服务画像的一部分：统一数字是管理的简化，却是运行的灾难',
+  layer: '统一治理前按目标负载验证资源参数，并区分request、limit和HPA指标口径',
   part: 'engineer',
   chapterId: 'runtime',
   order: 5,
@@ -30,6 +30,11 @@ export const containerReviewCase: DiagnosisCase = {
         type: 'text',
         title: '评审输入 · 资源画像抽样',
         text: '本题给定画像：单线程网关峰值1CPU；报表稳态3.2Gi、完整大报表峰值4.8Gi；商品服务目标吞吐需3.5CPU，内存1.8Gi；静态内容服务5个，各约200Mi。',
+      },
+      {
+        type: 'log',
+        title: '镜像扫描附件告警',
+        text: '[WARN] image scan report upload retry；治理评审输入中夹有此条。',
       },
     ],
     timeline: '17 个服务资源画像从未系统采集 ｜ 上季度事件循环阻塞事故（event-loop lag 监控已上线）｜ HPA 上线至今从未触发过扩容',
@@ -73,7 +78,7 @@ export const containerReviewCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '草案同时统一资源request/limit和扩缩容目标；管理成本下降是动机，但需要逐服务验证目标负载。当前方案未发布，不能把评审预测写成已发生事故。',
+        text: '草案同时统一资源request/limit和扩缩容目标；管理成本下降是动机，但需要逐服务验证目标负载。当前方案未发布，不能把评审预测写成已发生事故。\n噪声收线：扫描报告附件上传不改变已给出的request/limit、峰值画像或HPA配置；当前方案未发布，不能把附件重试当运行事故。',
       },
     },
     {

@@ -32,6 +32,11 @@ export const enumDriftCase: DiagnosisCase = {
         title: '时间线',
         text: '旧公开契约2=PAID、3=SHIPPED。上月重构时对外映射改为PAID(3)、SHIPPED(2)；合作方未变更。类型校验仍全部通过。',
       },
+      {
+        type: 'log',
+        title: '轨迹图片告警',
+        text: '[WARN] shipment proof thumbnail 404；物流侧同时上报。',
+      },
     ],
     timeline: '重构上线当日合作方已在运行；之后1204笔PAID事件被错派，所有样本均为重构后新订单。',
     impactHint: '值合法、含义错——类型校验全绿灯，业务语义全红灯。1 和 2 的"含义"是谁定义的？',
@@ -118,7 +123,7 @@ export const enumDriftCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '字段映射核对',
-        text: '合作方读取JSON的status字段，没有读取orderType；该字段从既有公开契约沿用，不是本次新字段。',
+        text: '合作方读取JSON的status字段，没有读取orderType；该字段从既有公开契约沿用，不是本次新字段。\n噪声收线：缩略图在路由决定后读取，失败不改status字段；合作方输入JSON与字段映射已保存，错误出在状态含义。',
       },
     },
     {
@@ -207,7 +212,7 @@ export const enumDriftCase: DiagnosisCase = {
     {
       id: 'a-fixenum',
       name: '沉淀：枚举契约化规范',
-      desc: '【状态变更】对外接口枚举禁用裸数字重排：字符串常量/枚举类名传输；文档从枚举类生成',
+      desc: '【状态变更】固定已有数字协议映射；新字符串协议须版本化迁移',
       cost: 1,
       gain: 'mid',
       danger: false,
@@ -233,7 +238,7 @@ export const enumDriftCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '样例单验证',
-        text: '对接 SOP 新增：每个枚举状态值各走一单真实业务，对方回读确认语义。\n语义漂移最隐蔽（类型全绿）——只有"语义级样例"能验出来。对接当天的 10 分钟，省 1,204 单的召回。',
+        text: '每个业务状态构造样例，验证数据库状态→输出数字→消费者路由。类型检查通过不能替代语义样例；样例须与已发布承诺对比。',
       },
     },
   ],

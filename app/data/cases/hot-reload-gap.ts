@@ -32,6 +32,11 @@ export const hotReloadGapCase: DiagnosisCase = {
         title: '影响',
         text: '大促高峰按 50 的旧阈值拦截新用户下单 25 分钟——运营在配置中心"明明改成功了"。',
       },
+      {
+        type: 'log',
+        title: '指标投递重试',
+        text: '[WARN] metrics remote_write retry=1；阈值推送窗口也出现监控投递告警。',
+      },
     ],
     timeline: '阈值推送 10:00（ACK 全绿）｜ 拦截异常 10:25 被运营发现 ｜ 注入代码一年未动 ｜ 上次 config-drift 整改后"送达"已有保障',
     impactHint: '上次修的是"送达"，这次断在"生效"——收到消息的字段，为什么没有换心？',
@@ -100,7 +105,7 @@ export const hotReloadGapCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '注入模式解剖',
-        text: '本案自定义Nacos监听器只替换MapPropertySource；不发布刷新事件，也未调用ContextRefresher。\n中心与代码精确键均为risk.threshold；Environment.getProperty=80，普通单例Bean中@Value字段仍50。\n同构对照：把Bean类标注@RefreshScope，并显式触发受控ContextRefresher.refresh()后，重新取Bean读取80。@RefreshScope不标在字段上。不是所有Nacos集成都有本案行为。',
+        text: '本案自定义Nacos监听器只替换MapPropertySource；不发布刷新事件，也未调用ContextRefresher。\n中心与代码精确键均为risk.threshold；Environment.getProperty=80，普通单例Bean中@Value字段仍50。\n同构对照：把Bean类标注@RefreshScope，并显式触发受控ContextRefresher.refresh()后，重新取Bean读取80。@RefreshScope不标在字段上。不是所有Nacos集成都有本案行为。\n噪声收线：该WARN来自指标上报器，配置监听ACK与Environment新值均已到达，不参与Bean字段回注。',
       },
     },
     {

@@ -32,6 +32,11 @@ export const bootOrderCase: DiagnosisCase = {
         title: '启动日志的真相',
         text: '启动日志中有cache warmup failed、MQ listener start failed、config snapshot fetch failed三条WARN；随后记录Application started successfully。另有日志归档重试WARN。',
       },
+      {
+        type: 'log',
+        title: '日志归档重试',
+        text: '[WARN] archive upload retry=1；同批次初始化日志中夹有归档任务告警。',
+      },
     ],
     timeline: 'DB 维护窗口 01:00-01:20 ｜ 应用 01:05 重启（DB 切换中）｜ 01:30 用户反馈"通知收不到" ｜ 02:00 定位到启动日志',
     impactHint: '把受影响的业务路径与启动时间线对齐，避免把端口存活当作所有组件就绪。',
@@ -100,7 +105,7 @@ export const bootOrderCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '启动日志解剖',
-        text: '01:05:12缓存预热读DB被拒绝；01:05:12监听器读DB订阅游标被拒绝，未执行MQ注册；01:05:13业务配置快照读DB被拒绝。\n三个init的catch仅记录WARN后返回，无状态上报或重试；缓存失败分支没有写入空对象，样本键均不存在。01:05:14打印started。\n日志归档WARN来自独立定时器，重试成功；不参与上述初始化调用链。',
+        text: '01:05:12缓存预热读DB被拒绝；01:05:12监听器读DB订阅游标被拒绝，未执行MQ注册；01:05:13业务配置快照读DB被拒绝。\n三个init的catch仅记录WARN后返回，无状态上报或重试；缓存失败分支没有写入空对象，样本键均不存在。01:05:14打印started。\n日志归档WARN来自独立定时器，重试成功；不参与上述初始化调用链。\n噪声收线：归档定时器随后重试成功，不调用DB初始化或MQ注册；三条init失败仍独立存在。',
       },
     },
     {
@@ -134,7 +139,7 @@ export const bootOrderCase: DiagnosisCase = {
     {
       id: 'a-cachecheck',
       name: '核对预热失败后的缓存内容',
-      desc: '确认放大器：空数据是否被写入',
+      desc: '核对失败是否写占位；本案证据将其排除',
       cost: 1,
       gain: 'mid',
       danger: false,
@@ -196,7 +201,7 @@ export const bootOrderCase: DiagnosisCase = {
     {
       id: 'a-fixboot',
       name: '修复：启动分两级——核心 fail-fast，非核心显式降级',
-      desc: '【状态变更】核心依赖(DB)失败即终止启动；非核心(预热/监听)标记 degraded + 后台重试',
+      desc: '【状态变更】本案监听/业务配置属核心，缓存预热可降级；初始化状态必须上报',
       cost: 2,
       gain: 'high',
       danger: false,

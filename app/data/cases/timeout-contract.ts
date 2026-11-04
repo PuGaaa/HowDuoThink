@@ -7,7 +7,7 @@ export const timeoutContractCase: DiagnosisCase = {
   title: '客户端 3 秒超时，服务端要跑 5 秒',
   intro: '部分聚合请求在客户端3秒超时，服务端仍继续执行。检查延迟分布、取消和重试，建立可兑现的预算。',
   domain: 'build',
-  layer: '超时是递减的预算链——每层预算要覆盖下一层的最坏情况',
+  layer: '沿链路传播剩余预算，排队、处理、重试与回传共同消耗体验期限',
   part: 'engineer',
   chapterId: 'contract',
   order: 3,
@@ -31,6 +31,11 @@ export const timeoutContractCase: DiagnosisCase = {
         type: 'text',
         title: '三层超时盘点',
         text: '客户端 SDK：3s（写死在封装里，"感觉 3 秒够"）\n网关：10s（默认模板）\n服务端：无内部预算（聚合要等多久算多久）',
+      },
+      {
+        type: 'log',
+        title: '审计附件超时',
+        text: '[WARN] audit attachment upload timeout；压测同期出现。',
       },
     ],
     timeline: '库存聚合上月新增4个下游（8→12），P99从2s升至5s；客户端超时未调整；大促12天后。',
@@ -100,7 +105,7 @@ export const timeoutContractCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '契约对账',
-        text: '单trace：t=0发起，t=3.000客户端计时器触发并重试；网关尚未到10s，服务端第一份工作直到t=5.000完成。未转发剩余预算，聚合也未观察取消。\n同构保持工作负载不变，启用剩余预算和协作取消后，客户端放弃的工作按预算终止。取消是否真正停止DB/SDK工作还取决于具体调用是否支持，HTTP断开不会自动中断所有任务。',
+        text: '单trace：t=0发起，t=3.000客户端计时器触发并重试；网关尚未到10s，服务端第一份工作直到t=5.000完成。未转发剩余预算，聚合也未观察取消。\n同构保持工作负载不变，启用剩余预算和协作取消后，客户端放弃的工作按预算终止。取消是否真正停止DB/SDK工作还取决于具体调用是否支持，HTTP断开不会自动中断所有任务。\n噪声收线：附件由独立离线队列上传，不在库存聚合trace中；本次t=3退出与t=5完成的跨度来自明确业务调用。',
       },
     },
     {
@@ -191,7 +196,7 @@ export const timeoutContractCase: DiagnosisCase = {
     {
       id: 'a-fixbudget',
       name: '修复：超时预算链重排',
-      desc: '【状态变更】client 8s / gw 6s / server 预算 5s 内并行化压到 2.5s / 下游各 1s——递减链成立',
+      desc: '【状态变更】按体验目标分配总预算；并行收益与整体P99需同负载实测',
       cost: 2,
       gain: 'high',
       danger: false,
@@ -207,7 +212,7 @@ export const timeoutContractCase: DiagnosisCase = {
     {
       id: 'a-fixcancel',
       name: '沉淀：取消传播',
-      desc: '【状态变更】客户端断开 → 网关感知 → 向服务端发 cancel → 聚合中断（省 40% 白做）',
+      desc: '【状态变更】显式传播deadline/取消，验证SDK协作终止',
       cost: 1,
       gain: 'mid',
       danger: false,
@@ -233,7 +238,7 @@ export const timeoutContractCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '登记表',
-        text: '库存链路：8s/6s/5s/1s ✓ 递减断言通过。\n新链路接入必填四值——超时从"各配各的"变成"一张表上的预算链"。',
+        text: '登记端到端目标、总预算、排队/连接/读取/重试消耗及回传余量；顺序递减只是必要约束之一，不能单靠四值不等式保证满足。',
       },
     },
     {

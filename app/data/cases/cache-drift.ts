@@ -7,7 +7,7 @@ export const cacheDriftCase: DiagnosisCase = {
   title: '用户的头像变回了旧的',
   intro: '客服反馈：一批用户上传了新头像，App 里显示的还是旧头像，但网页版是新的。',
   domain: 'data',
-  layer: '缓存与数据库之间，永远隔着一致性窗口',
+  layer: '缓存新鲜度需要明确时效与失效机制，副本差异必须按同一主键核对',
   part: 'engineer',
   chapterId: 'data',
   order: 2,
@@ -29,6 +29,11 @@ export const cacheDriftCase: DiagnosisCase = {
         type: 'error',
         title: '服务端监控',
         text: '头像上传接口 100% 成功；无报错、无超时——上传链路完全正常。',
+      },
+      {
+        type: 'log',
+        title: 'CDN日志投递告警',
+        text: '[WARN] CDN log delivery delayed；新头像上传当天出现。',
       },
     ],
     timeline: '昨晚22:00发布后取消主动失效，改为每6小时批量刷新；10:00反馈来自之前已有缓存且在本次刷新窗口内改过头像的用户。',
@@ -139,7 +144,7 @@ export const cacheDriftCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: 'URL 规则',
-        text: '上传生成新内容哈希URL，不覆盖旧文件。直接访问新URL得到新图，旧URL仍为旧图；App接口实际返回旧URL，图片层没有把新URL错误缓存成旧图。',
+        text: '上传生成新内容哈希URL，不覆盖旧文件。直接访问新URL得到新图，旧URL仍为旧图；App接口实际返回旧URL，图片层没有把新URL错误缓存成旧图。\n噪声收线：告警是访问日志异步投递；直接GET新URL能取新图，头像API返回旧URL发生在图片请求之前。',
       },
     },
     {

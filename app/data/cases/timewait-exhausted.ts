@@ -7,7 +7,7 @@ export const timewaitCase: DiagnosisCase = {
   title: '接近三万个TIME_WAIT，出站请求开始失败',
   intro: '物流调用报EADDRNOTAVAIL，下游指标正常。核对同一源地址与目标的连接状态、临时端口和复用设置。',
   domain: 'runtime',
-  layer: 'TCP 连接是有状态的：每个挥手道别的连接，会在 TIME_WAIT 里停留 60 秒',
+  layer: '按源/目的元组核对临时端口与连接留存，复用可降低持续新建速率',
   part: 'engineer',
   chapterId: 'runtime',
   order: 4,
@@ -30,6 +30,11 @@ export const timewaitCase: DiagnosisCase = {
         type: 'text',
         title: '监控两侧对比',
         text: '物流查询服务：QPS 平稳、P99 正常、零报错——"我这边什么都没发生"。\n订单服务：仅调用物流接口的请求报错，报错率随流量上升。',
+      },
+      {
+        type: 'log',
+        title: '证书到期预警',
+        text: '[WARN] admin-console certificate expires in 10 days；同节点日志有此条。',
       },
     ],
     timeline: '物流全局约3000QPS，其中故障Pod约485次建连尝试/秒；业务增长后出现，连接代码未变，未启用端口复用相关调优。',
@@ -94,7 +99,7 @@ export const timewaitCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: 'netstat -an | 统计',
-        text: '同一Pod网络命名空间、同一源IP→物流VIP:9443：TIME_WAIT28080、ESTABLISHED100。ip_local_port_range=32768~60999，共28232个候选端口；同元组占用已接近上限。\n本环境实测TIME_WAIT约60秒、无可用复用路径；connect失败前无SYN发出，localAddress存在。端口压力可解释本案，不能把跨目标聚合31284个连接塞进单目标28232范围。',
+        text: '同一Pod网络命名空间、同一源IP→物流VIP:9443：TIME_WAIT28080、ESTABLISHED100。ip_local_port_range=32768~60999，共28232个候选端口；同元组占用已接近上限。\n本环境实测TIME_WAIT约60秒、无可用复用路径；connect失败前无SYN发出，localAddress存在。端口压力可解释本案，不能把跨目标聚合31284个连接塞进单目标28232范围。\n噪声收线：预警针对管理域名且尚未过期；物流失败发生在本机分配端口、发SYN之前，不可能由另一个域名的证书校验触发。',
       },
     },
     {
@@ -231,7 +236,7 @@ export const timewaitCase: DiagnosisCase = {
     {
       id: 'a-rollback',
       name: '重启订单服务止血',
-      desc: '【状态变更】滚动重启清空 TIME_WAIT',
+      desc: '【状态变更】单重启应用不清TIME_WAIT；换Pod需评估源地址和迁移容量',
       cost: 9,
       gain: 'none',
       danger: true,

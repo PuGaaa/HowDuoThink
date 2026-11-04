@@ -31,6 +31,11 @@ export const eventLoopBlockedCase: DiagnosisCase = {
         title: '时间线',
         text: '卡顿从三天前 v2.3.0 发布后开始，此前半年无此现象。\nv2.3.0 内容：新增"发票导出"功能 + 常规依赖升级。',
       },
+      {
+        type: 'log',
+        title: 'DNS重试记录',
+        text: '[WARN] optional telemetry DNS retry=1；导出期间出现。',
+      },
     ],
     timeline: 'v2.3.0 发布于三天前 ｜ 卡顿全天间歇出现，与流量高峰弱相关 ｜ 下游五个微服务零变更',
     impactHint: '"资源很闲，用户很急"——资源利用率的数字骗了所有人。什么程序结构会让 CPU 看起来很闲、服务却卡死？',
@@ -166,7 +171,7 @@ export const eventLoopBlockedCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '下游监控',
-        text: '同trace下游调用各<60ms；/health不调用下游也在导出期间卡住。排除下游变慢主因，零变更本身不等于无故障。',
+        text: '同trace下游调用各<60ms；/health不调用下游也在导出期间卡住。排除下游变慢主因，零变更本身不等于无故障。\n噪声收线：该解析属于独立遥测队列，/health无此调用；阻塞区间CPU profile集中同步导出而非解析等待，不能用它解释800ms主线程计算。',
       },
     },
     {

@@ -7,7 +7,7 @@ export const cascadeCase: DiagnosisCase = {
   title: '只占5%的慢调用，为什么拖住整个池',
   intro: '评论查询变慢后，共享线程池饱和，其他业务也超时。源头修好后仍有短暂排队，核对共享资源和恢复曲线。',
   domain: 'runtime',
-  layer: '级联雪崩：一个依赖的超时传递为全链路故障——没有熔断、没有背压、超时值形同虚设',
+  layer: '慢调用通过共享资源传播，隔离并发与有界排队，沿链路使用剩余预算',
   part: 'engineer',
   chapterId: 'runtime',
   order: 6,
@@ -30,6 +30,11 @@ export const cascadeCase: DiagnosisCase = {
         type: 'text',
         title: '超时配置审计',
         text: '每一层等待上限30s；同一请求的等待时间大多重叠。网关自t0起30s会返回，因此不能把四个30s直接相加成用户120s。缺少隔离与取消让慢调用占满共享池。',
+      },
+      {
+        type: 'log',
+        title: '指标外送告警',
+        text: '[WARN] metrics exporter retry；全站告警中还有此条。',
       },
     ],
     timeline: '22:00评论SQL变慢；22:05共享池饱和；22:20 SQL修复并限制重试，新查询回30ms；既有队列在随后6秒逐步消退。',
@@ -156,7 +161,7 @@ export const cascadeCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '独立问题排查',
-        text: '订单线程调用栈均关联评论HTTP等待，无独立业务异常；相同版本只隔离/限额评论调用后普通请求恢复，评论变慢之前订单正常。以同trace与受控隔离反证独立故障。',
+        text: '订单线程调用栈均关联评论HTTP等待，无独立业务异常；相同版本只隔离/限额评论调用后普通请求恢复，评论变慢之前订单正常。以同trace与受控隔离反证独立故障。\n噪声收线：exporter独立进程，不占订单共享工作池；等待栈和隔离对照均指向评论HTTP，指标外送并非两服务共同独立故障。',
       },
     },
     {
@@ -201,7 +206,7 @@ export const cascadeCase: DiagnosisCase = {
     {
       id: 'a-fixtimeout',
       name: '全链路超时重配 + 加熔断器',
-      desc: '【状态变更】每层超时改为上游 P99×2 + 熔断器（5 次失败自动断路 30s）',
+      desc: '【状态变更】按体验期限分配剩余预算，配置隔离/背压并复验恢复',
       cost: 2,
       gain: 'high',
       danger: false,

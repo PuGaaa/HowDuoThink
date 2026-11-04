@@ -31,6 +31,11 @@ export const oomLeakCase: DiagnosisCase = {
         title: '用户与监控',
         text: '每次重启前 1~2 分钟，查询接口批量超时；重启后立即恢复。\n服务 CPU 全程平稳（<30%），重启不挑时间——深夜也会被杀。',
       },
+      {
+        type: 'log',
+        title: '图片对象告警',
+        text: '[WARN] order proof image 404；重启前日志中混有此条。',
+      },
     ],
     timeline: '近9天第6次重启，间隔34~38小时；一个月前提速优化引入缓存，当前镜像随后未变；限额2Gi未改。',
     impactHint: '"重启后恢复"说明进程状态里有东西在长大——它是什么，从哪来的？',
@@ -143,7 +148,7 @@ export const oomLeakCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '堆快照 Diff（t1 → t1+1h）',
-        text: '相隔1小时的同负载快照：orderCache条目800000→880000；Map结构约+6Mi，持有订单字符串约+39Mi，总约45Mi，与曲线同量级。\nRetainer为模块顶层Map；Timers/Listeners计数及保留体积稳定，排除监听器持续注册。',
+        text: '相隔1小时的同负载快照：orderCache条目800000→880000；Map结构约+6Mi，持有订单字符串约+39Mi，总约45Mi，与曲线同量级。\nRetainer为模块顶层Map；Timers/Listeners计数及保留体积稳定，排除监听器持续注册。\n噪声收线：404计数没有随堆增长，图片请求对象未在增长retainer中；增长由orderCache持有的订单数据解释，图像对象不是该引用链。',
       },
     },
     {
@@ -256,7 +261,7 @@ export const oomLeakCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '止血结果',
-        text: '重启后内存归零、查询恢复。但如果什么都不改，36 小时后它会准时回来。\n→ 重启是止血，不是修复——别把它写进值班手册就完事。',
+        text: '受控重启后内存回到约400Mi而不是归零；若输入与实现不变，预计仍会累积。该动作恢复服务但会丢现场，不能单独证明Map就是根因。',
       },
     },
     {

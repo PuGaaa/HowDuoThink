@@ -30,6 +30,11 @@ export const poolExhaustedCase: DiagnosisCase = {
         title: '监控大盘',
         text: '下单接口 P99 从 200ms 飙到 5000ms+；CPU 15%、内存平稳、MySQL QPS 反而比平时低——"机器不忙，业务却卡死"。',
       },
+      {
+        type: 'log',
+        title: '监控推送告警',
+        text: '[WARN] metrics push retry；下单超时同期出现。',
+      },
     ],
     timeline: '20:10 大促预热活动开始后 10 分钟内故障 ｜ 无任何发版（最近一次发布在三天前）',
     impactHint: '下单全挂，但商品浏览正常——范围先画清楚。',
@@ -178,7 +183,7 @@ export const poolExhaustedCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: 'MySQL 侧',
-        text: '故障同窗主库CPU8%，连接23/500、无锁等待；同主库独立诊断连接的小查询延迟正常。仅20条导出扫描慢，排除数据库整体故障或所有SQL同时退化。',
+        text: '故障同窗主库CPU8%，连接23/500、无锁等待；同主库独立诊断连接的小查询延迟正常。仅20条导出扫描慢，排除数据库整体故障或所有SQL同时退化。\n噪声收线：推送在独立监控进程，不使用业务连接池；池connectionId均已对应到导出SQL，监控重试不解释20个持有者。',
       },
     },
     {

@@ -31,6 +31,11 @@ export const profileMazeCase: DiagnosisCase = {
         title: '业务困扰',
         text: '运营依赖 CSV 做对账脚本解析（XLSX 解析成本高）；\n生产却一直产出 XLSX——功能方提了 bug，开发者本地复现不了。',
       },
+      {
+        type: 'log',
+        title: '日志归档重试',
+        text: '[WARN] log archive upload retry；与生产导出同窗。',
+      },
     ],
     timeline: '三个月前引入导出格式配置；本地和测试一直导出CSV，生产导出XLSX；本周运营对账脚本首次暴露差异。',
     impactHint: '镜像相同并不能证明运行配置相同，先看最终值及其来源。',
@@ -127,7 +132,7 @@ export const profileMazeCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '产物核对',
-        text: '同一部署清单诊断：三个环境运行镜像digest和JAR校验和相同，包内application*.yml相同；部署进程环境变量/命令行均无export.format覆盖。\n生产差异只在外置目录，不在构建产物，也不是代码版本或环境注入。',
+        text: '同一部署清单诊断：三个环境运行镜像digest和JAR校验和相同，包内application*.yml相同；部署进程环境变量/命令行均无export.format覆盖。\n生产差异只在外置目录，不在构建产物，也不是代码版本或环境注入。\n噪声收线：归档只上传运行日志，不写部署配置；三个环境相同输入导出均完成，格式差异来自可复验的外置来源。',
       },
     },
     {

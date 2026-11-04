@@ -32,6 +32,11 @@ export const replicaLagCase: DiagnosisCase = {
         title: '分裂对照',
         text: '同一订单：详情页（读主库）立刻可见；列表页（读从库）暂时不可见。\n两处读的是"同一份数据的两个时点"。',
       },
+      {
+        type: 'log',
+        title: '订单缩略图失败',
+        text: '[WARN] order thumbnail 404；同一页面控制台出现。',
+      },
     ],
     timeline: '大促第一波高峰进行中 ｜ 上月为读扩展新增 2 个从库、列表页切到从库 ｜ 客诉量随写入量增长',
     impactHint: '详情页看得见、列表页看不见——同一份数据的"两个时点"。写完就读，读到的是几秒前的世界？',
@@ -162,7 +167,7 @@ export const replicaLagCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '缓存核对',
-        text: '列表无负缓存；保留同一参数直查本次命中的replica，在GTID到达前也为空，排除缓存空结果。',
+        text: '列表无负缓存；保留同一参数直查本次命中的replica，在GTID到达前也为空，排除缓存空结果。\n噪声收线：缩略图请求与订单列表JSON分离；直接SQL在GTID到达前为空、到达后出现，图片404不改变数据可见时点。',
       },
     },
     {
@@ -207,7 +212,7 @@ export const replicaLagCase: DiagnosisCase = {
     {
       id: 'a-fixsession',
       name: '修复：写后立读会话粘滞（读己之写）',
-      desc: '【状态变更】用户"写后 N 秒内"的订单读固定路由主库',
+      desc: '【状态变更】关键读选择主库或提交位置确认；计时粘滞仅有条件有效',
       cost: 2,
       gain: 'high',
       danger: false,
@@ -223,7 +228,7 @@ export const replicaLagCase: DiagnosisCase = {
     {
       id: 'a-fixbigtx',
       name: '沉淀：大事务拆分',
-      desc: '【状态变更】批量任务分批提交（每批 < 1000 行），复制延迟毛刺 8s → 0.5s',
+      desc: '【状态变更】核对回放瓶颈后评估拆批与错峰，收益需复验',
       cost: 1,
       gain: 'mid',
       danger: false,
@@ -233,7 +238,7 @@ export const replicaLagCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '任务改造',
-        text: '批量积分发放拆为分批提交 + 批间让出（错峰到低峰执行）。\n从库回放不再被单事务长阻塞，高峰延迟稳定 < 500ms。',
+        text: '先验证复制回放瓶颈是否来自该批处理，再评估拆批、节流和错峰；拆批会改变原子性边界，必须满足业务契约。未做受控回放时不承诺8秒必降至0.5秒。',
       },
     },
     {

@@ -31,6 +31,11 @@ export const slowQueryCase: DiagnosisCase = {
         title: '业务影响',
         text: '列表页 P99 从 200ms 涨到 3.5s，还在缓慢恶化；\n商品详情页（按 ID 查单条）完全正常。',
       },
+      {
+        type: 'log',
+        title: '备份通知告警',
+        text: '[WARN] backup notification retry；列表页告警同窗。',
+      },
     ],
     timeline: '近两周逐渐恶化 ｜ 三周前上线"按最新排序"功能 ｜ 商品总量从 300 万涨到 500 万',
     impactHint: '只有一条 SQL 慢，还是整个库都慢？这两个答案通向完全不同的排查方向。',
@@ -189,7 +194,7 @@ export const slowQueryCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '服务器水位',
-        text: '同窗CPU35%、磁盘util45%、无swap；独立点查延迟稳定，增加索引的同负载对照消除该查询慢化。排除整体CPU/IO饱和是主因，但单独一个平均利用率不足以排除资源问题。',
+        text: '同窗CPU35%、磁盘util45%、无swap；独立点查延迟稳定，增加索引的同负载对照消除该查询慢化。排除整体CPU/IO饱和是主因，但单独一个平均利用率不足以排除资源问题。\n噪声收线：备份已结束，当前无备份读写；通知器重试只发外部webhook，同窗DB等待与访问计划未受它改变。',
       },
     },
     {
@@ -247,6 +252,22 @@ export const slowQueryCase: DiagnosisCase = {
         text: '经评审在低峰增加复合索引并观察锁、IO与回退条件；Online DDL也可能短暂等待元数据锁，不能承诺无阻塞或固定4分钟。\n本题同构对照P99为180ms，不代表所有500万行表的保证。新增索引还需评估写放大、空间和现有索引冗余。',
       },
     },
+    {
+      id: 'a-restart',
+      name: '立即重启MySQL期待慢查询消失',
+      desc: '【状态变更】未改查询/索引就重启数据库，增加业务中断与冷缓存风险',
+      cost: 9,
+      gain: 'none',
+      danger: true,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '重启分支',
+        text: '重启结束后相同SQL仍缺匹配索引，计划仍为ALL；还引入中断和缓冲池重新升温。状态变更不产生定位证据，不能拿短时排队消失当成索引问题已修。',
+      },
+    },
   ],
   rootCauses: [
     {
@@ -271,7 +292,7 @@ export const slowQueryCase: DiagnosisCase = {
     },
   ],
   expertCost: 6,
-  restartActionId: 'a-fixindex',
+  restartActionId: 'a-restart',
   expertChain: [
     {
       thought: '区分单查询和全库。',

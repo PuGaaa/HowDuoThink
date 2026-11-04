@@ -7,7 +7,7 @@ export const priorityClashCase: DiagnosisCase = {
   title: '配置中心改了三个月，连接池一直是 20',
   intro: '配置中心连续三次调大连接池，重启后却始终是20。运行值究竟来自哪个来源？',
   domain: 'deploy',
-  layer: '同一键多个来源时，优先级链决定最终事实——同键多源就是治理工单',
+  layer: '同键多源要标明用途及实际覆盖来源，迁移入口时审计遗留值',
   part: 'engineer',
   chapterId: 'config-boot',
   order: 4,
@@ -31,6 +31,11 @@ export const priorityClashCase: DiagnosisCase = {
         type: 'text',
         title: '回执的迷惑',
         text: '上次的 config-drift 整改装了 ACK 回执——回执证明"配置送到了应用"。\n但"送到"与"被采纳"是两回事：应用收到了 50，转身用了 20。',
+      },
+      {
+        type: 'log',
+        title: '审计上传失败',
+        text: '[WARN] config audit upload failed；与池容量变更同一分钟。',
       },
     ],
     timeline: '连接池配置半年前 K8s 迁移时写死在 Deployment env（POOL_SIZE=20）｜ 此后无人再看过它 ｜ 配置中心上线后成为"大家默认的配置入口"',
@@ -105,7 +110,7 @@ export const priorityClashCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '来源审计（/actuator/env）',
-        text: '当前实例Environment来源诊断（高→低）：systemEnvironment中的POOL_SIZE=20；本案Nacos PropertySource中pool.size=50；application.yml中pool.size=30。\n标准环境变量映射POOL_SIZE→pool.size；三次受控启动均显示相同来源顺序和origin，最终池容量20。不是Nacos在所有版本/接入方式下都低于环境变量。键名匹配，加载顺序确定。',
+        text: '当前实例Environment来源诊断（高→低）：systemEnvironment中的POOL_SIZE=20；本案Nacos PropertySource中pool.size=50；application.yml中pool.size=30。\n标准环境变量映射POOL_SIZE→pool.size；三次受控启动均显示相同来源顺序和origin，最终池容量20。不是Nacos在所有版本/接入方式下都低于环境变量。键名匹配，加载顺序确定。\n噪声收线：配置审计附件上传失败不改变PropertySources；本地受控来源诊断已完整生成并能重复取得相同origin。',
       },
     },
     {
@@ -196,7 +201,7 @@ export const priorityClashCase: DiagnosisCase = {
     {
       id: 'a-fixsingle',
       name: '修复：单一事实源清理',
-      desc: '【状态变更】pool.size 只留配置中心；环境变量与 yml 同键清除；基础设施层红线',
+      desc: '【状态变更】按本团队维护入口约定清理遗留POOL_SIZE覆盖',
       cost: 2,
       gain: 'high',
       danger: false,
@@ -222,13 +227,13 @@ export const priorityClashCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '审计制度',
-        text: '每周来源扫描：同键多源清单自动生成（各源值并列展示）→ 多源即工单限期清理。\n"同键多源"从隐形状态变成有账本的债务——优先级链上不再藏雷。',
+        text: '周期生成同键来源及最终origin清单；区分有意默认层与遗留覆盖，按团队维护约定处理，不把所有多源都自动判错。',
       },
     },
     {
       id: 'a-fixdoc',
       name: '沉淀：优先级链文档化',
-      desc: '【状态变更】Spring 配置优先级图进新人手册；"环境变量只放基础设施"红线写进规范',
+      desc: '【状态变更】记录当前版本的实际来源顺序及团队用途约定',
       cost: 1,
       gain: 'mid',
       danger: false,

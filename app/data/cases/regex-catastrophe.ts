@@ -32,6 +32,11 @@ export const regexCatastropheCase: DiagnosisCase = {
         title: '触发请求特征',
         text: '慢输入是大量连续ASCII字母a后接非法叹号，例如a重复4096次再加!；同长度且全为a的合法输入快速完成。原来的“限时！！！...”在默认Java \\w开头就失败，不能用来证明深回溯。',
       },
+      {
+        type: 'log',
+        title: '另一索引慢日志',
+        text: '[WARN] ES marketing_archive query 90ms；故障窗口内单独记录。',
+      },
     ],
     timeline: '批量导入新活动标识后暴露，校验模式长期未改；故障流量上涨40%；下列毫秒数据是本机受限复核，不是生产耗时保证。',
     impactHint: '模式、字符集和失败位置必须对上：开头就失败与长前缀后失败，回溯行为完全不同。',
@@ -101,7 +106,7 @@ export const regexCatastropheCase: DiagnosisCase = {
     {
       id: 'a-repro',
       name: '边界实验：耗时 vs 输入长度',
-      desc: '画指数曲线，钉死回溯',
+      desc: '受限运行实际JDK与失败后缀，记录样本，不从少量数据夸称指数阶',
       cost: 1,
       gain: 'high',
       danger: false,
@@ -157,7 +162,7 @@ export const regexCatastropheCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: 'ES 指标',
-        text: '同trace慢请求尚未发起ES调用，时间已耗在校验；独立ES查询P99约35ms。排除ES作为本次先行慢源。',
+        text: '同trace慢请求尚未发起ES调用，时间已耗在校验；独立ES查询P99约35ms。排除ES作为本次先行慢源。\n噪声收线：该慢日志属于另一索引的归档查询；本次慢trace根本没发起ES请求，前置校验的CPU时间不能由这条90ms日志解释。',
       },
     },
     {
@@ -202,7 +207,7 @@ export const regexCatastropheCase: DiagnosisCase = {
     {
       id: 'a-fixregex',
       name: '修复：重写校验 + 长度上限 + 执行超时',
-      desc: '【状态变更】线性匹配器重写 + 输入长度上限 200 + 正则执行可中断',
+      desc: '【状态变更】等价线性校验与业务长度边界；验证可终止执行边界',
       cost: 2,
       gain: 'high',
       danger: false,
@@ -234,7 +239,7 @@ export const regexCatastropheCase: DiagnosisCase = {
     {
       id: 'a-fixfuzz',
       name: '沉淀：正则模糊测试进 CI',
-      desc: '【状态变更】对校验类正则注入随机特殊字符，执行耗时断言 < 10ms',
+      desc: '【状态变更】对抗输入与正常语义同时复验，记录JDK版本和采样限制',
       cost: 1,
       gain: 'mid',
       danger: false,

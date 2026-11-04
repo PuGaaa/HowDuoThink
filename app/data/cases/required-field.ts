@@ -31,6 +31,11 @@ export const requiredFieldCase: DiagnosisCase = {
         title: '变更记录',
         text: '本次需求：渠道归因分析需要 channelSource 字段（记录下单来源渠道）。\n开发在请求 DTO 上加了 @NotNull——"反正新功能要用，就必填吧"。服务端昨天上线。',
       },
+      {
+        type: 'log',
+        title: '遥测上传告警',
+        text: '[WARN] mobile telemetry upload 503；客服同时报告。',
+      },
     ],
     timeline: '服务端昨天 20:00 上线 ｜ 21:00 起老版 App 用户下单失败潮 ｜ 老 App 版本轮：用户不主动升级则长期停留 ｜ 教学流量 中 75% 为老版本',
     impactHint: '新客户端全好、老客户端全坏——服务端"加"了什么，让"没变"的请求变得不合法？',
@@ -122,7 +127,7 @@ export const requiredFieldCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '网关核对',
-        text: '同一旧请求在网关入口与服务端入口body校验和相同，路由一致；TLS握手完成，400由服务端校验器产生，排除网关转换和证书失败。',
+        text: '同一旧请求在网关入口与服务端入口body校验和相同，路由一致；TLS握手完成，400由服务端校验器产生，排除网关转换和证书失败。\n噪声收线：遥测走独立域名且可重试；本次下单请求已到服务端并由字段校验器返回400，body和TLS证据不受遥测上传影响。',
       },
     },
     {

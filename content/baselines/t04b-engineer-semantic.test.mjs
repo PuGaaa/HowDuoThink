@@ -104,3 +104,7 @@ test('端口题同元组不超过范围，HPA按requests且readiness不直接重
 test('级联超时等待重叠，不把四层30秒相加；正则不承诺线程中断',()=>{
  assert.equal(1000*.05*5,250);const c=load('app/data/cases/cascade-timeout.ts');assert.match(c.scene.symptoms[1].text,/不能.*相加.*120s/);const regex=load('app/data/cases/regex-catastrophe.ts');assert.match(regex.actions.find(a=>a.id==='a-flamegraph').result.text,/\^\(a\+\)\+\$/);assert.match(regex.actions.find(a=>a.id==='a-fixregex').result.text,/Future.get超时也不代表匹配线程停下/)
 })
+test('29题全部完成，噪声在两条可玩路径中均能收线，L1保持入门豁免',()=>{
+ assert.equal(baseline.cases.filter(r=>r.status==='calibrated').length,29)
+ for(const r of baseline.cases){const c=load(r.file);assert.ok(r.dimensionEvidence.every(e=>e.includes('原文依据')));if(c.difficulty===1){assert.equal(r.noise,null);continue}assert.ok(r.noise);assert.ok(c.scene.symptoms.some(s=>s.title===r.noise.title&&s.text===r.noise.text));assert.ok(c.actions.find(a=>a.id===r.noise.closeActionId).result.text.includes(r.noise.closure));for(const p of r.paths)assert.ok(p.actions.includes(r.noise.closeActionId),`${r.id} ${p.name} 未收线`)}
+})

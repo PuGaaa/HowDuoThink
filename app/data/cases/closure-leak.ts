@@ -31,6 +31,11 @@ export const closureLeakCase: DiagnosisCase = {
         title: '时间线核对',
         text: '修复版本 v2.4.1 一直未变（无发布）。\n昨天 14:00 的变更是：运营后台上线了"订单导出批量标注"功能（调用本服务的接口频率 ×50）。',
       },
+      {
+        type: 'log',
+        title: '归档投递重试',
+        text: '[WARN] log archive retry=1；监听器告警附近还有此条。',
+      },
     ],
     timeline: '上次 OOM 修复后稳定 40 天 ｜ 昨天 14:00 运营上线批量标注功能 ｜ 泄漏速率：每小时约 37MB',
     impactHint: '无发布也会因已有路径被更高频调用而暴露；先确认增长对象和调用关系。',
@@ -217,13 +222,13 @@ export const closureLeakCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '内存构成对比',
-        text: 'process.memoryUsage中external和arrayBuffers近似稳定；完整GC后heapUsed增加，快照增长与listener→context引用链同量级。排除与JS引用无关的独立native/Buffer增长，本案上下文不是4MiB Buffer。',
+        text: 'process.memoryUsage中external和arrayBuffers近似稳定；完整GC后heapUsed增加，快照增长与listener→context引用链同量级。排除与JS引用无关的独立native/Buffer增长，本案上下文不是4MiB Buffer。\n噪声收线：归档队列与保留体积稳定，未出现在新增引用链中；增长是listener捕获的JS context，external/arrayBuffers没有同步增加。',
       },
     },
     {
       id: 'a-fix',
       name: '监听器改请求级并加移除',
-      desc: '【状态变更】on→once + 请求结束 removeListener，修复重复推送',
+      desc: '【状态变更】移除不必要全局监听；确需事件时明确请求关联与清理生命周期',
       cost: 2,
       gain: 'high',
       danger: false,

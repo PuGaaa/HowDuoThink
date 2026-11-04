@@ -31,6 +31,11 @@ export const docDriftCase: DiagnosisCase = {
         title: '双方立场',
         text: '合作方："文档就这么写的，我按文档对接。"\n内部开发："接口早就改了，文档是老的。"\n文档站显示"最后更新：三个月前"——代码此后发布了 4 个版本。',
       },
+      {
+        type: 'log',
+        title: '文档静态资源告警',
+        text: '[WARN] docs favicon.ico 404；合作方浏览文档时出现。',
+      },
     ],
     timeline: '文档三个月前生成 ｜ 代码 4 次变更均未更新注解 ｜ 合作方对接窗口本周截止（上线排期卡死）',
     impactHint: '文档与实现打架——但"文档错"只是结论，要紧的是：漂了 4 次没人发现，机制上少装了什么报警器？',
@@ -77,7 +82,7 @@ export const docDriftCase: DiagnosisCase = {
     {
       id: 'a-docvscode',
       name: '逐字段裁决：文档 vs 实现序列化结果',
-      desc: '拿真实响应当裁判——文档与代码各执一词时，序列化结果是唯一事实',
+      desc: '对比同版本DTO、运行输出与已发布承诺，追踪文档构建产物',
       cost: 2,
       gain: 'high',
       danger: false,
@@ -122,7 +127,7 @@ export const docDriftCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '版本核对',
-        text: '合作方引用该路径当前公开文档；请求URL、版本头、部署接口均为v1。文档artifact仍为三个月前版本，不是合作方自行选错v2/v1。',
+        text: '合作方引用该路径当前公开文档；请求URL、版本头、部署接口均为v1。文档artifact仍为三个月前版本，不是合作方自行选错v2/v1。\n噪声收线：favicon是页面图标，schema JSON下载成功且校验和稳定；图标404不改变字段类型或文档版本。',
       },
     },
     {
@@ -145,7 +150,7 @@ export const docDriftCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '序列化核对',
-        text: '全局 ObjectMapper 配置 8 个月未动；实现响应与代码 DTO 逐字段一致。\n→ 排除序列化冲突：实现忠实于代码，代码忠实于业务——只有文档掉队。',
+        text: '同一版本DTO字段和序列化响应一致，没有定制ObjectMapper改写。这里只排除序列化偏离DTO，不能据此宣称DTO一定符合对外业务承诺。',
       },
     },
     {
@@ -206,7 +211,7 @@ export const docDriftCase: DiagnosisCase = {
     {
       id: 'a-fixmock',
       name: '沉淀：文档即 mock 服务',
-      desc: '【状态变更】按 schema 自动生成 mock 端点供合作方联调——文档错了，mock 也错，互相暴露',
+      desc: '【状态变更】schema mock供联调，再与真实实现做独立契约校验',
       cost: 1,
       gain: 'mid',
       danger: false,

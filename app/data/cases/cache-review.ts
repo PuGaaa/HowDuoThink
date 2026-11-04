@@ -31,6 +31,11 @@ export const cacheReviewCase: DiagnosisCase = {
         title: '现网事实',
         text: '业务要求促销改价一分钟内生效，结算必须使用当前有效价格；这是本次发布的明确验收条件。去年改价投诉作为教学背景，不是本题已验证生产事实。',
       },
+      {
+        type: 'log',
+        title: '推荐位缓存告警',
+        text: '[WARN] recommendation banner cache miss；评审样例还记录此条。',
+      },
     ],
     timeline: '方案评审明天举行 ｜ 双 11 预热 11 天后开始 ｜ 去年大促出现过价格投诉与一次临时救火',
     impactHint: '这不是故障排查——是在故障发生之前，把种子找出来。最值钱的问句是："什么情况下这个设计会出事？"',
@@ -99,7 +104,7 @@ export const cacheReviewCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '下单链路代码',
-        text: '方案结算代码直接读取sku缓存price并charge，无有效价版本校验。教学样例：t0价格100，t1运营改DB为80，缓存仍100且到t0+30min才到期；t1+2min低流量订单仍按100收费。\n该路径违反当前有效价成交和一分钟展示时效；是否最终产生资损还取决于促销方向和赔付口径，不预先编金额。',
+        text: '方案结算代码直接读取sku缓存price并charge，无有效价版本校验。教学样例：t0价格100，t1运营改DB为80，缓存仍100且到t0+30min才到期；t1+2min低流量订单仍按100收费。\n该路径违反当前有效价成交和一分钟展示时效；是否最终产生资损还取决于促销方向和赔付口径，不预先编金额。\n噪声收线：推荐位使用独立key，不进入sku.price或结算charge；本例低流量且价格命中旧值，推荐位miss不改变收费100的路径。',
       },
     },
     {

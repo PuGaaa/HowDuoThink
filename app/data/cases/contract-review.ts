@@ -32,6 +32,11 @@ export const contractReviewCase: DiagnosisCase = {
         title: '教学事故档案',
         text: 'api-sunset：v2 下线邮件通知，2,987 单投诉（全口径盲区）\nrequired-field：请求加必填字段，老 App 全体 400（兼容铁律）\nenum-drift：重构对调枚举语义，1,204 单错误路由（语义级样例验证缺失）\ndoc-drift：文档漂移三个月，对接失败（文档与实现无对账）',
       },
+      {
+        type: 'log',
+        title: '评审附件告警',
+        text: '[WARN] appendix diagram preview unavailable；评审页附件预览失败。',
+      },
     ],
     timeline: '规范评审明天终审 ｜ 通过后立即生效于全部对外接口 ｜ 五板块：版本/废弃/错误码/限流/兼容',
     impactHint: '四份教学档案用来检验条款能否执行，并不声称它们是真实原始事故。',
@@ -72,7 +77,7 @@ export const contractReviewCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '判据确立',
-        text: '规范的价值不是"写得全"，是"拦得住"——判据：每条条款能否拦截一次已发生的事故？\n对照表：①版本策略 ↔ 契约破坏类　②废弃流程 ↔ api-sunset　③错误码 ↔ enum-drift/doc-drift\n④限流 ↔ rate-limit-passthrough　⑤兼容 ↔ required-field/mixversion\n→ 五板块五道关，逐一拷问。',
+        text: '规范的价值不是"写得全"，是"拦得住"——判据：每条条款能否拦截一次已发生的事故？\n对照表：①版本策略 ↔ 契约破坏类　②废弃流程 ↔ api-sunset　③错误码 ↔ enum-drift/doc-drift\n④限流 ↔ rate-limit-passthrough　⑤兼容 ↔ required-field/mixversion\n→ 五板块五道关，逐一拷问。\n噪声收线：正文五项条款的原始文本均已取得并确认，缺失的只是布局示意图，不改变本题条款内容或执行门槛。',
       },
     },
     {
@@ -212,7 +217,7 @@ export const contractReviewCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '批准结果',
-        text: '规范原样生效。三个月后："尽量兼容"的重演、邮件废弃的投诉、一刀切限流的误伤——\n你批准的不是规范，是四起事故的重播授权。',
+        text: '按原稿批准会留下当前已证实的门禁缺口；后续事故类型和数量取决于实际变更，不能承诺三个月必然重演四起事故。',
       },
     },
     {
@@ -228,7 +233,7 @@ export const contractReviewCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '否决结果（陷阱动作）',
-        text: '规范作废——版本策略、三段式错误码这些"好的部分"一并归零，团队从零重写三个月。\n→ 复盘点评：五板块四个方向正确，否决整包是评审的另一种失职。',
+        text: '整体重写可能延长治理空窗并丢失现有可用结构；没有数据承诺一定耗时三个月。优先按已确认缺口开出可验收修正清单。',
       },
     },
   ],
@@ -311,7 +316,7 @@ export const contractReviewCase: DiagnosisCase = {
     },
     {
       text: '评审的产出是修正清单，不是否决票：五板块四个方向正确——把好的框架连同缺陷一起否掉，是评审的另一种失职。',
-      principle: '产品思维：契约规范的评审与 cache-review 同构——收益由作者论证、风险由评审证明、结论落在"有条件通过 + 阻断项清单"。方向正确的框架值得补强：否决整包 = 团队从零重写 = 学费白交。',
+      principle: '框架可保留与缺陷需修正可以同时成立。评审结果给出必改项、验证者和通过标准；是否重写由缺口范围决定，不以未经核实的重写三个月作为论据。',
     },
   ],
 }

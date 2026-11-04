@@ -7,7 +7,7 @@ export const deepPaginationCase: DiagnosisCase = {
   title: '翻到第4501页，数据库开始吃力',
   intro: '每页20条的列表，深翻到4501页时变慢。分开分页数据查询、总数查询与整体接口耗时，再核对访问量。',
   domain: 'data',
-  layer: 'OFFSET 的代价是扫过并丢弃——游标分页让每页代价恒定',
+  layer: '索引有序访问仍需支付OFFSET跳过成本，keyset需匹配排序与过滤',
   part: 'engineer',
   chapterId: 'data',
   order: 10,
@@ -31,6 +31,11 @@ export const deepPaginationCase: DiagnosisCase = {
         type: 'text',
         title: '体验侧',
         text: '仅数据查询：第1页60ms、第100页190ms、第500页720ms、第4501页6s；计数另耗时1.2s，所以整体接口第1页约1.26s、深页约7.2s。',
+      },
+      {
+        type: 'log',
+        title: '导出附件重试',
+        text: '[WARN] CSV attachment upload retry；客服后台同时显示。',
       },
     ],
     timeline: '列表页上线一年 ｜ 大促后运营集中清理历史工单，深页查询量激增 ｜ CPU 告警今天触发',
@@ -169,7 +174,7 @@ export const deepPaginationCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '计数核对',
-        text: 'trace分段：COUNT各页约1.2s且独立执行，数据SQL从60ms增到6s。关闭COUNT后深页数据SQL仍6s，故COUNT不是深度相关增长的全部原因；它是需要另行优化的固定开销。',
+        text: 'trace分段：COUNT各页约1.2s且独立执行，数据SQL从60ms增到6s。关闭COUNT后深页数据SQL仍6s，故COUNT不是深度相关增长的全部原因；它是需要另行优化的固定开销。\n噪声收线：上传的是已生成的另一份CSV，不执行本列表查询；分页和COUNT trace已独立分段，深度开销在无该上传时仍可复现。',
       },
     },
     {
@@ -207,7 +212,7 @@ export const deepPaginationCase: DiagnosisCase = {
     {
       id: 'a-fixjump',
       name: '沉淀：与产品共创"跳页"替代方案',
-      desc: '【状态变更】"任意跳页"改为"日期筛选 + 游标"：精确到天定位历史订单，恒定代价',
+      desc: '【状态变更】先核实检索与随机跳页需求，再评估筛选和游标方案',
       cost: 1,
       gain: 'mid',
       danger: false,
