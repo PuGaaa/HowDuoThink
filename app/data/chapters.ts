@@ -1,12 +1,10 @@
-/** 篇-章-关三级内容架构。
- *  篇 = 学习阶段（三篇）；章 = 层的契约（可无限加，6~12 关封顶）；
- *  关 = 案例（带 part/typeTags/order），章内容按 layerKey 动态聚合——加第 101 关只需打标，不改本章。 */
-import { ALL_CASES, MAINLINE_CASE_IDS, TRIAL_CASE_IDS } from './cases'
+/** 篇-章-关目录：必修与挑战关按冻结课程管理，新题默认进入章内选做。 */
+import { CASE_CATALOG, getEffectiveCases, MAINLINE_CASE_IDS, TRIAL_CASE_IDS } from './cases'
+import { COURSE_CASE_IDS, LEGACY_CASE_CATALOG } from './course'
 import { DiagnosisCase } from '../types/case'
-import { getCaseProgress } from '../utils/storage'
+import { getCaseProgress, getUnlockedChapterIds, rememberUnlockedChapterIds, progressStorageGet, progressStorageSet } from '../utils/storage'
 import { getRemoteCases } from '../utils/sync'
 import { isLoggedIn } from '../utils/auth'
-import { getGuestFreeChapter, getGuestFreeLevels } from '../utils/app-config'
 
 export interface PartDef {
   id: string
@@ -49,32 +47,20 @@ export const CHAPTERS: ChapterDef[] = [
 
 export { MAINLINE_CASE_IDS, TRIAL_CASE_IDS }
 
-/** 章内关卡：按 chapterId 动态聚合 + order 排序；本地与远端（casepack）合并，按 id 去重 */
+/** 章内先展示冻结主线，再展示选做；所有入口采用同一有效题目修订。 */
 export function casesInChapter(chapterId: string): DiagnosisCase[] {
-  const merged: DiagnosisCase[] = []
-  const seen: string[] = []
-  const push = (c: DiagnosisCase) => {
-    if (seen.indexOf(c.id) < 0) {
-      seen.push(c.id)
-      merged.push(c)
-    }
-  }
-  for (let i = 0; i < ALL_CASES.length; i++) {
-    if (ALL_CASES[i].chapterId === chapterId) push(ALL_CASES[i])
-  }
-  const remote = getRemoteCases()
-  for (let i = 0; i < remote.length; i++) {
-    const c = remote[i]
-    if (c != null && c.chapterId === chapterId && seen.indexOf(c.id) < 0) push(c)
-  }
+  const merged = getEffectiveCases().filter((c) => c.chapterId === chapterId)
   return merged.sort((a, b) => {
-    const aMainline = MAINLINE_CASE_IDS.indexOf(a.id as (typeof MAINLINE_CASE_IDS)[number])
-    const bMainline = MAINLINE_CASE_IDS.indexOf(b.id as (typeof MAINLINE_CASE_IDS)[number])
+    const aMainline = MAINLINE_CASE_IDS.indexOf(a.id)
+    const bMainline = MAINLINE_CASE_IDS.indexOf(b.id)
     if (aMainline >= 0 || bMainline >= 0) {
       if (aMainline < 0) return 1
       if (bMainline < 0) return -1
       return aMainline - bMainline
     }
+    const aCommunity = CASE_CATALOG[a.id] == null && a.sourceType !== 'official'
+    const bCommunity = CASE_CATALOG[b.id] == null && b.sourceType !== 'official'
+    if (aCommunity !== bCommunity) return aCommunity ? 1 : -1
     return a.order - b.order
   })
 }
@@ -84,17 +70,28 @@ export function chaptersInPart(partId: string): ChapterDef[] {
   return CHAPTERS.filter((c) => c.part === partId)
 }
 
-// —— 解锁：游客留存门禁 + 进度解锁 ————————————————
-// 游客（未登录）：仅开放学徒篇第 1 章前 N 关，其余章节/关卡引导登录（utils/login-guide.ts）。
-// 已登录：沿用进度规则——每篇第 1 章恒开（编号按篇起算，篇首即入口）；
-//   章解锁 = 前一章全部通关 ∥ 本章跳级挑战已通关；跳级挑战 = 锁定章的 order 最小关恒可玩，
-//   通关即解锁本章。全部从 solved 进度派生，无独立存储。
+const KEY_LEGACY_CAPTURED = 'think_course_20261104_captured'
 
-// 游客免费章 / 免费关数：管理端「系统设置」下发（utils/app-config），拉取失败退内置默认
-
-/** 目标关是否在游客免费范围（rankInChapter = casesInChapter 升序中的下标） */
-function inGuestFreeScope(chapterId: string, rankInChapter: number): boolean {
-  return chapterId === getGuestFreeChapter() && rankInChapter < getGuestFreeLevels()
+/** 在切换身份或覆盖旧 casepack 前调用；仅按迁移时可证明的旧规则保留资格。 */
+export function preserveLegacyChapterUnlocks(): void {
+  if (progressStorageGet(KEY_LEGACY_CAPTURED) === '1') return
+  const oldCases = LEGACY_CASE_CATALOG.slice()
+  for (const item of getRemoteCases()) {
+    if (!oldCases.some((c) => c.id === item.id)) oldCases.push({ id: item.id, chapterId: item.chapterId, order: item.order })
+  }
+  const unlocked: string[] = []
+  for (const part of PARTS) {
+    const chapters = chaptersInPart(part.id)
+    for (let i = 0; i < chapters.length; i++) {
+      const current = oldCases.filter((c) => c.chapterId === chapters[i].id).sort((a, b) => a.order - b.order)
+      const challenge = current.length > 0 ? getCaseProgress(current[0].id) : null
+      const previous = i > 0 ? oldCases.filter((c) => c.chapterId === chapters[i - 1].id) : []
+      const completed = previous.length > 0 && previous.every((c) => getCaseProgress(c.id)?.solved === true)
+      if (i === 0 || challenge?.solved === true || completed) unlocked.push(chapters[i].id)
+    }
+  }
+  progressStorageSet(KEY_LEGACY_CAPTURED, '1')
+  rememberUnlockedChapterIds(unlocked)
 }
 
 /** 章内已破案数（本地 + 远端 casepack） */
@@ -130,9 +127,9 @@ export function chapterIndexInPart(chapterId: string): number {
 /** 锁定提示语（章页 toast / 首页弹窗共用）；游客态引导登录 */
 export function chapterUnlockHint(chapterId: string): string {
   if (!isLoggedIn()) {
-    return chapterId === getGuestFreeChapter() ? '登录后解锁本关' : '登录后解锁本章，继续侦探之旅'
+    return '登录保存破案记录，按学习顺序继续或参加跳级挑战'
   }
-  return '通关上一章全部关卡，解锁本章'
+  return '通关上一章主线关卡，或通过本章跳级挑战'
 }
 
 /** 本章跳级挑战关是否已通关（跳级承诺：赢了立即解锁本章） */
@@ -143,13 +140,11 @@ function challengeSolved(chapterId: string): boolean {
   return p != null && p.solved
 }
 
-/** 章全部通关（每关都已破案） */
+/** 冻结必修全部通过即完成；新题、选做题和远端排序不扩大要求。 */
 export function chapterCompleted(chapterId: string): boolean {
-  const list = casesInChapter(chapterId).filter((c) => MAINLINE_CASE_IDS.indexOf(c.id as (typeof MAINLINE_CASE_IDS)[number]) >= 0)
-  const required = list.length > 0 ? list : casesInChapter(chapterId)
-  if (required.length === 0) return false
+  const required = COURSE_CASE_IDS[chapterId]
   for (let i = 0; i < required.length; i++) {
-    const p = getCaseProgress(required[i].id)
+    const p = getCaseProgress(required[i])
     if (p == null || !p.solved) return false
   }
   return true
@@ -157,29 +152,29 @@ export function chapterCompleted(chapterId: string): boolean {
 
 /** 章解锁：游客 = 仅免费章；已登录 = 每篇第 1 章恒开 ∥ 本章跳级挑战已通关 ∥ 前一章全部通关 */
 export function isChapterUnlocked(chapterId: string): boolean {
-  if (!isLoggedIn()) return chapterId === getGuestFreeChapter()
+  preserveLegacyChapterUnlocks()
+  if (!isLoggedIn()) return chapterId === 'error-reading'
+  if (getUnlockedChapterIds().indexOf(chapterId) >= 0) return true
   const idx = chapterIndexInPart(chapterId)
-  if (idx <= 0) return true
-  if (challengeSolved(chapterId)) return true
   const list = chaptersInPart(chapterPartId(chapterId))
-  return chapterCompleted(list[idx - 1].id)
+  const unlocked = idx === 0 || challengeSolved(chapterId) || chapterCompleted(list[idx - 1].id)
+  if (unlocked) rememberUnlockedChapterIds([chapterId])
+  return unlocked
 }
 
-/** 章的跳级挑战关：order 最小（casesInChapter 已按 order 升序，取首关） */
+/** 跳级挑战固定为冻结目录首关，不被新题或重排序改变。 */
 export function chapterChallengeCaseId(chapterId: string): string {
-  const mainline = casesInChapter(chapterId).filter((c) => MAINLINE_CASE_IDS.indexOf(c.id as (typeof MAINLINE_CASE_IDS)[number]) >= 0)
-  const list = mainline.length > 0 ? mainline : casesInChapter(chapterId)
-  return list.length > 0 ? list[0].id : ''
+  return COURSE_CASE_IDS[chapterId][0]
 }
 
 /** 关可玩：游客 = 免费章前 N 关；已登录 = 所在章已解锁 ∥ 是本章挑战关。
  *  未知关返回 false（play 页另有"案例不存在"兜底） */
 export function isCasePlayable(caseId: string): boolean {
+  if (!isLoggedIn()) return TRIAL_CASE_IDS.indexOf(caseId as (typeof TRIAL_CASE_IDS)[number]) >= 0
   for (let i = 0; i < CHAPTERS.length; i++) {
     const cases = casesInChapter(CHAPTERS[i].id)
     for (let j = 0; j < cases.length; j++) {
       if (cases[j].id === caseId) {
-        if (!isLoggedIn()) return inGuestFreeScope(CHAPTERS[i].id, j)
         if (isChapterUnlocked(CHAPTERS[i].id)) return true
         return chapterChallengeCaseId(CHAPTERS[i].id) === caseId
       }

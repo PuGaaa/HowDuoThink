@@ -12,12 +12,13 @@
           <text class="hero__name">{{ ch.name }}</text>
         </view>
         <text class="hero__pact">层契约：{{ ch.pact }}</text>
-        <text class="hero__meta">进度 {{ solvedInChapter }}/{{ totalInChapter }} · 收集检查单 {{ lessonCount }} 条</text>
+        <text class="hero__meta">主线进度 {{ solvedInChapter }}/{{ totalInChapter }} · 检查单 {{ lessonCount }} 条</text>
       </view>
 
       <!-- 关卡路径 -->
       <view v-for="(node, i) in nodes" :key="node.id" class="nodewrap">
-        <view v-if="i > 0" class="conn"></view>
+        <text v-if="i === 0 || node.section !== nodes[i - 1].section" class="section-title">{{ node.section }}</text>
+        <view v-else class="conn"></view>
         <view :class="node.playable ? 'node node--live' : 'node'" @click="openCase(node)">
           <view :class="node.playable ? 'node__icon node__icon--live' : 'node__icon'">
             <image v-if="node.playable" class="node__bolt" src="/static/icons/bolt-white.png" mode="aspectFit"></image>
@@ -45,7 +46,7 @@ import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { CHAPTERS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId, chapterUnlockHint } from '../../data/chapters'
-import { ALL_CASES, getCaseById } from '../../data/cases'
+import { CASE_CATALOG, MAINLINE_CASE_IDS } from '../../data/cases'
 import { getCaseProgress } from '../../utils/storage'
 import { starsLabel } from '../../utils/scoring'
 import { isLoggedIn } from '../../utils/auth'
@@ -63,6 +64,7 @@ class NodeVM {
   /** 玩过未破（失败留痕：地图"未破"标 + 重练引导） */
   failed: boolean = false
   fails: number = 0
+  section: string = ''
 }
 
 const ch = ref(CHAPTERS[0])
@@ -90,11 +92,15 @@ onLoad((query : OnLoadOptions) => {
     const vm = new NodeVM()
     vm.id = c.id
     vm.title = c.title
+    const mainline = MAINLINE_CASE_IDS.indexOf(c.id) >= 0
+    const official = CASE_CATALOG[c.id] != null || c.sourceType === 'official'
+    vm.section = mainline ? '主线训练' : official ? '更多练习 · 选做' : '社区实战 · 选做'
     vm.live = true
     vm.playable = isCasePlayable(c.id)
     vm.challenge = !chapterOpen && isLoggedIn() && c.id === challengeId
     const p = getCaseProgress(c.id)
     const best = p != null && p.bestGrade.length > 0 ? p.bestGrade : ''
+    const difficulty = ['', '★ 入门', '★★ 标准', '★★★ 挑战'][c.difficulty]
     vm.stars = starsLabel(best)
     if (p != null && !p.solved && p.fails > 0) {
       vm.failed = true
@@ -103,16 +109,16 @@ onLoad((query : OnLoadOptions) => {
     if (vm.challenge) {
       vm.meta = '跳级挑战 · 赢了立即解锁本章 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
     } else if (vm.failed) {
-      vm.meta = '★★ 标准 · 失败 ' + vm.fails + ' 次 · 点此重练'
+      vm.meta = difficulty + ' · 失败 ' + vm.fails + ' 次 · 点此重练'
     } else {
-      vm.meta = '★★ 标准 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
+      vm.meta = difficulty + ' · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
     }
-    if (p != null && p.solved) solved++
+    if (mainline && p != null && p.solved) solved++
     list.push(vm)
   }
   nodes.value = list
   solvedInChapter.value = solved
-  totalInChapter.value = list_cases.length
+  totalInChapter.value = list_cases.filter((c) => MAINLINE_CASE_IDS.indexOf(c.id) >= 0).length
   // 章内检查单总数（Figma hero 进度行）
   let lessons = 0
   for (let i = 0; i < list_cases.length; i++) {
@@ -129,7 +135,7 @@ function openCase(node: NodeVM) {
   // 实时判可玩（登录返回等场景下 vm.playable 可能是旧快照）
   if (!isCasePlayable(node.id)) {
     if (!isLoggedIn()) {
-      openGuestLoginDialog()
+      openGuestLoginDialog(node.id)
       return
     }
     uni.showToast({ title: chapterUnlockHint(ch.value.id), icon: 'none' })
@@ -209,6 +215,13 @@ function openCase(node: NodeVM) {
   border-left-width: 3rpx;
   border-left-style: dashed;
   border-left-color: #FFB5C8;
+}
+.section-title {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #7A7290;
+  margin-top: 16rpx;
+  margin-bottom: 18rpx;
 }
 .node__tailpad {
   height: 6rpx;

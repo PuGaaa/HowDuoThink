@@ -1,8 +1,9 @@
 /** Web 社区同步：拉取 casepack（已发布关卡包），本地校验后落 storage。
  *  增量：带本地版本号 since 只拉 delta，按 id 并入已存整包；
- *  远端关由 chapters.ts 按章节聚合、getCaseById 兜底取用（本地关同 id 优先）。 */
+ *  所有入口经 getEffectiveCases 按内容修订合并；发布游标只决定增量范围。 */
 import { API_BASE } from '../config'
 import { DiagnosisCase } from '../types/case'
+import { preserveLegacyChapterUnlocks } from '../data/chapters'
 
 export interface SyncResult {
   version: number
@@ -51,6 +52,7 @@ export function getPackCount(): number {
 }
 
 export function fetchCasepack(cb: (r: SyncResult) => void) {
+  preserveLegacyChapterUnlocks()
   uni.request({
     url: API_BASE + '/api/casepack?since=' + getPackVersion(),
     method: 'GET',
@@ -60,6 +62,10 @@ export function fetchCasepack(cb: (r: SyncResult) => void) {
         const data = res.data as { version: number, count: number, cases: any[] }
         if (data == null || data.version == null || !Array.isArray(data.cases)) {
           cb({ version: 0, count: 0, error: '数据格式异常' })
+          return
+        }
+        if (data.version < getPackVersion()) {
+          cb({ version: getPackVersion(), count: getPackCount(), error: '' })
           return
         }
         // 最小字段校验（App 端防丢字段第二道门）
@@ -75,7 +81,8 @@ export function fetchCasepack(cb: (r: SyncResult) => void) {
           if (c != null && c.id) mergedMap.set(c.id, c)
         }
         for (const c of data.cases) {
-          mergedMap.set(c.id, c)
+          const previous = mergedMap.get(c.id)
+          if (previous == null || (c.contentRevision ?? 1) > (previous.contentRevision ?? 1)) mergedMap.set(c.id, c)
         }
         const merged = [...mergedMap.values()]
         uni.setStorageSync(KEY_PACK, JSON.stringify(merged))
