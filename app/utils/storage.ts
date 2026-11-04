@@ -120,9 +120,10 @@ export function confirmProgressOperations(ids: string[]): void {
 export function clearProgressLocal(): void {
   const info = uni.getStorageInfoSync()
   const prefix = 'think_progress_' + progressIdentity() + '_'
+  const legacyKeys = ['think_session_v1', 'think_mascots_v1', 'think_streak_v1', 'think_tasks_v1', 'think_progress_ops_v1', 'think_daily_done_v1', 'think_checkuse_v1', 'think_solved_layers_v1', 'think_unlocked_chapters_v1']
   for (let i = 0; i < info.keys.length; i++) {
     const key = info.keys[i]
-    if (key.indexOf(prefix) === 0) {
+    if (key.indexOf(prefix) === 0 || (progressIdentity() === 'guest' && (key.indexOf('think_case_') === 0 || legacyKeys.indexOf(key) >= 0))) {
       uni.removeStorageSync(key)
     }
   }
@@ -153,6 +154,7 @@ export interface ProgressBundle {
   dailyDone: string
   checkuse: number
   solvedLayers: string[]
+  unlockedChapterIds: string[]
 }
 
 /** 导出本地全量进度（登录态上传用） */
@@ -178,6 +180,7 @@ export function exportProgressBundle(): ProgressBundle {
     dailyDone: progressStorageGet('think_daily_done_v1') as string ?? '',
     checkuse: getChecklistUse(),
     solvedLayers: progressStorageGet(KEY_SOLVED_LAYERS) == null ? [] : JSON.parse(progressStorageGet(KEY_SOLVED_LAYERS) as string) as string[],
+    unlockedChapterIds: getUnlockedChapterIds(),
   }
   return b
 }
@@ -193,6 +196,7 @@ export function importProgressBundle(b: ProgressBundle) {
   progressStorageSet('think_daily_done_v1', b.dailyDone ?? '')
   progressStorageSet('think_checkuse_v1', String(b.checkuse ?? 0))
   progressStorageSet(KEY_SOLVED_LAYERS, JSON.stringify(b.solvedLayers ?? []))
+  progressStorageSet(KEY_UNLOCKED_CHAPTERS, JSON.stringify(b.unlockedChapterIds ?? []))
 }
 
 export function getCaseProgress(caseId: string): CaseProgress | null {
@@ -223,13 +227,13 @@ export function saveSession(record: SessionRecord): void {
   // 合并案例进度
   const key = KEY_CASE + record.caseId
   let bestGrade = record.grade
-  let bestCost = record.playerCost
+  let bestCost = record.solved ? record.playerCost : 0
   const prev = getCaseProgress(record.caseId)
   if (prev != null) {
     if (prev.bestGrade === 'S' || (record.grade !== 'S' && gradeRank(prev.bestGrade) <= gradeRank(record.grade))) {
       bestGrade = prev.bestGrade
     }
-    if (prev.bestCost > 0 && (bestCost === 0 || prev.bestCost < bestCost)) {
+    if (prev.solved && (!record.solved || prev.bestCost < bestCost)) {
       bestCost = prev.bestCost
     }
   }
@@ -435,6 +439,7 @@ export interface TaskProgress {
 
 const KEY_TASKS = 'think_tasks_v1'
 const KEY_SOLVED_LAYERS = 'think_solved_layers_v1'
+const KEY_UNLOCKED_CHAPTERS = 'think_unlocked_chapters_v1'
 
 function dayStr(d: Date): string {
   const m = d.getMonth() + 1
@@ -497,6 +502,26 @@ export function recordSolvedLayer(layer: string): boolean {
   layers.push(layer)
   progressStorageSet(KEY_SOLVED_LAYERS, JSON.stringify(layers))
   return true
+}
+
+export function getUnlockedChapterIds(): string[] {
+  const raw = progressStorageGet(KEY_UNLOCKED_CHAPTERS)
+  return raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as string[]
+}
+
+export function rememberUnlockedChapterIds(ids: string[]): void {
+  const current = getUnlockedChapterIds()
+  const added: string[] = []
+  for (let i = 0; i < ids.length; i++) {
+    if (current.indexOf(ids[i]) < 0) {
+      current.push(ids[i])
+      added.push(ids[i])
+    }
+  }
+  if (added.length === 0) return
+  progressStorageSet(KEY_UNLOCKED_CHAPTERS, JSON.stringify(current))
+  enqueueOperation('unlocked_chapters', { chapterIds: added })
+  notifyProgressDirty()
 }
 
 export function getTaskDaily(metric: string): number {

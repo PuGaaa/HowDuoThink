@@ -4,7 +4,7 @@
  *  手动同步 = 先推后拉。未登录（游客态）全部为本地，无网络行为。 */
 import { API_BASE } from '../config'
 import { getToken, isLoggedIn } from './auth'
-import { confirmProgressOperations, exportProgressBundle, pendingProgressOperations, progressIdentity, progressStorageGet, progressStorageSet, setProgressIdentity, setProgressListener } from './storage'
+import { clearProgressLocal, confirmProgressOperations, exportProgressBundle, getUnlockedChapterIds, pendingProgressOperations, progressIdentity, progressStorageGet, progressStorageSet, setProgressIdentity, setProgressListener } from './storage'
 
 const KEY_LAST_SYNC = 'think_last_sync'
 
@@ -12,12 +12,17 @@ export function prepareProgressIdentity(uid: string): void {
   const previous = progressIdentity()
   if (previous === 'guest') {
     const bundle = exportProgressBundle()
+    const guestOperations = pendingProgressOperations()
+    setProgressIdentity('guest')
+    clearProgressLocal()
     setProgressIdentity(uid)
-    const archiveId = 'archive-' + String(Date.now()) + '-' + String(Math.random())
-    progressStorageSet('think_progress_ops_v1', JSON.stringify([
-      { opId: 'bootstrap-' + archiveId, kind: 'bootstrap', occurredAt: new Date().toISOString(), payload: { archiveId: archiveId, bundle: bundle },
-      },
-    ]))
+    const operations = pendingProgressOperations()
+    if (Object.keys(bundle.cases).length > 0 || Object.keys(bundle.mascots).length > 0 || Object.keys(bundle.tasks).length > 0 || bundle.dailyDone.length > 0 || bundle.checkuse > 0 || bundle.solvedLayers.length > 0 || bundle.unlockedChapterIds.length > 0) {
+      const archiveId = 'archive-' + String(Date.now()) + '-' + String(Math.random())
+      operations.push({ opId: 'bootstrap-' + archiveId, kind: 'bootstrap', occurredAt: new Date().toISOString(), payload: { archiveId: archiveId, bundle: bundle } })
+    }
+    operations.push(...guestOperations)
+    progressStorageSet('think_progress_ops_v1', JSON.stringify(operations))
     return
   }
   setProgressIdentity(uid)
@@ -100,10 +105,11 @@ export function pullServerProgress(cb?: (r: { error: string }) => void) {
         try {
           const lp = JSON.parse(raw as string)
           const before = JSON.stringify(lp)
+          const localSolved = lp.solved
           if (!lp.solved && rp.solved) lp.solved = true
           if (rp.bestGrade === 'S' || (lp.bestGrade !== 'S' && rp.bestGrade !== '' && (lp.bestGrade === '' || rp.bestGrade < lp.bestGrade))) lp.bestGrade = rp.bestGrade
           if (rp.bestGrade === 'S' && lp.bestGrade !== 'S') lp.bestGrade = 'S'
-          if ((rp.bestCost ?? 0) > 0 && ((lp.bestCost ?? 0) === 0 || rp.bestCost < lp.bestCost)) lp.bestCost = rp.bestCost
+          if (rp.solved && (!localSolved || rp.bestCost < lp.bestCost)) lp.bestCost = rp.bestCost
           lp.plays = Math.max(lp.plays ?? 0, rp.plays ?? 0)
           lp.fails = Math.max(lp.fails ?? 0, rp.fails ?? 0)
           if (JSON.stringify(lp) !== before) {
@@ -151,6 +157,11 @@ export function pullServerProgress(cb?: (r: { error: string }) => void) {
       const rcu = d.checkuse ?? 0
       const lcu = Number(progressStorageGet('think_checkuse_v1')) || 0
       if (rcu > lcu) progressStorageSet('think_checkuse_v1', String(rcu))
+      const localUnlocked = getUnlockedChapterIds()
+      const remoteUnlocked = (d.unlockedChapterIds ?? []) as string[]
+      const mergedUnlocked = localUnlocked.slice()
+      for (let i = 0; i < remoteUnlocked.length; i++) if (mergedUnlocked.indexOf(remoteUnlocked[i]) < 0) mergedUnlocked.push(remoteUnlocked[i])
+      if (mergedUnlocked.length !== localUnlocked.length) progressStorageSet('think_unlocked_chapters_v1', JSON.stringify(mergedUnlocked))
       markSynced()
       if (cb != null) cb({ error: '' })
     },
