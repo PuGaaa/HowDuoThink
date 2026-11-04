@@ -29,6 +29,9 @@ BUSINESS_TABLES = {
     "assets",
     "resource_slots",
     "index_tasks",
+    "progress_ops",
+    "learning_events",
+    "progress_imports",
 }
 
 REVISION_TABLES = {"index_tasks"}
@@ -66,14 +69,14 @@ def test_replay_sqlite(monkeypatch, tmp_path):
     _use_db(monkeypatch, path)
 
     migrate.upgrade_head()
-    assert migrate.current_version() == "0004_learning_events"
+    assert migrate.current_version() == "0005_progress_integrity"
 
     alembic_command.downgrade(migrate._cfg(), "base")
     remaining = {n for _, n, _ in _master_rows(path)}
     assert not (remaining & BUSINESS_TABLES), remaining
 
     migrate.upgrade_head()
-    assert migrate.current_version() == "0004_learning_events"
+    assert migrate.current_version() == "0005_progress_integrity"
 
 
 def test_downgrade_to_base_sqlite(monkeypatch, tmp_path):
@@ -83,7 +86,7 @@ def test_downgrade_to_base_sqlite(monkeypatch, tmp_path):
     _use_db(monkeypatch, path)
 
     migrate.upgrade_head()
-    assert migrate.current_version() == "0004_learning_events"
+    assert migrate.current_version() == "0005_progress_integrity"
 
     migrate.downgrade_to_base()
     remaining = {n for _, n, _ in _master_rows(path)}
@@ -111,7 +114,7 @@ def test_upgrade_uses_current_config(monkeypatch, tmp_path):
     assert names_first >= BUSINESS_TABLES
     conn = sqlite3.connect(first)
     try:
-        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0004_learning_events"
+        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0005_progress_integrity"
     finally:
         conn.close()
 
@@ -166,12 +169,12 @@ def test_case_revision_schema(monkeypatch, tmp_path):
 
 def test_head_and_stamp(monkeypatch, tmp_path):
     """head_version 报基线链头；stamp_head 只打版本戳不建业务表（存量库收编入口）。"""
-    assert migrate.head_version() == "0004_learning_events"
+    assert migrate.head_version() == "0005_progress_integrity"
 
     path = tmp_path / "stamped.db"
     _use_db(monkeypatch, path)
     migrate.stamp_head()
-    assert migrate.current_version() == "0004_learning_events"
+    assert migrate.current_version() == "0005_progress_integrity"
     # stamp 只写 alembic_version，不执行 DDL：业务表不应出现
     names = {n for _, n, _ in _master_rows(path, exclude_alembic=False)}
     assert "alembic_version" in names
@@ -187,5 +190,5 @@ def test_upgrade_head_cwd_independent(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
 
     migrate.upgrade_head()
-    assert migrate.current_version() == "0004_learning_events"
+    assert migrate.current_version() == "0005_progress_integrity"
     assert {n for _, n, _ in _master_rows(path)} >= BUSINESS_TABLES
