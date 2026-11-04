@@ -36,7 +36,7 @@
       <!-- 手册收获 + 动机出口 -->
       <view v-if="solved" class="gain">
         <image class="gain__icon" src="/static/icons/book-mintdeep.png" mode="aspectFit"></image>
-        <text class="gain__text">手册新增 {{ lessonCount }} 条诊断检查单</text>
+        <text class="gain__text">本题含 {{ lessonCount }} 条诊断检查单</text>
       </view>
       <view class="btnrow">
         <view class="nextbtn" @click="goNext">
@@ -131,6 +131,10 @@
           <text class="lesson__principle">{{ l.principle }}</text>
         </view>
       </view>
+      <view v-if="contributors.length > 0" class="lessons">
+        <text class="lessons__title">案例贡献</text>
+        <text v-for="person in contributors" :key="person.authorId + '-' + person.role" class="lessons__layer">{{ person.role === 'source' ? '案例来源' : '补充证据' }} · {{ person.author }}</text>
+      </view>
     </view>
 
     <view v-else class="loading">
@@ -144,12 +148,13 @@ import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { getCaseById, MAINLINE_CASE_IDS } from '../../data/cases'
-import { ExpertStep, Lesson } from '../../types/case'
+import { CaseAction, ExpertStep, Lesson } from '../../types/case'
 import { SessionRecord, SessionEvent, MascotEventRec, getLastSession } from '../../utils/storage'
 import { clearDraftPreview, getPreviewSession } from '../../utils/draft-preview'
 import { trackLearningEvent } from '../../utils/learning-events'
 import { isLoggedIn } from '../../utils/auth'
 import { openGuestLoginDialog } from '../../utils/login-guide'
+import { API_BASE } from '../../config'
 import { gradeTitle, starsOf } from '../../utils/scoring'
 import { getMascotUrl } from '../../utils/remote-assets'
 import { reviewNote } from '../../utils/mascot'
@@ -178,6 +183,7 @@ const wrongIdentifies = ref(0)
 const layer = ref('')
 const replayItems = ref<ReplayItem[]>([])
 const chainAll = ref<ExpertStep[]>([])
+const reviewActions = ref<CaseAction[]>([])
 const chainIdx = ref(0)
 const chainTotal = ref(0)
 const lessons = ref<Lesson[]>([])
@@ -195,6 +201,12 @@ const youPct = ref(100)
 const previewId = ref('')
 const legacySnapshot = ref(false)
 const needsLogin = ref(false)
+interface CaseContributor {
+  authorId: string
+  author: string
+  role: string
+}
+const contributors = ref<CaseContributor[]>([])
 
 onLoad((query : OnLoadOptions) => {
   previewId.value = query['previewId'] != null ? query['previewId'] as string : ''
@@ -225,11 +237,21 @@ onLoad((query : OnLoadOptions) => {
   wrongIdentifies.value = session.wrongIdentifies
   layer.value = c.layer
   chainAll.value = c.expertChain
+  reviewActions.value = c.actions
   chainTotal.value = c.expertChain.length
   chainIdx.value = 0
   lessons.value = c.lessons
   lessonCount.value = c.lessons.length
   if (previewId.value.length === 0) trackLearningEvent('review_view', session.sessionId, c.id, 'review', session.contentRevision)
+  if (previewId.value.length === 0) {
+    uni.request({
+      url: API_BASE + '/api/submissions/contributors/' + c.id,
+      method: 'GET',
+      success: (response) => {
+        if (response.statusCode === 200) contributors.value = (response.data as { items: CaseContributor[] }).items
+      },
+    })
+  }
 
   const stars = starsOf(session.grade)
   const imgs: string[] = []
@@ -290,12 +312,8 @@ function nextStep() {
 }
 
 function actionName(actionId: string): string {
-  const c = getCaseById(caseId.value)
-  if (c == null) return actionId
-  for (let i = 0; i < c.actions.length; i++) {
-    if (c.actions[i].id === actionId) return c.actions[i].name + '（-' + c.actions[i].cost + ' ⚡︎）'
-  }
-  return actionId
+  const action = reviewActions.value.find((item) => item.id === actionId)!
+  return action.name + '（-' + action.cost + ' ⚡︎）'
 }
 
 function buildReplay(events: SessionEvent[], mascots: MascotEventRec[]) {

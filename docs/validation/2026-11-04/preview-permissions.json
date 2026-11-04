@@ -1,0 +1,11 @@
+{
+  "anonymousRead": 401,
+  "ordinaryTokenRead": 401,
+  "ordinaryCreate": 403,
+  "validScopedRead": 200,
+  "scopeMismatch": 401,
+  "previewCannotUseSessionEvenWithCookie": 401,
+  "expired": 401,
+  "immutableSnapshot": true,
+  "draftExcludedFromPack": true
+}
