@@ -43,10 +43,15 @@ def verify_login(login: str, password: str) -> dict:
     """账密校验（带防爆破频控）；按已有 login 或绑定 phone 查询。"""
     key = "pw:" + login.lower()
     _throttle_check(key)
-    rows = db.q(
-        "SELECT id, login, name, avatar, password_hash, role, status FROM users WHERE login=?",
-        (login,),
-    )
+    if login.lower() == "admin":
+        rows = db.q(
+            "SELECT id, login, name, avatar, password_hash, role, status FROM users WHERE id='pw-admin'",
+        )
+    else:
+        rows = db.q(
+            "SELECT id, login, name, avatar, password_hash, role, status FROM users WHERE login=?",
+            (login,),
+        )
     if not rows:
         rows = db.q(
             "SELECT id, login, name, avatar, password_hash, role, status FROM users WHERE phone=?",

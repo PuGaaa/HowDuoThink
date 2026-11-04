@@ -118,6 +118,38 @@ def test_default_account_hint_is_false_without_default_password(monkeypatch):
         assert client.get("/api/auth/default-account").json() == {"default": False}
 
 
+def test_dev_without_admin_password_does_not_overwrite_existing_hash(monkeypatch):
+    import db
+    from core import config, security
+
+    _restore_pw_admin("keep-this-password")
+    before = db.q("SELECT password_hash FROM users WHERE id='pw-admin'")[0]["password_hash"]
+    monkeypatch.setattr(config, "ADMIN_PASSWORD", "")
+    monkeypatch.setattr(config, "DEV_MODE", True)
+    with make_client():
+        pass
+    after = db.q("SELECT password_hash FROM users WHERE id='pw-admin'")[0]["password_hash"]
+    assert after == before
+    assert security.verify_password("keep-this-password", after)
+
+
+def test_admin_alias_prefers_canonical_pw_admin(monkeypatch):
+    import db
+    from core import security
+
+    db.ex(
+        "INSERT INTO users(id, login, name, role, password_hash) VALUES(?,?,?,?,?)",
+        ("legacy-admin-row", "admin", "旧管理员", "user", security.hash_password("legacy-password")),
+    )
+    try:
+        with make_client() as client:
+            response = client.post("/api/auth/login", json={"login": "admin", "password": "test-admin-pw"})
+            assert response.status_code == 200
+            assert response.json()["userId"] == "pw-admin"
+    finally:
+        db.ex("DELETE FROM users WHERE id='legacy-admin-row'")
+
+
 def test_bootstrap_endpoints_removed():
     with make_client() as client:
         assert client.post("/api/auth/bootstrap", json={"login": "x", "password": "x12345"}).status_code in (404, 405)

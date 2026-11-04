@@ -197,6 +197,8 @@ def create_app() -> FastAPI:
         has_admin = db.q("SELECT id FROM users WHERE role='admin' LIMIT 1")
         if not has_admin and not config.ADMIN_PASSWORD:
             raise RuntimeError("新库初始化必须显式配置 ADMIN_PASSWORD")
+        if not config.ADMIN_PASSWORD:
+            return
         if has_admin and not config.DEV_MODE:
             return
         pw = config.ADMIN_PASSWORD
