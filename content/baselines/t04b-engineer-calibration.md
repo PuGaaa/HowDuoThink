@@ -372,3 +372,141 @@
 
 技术机制依据：[官方资料1](https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside)。
 
+## midnight-rollback（data/5）
+
+学习目标：决策依据是风险不对称：回滚 10 分钟可逆，不行动的代价是用户持续受损——疑似即行动。
+
+编审：5⚡保留，但定位链不再把9⚡状态变更算成2⚡取证；候选统一成决策命题，保留渠道未知，纠正失败请求/订单混淆和D-11→D-9被说7天。
+
+难度：L3→L2；六维[2, 2, 2, 2, 2, 2]。
+
+1. 影响→行动条件
+2. 时间线与回滚记录
+3. 不确定下决策
+4. 未知根因仍可止损
+5. 发布与支付约束
+6. 等待或回滚都有代价
+
+标准路径：a-impact → a-timeline → a-env → a-channel，5⚡，零错S；终态确认h-newcode，其余全部excluded。
+
+替代路径：a-impact → a-env → a-channel → a-timeline，5⚡，零错S；终态确认h-newcode，其余全部excluded。
+
+停止点：【停止规则】持续失败、版本关联、两侧代价与安全回滚条件齐备；本局只完成行动选择，回滚及根因复现尚未执行。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://sre.google/sre-book/managing-incidents/)。
+
+## double-strike（data/6）
+
+学习目标：多因叠加的排错：每条线单独看都"还行"，是因为它们互相掩盖——必须拉全链路同时看。
+
+编审：人工裁定4⚡（原6、实际旧链4），保留三组对照作为最小证明；修正QPS/并发单位、池上限、不必全因同时修及日志阈值。L3→L2。
+
+难度：L3→L2；六维[2, 3, 2, 3, 2, 2]。
+
+1. 异常指标→组合对照
+2. 同窗三组实验
+3. QPS×秒容量
+4. 单项不过阈值叠加过载
+5. 缓存/SQL/池
+6. 扩池掩盖需求
+
+标准路径：a-impact → a-combo → a-poolsize，4⚡，零错S；终态确认h-combo，其余全部excluded。
+
+替代路径：a-impact → a-poolsize → a-combo，4⚡，零错S；终态确认h-combo，其余全部excluded。
+
+停止点：【停止规则】三组同构对照和单位一致的容量模型成立，两个单因无关论及扩1000充分论均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://sre.google/sre-book/handling-overload/)。
+
+## data-script-accident（data/7）
+
+学习目标：数据操作脚本的三道防线：测试环境验证 + 备份 + 双人复核——缺一道就是全表灾难。
+
+编审：5⚡保留，新增必要影响面1⚡、删重复环境取证；修正目标已下架却期望1行、行数等于全表就必无WHERE、已提交仍立刻ROLLBACK及CLI自带保护等错误。
+
+难度：L2→L2；六维[2, 2, 2, 2, 2, 2]。
+
+1. 范围→执行文本→输入
+2. 审计与终端记录
+3. DML事务与恢复
+4. 文件正确执行不同
+5. 编辑器/CLI/DB
+6. 整表恢复可能覆盖新写
+
+标准路径：a-impact → a-sqlcheck → a-reason → a-triggercheck，5⚡，零错S；终态确认h-wheremissing，其余全部excluded。
+
+替代路径：a-impact → a-triggercheck → a-reason → a-sqlcheck，5⚡，零错S；终态确认h-wheremissing，其余全部excluded。
+
+停止点：【停止规则】实际输入与审计吻合，带WHERE条件错误、ORM和触发器均排除；恢复尚未执行。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://dev.mysql.com/doc/refman/8.0/en/commit.html)、[官方资料2](https://dev.mysql.com/doc/refman/8.0/en/update.html)。
+
+## replica-lag（data/8）
+
+学习目标：读写分离读的是"过去"——写后立读必须有一致性保障。
+
+编审：人工裁定5⚡（原4，旧链5但漏缓存/路由），移出未经验证的大事务制造者；纠正Seconds_Behind精度与固定10秒严格保证。
+
+难度：L2→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 双读路径→GTID时序
+2. 逐单到达记录
+3. 异步复制与可见性
+4. 写成功不保证副本可见
+5. 主库/副本/客户端
+6. 全切主库增加负载
+
+标准路径：a-impact → a-lagprobe → a-cacheprobe → a-shardcheck，5⚡，零错S；终态确认h-replag，其余全部excluded。
+
+替代路径：a-impact → a-shardcheck → a-cacheprobe → a-lagprobe，5⚡，零错S；终态确认h-replag，其余全部excluded。
+
+停止点：【停止规则】GTID时序直接解释首查为空，提前返回、负缓存和分片错误均排除；延迟制造者尚需独立对照。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://dev.mysql.com/doc/refman/8.0/en/show-replica-status.html)、[官方资料2](https://dev.mysql.com/doc/refman/8.0/en/gtid-functions.html)。
+
+## implicit-cast（data/9）
+
+学习目标：索引是为"类型一致"建的——一次隐式转换就够它作废。
+
+编审：人工裁定5⚡（原4、旧链5却漏锁）。MySQL8统一、CPU百分比口径明确；修正不同字段唯一差异、显式CAST假象和2100倍算术。
+
+难度：L2→L2；六维[2, 2, 2, 2, 2, 2]。
+
+1. 同值对照→计划
+2. 参数与计划对照
+3. 数值比较语义
+4. 有索引仍不能定位
+5. 服务绑定到优化器
+6. 只限流不修单次成本
+
+标准路径：a-impact → a-explain → a-lockcheck → a-cachecheck，5⚡，零错S；终态确认h-cast，其余全部excluded。
+
+替代路径：a-impact → a-cachecheck → a-lockcheck → a-explain，5⚡，零错S；终态确认h-cast，其余全部excluded。
+
+停止点：【停止规则】同值参数对照和计划差异成立，统计、锁与重复请求解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://dev.mysql.com/doc/refman/8.0/en/type-conversion.html)、[官方资料2](https://dev.mysql.com/doc/refman/8.0/en/explain-output.html)。
+
+## deep-pagination（data/10）
+
+学习目标：OFFSET 的代价是扫过并丢弃——游标分页让每页代价恒定。
+
+编审：人工裁定5⚡（原4、旧链5漏锁）。统一4501页/20条/OFFSET90000，分离COUNT1.2s与第一页60ms，去掉完美线性和任意场景恒定2ms。
+
+难度：L2→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 曲线→执行访问量
+2. 分页算术与分段
+3. OFFSET与keyset
+4. 索引正确仍慢
+5. 交互到SQL计划
+6. 禁深页会影响工作
+
+标准路径：a-impact → a-explain → a-lockcheck → a-countcheck，5⚡，零错S；终态确认h-offset，其余全部excluded。
+
+替代路径：a-impact → a-lockcheck → a-countcheck → a-explain，5⚡，零错S；终态确认h-offset，其余全部excluded。
+
+停止点：【停止规则】页码访问量及无COUNT对照成立，排序缺索引、锁与COUNT全部解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://dev.mysql.com/doc/refman/8.0/en/explain-output.html)、[官方资料2](https://dev.mysql.com/doc/refman/8.0/en/limit-optimization.html)。
+

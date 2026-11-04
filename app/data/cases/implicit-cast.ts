@@ -1,23 +1,22 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 2 章 · 数据的脾气 第三批（隐式类型转换索引失效 L2）
- * 教学点：程序设计——隐式类型转换让"看起来会用索引"的 SQL 全表扫描；
- * EXPLAIN 断言进上线门禁；"隐式转换三坑"（类型/字符集/排序规则）是索引杀手清单。
- * 专家路径：impact(1) + explain(2) + analyize(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const implicitCastCase: DiagnosisCase = {
   id: 'implicit-cast',
-  title: '一条数字字面量，让百万行索引作废',
-  intro: '客服查询接口上线后主库 CPU 翻倍：一条 SQL 用数字查 VARCHAR 手机号——隐式转换让索引整个作废。',
+  title: '索引存在，数字参数却触发全表访问',
+  intro: '会员手机号列有索引，客服查询却扫全表。用同一手机号、同一数据和不同参数类型做对照。',
   domain: 'data',
   layer: '索引是为"类型一致"建的——一次隐式转换就够它作废',
   part: 'engineer',
   chapterId: 'data',
   order: 9,
-  typeTags: ['data', 'resource', 'verification'],
+  typeTags: [
+    'data',
+    'resource',
+    'verification',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」会员平台的 DBA 兼后端，新接口上线 2 小时后主库 CPU 翻倍的告警落在你头上。',
     architecture: '客服后台 → 会员查询服务 → MySQL 会员表(3200 万行, phone VARCHAR(20), 索引 idx_phone)',
@@ -26,7 +25,7 @@ export const implicitCastCase: DiagnosisCase = {
       {
         type: 'error',
         title: '慢查询与 CPU',
-        text: 'EXPLAIN：SELECT ... WHERE phone = 13800001234 → type=ALL（全表扫描），rows=32,000,000\n主库 CPU：35% → 155%，与该接口调用量线性同步爬升。',
+        text: '数字参数WHERE phone=13800001234：计划type=ALL、估算3200万行，查询4.2s。主机归一化CPU35%→85%。同一手机号绑定字符串时2ms。',
       },
       {
         type: 'text',
@@ -34,17 +33,31 @@ export const implicitCastCase: DiagnosisCase = {
         text: 'idx_phone 索引明明存在；代码 review 没发现问题；\n同样的表结构，去年上线的"邮箱查询"接口（email VARCHAR + 字符串参数）一直是 2ms 的快查询。',
       },
     ],
-    timeline: '查询接口今天上午上线 ｜ CPU 告警 2 小时后触发 ｜ MySQL 5.7（隐式转换规则：字符串列与数字比较时，列值转数字逐行计算）',
+    timeline: 'MySQL8.0；接口上午上线，2小时后告警；phone为VARCHAR(20)，既有idx_phone。',
     impactHint: '同表同结构的两个查询一快一慢——对比它们的差异，索引"看不看得上"这次查询？',
   },
-
   hypotheses: [
-    { id: 'h-cast', text: '隐式类型转换：数字字面量 vs VARCHAR 列，MySQL 将列值逐行转数字——索引失效全表扫描', excludeActionId: 'a-explain' },
-    { id: 'h-stat', text: '统计信息过期，优化器选错执行计划', excludeActionId: 'a-analyze' },
-    { id: 'h-lock', text: '查询引发锁等待，连接堆积放大 CPU', excludeActionId: 'a-lockcheck' },
-    { id: 'h-cache', text: '查询无缓存层，重复全表扫描叠加（纯容量问题）', excludeActionId: 'a-cachecheck' },
+    {
+      id: 'h-cast',
+      text: '隐式类型转换：数字字面量 vs VARCHAR 列，MySQL 将列值逐行转数字——索引失效全表扫描',
+      excludeActionId: 'a-explain',
+    },
+    {
+      id: 'h-stat',
+      text: '统计信息过期，优化器选错执行计划',
+      excludeActionId: 'a-analyze',
+    },
+    {
+      id: 'h-lock',
+      text: '查询引发锁等待，连接堆积放大 CPU',
+      excludeActionId: 'a-lockcheck',
+    },
+    {
+      id: 'h-cache',
+      text: '首次唯一手机号查询本来很快，只有重复请求无缓存才制造慢化',
+      excludeActionId: 'a-cachecheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +72,7 @@ export const implicitCastCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '快慢对照',
-        text: '慢（4.2s/次）：WHERE phone = 13800001234      ← 数字字面量\n快（2ms/次）：  WHERE email = "user@example.com" ← 字符串字面量\n同表、同类 VARCHAR 列、同类索引——唯一差异：比较值的"类型"。\n→ 索引没坏，是它"认不出"这个查询。',
+        text: '同一phone列、相同值、数据快照和查询字段：参数数字13800001234时4.2s，字符串"13800001234"时2ms。\n旧邮箱接口只能算线索，因为字段、基数和数据分布也不同；不能说比较邮箱与手机号时唯一差异就是类型。',
       },
     },
     {
@@ -70,12 +83,24 @@ export const implicitCastCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-cast'],
-      hypotheses: [{ id: 'h-cast', status: 'confirmed' }],
+      tests: [
+        'h-cast',
+        'h-stat',
+      ],
+      hypotheses: [
+        {
+          id: 'h-cast',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-stat',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '执行计划对照 + 机制验证',
-        text: '慢查询：type=ALL, rows=32M —— 全表扫描\n快查询：type=ref, rows=1  —— 索引命中\nMySQL 规则：字符串列与数字比较 → 把"列"转成数字逐行算（ CAST(phone AS DOUBLE) ）\n→ 列被函数包裹，索引存储的是字符串序，无法服务数字比较 → idx_phone 作废。\n复现修复：WHERE phone = "13800001234"（字符串）→ type=ref, rows=1，2ms。\n实锤：一行代码的类型差异 = 2000 倍的性能差。',
+        text: 'MySQL8.0同一数据/统计信息对照：数字参数type=ALL、key=NULL；字符串绑定type=ref、key=idx_phone。字符串列与数值比较按数值语义比较，多种字符串（如前导零）可等于同一数值，字符串索引不能用于这种精确定位。\n这是隐式比较语义的解释，并不是执行计划真的显示了CAST(phone AS DOUBLE)函数改写。仅改绑定类型即恢复2ms，约2100倍教学样例差异。',
       },
     },
     {
@@ -86,12 +111,19 @@ export const implicitCastCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-stat'],
-      hypotheses: [{ id: 'h-stat', status: 'excluded' }],
+      tests: [
+        'h-stat',
+      ],
+      hypotheses: [
+        {
+          id: 'h-stat',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '优化器核对',
-        text: 'ANALYZE TABLE 刚跑过；FORCE INDEX(idx_phone) 强制走索引——依然慢（转换在列上，索引帮不上）。\n→ 排除优化器：不是"不想用索引"，是"用不了"。',
+        text: '同一快照、同一统计信息下仅改参数类型，数字计划ALL而字符串ref。该受控对照排除统计信息过期是本次主因；本局没有在生产实际执行ANALYZE，也不把FORCE INDEX仍慢当作万能证明。',
       },
     },
     {
@@ -102,12 +134,19 @@ export const implicitCastCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-lock'],
-      hypotheses: [{ id: 'h-lock', status: 'excluded' }],
+      tests: [
+        'h-lock',
+      ],
+      hypotheses: [
+        {
+          id: 'h-lock',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '锁核对',
-        text: 'data_locks 无等待；慢查询是只读 SELECT 不持锁。\n→ 排除锁问题：CPU 是纯扫描消耗。',
+        text: '同窗无该SELECT的行锁/元数据锁等待，慢日志Lock_time=0；它是普通一致性读，但仍可能在其他条件下等元数据锁。以观测排除本案锁等待。',
       },
     },
     {
@@ -118,19 +157,26 @@ export const implicitCastCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-cache'],
-      hypotheses: [{ id: 'h-cache', status: 'down' }],
+      tests: [
+        'h-cache',
+      ],
+      hypotheses: [
+        {
+          id: 'h-cache',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '缓存评估',
-        text: '查询确实无缓存，加缓存能挡住重复查询。\n→ 降权为次因：但每一条首次查询仍要 4.2s 全表扫——"每笔都慢"的根因必须修 SQL，缓存只是止痛片。',
+        text: '只发一次此前未查过的手机号，数字绑定仍4.2s，字符串绑定2ms；未发生重复请求。反证“首次很快、只有重复无缓存才慢”。缓存可能减少重复次数，但不能修正比较语义。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急对该接口限流到 10 QPS',
       desc: '【状态变更】网关对新接口限流，保住主库',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -207,67 +253,79 @@ export const implicitCastCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-cast', text: 'phone VARCHAR(20) 列与数字字面量比较：MySQL 将列值逐行 CAST 成数字，idx_phone 无法服务——每查询全表扫描 3200 万行（4.2s），CPU 随调用量线性爆涨', correct: true },
-    { id: 'rc-stat', text: '统计信息过期导致优化器选错执行计划', correct: false },
-    { id: 'rc-lock', text: '锁等待导致连接堆积放大 CPU', correct: false },
-    { id: 'rc-cache', text: '查询无缓存导致重复扫描叠加（次因）', correct: false },
+    {
+      id: 'rc-cast',
+      text: 'phone字符串列与数字参数进行数值语义比较，无法用idx_phone做精确定位，实际采用全表访问；同值改字符串绑定后走ref并恢复延迟',
+      correct: true,
+    },
+    {
+      id: 'rc-stat',
+      text: '统计信息过期导致优化器选错执行计划',
+      correct: false,
+    },
+    {
+      id: 'rc-lock',
+      text: '锁等待导致连接堆积放大 CPU',
+      correct: false,
+    },
+    {
+      id: 'rc-cache',
+      text: '首次查询很快，只有重复请求缺缓存才导致慢化',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 5,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '同表同索引一快一慢——先对比两条 SQL 本身：差异往往小到一个字符。',
-      update: '唯一差异：比较值的类型（数字 vs 字符串）——"索引认不认"的第一嫌疑出现。',
+      thought: '建立同列同值的参数对照。',
+      update: '只有参数类型改变，4.2s与2ms分开。',
       actionId: 'a-impact',
-      why: '1⚡︎ 快慢对照是最便宜的二分法：环境相同、结构相同、索引相同，剩下的变量就是"类型"——程序设计思维在数据层的用武之地。',
-      conclusion: '嫌疑锁定：隐式类型转换（h-cast 升权）。',
+      why: '1⚡不同字段不是单变量实验，需控制值与数据分布。',
+      conclusion: '核对实际计划。',
     },
     {
-      thought: 'EXPLAIN 对比 + 转换规则验证：把"猜测"升级为"执行计划证据 + 数据库规则引用"。',
-      update: '实锤：列被 CAST 包裹索引作废；字符串参数立刻 type=ref rows=1——一行类型 2000 倍差距。',
+      thought: '比较计划与MySQL转换语义。',
+      update: '数字ALL、字符串ref，同统计条件。',
       actionId: 'a-explain',
-      why: '2⚡︎ EXPLAIN 是 SQL 排查的显微镜：它给出的不是"可能慢"，而是"计划怎么走的"；配合类型转换规则的引用，修复从"试试看"变成"确定性的一行改动"。',
-      conclusion: '根因实锤 → 排除优化器与锁。',
+      why: '2⚡语义与计划结合确认隐式比较，并反证统计过期。',
+      conclusion: '确认类型原因。',
     },
     {
-      thought: '统计信息假设要专门排除——"优化器选错计划"是最常被提起的解释，不关掉它修复就会跑偏成 ANALYZE。',
-      update: '强制索引依然慢：转换在列上，任何索引都帮不上——优化器清白。',
-      actionId: 'a-analyze',
-      why: '1⚡︎ FORCE INDEX 实验一举两得：排除优化器假设 + 证明"这不是计划问题而是可用性问题"——修复方向从"调优"转到"改代码"。',
-      conclusion: '嫌疑收敛单点。',
+      thought: '核对同窗等待。',
+      update: '无行锁或元数据锁等待。',
+      actionId: 'a-lockcheck',
+      why: '1⚡普通SELECT也不能凭名称保证免元数据锁。',
+      conclusion: '排除锁。',
     },
     {
-      thought: '锁与缓存各留一笔：锁清白；缓存缺口降权为次因——止痛片不能替代手术。',
-      update: '锁排除；缓存降权——"每笔都慢"的根因必须修 SQL 本身。',
+      thought: '发送唯一首次请求。',
+      update: '没有重复仍能复现数字慢查询。',
       actionId: 'a-cachecheck',
-      why: '1⚡︎ "加个缓存"是性能问题的万能诱惑：它改变症状的频率但不改变单次的荒谬——根因分层（每笔慢 vs 重复慢）决定修复的先后。',
-      conclusion: '修复清单：参数修正 + 同类扫描 + 门禁。',
+      why: '1⚡排除仅重复无缓存解释，不宣称缓存永无价值。',
+      conclusion: '其余候选排除。',
     },
     {
-      thought: '止血（限流）、修复（类型+全仓扫描）、门禁（EXPLAIN 断言）、观测（全表扫描告警）、规范（三坑清单）。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（列被 CAST）✓ 同类面（4 处隐患）✓ 防线（门禁+告警）✓——个案、家族、防线三层闭合。',
-      conclusion: '沉淀：索引是为类型一致建的——一次隐式转换就够它作废。SQL 的性能问题先看执行计划，再看类型与字符集，最后才谈加缓存。',
+      why: '【停止规则】同值参数对照和计划差异成立，统计、锁与重复请求解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: 'phone字符串列与数字参数进行数值语义比较，无法用idx_phone做精确定位，实际采用全表访问；同值改字符串绑定后走ref并恢复延迟',
     },
   ],
-
   lessons: [
     {
-      text: '索引是为"类型一致"建的：字符串列与数字比较时，列被逐行 CAST，索引整个作废——一行代码 2000 倍性能差。',
+      text: '字符串列与数字参数比较可能使字符串索引无法精确定位；以同值同列的参数类型对照和实际计划确认。',
       principle: '程序设计：隐式转换三坑进 review 清单——类型不一致（字符串列 vs 数字）、关联列字符集不一致、COLLATION 不同。外部入参以数据库列类型为准绑定；"看起来会走索引"永远要用 EXPLAIN 验证。',
     },
     {
       text: 'SQL 上线要有执行计划门禁：EXPLAIN 断言（type ≠ ALL、rows < 阈值）在合并前拦住，而不是上线后由 CPU 告警揭发。',
-      principle: '验证思维：SQL 的正确性靠测试，性能靠执行计划——两者都该是合并门禁。慢查询的发现时点决定它的代价：合并前 10 分钟 vs 上线 2 小时，差的是一套自动化断言。',
+      principle: '查询计划门禁要结合数据规模和延迟目标，不能全局禁止ALL（小表扫描可能合理）。类型、字符集和排序规则差异只是风险线索，不能无条件断言全部索引失效。',
     },
     {
       text: '快慢对照是最便宜的二分法：同表同索引的两个查询，差异小到一个字符——把变量缩小到不能再小，根因自己现形。',
-      principle: '假设思维：性能排查先找"天然对照组"（同类接口/同结构查询），差异即嫌疑。对照组的存在让"猜测"变成"对照实验"——尤其当直觉（索引存在所以快）与事实（全表扫描）相悖时。',
+      principle: '天然对照可能有隐藏变量。邮箱与手机号不同字段不能证明只有类型不同；保持同列同值同统计，仅改绑定类型，才能把因果缩小到参数类型。',
     },
   ],
 }

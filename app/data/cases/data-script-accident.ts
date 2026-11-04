@@ -1,25 +1,21 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * B5-4 · data L2
- * 主训思维：沉淀思维（数据操作脚本的安全规范——测试环境验证 + 备份 + 双人复核）
- * 次训思维：程序设计（UPDATE 不加 WHERE 或 WHERE 写错 = 全表灾难）
- * 真实原型：修复库存不一致的脚本少了 WHERE 条件，UPDATE 全表——一个错误变成 5 万个错误
- * 情绪兽设计：恐怖蛙（恐慌）——"一个错误变成了五万个"
- * 检查单：思维型 3 + 知识型 1
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const dataScriptCase: DiagnosisCase = {
   id: 'data-script-accident',
   title: '修数据的脚本，修出了五万个新错误',
-  intro: '运营反馈某商品库存显示为 -50。你写了个修复脚本——结果 5 万个商品的库存全部变成了 -50。',
+  intro: '原计划修正一行库存，实际执行后五万行都变为负数。先核对执行文本和事务状态，别只看编辑器里的文件。',
   domain: 'data',
   layer: '数据操作脚本的三道防线：测试环境验证 + 备份 + 双人复核——缺一道就是全表灾难',
   part: 'engineer',
   chapterId: 'data',
   order: 7,
-  typeTags: ['data', 'database'],
+  typeTags: [
+    'data',
+    'database',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」的运营平台后端。运营报了库存显示 -50 的 bug，你 5 分钟写了个修复脚本——执行后 5 万个商品库存全部变成 -50。',
     architecture: '运营后台 → 库存服务 → MySQL(inventory 表 5 万行)',
@@ -28,7 +24,7 @@ export const dataScriptCase: DiagnosisCase = {
       {
         type: 'error',
         title: '执行结果',
-        text: 'UPDATE inventory SET stock = -50 WHERE sku_id = 12345\n→ 执行返回：affected rows: 50,000（不是 1）\n→ WHERE 条件没有生效——更新了全表而非单条。',
+        text: '计划文件：UPDATE inventory SET stock=50 WHERE sku_id=12345；目标行存在且预期改1行。\n实际执行后50000行库存均为-50，客户端报告50000行改变。执行文本与计划文件是否相同尚待核对。',
       },
       {
         type: 'text',
@@ -39,15 +35,45 @@ export const dataScriptCase: DiagnosisCase = {
     timeline: '脚本编写：5 分钟 ｜ 脚本执行：直接在生产执行（无测试环境验证、无备份）｜ 发现全表更新：执行后 30 秒（affected rows 异常）',
     impactHint: 'UPDATE 的 affected rows = 50000 而不是 1——WHERE 到底写没写、写对了没？',
   },
-
   hypotheses: [
-    { id: 'h-wheremissing', text: 'UPDATE 没写 WHERE 条件——全表更新', excludeActionId: 'a-sqlcheck' },
-    { id: 'h-wherewrong', text: 'WHERE 条件写错了（类型不匹配导致不匹配任何行→ MySQL 严格模式报错→但 affected rows=50000 说明不是这种情况）', excludeActionId: 'a-sqlcheck' },
-    { id: 'h-trigger', text: '触发了库存表的触发器，级联更新了其他行', excludeActionId: 'a-triggercheck' },
-    { id: 'h-orm', text: 'ORM 层的批量操作副作用', excludeActionId: 'a-ormcheck' },
+    {
+      id: 'h-wheremissing',
+      text: 'UPDATE 没写 WHERE 条件——全表更新',
+      excludeActionId: 'a-sqlcheck',
+    },
+    {
+      id: 'h-wherewrong',
+      text: '实际带有WHERE，但条件值或类型写错导致范围扩大',
+      excludeActionId: 'a-sqlcheck',
+    },
+    {
+      id: 'h-trigger',
+      text: '触发了库存表的触发器，级联更新了其他行',
+      excludeActionId: 'a-triggercheck',
+    },
+    {
+      id: 'h-orm',
+      text: 'ORM 层的批量操作副作用',
+      excludeActionId: 'a-ormcheck',
+    },
   ],
-
   actions: [
+    {
+      id: 'a-impact',
+      name: '确认受影响表与事务状态',
+      desc: '影响面：实例、表、行数和是否仍可事务回滚',
+      cost: 1,
+      gain: 'high',
+      danger: false,
+      effects: [],
+      tests: [],
+      hypotheses: [],
+      result: {
+        type: 'text',
+        title: '影响边界',
+        text: '仅inventory表50000行被改为-50，其他表无变化；目标sku12345存在且应为50。该CLI连接autocommit=1，语句已提交，普通ROLLBACK不能撤销。先暂停库存写入与对账任务，保护恢复证据。',
+      },
+    },
     {
       id: 'a-sqlcheck',
       name: '读执行的实际 SQL',
@@ -56,15 +82,29 @@ export const dataScriptCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-wheremissing', 'h-wherewrong'],
+      tests: [
+        'h-wheremissing',
+        'h-wherewrong',
+        'h-orm',
+      ],
       hypotheses: [
-        { id: 'h-wheremissing', status: 'confirmed' },
-        { id: 'h-wherewrong', status: 'excluded' },
+        {
+          id: 'h-wheremissing',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-wherewrong',
+          status: 'excluded',
+        },
+        {
+          id: 'h-orm',
+          status: 'excluded',
+        },
       ],
       result: {
         type: 'text',
         title: 'general log',
-        text: 'general log（DB 服务端记录，最诚实的证据）——实际执行的 SQL：\nUPDATE inventory SET stock = -50\n→ 没有 WHERE 子句。而你的脚本文件 fix_stock.sql 里明明写着 WHERE sku_id = 12345。\n→ 执行的和你以为的不是同一条——问题在"从脚本到执行"之间。',
+        text: '已留存数据库审计的connectionId与执行时间对应：UPDATE inventory SET stock=-50；没有WHERE。CLI原样执行，无ORM。\n编辑器文件是SET stock=50 WHERE sku_id=12345，实际输入却是旧模板的第一行；因此不是带WHERE但类型/值错误。',
       },
     },
     {
@@ -80,7 +120,7 @@ export const dataScriptCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '环境确认',
-        text: '你执行的连接串指向：mysql://prod-cluster/inventory_db\n库里的 inventory 表确实有 50000 行。\nsku_id = 12345 已下架不在表中：带 WHERE 的版本应影响 0 行；实际影响 50000 行 = 全表 → 执行的确实是无 WHERE 的版本。它是怎么来的？',
+        text: '连接标签与审计确认是生产inventory库，总50000行；sku12345存在唯一约束，执行计划文件中的等值WHERE应匹配1行。影响50000行只说明范围异常，单靠行数不能证明没有WHERE。',
       },
     },
     {
@@ -96,7 +136,7 @@ export const dataScriptCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '数字分析',
-        text: 'inventory 表总行数 = 50,000。\n脚本输出 "affected rows: 50000" —— 但 sku_id = 12345 已下架不在表中。\n→ 也就是说实际执行的 UPDATE 没有WHERE 条件！\n检查你的终端历史——你是不是复制了模板忘了改 WHERE？',
+        text: '终端会话录屏/历史中实际提交旧模板第一行“UPDATE inventory SET stock=-50;”，计划文件未通过source执行；缺WHERE及错误SET值都有输入证据。全表行数相等本身不是无WHERE的逻辑铁证，因为WHERE 1=1也可能匹配全表。',
       },
     },
     {
@@ -107,12 +147,19 @@ export const dataScriptCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-trigger'],
-      hypotheses: [{ id: 'h-trigger', status: 'excluded' }],
+      tests: [
+        'h-trigger',
+      ],
+      hypotheses: [
+        {
+          id: 'h-trigger',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '触发器检查',
-        text: 'inventory 表无 AFTER UPDATE 触发器。\n→ 排除触发器级联。',
+        text: 'SHOW TRIGGERS及相关事件定义显示inventory没有更新触发器或定时级联任务；审计只有该一条UPDATE，排除级联扩大。',
       },
     },
     {
@@ -123,8 +170,15 @@ export const dataScriptCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-orm'],
-      hypotheses: [{ id: 'h-orm', status: 'excluded' }],
+      tests: [
+        'h-orm',
+      ],
+      hypotheses: [
+        {
+          id: 'h-orm',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'ORM 检查',
@@ -135,16 +189,16 @@ export const dataScriptCase: DiagnosisCase = {
       id: 'a-restore',
       name: '从备份恢复库存表',
       desc: '【状态变更】从备份快照恢复 5 万行库存数据',
-      cost: 2,
-      gain: 'high',
-      danger: false,
+      cost: 9,
+      gain: 'none',
+      danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
       result: {
         type: 'text',
         title: '恢复结果',
-        text: '从 RDS 备份恢复 inventory 表（回到 -50 bug 前的状态）。\n5 万行库存数据恢复，前端恢复下单。\n→ 恢复用了 20 分钟；但你没有最初的 -50 bug 要修了——因为运营那边数据已自行刷新。',
+        text: '该UPDATE已自动提交，不能普通回滚。将RDS备份和binlog恢复到隔离实例的误操作前时点，比对后按主键恢复库存，并处理误操作后合法业务变更，不能直接覆盖整库/整表丢掉新写入。恢复用时取决于实际备份规模，不承诺20分钟。',
       },
     },
     {
@@ -167,7 +221,7 @@ export const dataScriptCase: DiagnosisCase = {
       id: 'a-notifybrand',
       name: '通知受影响品牌方',
       desc: '【状态变更】通知 300+ 品牌方库存异常与恢复时间',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -192,68 +246,83 @@ export const dataScriptCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '数据操作安全规范',
-        text: '① 测试环境先跑一遍（验证 SQL 正确性）\n② 生产执行前 mysqldump 备份目标表\n③ 双人复核（第二人确认 SQL 的 WHERE 条件）\n④ 生产执行必须用 CLI 工具（防复制丢失 WHERE）\n→ 三道防线写入团队 wiki，所有数据操作脚本必须遵守。',
+        text: '在同构隔离库验证；执行前用相同WHERE做SELECT核对主键和预期行数；备份并验证恢复路径；通过受控审计执行。可事务化的DML在未提交前检查结果并决定COMMIT/ROLLBACK。CLI本身不能防止复制缺行，禁止用“必须CLI”作为保护原理。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-wheremissing', text: '复制脚本模板时丢失了 WHERE 条件——实际执行的是无 WHERE 的全表 UPDATE，5 万行库存全部变为 -50。根因是"复制粘贴丢失 WHERE + 直接生产执行无验证、无备份、无复核"', correct: true },
-    { id: 'rc-wherewrong', text: 'WHERE 条件写错导致不匹配任何行', correct: false },
-    { id: 'rc-trigger', text: '表上触发器级联更新其他行', correct: false },
-    { id: 'rc-orm', text: 'ORM 层批量操作副作用', correct: false },
+    {
+      id: 'rc-wheremissing',
+      text: '实际提交旧模板UPDATE stock=-50且没有WHERE，与计划修单行的文件不同；语句自动提交后影响50000行，需按审计及备份恢复',
+      correct: true,
+    },
+    {
+      id: 'rc-wherewrong',
+      text: 'WHERE 条件写错导致不匹配任何行',
+      correct: false,
+    },
+    {
+      id: 'rc-trigger',
+      text: '表上触发器级联更新其他行',
+      correct: false,
+    },
+    {
+      id: 'rc-orm',
+      text: 'ORM 层批量操作副作用',
+      correct: false,
+    },
   ],
-
   expertCost: 5,
-  restartActionId: 'a-safetyscript',
-
+  restartActionId: 'a-restore',
   expertChain: [
     {
-      thought: '先读实际执行的 SQL：general log 是最诚实的证据——它记录了到底执行了什么。',
-      update: 'general log 显示实际执行的 SQL 没有 WHERE 子句——脚本文件里明明有。矛盾。',
+      thought: '确定范围和事务状态。',
+      update: '50000行已提交，不能普通ROLLBACK。',
+      actionId: 'a-impact',
+      why: '1⚡先保护恢复边界，防止继续写入增加对账难度。',
+      conclusion: '核对实际执行文本。',
+    },
+    {
+      thought: '读取已留存的执行审计。',
+      update: '实际旧模板缺WHERE，且是CLI原样执行。',
       actionId: 'a-sqlcheck',
-      why: '1⚡ general log 是最诚实的证据：它记录的是"实际执行的 SQL"，不是"你以为执行的 SQL"。',
-      conclusion: '执行的和文件里的不是同一条 → 确认执行环境。',
+      why: '1⚡审计同时反证带WHERE条件错误和ORM改写。',
+      conclusion: '确认实际文本错误。',
     },
     {
-      thought: '确认执行环境：连接串指向生产库、inventory 表 5 万行、sku_id = 12345 不在表中（已下架）。',
-      update: 'SQL 正确但 sku_id = 12345 不在表中 → 应该影响 0 行，实际影响 50000 行。\n→ 矛盾：不是 SQL 写错了，是执行了不同的 SQL。检查终端历史。',
-      actionId: 'a-environment',
-      why: '1⚡ "SQL 正确但影响行数错误"是最危险的线索——说明实际执行的 SQL 和你以为的不一样。',
-      conclusion: '确认执行了不同的 SQL → 分析 affected rows = 50000 的原因。',
-    },
-    {
-      thought: 'affected rows = 50000 = 表的总行数。这说明执行的 UPDATE 没有WHERE 条件。翻终端历史。',
-      update: '终端历史：你复制了一个模板脚本，模板里没有 WHERE 条件——你忘了加。\n→ 根因实锤：复制粘贴丢失 WHERE 条件 + 直接生产执行。',
+      thought: '追踪文件到终端输入。',
+      update: '提交的是旧模板行而不是计划文件。',
       actionId: 'a-reason',
-      why: '2⚡ affected rows = 表总行数是"全表 UPDATE"的铁证——不用猜，数字本身就是答案。',
-      conclusion: '根因实锤 → 恢复数据 + 制定安全规范。',
+      why: '2⚡输入证据解释差异来源，不以行数单独倒推无WHERE。',
+      conclusion: '因果来源闭合。',
     },
     {
-      thought: '触发器/ORM 排除，备份恢复完成，三道防线写入 wiki——排查闭环。',
-      update: '停止排查。数据恢复 ✓ 安全规范 ✓——事件闭环。',
+      thought: '检查触发器和级联审计。',
+      update: '没有触发器或额外UPDATE。',
+      actionId: 'a-triggercheck',
+      why: '1⚡必须独立排除级联，不在停止点凭空声称已查。',
+      conclusion: '所有候选收敛。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】数据恢复 ✓ 根因实锤（复制丢 WHERE）✓ 安全规范落地 ✓——三步闭环。',
-      conclusion: '检查单：数据操作脚本三道防线 = 测试环境验证 + 备份 + 双人复核。缺一道 = 全表灾难。',
+      why: '【停止规则】实际输入与审计吻合，带WHERE条件错误、ORM和触发器均排除；恢复尚未执行。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '实际提交旧模板UPDATE stock=-50且没有WHERE，与计划修单行的文件不同；语句自动提交后影响50000行，需按审计及备份恢复',
     },
   ],
-
   lessons: [
     {
-      text: '复制脚本模板时，WHERE 条件是最容易丢失的部分——尤其是行尾的 WHERE，丢了不影响语法只影响影响范围。',
-      principle: '程序设计纪律：数据操作脚本必须以"先写 WHERE 再写 UPDATE"的顺序编写（IDE 会提示未匹配的列名）。复制模板后第一步：检查 WHERE。',
+      text: '比较计划文件与实际提交文本。全表受影响说明范围异常，但只有执行记录才能确定WHERE是否缺失。',
+      principle: 'WHERE 1=1、条件退化等也可能匹配全表；affected rows还区分匹配与改变行，不能用一个数字替代SQL证据。',
     },
     {
-      text: 'affected rows 是最诚实的证据：期望影响 1 行实际影响 50000 行，数字本身就告诉你"执行了错误的 SQL"。',
-      principle: '验证思维：数据操作后第一时间看 affected rows——期望 1 行实际 50000 行，立刻回滚。不要等"看起来好像没问题"再做确认。',
+      text: '事务是否已提交决定能否普通回滚；autocommit=1后执行ROLLBACK不会撤销刚才那条UPDATE。',
+      principle: '先确认事务状态，已提交误操作需备份/binlog恢复。先恢复到隔离实例并处理后续合法写入，避免修复再次覆盖正确数据。',
     },
     {
-      text: '数据操作脚本三道防线：测试环境验证 + 备份 + 双人复核——缺任何一道都可能变成全表灾难。',
-      principle: '沉淀思维：数据操作的安全规范应该写入团队 wiki 并强制执行——"这次 5 分钟写的脚本"和"上次写了 2 小时的功能代码"在安全标准上应该一致。',
-    },
-    {
-      text: 'direct 生产执行是最危险的路径：CLI 直连生产库 + 复制粘贴 = 灾难的完美配方。',
-      principle: '程序设计纪律：生产数据操作必须通过受控工具（带确认/审计/回滚能力的平台），不允许 CLI 直连生产库执行裸 SQL。',
+      text: '受控执行、范围预查、人工复核和可用恢复路径针对不同失误；使用CLI不自动防止复制缺行。',
+      principle: '复核实际即将执行的文本和目标库，不只看编辑器文件；本题模拟数据不在任何真实业务库执行。',
     },
   ],
 }

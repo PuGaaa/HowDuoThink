@@ -1,23 +1,22 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 2 章 · 数据的脾气 第二批（主从延迟写后立读 L2）
- * 教学点：架构设计——读写分离的代价是读"过去"：写后立读必须有一致性保障（读己之写）；
- * 延迟不是异常是物理事实，架构要为它设计兜底。
- * 专家路径：impact(1) + lagprobe(2) + ordertime(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const replicaLagCase: DiagnosisCase = {
   id: 'replica-lag',
   title: '下单成功了，订单列表却是空的',
-  intro: '用户下单成功，跳到订单列表却看不到订单——刷新几次才出来。写后立读撞上了主从延迟。',
+  intro: '下单后详情可见，列表首次查询为空，稍后出现。追踪提交、读取实例和同一事务的复制到达时点。',
   domain: 'data',
   layer: '读写分离读的是"过去"——写后立读必须有一致性保障',
   part: 'engineer',
   chapterId: 'data',
   order: 8,
-  typeTags: ['data', 'timing', 'architecture'],
+  typeTags: [
+    'data',
+    'timing',
+    'architecture',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」订单平台的存储负责人，大促第一波高峰的客诉全是同一句话。',
     architecture: '下单(写主库) → binlog 复制 → 从库×4(轮询读) ｜ 订单列表页：读从库 ｜ 订单详情页：读主库',
@@ -26,7 +25,7 @@ export const replicaLagCase: DiagnosisCase = {
       {
         type: 'error',
         title: '复制延迟监控',
-        text: 'Seconds_Behind_Master：大促高峰 2~8s（平时 < 100ms）。\n客诉模式：下单成功提示后跳转订单列表，列表为空；几十秒后"自己好了"。',
+        text: 'SHOW REPLICA STATUS的Seconds_Behind_Source高峰显示2~8秒；这是秒级指示，并不能表达“平时<100ms”的精度。应用到达探针另测平时约80ms。\n用户在提交后0.5秒查询列表，部分首次为空，随后可见。',
       },
       {
         type: 'text',
@@ -37,14 +36,28 @@ export const replicaLagCase: DiagnosisCase = {
     timeline: '大促第一波高峰进行中 ｜ 上月为读扩展新增 2 个从库、列表页切到从库 ｜ 客诉量随写入量增长',
     impactHint: '详情页看得见、列表页看不见——同一份数据的"两个时点"。写完就读，读到的是几秒前的世界？',
   },
-
   hypotheses: [
-    { id: 'h-replag', text: '主从延迟：写后立读从从库读，复制尚未追上——读到了"过去"的快照', excludeActionId: 'a-lagprobe' },
-    { id: 'h-trans', text: '下单接口提前返回：事务未提交/异步落库，数据本来就没写进去', excludeActionId: 'a-ordertime' },
-    { id: 'h-cache', text: '订单列表缓存了空结果（负缓存），刷新也命中空缓存', excludeActionId: 'a-cacheprobe' },
-    { id: 'h-shard', text: '分片路由错误：订单被写到非预期分片，列表查错库', excludeActionId: 'a-shardcheck' },
+    {
+      id: 'h-replag',
+      text: '主从延迟：写后立读从从库读，复制尚未追上——读到了"过去"的快照',
+      excludeActionId: 'a-lagprobe',
+    },
+    {
+      id: 'h-trans',
+      text: '下单接口提前返回：事务未提交/异步落库，数据本来就没写进去',
+      excludeActionId: 'a-ordertime',
+    },
+    {
+      id: 'h-cache',
+      text: '订单列表缓存了空结果（负缓存），刷新也命中空缓存',
+      excludeActionId: 'a-cacheprobe',
+    },
+    {
+      id: 'h-shard',
+      text: '分片路由错误：订单被写到非预期分片，列表查错库',
+      excludeActionId: 'a-shardcheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -70,12 +83,24 @@ export const replicaLagCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-replag'],
-      hypotheses: [{ id: 'h-replag', status: 'confirmed' }],
+      tests: [
+        'h-replag',
+        'h-trans',
+      ],
+      hypotheses: [
+        {
+          id: 'h-replag',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-trans',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '复制到达实测',
-        text: 't0      主库提交（binlog 位点 L10001）\nt0+2.1s 从库 3 应用到 L10001\n高峰抽样 20 单：从库到达 1.8~7.9s，全部 > 客诉"首查为空"窗口\n→ 写后立读的窗口正好落在延迟里：用户 0.5s 内跳列表，读到的是 2 秒前的世界。',
+        text: '订单事务GTID为G10001：主库t0提交、t0+0.08s接口响应；用户t0+0.5s在指定replica3查列表为空。replica3于t0+2.1s应用G10001，同一查询随后出现订单。\n20单分别关联实际命中的replica与GTID，应用延迟1.8~7.9s，首查均早于到达。主库提交早于响应，排除提前返回；不能用一次主库可见推导所有写都已及时提交。',
       },
     },
     {
@@ -91,7 +116,7 @@ export const replicaLagCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '延迟归因',
-        text: '从库回放线程：被"批量积分发放"大事务阻塞（单事务 12 万行，回放 6s+）\n该定时任务大促期间每小时全量跑一次，与高峰叠加 → 延迟毛刺 2~8s\n→ 两层问题：写后立读无保护（架构）× 大事务拖慢复制（运维）。先救用户，再修任务。',
+        text: '回放线程诊断将长耗时关联到积分批处理事务；本题只确认它与延迟相关。要认定12万行事务是主要制造者，还需隔离回放/拆批对照，不能在未执行时当作已确认第二根因。',
       },
     },
     {
@@ -102,8 +127,15 @@ export const replicaLagCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-trans'],
-      hypotheses: [{ id: 'h-trans', status: 'excluded' }],
+      tests: [
+        'h-trans',
+      ],
+      hypotheses: [
+        {
+          id: 'h-trans',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '提交核对',
@@ -118,12 +150,19 @@ export const replicaLagCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-cache'],
-      hypotheses: [{ id: 'h-cache', status: 'excluded' }],
+      tests: [
+        'h-cache',
+      ],
+      hypotheses: [
+        {
+          id: 'h-cache',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '缓存核对',
-        text: '列表页无负缓存；绕过缓存直查从库，延迟窗口内同样查不到。\n→ 排除缓存：查的就是"过去"的数据本身。',
+        text: '列表无负缓存；保留同一参数直查本次命中的replica，在GTID到达前也为空，排除缓存空结果。',
       },
     },
     {
@@ -134,19 +173,26 @@ export const replicaLagCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-shard'],
-      hypotheses: [{ id: 'h-shard', status: 'excluded' }],
+      tests: [
+        'h-shard',
+      ],
+      hypotheses: [
+        {
+          id: 'h-shard',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '路由核对',
-        text: '订单落在预期分片，主从拓扑正确，列表查询路由无偏差。\n→ 排除分片问题。',
+        text: '逐单核对写入主分片、对应replica拓扑及SQL路由，均匹配；应用GTID后同一replica同一查询可见，不是查询错分片。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急把列表页切回主库',
       desc: '【状态变更】大促期间列表读切主库',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -171,7 +217,7 @@ export const replicaLagCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '会话级读写一致性：下单成功后 10s 内，该用户的订单相关读固定走主库（粘滞窗口随实时延迟自适应）。\n列表页其余流量继续走从库——主库压力仅 +3%。\n回归：高峰期"下单后首查为空"率 31% → 0%。',
+        text: '对读己之写请求直接路由主库，或携带提交GTID等待指定副本追上后再读并设置有界等待。固定10秒粘滞仅在延迟不超过窗口时有条件有效，延迟突增时不保证一致。\n结合容量验证选路；会话窗口跨设备需明确身份和一致性token传递，不能把实时延迟估计当严格保证。',
       },
     },
     {
@@ -203,67 +249,79 @@ export const replicaLagCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '联动机制',
-        text: '延迟监控与路由层联动：延迟越大，粘滞窗口自动越长——一致性保障从静态配置变成自适应。\n> 5s 触发人工介入（检查是否有新的大事务）。',
+        text: '监控复制线程状态、到达探针和延迟；Seconds_Behind_Source=0并不保证副本已含某事务。需要硬读己之写时，使用主库或具体提交位置确认，不只按估计秒数延长粘滞。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-replag', text: '读写分离无"读己之写"保障：下单（写主库）后立读列表（读从库），高峰复制延迟 2~8s（被 12 万行大事务回放拖慢）——用户在延迟窗口内读到"过去"的从库快照', correct: true },
-    { id: 'rc-trans', text: '下单接口提前返回，事务未提交数据未落库', correct: false },
-    { id: 'rc-cache', text: '订单列表负缓存了空结果', correct: false },
-    { id: 'rc-shard', text: '分片路由错误，订单写入非预期分片', correct: false },
+    {
+      id: 'rc-replag',
+      text: '已提交订单的GTID尚未在本次列表命中的replica应用，用户首查早于到达；读写分离未提供读己之写保障',
+      correct: true,
+    },
+    {
+      id: 'rc-trans',
+      text: '下单接口提前返回，事务未提交数据未落库',
+      correct: false,
+    },
+    {
+      id: 'rc-cache',
+      text: '订单列表负缓存了空结果',
+      correct: false,
+    },
+    {
+      id: 'rc-shard',
+      text: '分片路由错误，订单写入非预期分片',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 5,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '"详情看得见、列表看不见"——同一份数据两条读路径，先对齐这个分裂：写进去了吗。',
-      update: '详情页（主库）100% 可见——数据已写入；分裂只发生在"从库那条读路径"上。',
+      thought: '按详情和列表两条路径切分。',
+      update: '主库可见而replica列表暂缺。',
       actionId: 'a-impact',
-      why: '1⚡︎ 双路径对照一步排除半个问题空间：写入侧清白，剩下的嫌疑全部落在"读从库的时点"上。',
-      conclusion: '嫌疑锁定：复制延迟（h-replag 升权）。',
+      why: '1⚡可见性分裂给出方向，仍需追踪提交和具体副本。',
+      conclusion: '追踪一次提交。',
     },
     {
-      thought: '实测一条订单的"从库到达时间"——把延迟从监控数字变成一次真实的到达实验。',
-      update: '实锤：t0 提交、t0+2~8s 到达从库；用户 0.5s 内首查——窗口精确咬合。',
+      thought: '对齐GTID、响应与副本到达。',
+      update: '提交先于响应，首查先于replica应用，同查询随后可见。',
       actionId: 'a-lagprobe',
-      why: '2⚡︎ 到达实验把"Seconds_Behind_Master 是 2~8"翻译成"用户在 t0+0.5s 读到 t0-2s 的世界"——监控数字只有落进用户行为的时间线，才能解释现象。',
-      conclusion: '根因实锤：写后立读 × 复制延迟。',
+      why: '2⚡同一事务的到达实验同时反证提前返回。',
+      conclusion: '确认复制可见性。',
     },
     {
-      thought: '延迟为什么会到 8 秒——监控告警之外要找到拖住复制的那只手。',
-      update: '12 万行大事务回放阻塞 + 高峰叠加——延迟有明确的"制造者"，也要一起修。',
-      actionId: 'a-lagstat',
-      why: '1⚡︎ 根因分两层：架构缺陷（立读无保护）不因延迟消失而消失，但延迟根因（大事务）不修则保护窗口越撑越大——两层一起治才闭环。',
-      conclusion: '修复双线：会话粘滞 + 大事务拆分。',
+      thought: '绕开缓存读取同一副本。',
+      update: '到达前直查也为空。',
+      actionId: 'a-cacheprobe',
+      why: '1⚡独立反证负缓存，而非凭架构图声明。',
+      conclusion: '排除空缓存。',
     },
     {
-      thought: '事务/缓存/分片三个常规嫌疑各 1⚡︎ 排除——主库可见已经先验了一半，排除只是留证。',
-      update: '提交时点、缓存、路由全部清白——嫌疑收敛单点。',
-      actionId: 'a-ordertime',
-      why: '1⚡︎ 快排留证是复盘的底气：下次再有人提"是不是没提交"，直接翻证据。',
-      conclusion: '嫌疑收敛 → 修复与止血分层。',
+      thought: '核对分片拓扑与实际路由。',
+      update: '写分片与读副本对应，应用后可见。',
+      actionId: 'a-shardcheck',
+      why: '1⚡具体路由反证查错分片。',
+      conclusion: '候选全部收敛。',
     },
     {
-      thought: '止血（切主库，代价大）、修复（读己之写粘滞）、治理（大事务）、联动（自适应窗口）。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（立读撞延迟）✓ 延迟根因（大事务）✓ 保障设计（粘滞自适应）✓——现象、制造者、防线三层闭合。',
-      conclusion: '沉淀：读写分离读的是"过去"。一致性不是全有或全无——"读己之写"是用户能感知的那部分一致性，必须单独设计。',
+      why: '【停止规则】GTID时序直接解释首查为空，提前返回、负缓存和分片错误均排除；延迟制造者尚需独立对照。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '已提交订单的GTID尚未在本次列表命中的replica应用，用户首查早于到达；读写分离未提供读己之写保障',
     },
   ],
-
   lessons: [
     {
-      text: '读写分离读的是"过去"：复制延迟是物理事实不是异常——写后立读（下单后看订单）必须有一致性保障。',
-      principle: '架构设计：读己之写（session 粘滞主库）是读写分离的标配组件，不是可选项。粘滞窗口可按实时延迟自适应；无法粘滞的场景（跨设备）要明示用户"稍后可见"。延迟不会消失，架构要为它兜底。',
+      text: '读己之写应按业务需求选择主库或提交位置确认；固定秒数粘滞是有条件策略，不是无限复制延迟下的严格保证。',
+      principle: '延迟指标用于观测，事务是否可读要核对实际命中的副本与GTID。跨设备需求还须传递一致性上下文，不能只靠本设备会话计时。',
     },
     {
-      text: '复制延迟的"制造者"要单独清算：一个 12 万行的大事务能让所有从库回放停摆 6 秒——延迟毛刺往往是少数任务拖的。',
-      principle: '数据运维：批量任务分批提交（每批千行级）+ 错峰执行；大事务是复制延迟的头号制造者，也是主库 undo/锁的头号制造者——一次改造三处收益。',
+      text: '大事务可能拖慢复制，但本局未做拆批因果对照，不能在专家停止点宣布它已经是已确认制造者。',
+      principle: '把读取可见性原因与复制延迟制造原因分层。先保证用户读己之写，再对回放线程、事务与容量做独立治理。',
     },
     {
       text: '监控数字要落进用户时间线才有解释力："延迟 2~8s"只有对上"用户 0.5s 后首查"，才从统计变成因果。',

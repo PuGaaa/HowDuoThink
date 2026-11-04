@@ -1,25 +1,22 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * B4-1 · data L3（决策现场皮肤试点）
- * 主训思维：产品思维（疑似即行动——回滚决策不需要根因确认，依据是风险不对称）
- * 次训思维：成本思维（回滚 10 分钟可逆 vs 排查 1~2h 不确定的期望成本对比）
- * 真实原型：凌晨疑似新版本引入故障，回滚丢功能 vs 硬扛排查的经典值班困境
- * 情绪兽设计：恐怖蛙（恐慌）——凌晨被叫醒、信息不足、还要做决定
- * 检查单：思维型 3 + 知识型 1
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const midnightRollbackCase: DiagnosisCase = {
   id: 'midnight-rollback',
   title: '凌晨一点四十分：回滚还是硬扛',
-  intro: '凌晨 1:40，值班手机响了：结算接口错误率从 0.1% 升到 3%。两小时前刚发布 v2.6.0（含大促核心功能）。你只有 15 分钟决定：回滚，还是硬扛。',
+  intro: '结算错误持续3%，新版本高度可疑但根因未证实。根据影响、回滚可行性和等待代价，选当前处置。',
   domain: 'data',
   layer: '决策依据是风险不对称：回滚 10 分钟可逆，不行动的代价是用户持续受损——疑似即行动',
   part: 'engineer',
   chapterId: 'data',
   order: 5,
-  typeTags: ['data', 'sre', 'decision'],
-  difficulty: 3,
-
+  typeTags: [
+    'data',
+    'sre',
+    'decision',
+  ],
+  difficulty: 2,
   scene: {
     role: '你是「鲜到家」值班工程师。凌晨 1:40 告警把你叫醒，你有 15 分钟决定：回滚 v2.6.0（大促功能推迟），还是留着继续排查。',
     architecture: 'App → 结算服务(v2.6.0, 2h 前发布) → 支付渠道',
@@ -28,7 +25,7 @@ export const midnightRollbackCase: DiagnosisCase = {
       {
         type: 'error',
         title: '监控快照',
-        text: '结算接口错误率：0.1% → 3.0%（两小时前起），当前在 2%~4% 波动，未持续恶化也未自愈。\n错误类型：支付渠道返回"签名无效"（新报错，此前从未出现）。',
+        text: '结算错误率0.1%→3%，从00:10至01:40在2%~4%波动，没有已知自愈机制。错误为签名无效。发布23:40，00:10全量完成。',
       },
       {
         type: 'text',
@@ -36,17 +33,31 @@ export const midnightRollbackCase: DiagnosisCase = {
         text: 'v2.6.0 两小时前发布（含支付渠道路由重构——大促核心功能）。\n上游无变更；依赖渠道侧无变更确认（渠道方值班未回复）。\n堆栈指向新路由代码，但复现条件复杂，初步判断完整定位需 1~2 小时。',
       },
     ],
-    timeline: 'v2.6.0 发布：23:40 ｜ 错误率爬升：00:10 起 ｜ 当前：1:40 ｜ 大促功能排期：D-11 预热前必须上线 ｜ 你的决策窗口：15 分钟',
+    timeline: '23:40发布，00:10全量及错误抬升，01:40告警；要求15分钟内完成处置决策，执行回滚另需8分钟；功能原计划D-11，修复后D-9重发。',
     impactHint: '决策依据不是"确定根因后才行动"——是"行动与不行动的代价对比"。先把两边的代价算清楚。',
   },
-
   hypotheses: [
-    { id: 'h-newcode', text: 'v2.6.0 支付路由重构引入：新报错类型 + 时间线吻合 + 堆栈指向新代码', excludeActionId: 'a-timeline' },
-    { id: 'h-channel', text: '支付渠道侧变更导致签名不兼容（渠道方未回复确认）', excludeActionId: 'a-channel' },
-    { id: 'h-traffic', text: '夜间流量模式变化触发边缘条件', excludeActionId: 'a-pattern' },
-    { id: 'h-env', text: '环境差异：v2.6.0 在灰度与全量间的配置漂移', excludeActionId: 'a-env' },
+    {
+      id: 'h-newcode',
+      text: '新版本高度可疑且回滚已验证可执行，应先受控回滚止损，再确认根因',
+      excludeActionId: 'a-timeline',
+    },
+    {
+      id: 'h-channel',
+      text: '渠道未回复时禁止任何止损动作，必须无限期等对方确认',
+      excludeActionId: 'a-channel',
+    },
+    {
+      id: 'h-traffic',
+      text: '错误率已经持续下降并恢复基线，可以继续观察不处置',
+      excludeActionId: 'a-pattern',
+    },
+    {
+      id: 'h-env',
+      text: '本次版本有不可逆数据迁移，旧版本无法安全运行，不能回滚',
+      excludeActionId: 'a-env',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -56,28 +67,42 @@ export const midnightRollbackCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
+      tests: [
+        'h-traffic',
+      ],
+      hypotheses: [
+        {
+          id: 'h-traffic',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '业务影响量化',
-        text: '结算 QPS ≈ 7000/分钟，错误率 3% → 每分钟 ~210 单支付失败。\n用户侧表现：支付页面报错、重试后仍失败 → 流失率随等待时间上升。\n→ 资损链路 + 持续受损：这不是"可以等到天亮"的问题。',
+        text: '接口每分钟7000次尝试，错误率3%即约210次失败尝试/分钟，不等于210个独立订单或确定金额资损。90分钟仍处于2%~4%，没有持续下降到0.1%基线。',
       },
     },
     {
       id: 'a-timeline',
       name: '对齐发布与故障的时间线',
       desc: '时间吻合 ≠ 因果确认——但它是决策信息的一部分',
-      cost: 1,
+      cost: 2,
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-newcode'],
-      hypotheses: [{ id: 'h-newcode', status: 'up' }],
+      tests: [
+        'h-newcode',
+      ],
+      hypotheses: [
+        {
+          id: 'h-newcode',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'text',
         title: '时间线对齐',
-        text: 'v2.6.0 发布 23:40 → 错误率爬升 00:10（间隔 30 分钟 ≈ 灰度放量到 100% 的时间）。\n时间线高度吻合，但未做因果确认（未回滚验证）。\n→ 作为决策信息：嫌疑重大但非 100% 确定——这正好落在"疑似"区间。',
+        text: '23:40发布，00:10放量到100%且错误抬升，堆栈指向新路由；这只支持高度可疑，不是根因确定。\n排期负责人给定：回滚使功能延后约1天，安全回滚预案预计8分钟；继续完整定位预计1~2小时，期间仍受损。应结合可执行性先止损，不需等完整复现。',
       },
     },
     {
@@ -88,12 +113,19 @@ export const midnightRollbackCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-traffic'],
-      hypotheses: [{ id: 'h-traffic', status: 'down' }],
+      tests: [
+        'h-traffic',
+      ],
+      hypotheses: [
+        {
+          id: 'h-traffic',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '波动模式分析',
-        text: '错误率在 2%~4% 波动，与流量 QPS 正相关。\n→ 间歇性触发：新代码路径的某个分支在特定条件下失败。\n→ 波动 ≠ 自愈前兆：QPS 持续则错误率持续，不会自然消失。',
+        text: '01:10~01:40错误率持续2%~4%，未回到0.1%基线；这不证明未来永不自愈，但与“已经恢复”不符。',
       },
     },
     {
@@ -104,8 +136,15 @@ export const midnightRollbackCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-channel'],
-      hypotheses: [{ id: 'h-channel', status: 'down' }],
+      tests: [
+        'h-channel',
+      ],
+      hypotheses: [
+        {
+          id: 'h-channel',
+          status: 'down',
+        },
+      ],
       result: {
         type: 'text',
         title: '上游排查',
@@ -120,12 +159,19 @@ export const midnightRollbackCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-channel'],
-      hypotheses: [{ id: 'h-channel', status: 'down' }],
+      tests: [
+        'h-channel',
+      ],
+      hypotheses: [
+        {
+          id: 'h-channel',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '渠道方联系',
-        text: '渠道值班电话无人接听（凌晨 1:50）。\n→ 渠道侧确认为信息盲区：无法确认也无法排除。',
+        text: '渠道值班暂未回复，不能据此排除渠道故障。团队事故处置规则允许对高度相关且可逆的发布先受控回退；等待回复不是硬前置。排除“未回复则任何止损都禁止”的决策规则。',
       },
     },
     {
@@ -136,12 +182,19 @@ export const midnightRollbackCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-env'],
-      hypotheses: [{ id: 'h-env', status: 'excluded' }],
+      tests: [
+        'h-env',
+      ],
+      hypotheses: [
+        {
+          id: 'h-env',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '配置比对',
-        text: '灰度与全量的配置完全一致（同一 config 版本）。\n→ 排除环境漂移。',
+        text: '回滚演练与当前发布差异检查：无schema/不可逆数据变更，旧版仍兼容当前数据和渠道密钥；可先小批回退、观察错误及健康，再扩展，失败可停止。配置版本与灰度一致。排除“不可逆迁移导致不能回滚”。',
       },
     },
     {
@@ -152,12 +205,12 @@ export const midnightRollbackCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-newcode'],
-      hypotheses: [{ id: 'h-newcode', status: 'confirmed' }],
+      tests: [],
+      hypotheses: [],
       result: {
         type: 'text',
         title: '定位进展',
-        text: '堆栈指向 v2.6.0 新增的支付路由重构代码。\n触发条件：特定渠道 + 特定金额段（间歇性的原因找到了，但完整修复需要代码改动）。\n→ 根因假设已有方向，但验证修复需要 1~2 小时开发 + 测试。',
+        text: '新路由堆栈给出调查方向，完整签名兼容复现尚需1~2小时。仅有堆栈不能把代码缺陷标成已确认根因；该事实不阻止先执行已验证可逆的止损。',
       },
     },
     {
@@ -189,7 +242,7 @@ export const midnightRollbackCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '回滚结果',
-        text: '回滚耗时 8 分钟（含确认），错误率回落至 0.08%。\n大促功能推迟 1 天——但资损链路止损成功。\n→ 根因随后在白天确认：路由重构在特定渠道签名算法下不兼容。修复后 D-9 重新上线。',
+        text: '这是选择后才执行的状态变更：小批回退、观测、全量回退共8分钟，教学分支记录错误回落0.08%。回落支持版本相关，但日后仍需根因复现；不能在执行前用这个结果证明决策必然正确。',
       },
     },
     {
@@ -205,14 +258,14 @@ export const midnightRollbackCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '硬扛结果',
-        text: '你选择了不回滚继续排查。\n→ 排查花了 1.5 小时才定位到路由兼容性 + 30 分钟修复 + 发布 = 2 小时+ 的持续受损窗口。\n→ 大促功能保住了排期，但结算错误率 3% 持续整夜，客服投诉 1400+，品牌搜索指数下降。此选项的期望成本远高于回滚。',
+        text: '继续定位预计1~2小时，这段时间可能持续失败；当前没有证据保证业务排期一定保住。不能虚构1400投诉或搜索指数下降为必然结果。',
       },
     },
     {
       id: 'a-observe',
       name: '观察一夜等自愈',
       desc: '【状态变更】错误率波动不大，先观察到天亮',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -221,68 +274,83 @@ export const midnightRollbackCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '观察结果',
-        text: '观察一夜：错误率未自愈（波动模式分析已排除自愈可能）。\n整夜持续受损 6 小时 = 210 单/分钟 × 360 分钟。\n→ 最差选项：把"不确定"当成了"不行动"的理由，忽略了持续受损的累积代价。',
+        text: '若错误率及流量维持6小时，约210×360=75600次失败尝试；这是条件情景估算，不是已发生的独立订单数，也不能凭波动证明绝不自愈。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-rollback', text: '立即回滚止损——依据是风险不对称而非根因确认：回滚 8 分钟可逆、代价 = 功能推迟 1 天；不回滚 = 3% 错误率持续整夜（用户流失+品牌损伤），期望成本远高', correct: true },
-    { id: 'rc-hold', text: '硬扛继续排查——根因未明时用户持续受损 2h+，且排查结果不确定', correct: false },
-    { id: 'rc-observe', text: '观察一夜等自愈——波动模式已排除自愈可能', correct: false },
-    { id: 'rc-delay', text: '先上线大促功能再修——资损链路故障不能让位于排期', correct: false },
+    {
+      id: 'rc-rollback',
+      text: '在新版本高度相关、故障持续且回滚可安全执行的给定条件下，先受控回退止损，再调查根因；不是因根因已被证明才行动',
+      correct: true,
+    },
+    {
+      id: 'rc-hold',
+      text: '渠道未回复则禁止止损，必须无限期等待',
+      correct: false,
+    },
+    {
+      id: 'rc-observe',
+      text: '错误率已经恢复基线，继续观察即可',
+      correct: false,
+    },
+    {
+      id: 'rc-delay',
+      text: '存在不可逆迁移，当前旧版不能运行',
+      correct: false,
+    },
   ],
-
   expertCost: 5,
   restartActionId: 'a-observe',
-
   expertChain: [
     {
-      thought: '凌晨被叫醒，第一件事不是排查——是评估"这个故障值不值得我叫醒所有人"。结算 = 资损链路，3% 每分钟 210 单。',
-      update: '资损链路 + 持续受损：这不是可以等到天亮的问题，决策窗口已经打开。',
+      thought: '量化持续失败与是否恢复。',
+      update: '约210次失败尝试/分钟，尚未恢复基线。',
       actionId: 'a-impact',
-      why: '1⚡ 先量化业务影响再决定排查深度：资损链路 3% 错误率的每小时代价，决定了"值得投入什么级别的响应"。',
-      conclusion: '持续受损实锤 → 收集决策所需的全部信息。',
+      why: '1⚡统一请求分母并反证已经自愈，不把失败请求当独立订单。',
+      conclusion: '需要及时止损。',
     },
     {
-      thought: '收集决策信息（不是根因信息）：发布时间线、错误率模式、上游变更、渠道联系、根因定位进度、排期约束——六块信息。',
-      update: '六块信息拼出来：嫌疑指向 v2.6.0（时间吻合+堆栈指向），但未 100% 确认；回滚代价 = 功能推迟 1 天；不回滚代价 = 持续受损。',
+      thought: '对齐发布、放量和两种等待代价。',
+      update: '版本可疑，继续调查较久，延期有明确给定代价。',
       actionId: 'a-timeline',
-      why: '1⚡ 决策需要的是决策信息，不是完整根因：根因排查是"定位到行"，决策排查是"定位到哪条路径嫌疑最大"——后者快得多。',
-      conclusion: '决策信息齐备：嫌疑 + 代价两侧都有了 → 该做决策了。',
+      why: '2⚡决策依靠相关性和风险比较，不伪称已确认缺陷。',
+      conclusion: '选择受控回退方向。',
     },
     {
-      thought: '决策时刻：嫌疑重大但非 100% 确定（未回滚验证因果）、回滚 8 分钟可逆、功能推迟 1 天、不回滚则整夜持续受损——风险不对称清晰。',
-      update: '疑似即行动：回滚不需要根因确认，依据是风险不对称——先止损再排查。',
-      actionId: 'a-rollback',
-      why: '2⚡ 回滚决策的核心逻辑：8 分钟可逆的动作 vs 不可逆的持续用户受损——即使回滚错了（不是新版本引起的），损失也只是功能推迟一天。期望成本碾压。',
-      conclusion: '回滚完成，错误率回落 0.08%——决策被验证正确（事后根因确认确实是新版本）。',
+      thought: '检查回滚前置条件。',
+      update: '无不可逆迁移，旧版可运行，有分批与观测。',
+      actionId: 'a-env',
+      why: '1⚡回滚安全性是行动前必须取得的证据。',
+      conclusion: '排除不能回滚。',
     },
     {
-      thought: '回滚后根因在白天确认：路由重构在特定渠道签名算法下不兼容。修复 + 灰度重发，大促功能 D-9 上线。',
-      update: '停止决策循环。转入正常修复流程。',
+      thought: '确认渠道联系不构成止损阻塞。',
+      update: '渠道仍未知，但规则允许可逆止损。',
+      actionId: 'a-channel',
+      why: '1⚡排除错误决策规则，不把未知渠道因果假装排除。',
+      conclusion: '决策信息充分，转受控回退。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】止损 ✓ 根因 ✓ 修复 ✓ 重发 ✓——决策循环完整闭环，无剩余动作。',
-      conclusion: '回滚决策复盘：从告警到回滚 22 分钟，从回滚到重发 7 天——回滚买来的 7 天里，根因被完整修复，且大促功能上线时不再带着隐患。',
+      why: '【停止规则】持续失败、版本关联、两侧代价与安全回滚条件齐备；本局只完成行动选择，回滚及根因复现尚未执行。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '在新版本高度相关、故障持续且回滚可安全执行的给定条件下，先受控回退止损，再调查根因；不是因根因已被证明才行动',
     },
   ],
-
   lessons: [
     {
-      text: '疑似即行动：回滚决策不需要根因确认——依据是风险不对称，不是确定性。',
-      principle: 'SRE 决策原则："如果不确定，回滚"。回滚是可逆的 10 分钟操作，持续故障是不可逆的用户流失——期望成本的差距就是决策的依据，不需要等到根因水落石出。',
+      text: '先判断影响和回滚能否安全执行，再比较止损与继续调查的代价；不是所有不确定都能用回滚解决。',
+      principle: '回滚可能涉及不兼容数据、密钥与外部副作用。本题明确排除这些阻碍，才可受控回退；“如果不确定就回滚”不是无条件规则。',
     },
     {
-      text: '决策需要的是决策信息，不是完整根因：根因排查是"定位到行"，决策排查是"定位到哪条路径嫌疑最大"。',
-      principle: '产品思维：凌晨值班的 15 分钟决策窗口里，你要回答的是"行动还是不行动"，不是"根因是什么"。把决策信息（发布时间线/影响面/代价对比）与根因排查（堆栈/复现/修复）分开，前者 10 分钟，后者可能 2 小时。',
+      text: '决策确认的是此时应做的行动，不等于确认新代码是根因；渠道未回复仍是未知信息。',
+      principle: '把可逆行动的依据与因果验证分开。止损后仍需复现和回归，不能用事后结果回填成事前已知。',
     },
     {
-      text: '回滚的代价是功能推迟，不回滚的代价是用户持续受损+品牌损伤——算清两边再决定，但一定要算。',
-      principle: '成本思维：决策 = 期望成本对比。回滚 8 分钟可逆（最坏：功能推迟）；不回滚最坏：整夜 3% 错误率 + 用户流失 + 品牌搜索下降。风险不对称时，选可逆的一边。',
-    },
-    {
-      text: '回滚买来的时间里，根因被完整修复——回滚不是"认输"，是"用可控的代价换取安全排查的时间与空间"。',
-      principle: '沉淀思维：回滚后的 7 天里，根因被完整定位修复，大促功能 D-9 重新上线时不再带隐患。如果当初硬扛，大促功能也会带着这个隐患上线——回滚保护的不只是用户，还有你自己的发布质量。',
+      text: '7000次尝试/分钟×3%=210次失败尝试；是否重复重试、独立用户或金额损失需另行去重与核实。',
+      principle: '以统一分母估算持续受损，不把失败请求直接等价成独立订单、资损和品牌指标。',
     },
   ],
 }

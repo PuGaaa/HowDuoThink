@@ -1,50 +1,63 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 2 章 · 数据的脾气 结业（深分页 OFFSET 陷阱 L2）
- * 教学点：程序设计——OFFSET 的代价是"扫过并丢弃"：翻页深度即扫描量；
- * 游标分页（keyset）代价恒定；产品方案与实现代价要一起设计。
- * 专家路径：impact(1) + explain(2) + indexcheck(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const deepPaginationCase: DiagnosisCase = {
   id: 'deep-pagination',
-  title: '翻到第 900 页，数据库开始冒烟',
-  intro: '运营翻到订单列表第 900 页，DB CPU 飙到 90%：LIMIT 90000,20——每一页都要把前面的行扫一遍再扔掉。',
+  title: '翻到第4501页，数据库开始吃力',
+  intro: '每页20条的列表，深翻到4501页时变慢。分开分页数据查询、总数查询与整体接口耗时，再核对访问量。',
   domain: 'data',
   layer: 'OFFSET 的代价是扫过并丢弃——游标分页让每页代价恒定',
   part: 'engineer',
   chapterId: 'data',
   order: 10,
-  typeTags: ['data', 'resource', 'capacity'],
+  typeTags: [
+    'data',
+    'resource',
+    'capacity',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」客服系统的后端，一个"越翻越慢"的列表页正在拖垮主库。',
-    architecture: '客服后台 → 订单列表(SELECT … ORDER BY id DESC LIMIT 90000, 20) → MySQL 订单表(8000 万行)',
+    architecture: '客服后台→订单列表ORDER BY id DESC LIMIT 90000,20→MySQL8000万行；另有独立COUNT计数查询。',
     tag: '故障现场',
     symptoms: [
       {
         type: 'error',
         title: '慢查询与 CPU',
-        text: '慢查询样本：LIMIT 90000, 20 → 扫描 90,020 行、丢弃 90,000 行、返回 20 行。\nDB CPU 随"翻页深度"同步上涨：运营找老订单翻得越深，主库越烫。',
+        text: '数据查询OFFSET90000、LIMIT20，实际访问约90020条索引记录并丢弃前90000条；这是每页20条的第4501页。CPU随深页请求量增长。',
       },
       {
         type: 'text',
         title: '体验侧',
-        text: '第 1 页 60ms；第 100 页 700ms；第 900 页 6s——单调递增的"深度税"。\n产品诉求："客服要能翻到任意一页找历史订单。"（升级冲突的种子）',
+        text: '仅数据查询：第1页60ms、第100页190ms、第500页720ms、第4501页6s；计数另耗时1.2s，所以整体接口第1页约1.26s、深页约7.2s。',
       },
     ],
     timeline: '列表页上线一年 ｜ 大促后运营集中清理历史工单，深页查询量激增 ｜ CPU 告警今天触发',
-    impactHint: '越翻越慢的单调曲线——每一页的代价由什么决定？第 900 页比第 1 页多付的 5.9 秒，付给了谁？',
+    impactHint: '先确认页码、页大小和OFFSET一致，再区分数据查询与计数的两笔时间。',
   },
-
   hypotheses: [
-    { id: 'h-offset', text: 'OFFSET 深分页：LIMIT 90000,20 要扫描 90020 行再丢弃——扫描量随页深线性增长', excludeActionId: 'a-explain' },
-    { id: 'h-index', text: '排序列无索引，深页触发 filesort', excludeActionId: 'a-indexcheck' },
-    { id: 'h-lock', text: '深页查询持锁时间长，阻塞写入放大 CPU', excludeActionId: 'a-lockcheck' },
-    { id: 'h-count', text: '每页附带 COUNT(*) 全表计数，双倍开销', excludeActionId: 'a-countcheck' },
+    {
+      id: 'h-offset',
+      text: 'OFFSET 深分页：LIMIT 90000,20 要扫描 90020 行再丢弃——扫描量随页深线性增长',
+      excludeActionId: 'a-explain',
+    },
+    {
+      id: 'h-index',
+      text: '排序列无索引，深页触发 filesort',
+      excludeActionId: 'a-indexcheck',
+    },
+    {
+      id: 'h-lock',
+      text: '深页查询持锁时间长，阻塞写入放大 CPU',
+      excludeActionId: 'a-lockcheck',
+    },
+    {
+      id: 'h-count',
+      text: '深页比浅页多出的约6秒全部来自COUNT，分页数据查询本身没有增长',
+      excludeActionId: 'a-countcheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +72,7 @@ export const deepPaginationCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '深度税曲线',
-        text: '第 1 页（OFFSET 0）：    60ms\n第 100 页（OFFSET 9800）：700ms\n第 500 页（OFFSET 49800）：3.1s\n第 900 页（OFFSET 89800）：6.0s\n耗时 ≈ 页深 × 6.7ms —— 完美线性\n→ 每一页多付的钱 = 前面所有页的"扫过成本"。线性关系直接指向 OFFSET 机制本身。',
+        text: '每页20条：页1 OFFSET0，页100 OFFSET1980，页500 OFFSET9980，页4501 OFFSET90000。数据查询约60ms/190ms/720ms/6s，整体呈随访问量增加的趋势，不宣称完美线性。\n独立COUNT为1.2s，未计入上述数据SQL耗时；整体接口需另相加。',
       },
     },
     {
@@ -70,12 +83,24 @@ export const deepPaginationCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-offset'],
-      hypotheses: [{ id: 'h-offset', status: 'confirmed' }],
+      tests: [
+        'h-offset',
+        'h-index',
+      ],
+      hypotheses: [
+        {
+          id: 'h-offset',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-index',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '执行计划解剖',
-        text: 'EXPLAIN：type=index, rows=90020, Extra="Using index condition"\n机制：ORDER BY id DESC 走索引倒序——索引没白给；\n但 OFFSET 90000 = 索引顺序"走过"90000 行、逐行丢弃，再取 20 行。\nOFFSET 的代价与它跳过的行数成正比——跳过 ≠ 免费。\n对照：游标分页 WHERE id < :last_id LIMIT 20 → rows=20，恒定 2ms。',
+        text: '同一查询计划：主键倒序访问、无filesort；实际执行观测访问约90020条记录，前90000条被OFFSET丢弃，返回20条。EXPLAIN.rows只是估算，实际访问量由执行观测核对。\n同数据改为WHERE id<:last_id ORDER BY id DESC LIMIT20，取得后续20条而无需跳过90000；教学样例2ms，不能保证带过滤/JOIN时永远恰扫20或恒定2ms。',
       },
     },
     {
@@ -86,8 +111,15 @@ export const deepPaginationCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-index'],
-      hypotheses: [{ id: 'h-index', status: 'excluded' }],
+      tests: [
+        'h-index',
+      ],
+      hypotheses: [
+        {
+          id: 'h-index',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '索引核对',
@@ -102,12 +134,19 @@ export const deepPaginationCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-lock'],
-      hypotheses: [{ id: 'h-lock', status: 'excluded' }],
+      tests: [
+        'h-lock',
+      ],
+      hypotheses: [
+        {
+          id: 'h-lock',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '锁核对',
-        text: '普通 SELECT 一致性读不持锁；data_locks 无等待。\n→ 排除锁：CPU 是纯扫描消耗。',
+        text: '同窗无该SQL的行锁或元数据锁等待，普通SELECT为一致性读；不能把MVCC等同所有情况下无锁等待。',
       },
     },
     {
@@ -118,19 +157,26 @@ export const deepPaginationCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-count'],
-      hypotheses: [{ id: 'h-count', status: 'down' }],
+      tests: [
+        'h-count',
+      ],
+      hypotheses: [
+        {
+          id: 'h-count',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '计数核对',
-        text: '每页确实附带 COUNT(*)（8000 万行全表计数 1.2s）——独立的第二慢源。\n→ 降权列入整改：它让"每一页"都慢（含第 1 页），但深页 6s 的主体是 OFFSET。两个账单分开修。',
+        text: 'trace分段：COUNT各页约1.2s且独立执行，数据SQL从60ms增到6s。关闭COUNT后深页数据SQL仍6s，故COUNT不是深度相关增长的全部原因；它是需要另行优化的固定开销。',
       },
     },
     {
       id: 'a-danger',
       name: '临时禁用 500 页以后的深页',
       desc: '【状态变更】> 500 页返回空列表',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -155,7 +201,7 @@ export const deepPaginationCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 游标分页：每页恒定扫描 20 行（2ms），第 1 页与第 9000 页同速\n② 游标 = 上一页最后一单的 id（单调且带索引）\n③ 回归：深度税曲线被削平——页深与耗时彻底解耦。',
+        text: '在产品允许连续翻页时采用稳定唯一排序键游标；本案主键id唯一，可用id<last_id。若按时间排序需加入id打破同值并配复合索引。复杂过滤和并发修改仍要验证，不承诺任何查询永远只访问20行。',
       },
     },
     {
@@ -171,7 +217,7 @@ export const deepPaginationCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '产品协同',
-        text: '运营真实诉求是"找到某天的旧订单"，不是"翻第 900 页"。\n方案：日期区间筛选（有索引）+ 游标翻页——诉求 100% 满足，代价从 O(页深) 降到 O(20)。\n→ "跳页"是实现方式的产物，不是需求本身——跟产品一起拆需求，代价才不会写死在交互里。',
+        text: '与客服验证真实检索目标；日期范围、订单号筛选与游标可减少深翻，但不能未经确认宣称100%满足任意跳页需求。若必须随机页码，另评估锚点、覆盖索引延迟关联或离线检索。',
       },
     },
     {
@@ -207,63 +253,75 @@ export const deepPaginationCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-offset', text: 'LIMIT 90000,20 的 OFFSET 深分页：每页要"走过并丢弃"全部前序行（90020 行扫描），代价随页深线性增长——运营深翻页时主库 CPU 被"深度税"拖垮（COUNT(*) 全表计数为并行慢源）', correct: true },
-    { id: 'rc-index', text: '排序列无索引触发 filesort', correct: false },
-    { id: 'rc-lock', text: '深页查询持锁阻塞写入', correct: false },
-    { id: 'rc-count', text: '每页 COUNT(*) 全表计数的双重开销（次因）', correct: false },
+    {
+      id: 'rc-offset',
+      text: '第4501页（20条/页）需要OFFSET90000，主键访问仍须走过并丢弃前90000条；数据查询的深度开销与独立COUNT固定1.2s分开',
+      correct: true,
+    },
+    {
+      id: 'rc-index',
+      text: '排序列无索引触发 filesort',
+      correct: false,
+    },
+    {
+      id: 'rc-lock',
+      text: '深页查询持锁阻塞写入',
+      correct: false,
+    },
+    {
+      id: 'rc-count',
+      text: '所有深度相关增加均来自COUNT，分页SQL耗时不随深度变',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 5,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '越翻越慢的单调曲线——先把它变成函数：耗时与页深的数学关系。',
-      update: '耗时 ≈ 页深 × 6.7ms，完美线性——线性关系直接指向 OFFSET 机制（跳过量 = 页深 × 每页行数）。',
+      thought: '对齐页码和计时分段。',
+      update: '4501页对应OFFSET90000，COUNT另算。',
       actionId: 'a-impact',
-      why: '1⚡︎ 把体验描述变成函数曲线：线性/恒定/指数各有其机制指纹——线性税 + "与页深成正比"的 OFFSET 定义严丝合缝。',
-      conclusion: '嫌疑锁定：OFFSET 机制（h-offset 升权）。',
+      why: '1⚡算术与计时口径先一致，否则曲线不能支持机制。',
+      conclusion: '核对实际访问。',
     },
     {
-      thought: 'EXPLAIN 拆账：OFFSET 90000 到底让数据库干了什么活。',
-      update: '实锤：索引顺序走过 90000 行逐行丢弃——"跳过"不等于"免费"；游标分页恒定 20 行的对照让修复方向自明。',
+      thought: '比较OFFSET与主键游标。',
+      update: '索引已用于排序，但OFFSET仍丢弃90000。',
       actionId: 'a-explain',
-      why: '2⚡︎ EXPLAIN 拆账把"OFFSET 慢"从口口相传的经验变成行数账本：扫描量 = OFFSET + LIMIT，这是机制层的因果——修复（游标）正是让"跳过量"归零。',
-      conclusion: '根因实锤 → 排除索引与锁。',
+      why: '2⚡区分计划估算和执行记录，同时反证缺排序索引。',
+      conclusion: '确认深度开销。',
     },
     {
-      thought: '索引与锁各 1⚡︎ 排除——尤其 filesort，是慢分页最常见的陪跑嫌疑。',
-      update: '主键倒序无 filesort、一致性读不持锁——两个假设有证据排除。',
-      actionId: 'a-indexcheck',
-      why: '1⚡︎ 排除"索引缺失"防止修复跑偏成"加索引"——索引已存在且被使用，病根在 OFFSET 的语义而非访问路径。',
-      conclusion: '嫌疑收敛单点。',
+      thought: '核对同窗等待事件。',
+      update: '无锁等待。',
+      actionId: 'a-lockcheck',
+      why: '1⚡以实际等待排除阻塞，不凭SELECT名称推断。',
+      conclusion: '排除锁。',
     },
     {
-      thought: 'COUNT(*) 单独定权：它让每页都慢，但不随页深变化——两个账单分开修。',
-      update: '计数降权为并行慢源：与 OFFSET 深度税分层处理，先修深页主体，计数并入改造。',
+      thought: '拆开计数与数据SQL。',
+      update: 'COUNT固定1.2s，关闭后深页仍6s。',
       actionId: 'a-countcheck',
-      why: '1⚡︎ 多慢源要分层记账：恒定慢源（COUNT）与线性慢源（OFFSET）的修复方案完全不同——混在一起会做出"又加缓存又改游标"的大杂烩。',
-      conclusion: '账单分层 → 游标修复 + 计数改造。',
+      why: '1⚡控制变量证明两笔账不同，COUNT并非全部原因。',
+      conclusion: '其余候选排除。',
     },
     {
-      thought: '止血（禁深页）、修复（游标）、产品协同（拆"跳页"需求）、门禁（分页规范）。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（OFFSET 线性税）✓ 分层（COUNT 独立账单）✓ 协同（产品方案共创）✓——技术、产品、防线三层闭合。',
-      conclusion: '沉淀：OFFSET 的代价是扫过并丢弃——游标分页让每页恒定。用户要的是"找到"，不是"翻页"——代价模型要前置到交互设计。',
+      why: '【停止规则】页码访问量及无COUNT对照成立，排序缺索引、锁与COUNT全部解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '第4501页（20条/页）需要OFFSET90000，主键访问仍须走过并丢弃前90000条；数据查询的深度开销与独立COUNT固定1.2s分开',
     },
   ],
-
   lessons: [
     {
       text: 'OFFSET 的代价是"扫过并丢弃"：LIMIT 90000,20 = 扫描 90020 行——跳过不等于免费，深度税随页深线性增长。',
-      principle: '程序设计：分页默认游标式（keyset：WHERE id < :cursor LIMIT n），代价恒定与页深无关；OFFSET 仅限浅页（≤ 1000）。配合 EXPLAIN 门禁（扫描行数断言），深分页在合并前被拦下。',
+      principle: 'LIMIT90000,20对应每页20的4501页。keyset可避免该跳过成本，但还取决于过滤、索引、排序唯一性；不能承诺任意复杂查询恒定访问20条。',
     },
     {
-      text: '用户要的是"找到"，不是"翻页"：跳页交互是实现方式的产物——日期筛选 + 游标可以 100% 满足诉求且代价恒定。',
-      principle: '产品思维：性能约束要前置到交互设计——"任意跳页"暗含 O(页深) 的扫描模型，"日期筛选"暗含 O(1) 的索引定位。跟产品一起拆需求，比在 DB 层硬扛交互设计的代价专业得多。',
+      text: '客服可能需要随机跳页，也可能只需找到日期或订单；先验证目标，再决定游标、筛选或其他索引方案。',
+      principle: '不能替用户宣布跳页不是真需求。把功能约束和访问量代价一起评审；日期范围定位是索引查找加结果扫描，不是无条件O(1)。',
     },
     {
       text: '多慢源要分层记账：恒定慢源（COUNT(*) 每页 1.2s）与线性慢源（OFFSET 深度税）的修复方案完全不同。',

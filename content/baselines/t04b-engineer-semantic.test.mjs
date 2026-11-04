@@ -83,3 +83,12 @@ test('连接池题20条长SQL才能解释20个持有者，读库正常不排除�
 test('filesort不等于必然落盘，缓存命中旧价不靠扩容或回源互斥解决',()=>{
  const c=load('app/data/cases/slow-query.ts');assert.match(c.actions.find(a=>a.id==='a-explain').result.text,/可能在内存完成/);assert.equal(c.actions.find(a=>a.id==='a-fixindex').danger,true);const cache=load('app/data/cases/cache-review.ts');assert.match(cache.actions.find(a=>a.id==='a-stampede').result.text,/一直hit旧值/);assert.match(cache.actions.find(a=>a.id==='a-benefit').result.text,/尚未实测/)
 })
+test('叠加题以QPS乘秒计算需求，并明确200是真实执行上限',()=>{
+ assert.equal(3000*0.35,1050);assert.equal(3000*0.005,15);assert.equal(50*0.35,17.5);const c=load('app/data/cases/double-strike.ts');assert.match(c.actions.find(a=>a.id==='a-combo').result.text,/实际200执行/);assert.match(c.actions.find(a=>a.id==='a-impact').result.text,/慢日志1s阈值/)
+})
+test('深分页4501页与90000 OFFSET相符，COUNT单独计时不与第一页60ms矛盾',()=>{
+ assert.equal((4501-1)*20,90000);assert.equal((100-1)*20,1980);const c=load('app/data/cases/deep-pagination.ts');assert.match(c.scene.symptoms[1].text,/整体接口第1页约1.26s/);assert.match(c.actions.find(a=>a.id==='a-countcheck').result.text,/关闭COUNT后.*仍6s/)
+})
+test('提交状态决定误更新能否普通回滚，秒级复制指标不能给出毫秒精度',()=>{
+ const c=load('app/data/cases/data-script-accident.ts');assert.match(c.actions[0].result.text,/autocommit=1/);assert.match(c.actions.find(a=>a.id==='a-restore').result.text,/隔离实例/);const lag=load('app/data/cases/replica-lag.ts');assert.match(lag.scene.symptoms[0].text,/秒级指示/);assert.match(lag.actions.find(a=>a.id==='a-fixsession').result.text,/固定10秒.*不保证/)
+})

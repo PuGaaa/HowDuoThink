@@ -949,7 +949,54 @@
       "originalDifficulty": 3,
       "originalExpertCost": 5,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "97c50ecb70846858847ea82f136b425903e9571d15fbafb60021f76bf672c2e9",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "影响→行动条件",
+        "时间线与回滚记录",
+        "不确定下决策",
+        "未知根因仍可止损",
+        "发布与支付约束",
+        "等待或回滚都有代价"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-timeline",
+            "a-env",
+            "a-channel"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-env",
+            "a-channel",
+            "a-timeline"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-newcode"
+      ],
+      "review": "5⚡保留，但定位链不再把9⚡状态变更算成2⚡取证；候选统一成决策命题，保留渠道未知，纠正失败请求/订单混淆和D-11→D-9被说7天。",
+      "sources": [
+        "https://sre.google/sre-book/managing-incidents/"
+      ]
     },
     {
       "id": "double-strike",
@@ -960,7 +1007,52 @@
       "originalDifficulty": 3,
       "originalExpertCost": 6,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "a636679bb152fe4605e5dbdda6764666ef2f4f7d0ae167e47831e1437de8ef67",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        3,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "异常指标→组合对照",
+        "同窗三组实验",
+        "QPS×秒容量",
+        "单项不过阈值叠加过载",
+        "缓存/SQL/池",
+        "扩池掩盖需求"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-combo",
+            "a-poolsize"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-poolsize",
+            "a-combo"
+          ],
+          "cost": 4
+        }
+      ],
+      "expectedConfirmed": [
+        "h-combo"
+      ],
+      "review": "人工裁定4⚡（原6、实际旧链4），保留三组对照作为最小证明；修正QPS/并发单位、池上限、不必全因同时修及日志阈值。L3→L2。",
+      "sources": [
+        "https://sre.google/sre-book/handling-overload/"
+      ]
     },
     {
       "id": "data-script-accident",
@@ -971,7 +1063,55 @@
       "originalDifficulty": 2,
       "originalExpertCost": 5,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "182c00aa7787faf0fa41196aec03bd6baea166afe2fc13a42d20dc9c2a06d9e7",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "范围→执行文本→输入",
+        "审计与终端记录",
+        "DML事务与恢复",
+        "文件正确执行不同",
+        "编辑器/CLI/DB",
+        "整表恢复可能覆盖新写"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-sqlcheck",
+            "a-reason",
+            "a-triggercheck"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-triggercheck",
+            "a-reason",
+            "a-sqlcheck"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-wheremissing"
+      ],
+      "review": "5⚡保留，新增必要影响面1⚡、删重复环境取证；修正目标已下架却期望1行、行数等于全表就必无WHERE、已提交仍立刻ROLLBACK及CLI自带保护等错误。",
+      "sources": [
+        "https://dev.mysql.com/doc/refman/8.0/en/commit.html",
+        "https://dev.mysql.com/doc/refman/8.0/en/update.html"
+      ]
     },
     {
       "id": "replica-lag",
@@ -982,7 +1122,55 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "bf4c68f73196bb60b16bd5cc310af35891d052199c60c87e6af37b88fc0bf89a",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "双读路径→GTID时序",
+        "逐单到达记录",
+        "异步复制与可见性",
+        "写成功不保证副本可见",
+        "主库/副本/客户端",
+        "全切主库增加负载"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-lagprobe",
+            "a-cacheprobe",
+            "a-shardcheck"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-shardcheck",
+            "a-cacheprobe",
+            "a-lagprobe"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-replag"
+      ],
+      "review": "人工裁定5⚡（原4，旧链5但漏缓存/路由），移出未经验证的大事务制造者；纠正Seconds_Behind精度与固定10秒严格保证。",
+      "sources": [
+        "https://dev.mysql.com/doc/refman/8.0/en/show-replica-status.html",
+        "https://dev.mysql.com/doc/refman/8.0/en/gtid-functions.html"
+      ]
     },
     {
       "id": "implicit-cast",
@@ -993,7 +1181,55 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "d6e740f4c727b74ceceba67be2062cf98c0f353ddb531ec9eda56704fe20a20b",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "同值对照→计划",
+        "参数与计划对照",
+        "数值比较语义",
+        "有索引仍不能定位",
+        "服务绑定到优化器",
+        "只限流不修单次成本"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-explain",
+            "a-lockcheck",
+            "a-cachecheck"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-cachecheck",
+            "a-lockcheck",
+            "a-explain"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-cast"
+      ],
+      "review": "人工裁定5⚡（原4、旧链5却漏锁）。MySQL8统一、CPU百分比口径明确；修正不同字段唯一差异、显式CAST假象和2100倍算术。",
+      "sources": [
+        "https://dev.mysql.com/doc/refman/8.0/en/type-conversion.html",
+        "https://dev.mysql.com/doc/refman/8.0/en/explain-output.html"
+      ]
     },
     {
       "id": "deep-pagination",
@@ -1004,7 +1240,55 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "e5246dc46d2e867be42550d87d75ac3b2c9494a2db80cc797ebe0f0050d1348e",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "曲线→执行访问量",
+        "分页算术与分段",
+        "OFFSET与keyset",
+        "索引正确仍慢",
+        "交互到SQL计划",
+        "禁深页会影响工作"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-explain",
+            "a-lockcheck",
+            "a-countcheck"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-lockcheck",
+            "a-countcheck",
+            "a-explain"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-offset"
+      ],
+      "review": "人工裁定5⚡（原4、旧链5漏锁）。统一4501页/20条/OFFSET90000，分离COUNT1.2s与第一页60ms，去掉完美线性和任意场景恒定2ms。",
+      "sources": [
+        "https://dev.mysql.com/doc/refman/8.0/en/explain-output.html",
+        "https://dev.mysql.com/doc/refman/8.0/en/limit-optimization.html"
+      ]
     },
     {
       "id": "oom-leak",
