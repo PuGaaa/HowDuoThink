@@ -1,5 +1,6 @@
 /** 每日一题：按日期确定性选题（同一天全员同题），完成后当日去重。 */
 import { ALL_CASES } from '../data/cases'
+import { isCasePlayable } from '../data/chapters'
 import { DiagnosisCase } from '../types/case'
 
 import { notifyProgressDirty, progressStorageGet, progressStorageSet } from './storage'
@@ -22,11 +23,14 @@ function hashStr(s: string): number {
   return Math.abs(h)
 }
 
-/** 今日一题：日期 hash 对案例注册表取模。
- *  刻意只用官方关池（不含社区 casepack）：池子对所有设备同长，保证"同一天全员同题"。 */
+/** 今日一题：日期 hash 对当前可玩官方池取模；游客与登录用户按各自资格选题。 */
 export function dailyCase(): DiagnosisCase {
   const h = hashStr('daily-' + todayKey())
-  return ALL_CASES[h % ALL_CASES.length]
+  const playable: DiagnosisCase[] = []
+  for (let i = 0; i < ALL_CASES.length; i++) {
+    if (isCasePlayable(ALL_CASES[i].id)) playable.push(ALL_CASES[i])
+  }
+  return playable[h % playable.length]
 }
 
 export function isDailyCase(caseId: string): boolean {

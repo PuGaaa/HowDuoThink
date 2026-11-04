@@ -675,7 +675,7 @@ A批适用A01至A16、A22、A24至A25，按该批实际交付边界验收；A15�
 | T05 | 固定主线门槛第一阶段已实现 | 主实施会话 | 工作区 | 试玩目录固定；章节完成/挑战关优先使用显式 `MAINLINE_CASE_IDS`，避免首批主线被同章选做题扩张 | 仍需接入 T03 历史解锁资格迁移，并核定其余章节的冻结必修集合 |
 | T09A | 最小版本与发布分发已实现，待批次独立评审 | 主实施会话 | `531cb18` | `content_revision/source_*` 新迁移、发布幂等与 stale baseRevision 冲突、文章投影、索引任务均在同一事务；固定 head 同步；MySQL8 定向 38 passed | 仍需补齐 App 真实有效版本读取与开局快照验收；完整内容维护归 T09B |
 | T03 | 操作账本与账号空间已实现第一阶段，待继续补客户端最终验收 | 主实施会话 | `faf6bfc` + 工作区 | 客户端改为 `guest/user:<uid>` 命名空间；切换只切 active namespace，不删除账号数据；请求回调校验 uid/token 代次；`session_end` 携带 `sessionId/contentRevision/scoringVersion/expertCost/chapterId`；bootstrap 携带 `archiveId` 且不重放已包含本地投影的操作；bestCost 客户端取最小成功成本；旧全量 POST 426 | 客户端版本快照与 HBuilderX 最终编译验收仍待完成；后端 v2 正确性以独立 progress-integrity 评审提交为准 |
-| T06 | 登录回跳与入口第一阶段已实现，待 HBuilderX 实机验收 | 主实施会话 | 工作区 | 复盘页下一关改用稳定 `MAINLINE_CASE_IDS`；游客登录携带 `returnCaseId` 回原题；保存/拉取失败明确提示；今日入口先检查可玩资格；游客引导不再承诺“登录解锁全部章节” | 第四题完整保存确认、浏览器返回栈、今日题实际走通和 HBuilderX 验收仍待完成 |
+| T06 | 登录回跳与入口第一阶段已实现，待 HBuilderX 实机验收 | 主实施会话 | 工作区 | 复盘页下一关改用稳定 `MAINLINE_CASE_IDS`；游客登录携带 `returnCaseId` 回原题；保存/拉取失败明确提示；今日题按当前可玩官方池选择；服务端允许本地 `127.0.0.1:5183` H5 origin；游客引导不再承诺“登录解锁全部章节” | 第四题完整保存确认、浏览器返回栈、今日题实际走通和 HBuilderX 验收仍待完成 |
 | T07 | 学习事件与最小指标口径已实现，待补批次/预览标记 | 主实施会话 | 工作区 | `0004_learning_events`；唯一 `session_end` 事件；管理员事件明细接口；`/api/admin/stats/learning` 输出开始/结束/破案漏斗及 D1/D7，固定日期样本覆盖观察期；重复同步不重复入账 | 仍需批次、预览/内部测试过滤与 App/Web 全埋点核对 |
 | T08A | 任务事实去重第一阶段已实现，待 HBuilderX 场景验收 | 主实施会话 | 工作区 | 破案层标签使用本地 `solvedLayers` 去重后才记 `layers2`，账号切换随进度空间清理/基线迁移；任务事实操作已接入 sync | 迟到事件的历史周期展示、错案重练跨端验算和 HBuilderX 实际任务路径仍待验收 |
 | T04B、T09B、T10、T11、T12、T13、T14、T15 | 未开始或待前置 | 主实施会话 | — | — | 按 A 批依赖链继续推进 |
