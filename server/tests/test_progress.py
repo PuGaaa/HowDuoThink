@@ -1,4 +1,4 @@
-"""progress 域：进度云同步三用例（未登录 401 / 上传拉取一致 / 覆盖语义）。"""
+"""progress 域：旧全量写入停用边界与进度读取。"""
 
 from tests.conftest import login_admin, make_client
 
@@ -21,24 +21,10 @@ def test_progress_requires_auth():
         assert client.post("/api/me/progress", json=BLOB_V1).status_code == 401
 
 
-def test_progress_put_then_get():
+def test_legacy_progress_put_is_rejected_without_mutation():
     with make_client() as client:
         login_admin(client)
         r = client.post("/api/me/progress", json=BLOB_V1)
-        assert r.status_code == 200
+        assert r.status_code == 426
         g = client.get("/api/me/progress").json()
-        assert g["cases"]["dns-hijack"]["bestGrade"] == "F"
-        # 失败留痕字段不被丢弃
-        assert g["cases"]["dns-hijack"]["fails"] == 2
-        assert g["updatedAt"]
-
-
-def test_progress_overwrite_semantics():
-    with make_client() as client:
-        login_admin(client)
-        client.post("/api/me/progress", json=BLOB_V1)
-        client.post("/api/me/progress", json=BLOB_V2)
-        g = client.get("/api/me/progress").json()
-        # 整体覆盖：v2 有 cors、dns 被 v2 值覆盖
-        assert "cors-101" in g["cases"]
-        assert g["cases"]["dns-hijack"]["bestGrade"] == "A"
+        assert g["cases"] == {}
