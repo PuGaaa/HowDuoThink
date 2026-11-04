@@ -58,12 +58,21 @@ services:
       - MYSQL_PWD=${MYSQL_PASSWORD}
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
-    entrypoint:
-      - bash
-      - -c
-      - 'set -o pipefail; while true; do if mysqldump --single-transaction --no-tablespaces -h mysql -u$$MYSQL_USER $$MYSQL_DATABASE | gzip > /backups/.hdx-tmp.sql.gz && [ -s /backups/.hdx-tmp.sql.gz ] && mv /backups/.hdx-tmp.sql.gz /backups/hdx-$$(date +%F).sql.gz; then echo "backup ok: hdx-$$(date +%F).sql.gz"; else echo "backup FAILED: mysqldump/gzip error, previous backups kept" >&2; rm -f /backups/.hdx-tmp.sql.gz; fi; find /backups -name "hdx-*.sql.gz" -mtime +7 -delete; sleep 86400; done'
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - BACKUP_DIR=/backups
+      - BACKUP_INTERVAL_SECONDS=86400
+      - BACKUP_RETENTION_DAYS=7
+    entrypoint: ["bash", "/ops/backup/schedule.sh"]
     volumes:
       - backups:/backups
+      - ./ops/backup:/ops/backup:ro
+    healthcheck:
+      test: ["CMD", "bash", "/ops/backup/health.sh"]
+      interval: 5m
+      timeout: 5s
+      retries: 1
+      start_period: 5m
 
 volumes:
   mysql-data:
