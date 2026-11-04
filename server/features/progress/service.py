@@ -47,6 +47,15 @@ def sync_operations(uid: str, operations: list[ProgressOperation]) -> dict:
         bundle.setdefault("dailyDone", "")
         revision = int(row["revision"]) if row else 0
         can_bootstrap = row is None
+        if row:
+            baseline = conn.execute(
+                "SELECT op_id FROM progress_ops WHERE user_id=? AND kind='baseline' LIMIT 1", (uid,)
+            ).fetchone()
+            if not baseline:
+                conn.execute(
+                    "INSERT INTO progress_ops(user_id, op_id, kind, payload, occurred_at) VALUES(?,?,?, ?,datetime('now'))",
+                    (uid, "baseline:" + uid, "baseline", db.jdump({"bundle": bundle})),
+                )
         confirmed = []
         for operation in operations:
             seen = conn.execute(

@@ -117,3 +117,33 @@ def test_streak_sync_rebuilds_from_beijing_event_days():
         response = client.post("/api/me/progress/sync", json={"operations": ops})
         assert response.status_code == 200
         assert response.json()["streak"] == {"last": "2026-11-05", "count": 2}
+
+
+def test_legacy_progress_is_recorded_as_baseline_before_new_operations():
+    import db
+
+    with make_client() as client:
+        login_admin(client)
+        db.ex("DELETE FROM progress_ops WHERE user_id=?", ("pw-admin",))
+        db.ex("DELETE FROM progress WHERE user_id=?", ("pw-admin",))
+        db.ex(
+            "INSERT INTO progress(user_id, payload, revision) VALUES(?,?,0)",
+            ("pw-admin", db.jdump({"cases": {"old-case": {"solved": True}}})),
+        )
+        response = client.post(
+            "/api/me/progress/sync",
+            json={
+                "operations": [
+                    {
+                        "opId": "baseline-followup",
+                        "kind": "checklist_use",
+                        "occurredAt": "2026-11-04T15:00:00.000Z",
+                        "payload": {},
+                    }
+                ]
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["cases"]["old-case"]["solved"] is True
+        rows = db.q("SELECT kind FROM progress_ops WHERE user_id=? ORDER BY op_id", ("pw-admin",))
+        assert {row["kind"] for row in rows} == {"baseline", "checklist_use"}
