@@ -47,7 +47,7 @@ function harness() {
   };
   const context = vm.createContext({
     uni, console, Date, Math, Set, Map, URL,
-    process: { env: { NODE_ENV: 'development' } },
+    process: { env: { NODE_ENV: 'development', APP_API_BASE: 'https://api.test.invalid' } },
     setTimeout: callback => { const id = ++timerId; timers.set(id, callback); return id; },
     clearTimeout: id => timers.delete(id),
     setInterval: callback => { const id = ++timerId; timers.set(id, callback); return id; },

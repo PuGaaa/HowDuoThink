@@ -120,7 +120,7 @@ jobs:
             BEFORE_SHA=$(git rev-list --max-parents=0 "$HEAD_SHA")
           fi
           changed=$(git diff --name-only "$BEFORE_SHA" "$HEAD_SHA")
-          if grep -Eq '^(server/|app/data/cases/|content/tools/export-case\.mjs)' <<< "$changed"; then
+          if grep -Eq '^(server/|app/data/cases/|content/tools/export-case\.mjs|\.github/workflows/ci\.yml)' <<< "$changed"; then
             echo "api=true" >> "$GITHUB_OUTPUT"
           fi
           if grep -q '^admin/' <<< "$changed"; then

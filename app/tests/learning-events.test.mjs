@@ -18,7 +18,7 @@ function harness() {
     getStorageInfoSync: () => ({ keys: [...values.keys()] }),
     request: request => { requests.push(request); },
   };
-  const context = vm.createContext({ uni, console, Date, Math, Set, Map, process: { env: { NODE_ENV: 'development' } } });
+  const context = vm.createContext({ uni, console, Date, Math, Set, Map, process: { env: { NODE_ENV: 'development', APP_API_BASE: 'https://api.test.invalid' } } });
   function load(file) {
     if (modules.has(file)) return modules.get(file).exports;
     const module = { exports: {} }; modules.set(file, module);
