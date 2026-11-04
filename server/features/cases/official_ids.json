@@ -1,0 +1,3994 @@
+{
+  "source": "官方登记和核定修订，由publication-release生成；不是正文编辑入口",
+  "ids": [
+    "alert-storm",
+    "api-sunset",
+    "async-swallow",
+    "avg-metric",
+    "bandwidth-hog",
+    "bg-split",
+    "boot-order",
+    "boot-storm",
+    "buildtime-inject",
+    "cache-drift",
+    "cache-review",
+    "callback-mismatch",
+    "canary-decision",
+    "capacity-assumption",
+    "capacity-review",
+    "cardinality-blast",
+    "cascade-timeout",
+    "caused-by",
+    "cdn-penetration",
+    "cdn-stale",
+    "cert-sni",
+    "chunk-overlap",
+    "ci-cache-pollution",
+    "closure-leak",
+    "config-drift",
+    "config-typo",
+    "container-review",
+    "contract-review",
+    "cookie-lost",
+    "cors-101",
+    "coverage-illusion",
+    "data-script-accident",
+    "deep-pagination",
+    "dep-hell",
+    "deploy-migration",
+    "distributed-monolith",
+    "dns-hijack",
+    "doc-drift",
+    "double-strike",
+    "enum-drift",
+    "env-contention",
+    "env-drift",
+    "env-inherit",
+    "error-budget",
+    "error-contract",
+    "event-loop-blocked",
+    "fallback-drill-fail",
+    "false-lead",
+    "field-mismatch",
+    "first-domino",
+    "first-npe",
+    "flag-leak",
+    "flaky-test",
+    "gateway-review",
+    "geo-stale",
+    "graceful-shutdown",
+    "h2-hol",
+    "happy-eyeballs",
+    "histogram-bucket",
+    "hot-reload-gap",
+    "hpa-lag",
+    "idempotent-fail",
+    "idle-reset",
+    "idor-orders",
+    "image-tag-drift",
+    "implicit-cast",
+    "leaked-keys",
+    "loadtest-illusion",
+    "lock-expiry",
+    "log-correlation",
+    "log-pii",
+    "log-sampling",
+    "metrics-review",
+    "midnight-rollback",
+    "mixversion",
+    "mock-canyon",
+    "mock-leak",
+    "mq-bus-review",
+    "mq-delay",
+    "mq-disk",
+    "mq-dlq",
+    "mq-dualwrite",
+    "mq-duplicate",
+    "mq-lost",
+    "mq-slowpart",
+    "msg-order",
+    "mtu-blackhole",
+    "nagle-ack",
+    "ndots-trap",
+    "nginx-trap",
+    "oom-leak",
+    "oversell-race",
+    "partition-split",
+    "pipeline-review",
+    "poll-storm",
+    "pool-deadlock",
+    "pool-exhausted",
+    "pool-rejection",
+    "priority-clash",
+    "probe-mismatch",
+    "profile-maze",
+    "proxy-headers",
+    "rate-limit-passthrough",
+    "rebalance-storm",
+    "regex-catastrophe",
+    "replay-surge",
+    "replica-lag",
+    "required-field",
+    "retry-storm",
+    "rollback-drift",
+    "rule-sprawl",
+    "slow-query",
+    "sqli-sort",
+    "ssl-chain-missing",
+    "ssrf-internal",
+    "supply-poison",
+    "symptom-cluster",
+    "tcp-retrans",
+    "testing-review",
+    "threadlocal-leak",
+    "timeout-contract",
+    "timewait-exhausted",
+    "trace-break",
+    "tri-platform",
+    "warmup-storm",
+    "waterfall-read",
+    "white-screen",
+    "withdraw-race",
+    "wrong-env",
+    "ws-upgrade",
+    "xss-decision"
+  ],
+  "legacySourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+  "legacyContentHashes": {
+    "ssl-chain-missing": "8d5af94163631c6be188d4df77cfdb3bb028cf45980082c6f1e6296a7267ecf9",
+    "dns-hijack": "06011a52f1efc22dd9fe2b70de6d7943c744e110ae3b0d380759a52951a0356f",
+    "cors-101": "fc0107047a4bc68046c36aeb929cdb71ef0bb19bbf07bb522dd10b90fd0be93e",
+    "pool-exhausted": "c21d4aadacd1e2572ddf8e3000f891e6ed77bc015e8d493127ee64449aef7904",
+    "cache-drift": "74df3e3f44ba3d9830eece40dbb5711c988853b76dc40e5d7c4144b63c2570d5",
+    "slow-query": "24ed8317b643be032a6804d5539e133148aa7d6005df3ba45403c291ea804dc7",
+    "oom-leak": "8bf21162d06d28cf60a9eddf83c8742017f29a815f553598522aecd56e2226b7",
+    "msg-order": "46e67bcfa21be183c7e276dbae0618473f92b4b13d246d866fbd95be767f5859",
+    "nginx-trap": "20971972fb83c3c304c4b43d8948d82780d385e454cd6b1383387de153043a40",
+    "cache-review": "bba9f5c316e05c5c23e6dca6dc989da7b61a17ab7d5e348e5355e3cec8af3164",
+    "event-loop-blocked": "2c0f469256b09fa90104365b9f747db922ef3bd710963dce73fd5caaa300221b",
+    "timewait-exhausted": "c467e75169a6ef9cbd280c228054cd806f6f23b747bf60a31cc6950488af2a4a",
+    "closure-leak": "2512c2c367097c2d5b705960b3ba1772dc447353079f8c7ba0cf93906de5b67a",
+    "ci-cache-pollution": "4695a5aea8d5d145c7c733a41217bd0571101bae9a23e8600f7640eb3e9e39af",
+    "alert-storm": "52bb51b53cf9fd1eb1923c830854e8173dd5d1a3ad2bcb14e9aa4f3b33d99729",
+    "histogram-bucket": "5696a0b7d5f0152b84fdc210c0671333d68467692d13e7a0055ec93b54eb0ae4",
+    "leaked-keys": "80164cb012ace82586ea028917d2d75dd2f84b3ce971c9d6ecc7be85d459f934",
+    "idor-orders": "993b2e37fd73409efb3f5ab3454f8751a293f48e3f188a56fbf389c7ec5321dd",
+    "log-pii": "aa2f162f2052363fa8ea329941659bf1d7a7dddb6fea7a428bfdf1b6b23a51b6",
+    "ssrf-internal": "4b2edd9cbec31179b5f9146e58403a3195d116a0ac2ba5b725e7bf80f940d956",
+    "withdraw-race": "ace894d04de38688c3ad923749490c5cd5eacc2836691fa5d43ba34d806fa1a1",
+    "supply-poison": "d5957a4210208fdda71f857813e8905e2423165a4ad8892039911ba3d34c6516",
+    "gateway-review": "572f46b6c630e0087f2ee8ba37b15de7c90d229be9f431b443d4748ffb1676e8",
+    "pipeline-review": "e14adac307443fdc695e42b17cb2c6818526c934941cfb0e417ac5ddb16f6e94",
+    "container-review": "de38c62f5e72f8b91a11303736a06bce49c0a49f15129b2f6c22a6bfda2ccb77",
+    "metrics-review": "68000a07d2f2be436c02dedfddf525d1814668cd9d8f725d3f5eaaa5ff5ff9eb",
+    "midnight-rollback": "b8539682e3d547a6b9214f126c046e28e07e6dca7bc484cba8c7e41185495164",
+    "canary-decision": "f40a2ace917c45f05a4fe127d7b5e5f9adeef64ff1a0eb72e10daf96ae3dbcbd",
+    "xss-decision": "b19cdf3144993e4ddb65174e84090b5cb54b278df5a9d8bb76695eca7786807a",
+    "error-budget": "4c4c605324699b3168c4040eaf0c5d0ab9a861bc98a7cd29c3b2a208f9e0a186",
+    "double-strike": "0eb69cb5a4303dbe1faaeb33cce8e7ba660939f316ba0b6bf330af68f01fbfa9",
+    "false-lead": "740fd9d4c096409788b0d4b4c42cfbc1a4eedb3c6aa6be1c085c54ffc209906a",
+    "cascade-timeout": "d2754d34f5f7344df0fd37a0c25ca240a212e36e613ec7e7753da93f0ac80db3",
+    "data-script-accident": "f44868562fd385b505d0e9902cd19f9cf2a3662005d970f1b9b09f0b351a4a57",
+    "rate-limit-passthrough": "f066e4caf8ed41f17df44efebf522ea437169ae6f06d7d47744dca09a6a11c48",
+    "fallback-drill-fail": "feafb0999639ba458b5405ec8dae3452c935f9c2104de0b0140552381d0df69d",
+    "retry-storm": "87e4cc7e798242f06906fcc658f77a02a95c939260b756b1fff6046549a539a9",
+    "hpa-lag": "6ea8b3483f565873ef39b32db82d76f2dccdf224a2d55644b8864149ff43ec48",
+    "white-screen": "c30d5dc1966b7d745f4beccae1f2822ed5e62bddcaff1c1cf4eaf5f62a5c3e53",
+    "dep-hell": "0776cff4d6b72f5986315cfcf107d0717e9af92271be545b453b795e106c3844",
+    "oversell-race": "4314ce4f2147c0af2262b85afbc42b5e4feca7de982704456c6d1c720c24dc9a",
+    "idempotent-fail": "829fc7ae47af7b8a199e4714f96eb8fcec488ce5e5c9a636d48dcf2e7b8d71b9",
+    "log-sampling": "fa454f7a13562aa7f002c8e253fe5e495135a729257dc02b245204389aaa68e7",
+    "avg-metric": "d69e7ee0e89cab3b521fb5c2c639e2c1ba86264b410f27b97b58d67188aa9229",
+    "mq-lost": "c60d0f53804184c064807d0d8949a9969d55331e013d351385e0497334d70ce9",
+    "mq-duplicate": "a3fec2fbc6c483e15af0b6fd7201f2a912653a86d6b326d660c97f4a04aed76a",
+    "mq-dlq": "0ef01aa00e3426f4d27c53c8880d3657c71a29fa07290ee03e3ef27976c1c5ee",
+    "mq-delay": "3f157694f365bc78e88cae969ed8e943cac0806749a45e0f3e92f75363d82ef9",
+    "bg-split": "48c21a16a561f6ba104df6efb83f39d54f5d9edc9b3bbe64e3fce428f8b924fd",
+    "flag-leak": "8ff59f03ba5013cc9aeed41fb22bd650fb91cc3a2f1a048df212aec4a82bcf03",
+    "mixversion": "7885c0aa6f1cd8006c38f26dd9873ee7856fba771c8a8a3c4a578aaff1496351",
+    "cdn-stale": "91d7232578b19d3c13dfb94ea80ac328ed3e12dfdbd5fabb954d60460d629f8d",
+    "tcp-retrans": "e99f3b6fff9a2dcd57aeae171a0b6da5631791651d2a1dee588d3c56964c820f",
+    "h2-hol": "1af21b4131218dc7aa889ae1b7e3d392f312192439e5ca47bcf1d5e4526cb6f2",
+    "cdn-penetration": "024b03d48e99f6242f4f403179d593d3b284040700406449e701acdd87278811",
+    "proxy-headers": "ae8413bfdfbde7a26b11ff489eb0ceecd90e0a2dfd0a6827921bf098977d20d3",
+    "coverage-illusion": "489fc3ecae439ed63dedb46f98a4a1d092b10b37135cfe8d16beb82fa4a4d422",
+    "mock-leak": "361ea0798e16c090c51393247650200d3a5ffadce44de97717eed6cd3a190aa0",
+    "flaky-test": "82cc816c41a4572d65a9188d88cc9efb9fa39177c756dd5dbf2c21ffb0877445",
+    "env-drift": "66049ffec67904b1e392de032a71798b8f3041d2668953c73627ef3bedb64111",
+    "mq-slowpart": "5a9d134824c25fe008afe65b62b4fc02ccd4259da20fcb420c71b7d4f6644b82",
+    "deploy-migration": "ce6fa3c1d2a762726ae7a0921e3c549e3646a903a3d4702452812df6878fa3af",
+    "pool-deadlock": "3f04283e1f030e82afe2dab20e58c09cfa965dd639d156bd08d1e5c9b92e5407",
+    "lock-expiry": "c4ed5165783eef0f510c65cea1c1c14b4cbfcc305316dd55f7699f61718cda97",
+    "idle-reset": "a80fe120a19321ed2a0890320f4b916fa6277077b15c6857a66173349ebe7630",
+    "mq-bus-review": "885dc73b4758dc47f930d269694d17617682915b3dce443d2776ba66ea38f5a6",
+    "threadlocal-leak": "49897aaf7e4dd2fddd1f78e647c155f606d24362b1ac3241e95a350b19309ef8",
+    "image-tag-drift": "f37b704f5030c3487c6721e7a43afdf17f76e2740e3c906c2abb8c35cc0e6d21",
+    "regex-catastrophe": "feb837dadb8ddb33390e8fb71f03758c7195e9a3b5cf0d3005ce3a6dceab4f82",
+    "cardinality-blast": "e7980680185fc44835e2d67e5054391c73305630225905c6d667aafc6ea388a9",
+    "distributed-monolith": "883bf7186a6135806b9266ab112aacf42f833cae9fc30d5e13f6f2112b5894ae",
+    "loadtest-illusion": "3dd6af3139ed7fc02b732e06203e6b7117d6d621fbb10915200a33776b021ea8",
+    "ws-upgrade": "d3d0e62ebfc5cc99be6d72e9eb0e940e4d638d0b5941780b42231089992aa9fb",
+    "replica-lag": "6f120e4185c7f83c51bb8e9620a917ad43e797d7adf94f5d86210c1738441cbc",
+    "sqli-sort": "fe20cb50bb40978d74c9c257d117e31b698446254d92eb69577f15c73d468325",
+    "rebalance-storm": "0f4fada6f748e05fb0b67ca6b17de09acbc507366e931bbd56a82624b8151e0f",
+    "graceful-shutdown": "91f13c53d42d4e016458e81add11291e6a052d8627398373ef3dc779e10cdaed",
+    "nagle-ack": "86abd774f44227e4bfcfbf89bf4623d79acfe4717ef60bd60f0818728392290d",
+    "buildtime-inject": "fe1fe4b6cc99a717e56197eb00bf5121cbccf5dddb0e83f2fe029b8800aa81a9",
+    "pool-rejection": "d0f6c687cfc4c02cdfa0d7b15150d86f43510f020712cbd41f72d2107a4d61a7",
+    "trace-break": "4f7ff4710060a1e0ef1b9939e6dfe83a491dd9210b7fe463342b409256fcde74",
+    "api-sunset": "2dc15ea9e952afe3aca9c3a901683586c4acc920a83699fbc1c2445992d5855a",
+    "implicit-cast": "d72b993538ba92db1e904c443abe486309819339146c8b405819416e6bffc96c",
+    "capacity-review": "aed667a153399eda88054486d62d2e4d53f8b8df520e8a4993c9cba4d266b04d",
+    "cert-sni": "b05c4c24d1e9c99b91fc547c298199b479c04329fd6b8397e8b21b4c327444be",
+    "testing-review": "24cbf131177210348ded3a47ac8bc9453c7c266071905639b8ee93e093506183",
+    "config-drift": "87d55ea8d6dd593b74d100fd8f4ad2fc968f4f3ec746789f752cf3df32ee9735",
+    "happy-eyeballs": "d004458767145d18e70c582906ec268ad98e42fa4213bf8cb7b1866a06b1f1dc",
+    "mq-disk": "4ecee98163a00fbdbe872d2c49c9b4adfddcc3f0c421d7e632e9df9d00dd27f6",
+    "chunk-overlap": "c7082eb340661feb718a9b029e363af4110ce52350d9545b60131ccc707bd063",
+    "callback-mismatch": "605247bd45cef0213b211c9d5c69f70ccb378bc75d5ebe9808cb58c08a751077",
+    "deep-pagination": "18f0f9e4defe946052cd5ebde7bf0fff7ef08d5698fe17885ed079eb8a18e039",
+    "rule-sprawl": "122b999be5dad5343fe8e4b2bca7ec9ab2a65fa900b67a700f135d6ac1253d5d",
+    "mq-dualwrite": "913290e2b7eb0c6763a1c1e9ca42978fb2d5eabd95a8bd9573fcd9585d57a13d",
+    "probe-mismatch": "7436a89f73caac1cc827544a3e5d69b7a16023d4d5aeffcc76d9e0aa8c83115c",
+    "wrong-env": "93fb8805f112b68cdbe677db43eb5e06d40b99ab062aa1192c5bbe47d2c225ff",
+    "bandwidth-hog": "b719578099a0695852592e2d801d79d1792033e9caa66a8becce9380ec5130a1",
+    "ndots-trap": "5b48b0f4b4382f50f74a07b2845ec2466cb5f49f0ffcb10f8f7f68031092e144",
+    "env-contention": "9b24614206ce43e500f3aeb002cee0a67deab1cc5b6a666a42ddc2e06d0dabcb",
+    "first-npe": "48dc54d5801f7ba190c7027066a6316486aab5c232ae07a4744d532b07050c9c",
+    "caused-by": "6cbd2a1ab1df1af4af87d2008a21812e494884b3828b6a7ffcf3e249ba09ec73",
+    "field-mismatch": "74e22a3459f7ca011526539fd4089760ba525d04ac166b678cbe1597b736280f",
+    "cookie-lost": "3507c20ceeaec26c6cdd7275852b30a57fd1911841ef663519bafc004f0ddbb6",
+    "required-field": "ef98d3d39aa731c755912ee8c8962a91d4d2e66b9cdbd50025cb1d63b14e49ec",
+    "doc-drift": "9f87178cf7a404ec565d184a315ff3e48fadd233a69341586c94f4a90b619428",
+    "config-typo": "8f4f263b90250881d9a39860ee437307ae2c72f6a7a6c725f4e91913f03c4de8",
+    "boot-order": "e6f4b71085ef8250fc0357eb2dc2b617b73646c5c2f6ce442f5fcb6a149ec7e4",
+    "log-correlation": "2635b1d13617414ca520b6fc6743f4fe9edeadd6c32173c97c3df2b6dee0b38b",
+    "waterfall-read": "562210f221d1d3098902b9cf9d01d4652a002fe07c927fa4a3fb51fafa31c8e6",
+    "timeout-contract": "4c90c3255248aebda0b19c1e2e974d845a47164e4836b9b10ffd8d12ff2ab2a9",
+    "hot-reload-gap": "760c5d9001a7e5e459e2132eeabfae44e2d3a91324dd5d6b6a2ea9820c4b54d2",
+    "async-swallow": "2c1a8e47c9bd7378912daa4303cda6818e4d41e1936074108609bfe215985ad8",
+    "poll-storm": "009d6935111670716220c48b5a61a0902ffda7b73891d46a562ca36028217166",
+    "enum-drift": "4b78ca6e240be2009e92b87c2faa029b5700d404a8bb174fe7c41d778d43d904",
+    "priority-clash": "e08fb1a4fc862342509d79e1c860c96524151f244184d9b5f4d3d953e4368c3a",
+    "symptom-cluster": "f994b20fedb32826caca7c2a3d0b163a6a403cb57ff9a7b6540cb1456ac298b0",
+    "first-domino": "232c1b1f684d186697b95d97caeb38b750f0da63a8a7b95cb8843098c6f2b175",
+    "mock-canyon": "24188c18e66bda14e4d95906ff91aa15a52c4cf6f759b9092dd1b8dd3acc1566",
+    "tri-platform": "b0a487b394d4d8b5de90b41c9db1df8ef58bac8bde981e4d945409381b4bc5ea",
+    "error-contract": "de77e691bce76688344f22875f76df008912e7a26406ca2e8886b9206a2f99a6",
+    "contract-review": "5325dd1dc63bab5e9547acfcde675f7fc3814912982bba76ef485428f1a2e696",
+    "profile-maze": "e61170d0d94ea6160221fc6683ee45b2851c62278c71257cb0ad3b040c8c8a37",
+    "boot-storm": "3e423149d76e6b582af330fc2a3c2a34a97983bc413981a89f7f1e6156ebb589",
+    "rollback-drift": "13a3e1e0c0f5219efc78cb45121cb13c0bb3f3488d3f7c8540f959e951c1cdfb",
+    "warmup-storm": "81cee68e71d24c16c79cc8b453d3f570372b69344c066a365bf1220913090d9c",
+    "partition-split": "8320d43bcbdeda7168c45608d591f70992b4d22bb5697e7649ec00bd59c2058a",
+    "replay-surge": "2f6573148d97ff3e28729124deefc3aa529beb5de1e8e8262641e187d4483a5e",
+    "mtu-blackhole": "bb085645032830199110355a115cdab39f26448bc73c07bd65c872ec09474319",
+    "geo-stale": "cd3fe7ce738979ef128734bc14d03e1eb2f7bebb89677646861a38efdc9fab56",
+    "env-inherit": "35016cea9208af98f3c43c0efd51f4451e54f79a20282e60205904750f279d0c",
+    "capacity-assumption": "2521b4c67bf976670f34a3109e7a158b6e140117e5a116a43b0334010d763d3e"
+  },
+  "publications": {
+    "ssl-chain-missing": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "08391975797b6eb7e30d1a7b68afcb0358a702d38d6f3d8f5baf944c571c33c2",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "8d5af94163631c6be188d4df77cfdb3bb028cf45980082c6f1e6296a7267ecf9",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "08391975797b6eb7e30d1a7b68afcb0358a702d38d6f3d8f5baf944c571c33c2",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "dns-hijack": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "dcc48d1db530d31d0b9590f7e8f2d227202edc030a7fc47187414400f645b764",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "06011a52f1efc22dd9fe2b70de6d7943c744e110ae3b0d380759a52951a0356f",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "dcc48d1db530d31d0b9590f7e8f2d227202edc030a7fc47187414400f645b764",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "cors-101": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "e552316bbc7e6afed0f19964324c2839c99c1aec4151bd35d1367b4f568be4b6",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "fc0107047a4bc68046c36aeb929cdb71ef0bb19bbf07bb522dd10b90fd0be93e",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "e552316bbc7e6afed0f19964324c2839c99c1aec4151bd35d1367b4f568be4b6",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          1,
+          1,
+          1,
+          1,
+          2,
+          1
+        ],
+        "gaps": []
+      }
+    },
+    "pool-exhausted": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "d64b08d1b30601d9dfad72e621055bac48aa60a02925070aeac288df774c5dc7",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "c21d4aadacd1e2572ddf8e3000f891e6ed77bc015e8d493127ee64449aef7904",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "d64b08d1b30601d9dfad72e621055bac48aa60a02925070aeac288df774c5dc7",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "cache-drift": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "f81442d7c45280cb46428aaa813ece38e3cf4eaf11e0cd1bd9714d1bb9069670",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "74df3e3f44ba3d9830eece40dbb5711c988853b76dc40e5d7c4144b63c2570d5",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "f81442d7c45280cb46428aaa813ece38e3cf4eaf11e0cd1bd9714d1bb9069670",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "slow-query": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "8dd861657759dba3c90b89f0ec2ea0b73f7bd7209cbe302d8267565f3ff45a2e",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "24ed8317b643be032a6804d5539e133148aa7d6005df3ba45403c291ea804dc7",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "8dd861657759dba3c90b89f0ec2ea0b73f7bd7209cbe302d8267565f3ff45a2e",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "oom-leak": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "266fa8848ac972cc5ba669ee5a0e18d057ca0cd6175c4ebef73133cf8b4da3ab",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "8bf21162d06d28cf60a9eddf83c8742017f29a815f553598522aecd56e2226b7",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "266fa8848ac972cc5ba669ee5a0e18d057ca0cd6175c4ebef73133cf8b4da3ab",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "msg-order": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "bdc30ef8af61b024a16597ad365a7584461727b5de2a709511c9109559e7aec5",
+      "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897",
+      "history": [
+        {
+          "contentHash": "46e67bcfa21be183c7e276dbae0618473f92b4b13d246d866fbd95be767f5859",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "bdc30ef8af61b024a16597ad365a7584461727b5de2a709511c9109559e7aec5",
+          "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          3,
+          2,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "nginx-trap": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "b3969b6e85258304b2e139acc4df0bec48992412620c6c70e87971bc8d852503",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "20971972fb83c3c304c4b43d8948d82780d385e454cd6b1383387de153043a40",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "b3969b6e85258304b2e139acc4df0bec48992412620c6c70e87971bc8d852503",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "cache-review": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "e3cf0c081ebc34c84f7acf52ede7c0055905f64ecd293e4c4d90802cb16ffa4d",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "bba9f5c316e05c5c23e6dca6dc989da7b61a17ab7d5e348e5355e3cec8af3164",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "e3cf0c081ebc34c84f7acf52ede7c0055905f64ecd293e4c4d90802cb16ffa4d",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "event-loop-blocked": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "c60fe45c33e962bbe5e5a1476e8e16f1df951b5863ebc32e58df3140b2d07dd6",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "2c0f469256b09fa90104365b9f747db922ef3bd710963dce73fd5caaa300221b",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "c60fe45c33e962bbe5e5a1476e8e16f1df951b5863ebc32e58df3140b2d07dd6",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "timewait-exhausted": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "534fe7370862923e630daf65e2e7cc3d94131722ec724c8dfc79e67cd90652d0",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "c467e75169a6ef9cbd280c228054cd806f6f23b747bf60a31cc6950488af2a4a",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "534fe7370862923e630daf65e2e7cc3d94131722ec724c8dfc79e67cd90652d0",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "closure-leak": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "34d0f511e3a4d292ffc79e238790fd7955cfee0d80703991e390a417c4ae2a8a",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "2512c2c367097c2d5b705960b3ba1772dc447353079f8c7ba0cf93906de5b67a",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "34d0f511e3a4d292ffc79e238790fd7955cfee0d80703991e390a417c4ae2a8a",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "ci-cache-pollution": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "d75ae493e1ff057cddbf33ab1e815de7952b58d896c74921c46b9668c7d5a0c5",
+      "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac",
+      "history": [
+        {
+          "contentHash": "4695a5aea8d5d145c7c733a41217bd0571101bae9a23e8600f7640eb3e9e39af",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "d75ae493e1ff057cddbf33ab1e815de7952b58d896c74921c46b9668c7d5a0c5",
+          "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          3,
+          2,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "alert-storm": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "90fb25c37a7107223ddaca038a6d8695a4cfffe00fabb5517f15aeb62eafc485",
+      "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0",
+      "history": [
+        {
+          "contentHash": "52bb51b53cf9fd1eb1923c830854e8173dd5d1a3ad2bcb14e9aa4f3b33d99729",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "90fb25c37a7107223ddaca038a6d8695a4cfffe00fabb5517f15aeb62eafc485",
+          "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-product-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "histogram-bucket": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "a64dd9754ebd5c37ae6eb101627d06a5042b0427a6a2e834fb5f86d8c534060b",
+      "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0",
+      "history": [
+        {
+          "contentHash": "5696a0b7d5f0152b84fdc210c0671333d68467692d13e7a0055ec93b54eb0ae4",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "a64dd9754ebd5c37ae6eb101627d06a5042b0427a6a2e834fb5f86d8c534060b",
+          "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-product-cases.json",
+        "dimensions": [
+          2,
+          3,
+          3,
+          3,
+          2,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "leaked-keys": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "80164cb012ace82586ea028917d2d75dd2f84b3ce971c9d6ecc7be85d459f934",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "80164cb012ace82586ea028917d2d75dd2f84b3ce971c9d6ecc7be85d459f934",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "idor-orders": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "993b2e37fd73409efb3f5ab3454f8751a293f48e3f188a56fbf389c7ec5321dd",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "993b2e37fd73409efb3f5ab3454f8751a293f48e3f188a56fbf389c7ec5321dd",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "log-pii": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "aa2f162f2052363fa8ea329941659bf1d7a7dddb6fea7a428bfdf1b6b23a51b6",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "aa2f162f2052363fa8ea329941659bf1d7a7dddb6fea7a428bfdf1b6b23a51b6",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "ssrf-internal": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "4b2edd9cbec31179b5f9146e58403a3195d116a0ac2ba5b725e7bf80f940d956",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "4b2edd9cbec31179b5f9146e58403a3195d116a0ac2ba5b725e7bf80f940d956",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "withdraw-race": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "ace894d04de38688c3ad923749490c5cd5eacc2836691fa5d43ba34d806fa1a1",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "ace894d04de38688c3ad923749490c5cd5eacc2836691fa5d43ba34d806fa1a1",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "supply-poison": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "d5957a4210208fdda71f857813e8905e2423165a4ad8892039911ba3d34c6516",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "d5957a4210208fdda71f857813e8905e2423165a4ad8892039911ba3d34c6516",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "gateway-review": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "145925eee6b10f6a49e68fd21eacfac3898194a60675fa03728be7dffe3618fc",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "572f46b6c630e0087f2ee8ba37b15de7c90d229be9f431b443d4748ffb1676e8",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "145925eee6b10f6a49e68fd21eacfac3898194a60675fa03728be7dffe3618fc",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "pipeline-review": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "0c9583b3714b6aa3785800a7dbae5e32b16f4247c277a8bdf0613ab774064940",
+      "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac",
+      "history": [
+        {
+          "contentHash": "e14adac307443fdc695e42b17cb2c6818526c934941cfb0e417ac5ddb16f6e94",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "0c9583b3714b6aa3785800a7dbae5e32b16f4247c277a8bdf0613ab774064940",
+          "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "container-review": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "3054a4e8000d4a4ea8099c0ef0aae86d388b5be196a001532c1af0b42289c30c",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "de38c62f5e72f8b91a11303736a06bce49c0a49f15129b2f6c22a6bfda2ccb77",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "3054a4e8000d4a4ea8099c0ef0aae86d388b5be196a001532c1af0b42289c30c",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "metrics-review": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "0b10280dfedac2b9c6f450b5095b6881dcd782638633d53dc507f0a58c1cb878",
+      "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0",
+      "history": [
+        {
+          "contentHash": "68000a07d2f2be436c02dedfddf525d1814668cd9d8f725d3f5eaaa5ff5ff9eb",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "0b10280dfedac2b9c6f450b5095b6881dcd782638633d53dc507f0a58c1cb878",
+          "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-product-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "midnight-rollback": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "3fecabadb3d578cb1bb64119faa9dd726b734b5c30c0a67d93715a2a5ff33915",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "b8539682e3d547a6b9214f126c046e28e07e6dca7bc484cba8c7e41185495164",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "3fecabadb3d578cb1bb64119faa9dd726b734b5c30c0a67d93715a2a5ff33915",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "canary-decision": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "e6c94c441c6e36f323d7fac2c34f09dc491f7a46c4d3c1e2a1816f2bd4de3966",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "f40a2ace917c45f05a4fe127d7b5e5f9adeef64ff1a0eb72e10daf96ae3dbcbd",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "e6c94c441c6e36f323d7fac2c34f09dc491f7a46c4d3c1e2a1816f2bd4de3966",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          3,
+          3,
+          2,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "xss-decision": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "b19cdf3144993e4ddb65174e84090b5cb54b278df5a9d8bb76695eca7786807a",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "b19cdf3144993e4ddb65174e84090b5cb54b278df5a9d8bb76695eca7786807a",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "error-budget": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "d3b56996eb2609ce4d60961230eaae4bc488616c8d3463e366901d2f34129c27",
+      "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0",
+      "history": [
+        {
+          "contentHash": "4c4c605324699b3168c4040eaf0c5d0ab9a861bc98a7cd29c3b2a208f9e0a186",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "d3b56996eb2609ce4d60961230eaae4bc488616c8d3463e366901d2f34129c27",
+          "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-product-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          3,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "double-strike": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "ca6f1d11fa3ca8345aaad57e2308cb98fe1d9f9013f85d0f19adc0e6d04d63de",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "0eb69cb5a4303dbe1faaeb33cce8e7ba660939f316ba0b6bf330af68f01fbfa9",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "ca6f1d11fa3ca8345aaad57e2308cb98fe1d9f9013f85d0f19adc0e6d04d63de",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          3,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "false-lead": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "0b31997ded02246f4737d372f1a081e8aae9e5d0d6f595bf700443add4a27bee",
+      "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897",
+      "history": [
+        {
+          "contentHash": "740fd9d4c096409788b0d4b4c42cfbc1a4eedb3c6aa6be1c085c54ffc209906a",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "0b31997ded02246f4737d372f1a081e8aae9e5d0d6f595bf700443add4a27bee",
+          "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          3,
+          3,
+          2,
+          3,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "cascade-timeout": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "eb06cc031b7cc86ae08bb94d868e324a98898db1b088cfc7f70ff9db4f70fa82",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "d2754d34f5f7344df0fd37a0c25ca240a212e36e613ec7e7753da93f0ac80db3",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "eb06cc031b7cc86ae08bb94d868e324a98898db1b088cfc7f70ff9db4f70fa82",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "data-script-accident": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "5ddfce72492791b238f4db27169a290b2c6927d7b2e573f680779e0b2f8fdba3",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "f44868562fd385b505d0e9902cd19f9cf2a3662005d970f1b9b09f0b351a4a57",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "5ddfce72492791b238f4db27169a290b2c6927d7b2e573f680779e0b2f8fdba3",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "rate-limit-passthrough": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "f066e4caf8ed41f17df44efebf522ea437169ae6f06d7d47744dca09a6a11c48",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "f066e4caf8ed41f17df44efebf522ea437169ae6f06d7d47744dca09a6a11c48",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "fallback-drill-fail": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "feafb0999639ba458b5405ec8dae3452c935f9c2104de0b0140552381d0df69d",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "feafb0999639ba458b5405ec8dae3452c935f9c2104de0b0140552381d0df69d",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "retry-storm": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "87e4cc7e798242f06906fcc658f77a02a95c939260b756b1fff6046549a539a9",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "87e4cc7e798242f06906fcc658f77a02a95c939260b756b1fff6046549a539a9",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "hpa-lag": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "6ea8b3483f565873ef39b32db82d76f2dccdf224a2d55644b8864149ff43ec48",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "6ea8b3483f565873ef39b32db82d76f2dccdf224a2d55644b8864149ff43ec48",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "white-screen": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "4fe584c5d65ab0c167f6bb9066056e234b4dcd6b251971101fd1417e78fc7b9c",
+      "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac",
+      "history": [
+        {
+          "contentHash": "c30d5dc1966b7d745f4beccae1f2822ed5e62bddcaff1c1cf4eaf5f62a5c3e53",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "4fe584c5d65ab0c167f6bb9066056e234b4dcd6b251971101fd1417e78fc7b9c",
+          "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          1,
+          1,
+          1,
+          1,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "dep-hell": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "818f529fc40db6e1f73979fceaca6fb1589e6e98129a2b07c27b0a8cf9d08f3d",
+      "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac",
+      "history": [
+        {
+          "contentHash": "0776cff4d6b72f5986315cfcf107d0717e9af92271be545b453b795e106c3844",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "818f529fc40db6e1f73979fceaca6fb1589e6e98129a2b07c27b0a8cf9d08f3d",
+          "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          1,
+          2,
+          2,
+          1,
+          1,
+          1
+        ],
+        "gaps": []
+      }
+    },
+    "oversell-race": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "8d74ccbbb3c6a4f6fcbb9f8a6b1c18ffba405c18ca8507a472f7ce66fb5f2eab",
+      "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897",
+      "history": [
+        {
+          "contentHash": "4314ce4f2147c0af2262b85afbc42b5e4feca7de982704456c6d1c720c24dc9a",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "8d74ccbbb3c6a4f6fcbb9f8a6b1c18ffba405c18ca8507a472f7ce66fb5f2eab",
+          "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "idempotent-fail": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "9303f2c6bd50093621837962d5c9086f52459ec87420b6140e27095be34c7d01",
+      "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897",
+      "history": [
+        {
+          "contentHash": "829fc7ae47af7b8a199e4714f96eb8fcec488ce5e5c9a636d48dcf2e7b8d71b9",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "9303f2c6bd50093621837962d5c9086f52459ec87420b6140e27095be34c7d01",
+          "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "log-sampling": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "fd471ae9cd4b385b15afeaf6ec545df1d51b631b8bc5654b8bd59318878a8163",
+      "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0",
+      "history": [
+        {
+          "contentHash": "fa454f7a13562aa7f002c8e253fe5e495135a729257dc02b245204389aaa68e7",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "fd471ae9cd4b385b15afeaf6ec545df1d51b631b8bc5654b8bd59318878a8163",
+          "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-product-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "avg-metric": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "808201f546c25c7ca5a4576b37661cee04103cf97479997cb7297e552293ec01",
+      "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0",
+      "history": [
+        {
+          "contentHash": "d69e7ee0e89cab3b521fb5c2c639e2c1ba86264b410f27b97b58d67188aa9229",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "808201f546c25c7ca5a4576b37661cee04103cf97479997cb7297e552293ec01",
+          "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-product-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "mq-lost": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "d4472d660aa2072c62b8d97663ac82a02a58877b7b6d5a9d87e834b6deaa50d5",
+      "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff",
+      "history": [
+        {
+          "contentHash": "c60d0f53804184c064807d0d8949a9969d55331e013d351385e0497334d70ce9",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "d4472d660aa2072c62b8d97663ac82a02a58877b7b6d5a9d87e834b6deaa50d5",
+          "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "mq-duplicate": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "b7009873b8cbdfe9c010d25b53030ff9d899b55358eb09554462e91a34bc8d68",
+      "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff",
+      "history": [
+        {
+          "contentHash": "a3fec2fbc6c483e15af0b6fd7201f2a912653a86d6b326d660c97f4a04aed76a",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "b7009873b8cbdfe9c010d25b53030ff9d899b55358eb09554462e91a34bc8d68",
+          "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          3,
+          2,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "mq-dlq": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "3543bcd3f4f8171f4a92878eee74603be879ea56b0395d1f882cd4177eb26c5a",
+      "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff",
+      "history": [
+        {
+          "contentHash": "0ef01aa00e3426f4d27c53c8880d3657c71a29fa07290ee03e3ef27976c1c5ee",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "3543bcd3f4f8171f4a92878eee74603be879ea56b0395d1f882cd4177eb26c5a",
+          "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "mq-delay": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "28e8f51708e06bc5300f62390e9df96fd72515d0539d4b2b2c9f2f201da73fba",
+      "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff",
+      "history": [
+        {
+          "contentHash": "3f157694f365bc78e88cae969ed8e943cac0806749a45e0f3e92f75363d82ef9",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "28e8f51708e06bc5300f62390e9df96fd72515d0539d4b2b2c9f2f201da73fba",
+          "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          3,
+          3,
+          2,
+          3,
+          2,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "bg-split": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "48c21a16a561f6ba104df6efb83f39d54f5d9edc9b3bbe64e3fce428f8b924fd",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "48c21a16a561f6ba104df6efb83f39d54f5d9edc9b3bbe64e3fce428f8b924fd",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "flag-leak": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "8ff59f03ba5013cc9aeed41fb22bd650fb91cc3a2f1a048df212aec4a82bcf03",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "8ff59f03ba5013cc9aeed41fb22bd650fb91cc3a2f1a048df212aec4a82bcf03",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "mixversion": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "7885c0aa6f1cd8006c38f26dd9873ee7856fba771c8a8a3c4a578aaff1496351",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "7885c0aa6f1cd8006c38f26dd9873ee7856fba771c8a8a3c4a578aaff1496351",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "cdn-stale": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "91d7232578b19d3c13dfb94ea80ac328ed3e12dfdbd5fabb954d60460d629f8d",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "91d7232578b19d3c13dfb94ea80ac328ed3e12dfdbd5fabb954d60460d629f8d",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "tcp-retrans": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "e99f3b6fff9a2dcd57aeae171a0b6da5631791651d2a1dee588d3c56964c820f",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "e99f3b6fff9a2dcd57aeae171a0b6da5631791651d2a1dee588d3c56964c820f",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "h2-hol": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "1af21b4131218dc7aa889ae1b7e3d392f312192439e5ca47bcf1d5e4526cb6f2",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "1af21b4131218dc7aa889ae1b7e3d392f312192439e5ca47bcf1d5e4526cb6f2",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "cdn-penetration": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "024b03d48e99f6242f4f403179d593d3b284040700406449e701acdd87278811",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "024b03d48e99f6242f4f403179d593d3b284040700406449e701acdd87278811",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "proxy-headers": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "ae8413bfdfbde7a26b11ff489eb0ceecd90e0a2dfd0a6827921bf098977d20d3",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "ae8413bfdfbde7a26b11ff489eb0ceecd90e0a2dfd0a6827921bf098977d20d3",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "coverage-illusion": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "489fc3ecae439ed63dedb46f98a4a1d092b10b37135cfe8d16beb82fa4a4d422",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "489fc3ecae439ed63dedb46f98a4a1d092b10b37135cfe8d16beb82fa4a4d422",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "mock-leak": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "361ea0798e16c090c51393247650200d3a5ffadce44de97717eed6cd3a190aa0",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "361ea0798e16c090c51393247650200d3a5ffadce44de97717eed6cd3a190aa0",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "flaky-test": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "82cc816c41a4572d65a9188d88cc9efb9fa39177c756dd5dbf2c21ffb0877445",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "82cc816c41a4572d65a9188d88cc9efb9fa39177c756dd5dbf2c21ffb0877445",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "env-drift": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "66049ffec67904b1e392de032a71798b8f3041d2668953c73627ef3bedb64111",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "66049ffec67904b1e392de032a71798b8f3041d2668953c73627ef3bedb64111",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "mq-slowpart": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "67fe6b1a5a5f2903e822c22a8eb5ed6220e0187d040dbaee7088eeaa29d32ed6",
+      "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff",
+      "history": [
+        {
+          "contentHash": "5a9d134824c25fe008afe65b62b4fc02ccd4259da20fcb420c71b7d4f6644b82",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "67fe6b1a5a5f2903e822c22a8eb5ed6220e0187d040dbaee7088eeaa29d32ed6",
+          "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          3,
+          3,
+          2,
+          3,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "deploy-migration": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "ce6fa3c1d2a762726ae7a0921e3c549e3646a903a3d4702452812df6878fa3af",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "ce6fa3c1d2a762726ae7a0921e3c549e3646a903a3d4702452812df6878fa3af",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "pool-deadlock": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "8e067e30e340f79f76cf3a2bf1446f0d96580db3938f2e05ae84f1e4f0593ae2",
+      "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897",
+      "history": [
+        {
+          "contentHash": "3f04283e1f030e82afe2dab20e58c09cfa965dd639d156bd08d1e5c9b92e5407",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "8e067e30e340f79f76cf3a2bf1446f0d96580db3938f2e05ae84f1e4f0593ae2",
+          "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          3,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "lock-expiry": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "966769730fab96c607b92bcb034b814a38ab017c221065e915272b0f845f84f8",
+      "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897",
+      "history": [
+        {
+          "contentHash": "c4ed5165783eef0f510c65cea1c1c14b4cbfcc305316dd55f7699f61718cda97",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "966769730fab96c607b92bcb034b814a38ab017c221065e915272b0f845f84f8",
+          "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          3,
+          2,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "idle-reset": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "a80fe120a19321ed2a0890320f4b916fa6277077b15c6857a66173349ebe7630",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "a80fe120a19321ed2a0890320f4b916fa6277077b15c6857a66173349ebe7630",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "mq-bus-review": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "70d25d7b97988188408556c5ce6e36c9799eda6e1db2cc4fb2d4a367249308fd",
+      "sourceCommit": "8de19a57b0bbb28f62fff67d30d299139914f7a1",
+      "history": [
+        {
+          "contentHash": "885dc73b4758dc47f930d269694d17617682915b3dce443d2776ba66ea38f5a6",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "70d25d7b97988188408556c5ce6e36c9799eda6e1db2cc4fb2d4a367249308fd",
+          "sourceCommit": "8de19a57b0bbb28f62fff67d30d299139914f7a1"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          3,
+          3,
+          2,
+          3,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "threadlocal-leak": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "254dbd737796a8f7ce5411796eabbb597521a5573f06c417048e16d07b3e6fc2",
+      "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897",
+      "history": [
+        {
+          "contentHash": "49897aaf7e4dd2fddd1f78e647c155f606d24362b1ac3241e95a350b19309ef8",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "254dbd737796a8f7ce5411796eabbb597521a5573f06c417048e16d07b3e6fc2",
+          "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          3,
+          2,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "image-tag-drift": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "fcf0564401c0aa73ecb3272d43c0a4f4df366d6d3af6d6cbf9b9f641fe1fd8a5",
+      "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac",
+      "history": [
+        {
+          "contentHash": "f37b704f5030c3487c6721e7a43afdf17f76e2740e3c906c2abb8c35cc0e6d21",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "fcf0564401c0aa73ecb3272d43c0a4f4df366d6d3af6d6cbf9b9f641fe1fd8a5",
+          "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "regex-catastrophe": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "55e15f1cd9c05bb5119ab57fe6ab30a86d20e1916034096fa10ddf54b83acfb5",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "feb837dadb8ddb33390e8fb71f03758c7195e9a3b5cf0d3005ce3a6dceab4f82",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "55e15f1cd9c05bb5119ab57fe6ab30a86d20e1916034096fa10ddf54b83acfb5",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          3,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "cardinality-blast": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "014e099dc3a65a6953cf75032f9b40d38f40da6baa0e2a7ed15ebc26625fcd13",
+      "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0",
+      "history": [
+        {
+          "contentHash": "e7980680185fc44835e2d67e5054391c73305630225905c6d667aafc6ea388a9",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "014e099dc3a65a6953cf75032f9b40d38f40da6baa0e2a7ed15ebc26625fcd13",
+          "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-product-cases.json",
+        "dimensions": [
+          2,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "distributed-monolith": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "883bf7186a6135806b9266ab112aacf42f833cae9fc30d5e13f6f2112b5894ae",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "883bf7186a6135806b9266ab112aacf42f833cae9fc30d5e13f6f2112b5894ae",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "loadtest-illusion": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "3dd6af3139ed7fc02b732e06203e6b7117d6d621fbb10915200a33776b021ea8",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "3dd6af3139ed7fc02b732e06203e6b7117d6d621fbb10915200a33776b021ea8",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "ws-upgrade": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "a5dbe87b7383348d1f6e915df8c711f2a945a751889eebec9e897c7db6d8b1fd",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "d3d0e62ebfc5cc99be6d72e9eb0e940e4d638d0b5941780b42231089992aa9fb",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "a5dbe87b7383348d1f6e915df8c711f2a945a751889eebec9e897c7db6d8b1fd",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "replica-lag": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "7658c7ff911ecc7a8ee75884f19851cc4d584e3ca0a87c942c59ca589bfba347",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "6f120e4185c7f83c51bb8e9620a917ad43e797d7adf94f5d86210c1738441cbc",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "7658c7ff911ecc7a8ee75884f19851cc4d584e3ca0a87c942c59ca589bfba347",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "sqli-sort": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "fe20cb50bb40978d74c9c257d117e31b698446254d92eb69577f15c73d468325",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "fe20cb50bb40978d74c9c257d117e31b698446254d92eb69577f15c73d468325",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "rebalance-storm": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "65c543fe4029a6ffdcb9c441919607c8df739ac9010f3d545a4ce67fa87c7a3e",
+      "sourceCommit": "8de19a57b0bbb28f62fff67d30d299139914f7a1",
+      "history": [
+        {
+          "contentHash": "0f4fada6f748e05fb0b67ca6b17de09acbc507366e931bbd56a82624b8151e0f",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "65c543fe4029a6ffdcb9c441919607c8df739ac9010f3d545a4ce67fa87c7a3e",
+          "sourceCommit": "8de19a57b0bbb28f62fff67d30d299139914f7a1"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          3,
+          3,
+          2,
+          3,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "graceful-shutdown": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "91f13c53d42d4e016458e81add11291e6a052d8627398373ef3dc779e10cdaed",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "91f13c53d42d4e016458e81add11291e6a052d8627398373ef3dc779e10cdaed",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "nagle-ack": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "86abd774f44227e4bfcfbf89bf4623d79acfe4717ef60bd60f0818728392290d",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "86abd774f44227e4bfcfbf89bf4623d79acfe4717ef60bd60f0818728392290d",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "buildtime-inject": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "a5295b029f8216c2e3a2d941d709261f181c2cdd0240388425ca0ee963dcb510",
+      "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac",
+      "history": [
+        {
+          "contentHash": "fe1fe4b6cc99a717e56197eb00bf5121cbccf5dddb0e83f2fe029b8800aa81a9",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "a5295b029f8216c2e3a2d941d709261f181c2cdd0240388425ca0ee963dcb510",
+          "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "pool-rejection": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "811c9b0638e0fa39fc155cf01387d2a2da73c702fc5a92aebbd60de3cf998f01",
+      "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897",
+      "history": [
+        {
+          "contentHash": "d0f6c687cfc4c02cdfa0d7b15150d86f43510f020712cbd41f72d2107a4d61a7",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "811c9b0638e0fa39fc155cf01387d2a2da73c702fc5a92aebbd60de3cf998f01",
+          "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          3,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "trace-break": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "d6eaa6daf763b1a40ef5ee8900b28c747488a99326e3087d7b2c238b0415306d",
+      "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0",
+      "history": [
+        {
+          "contentHash": "4f7ff4710060a1e0ef1b9939e6dfe83a491dd9210b7fe463342b409256fcde74",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "d6eaa6daf763b1a40ef5ee8900b28c747488a99326e3087d7b2c238b0415306d",
+          "sourceCommit": "3f888c08a7dcf10879249d6286c7048eafa17be0"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-product-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          3,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "api-sunset": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "2dc15ea9e952afe3aca9c3a901683586c4acc920a83699fbc1c2445992d5855a",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "2dc15ea9e952afe3aca9c3a901683586c4acc920a83699fbc1c2445992d5855a",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "implicit-cast": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "a475186ea3445a23faf5b696be06fd6d3383d61047bdfd90ca0b3d60bd4bd944",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "d72b993538ba92db1e904c443abe486309819339146c8b405819416e6bffc96c",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "a475186ea3445a23faf5b696be06fd6d3383d61047bdfd90ca0b3d60bd4bd944",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "capacity-review": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "aed667a153399eda88054486d62d2e4d53f8b8df520e8a4993c9cba4d266b04d",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "aed667a153399eda88054486d62d2e4d53f8b8df520e8a4993c9cba4d266b04d",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "cert-sni": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "c9c7be1f07fe0b5348257fd8d8821001458cfb39117e3c00006b53d92b2d02f0",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "b05c4c24d1e9c99b91fc547c298199b479c04329fd6b8397e8b21b4c327444be",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "c9c7be1f07fe0b5348257fd8d8821001458cfb39117e3c00006b53d92b2d02f0",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "testing-review": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "24cbf131177210348ded3a47ac8bc9453c7c266071905639b8ee93e093506183",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "24cbf131177210348ded3a47ac8bc9453c7c266071905639b8ee93e093506183",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "config-drift": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "87d55ea8d6dd593b74d100fd8f4ad2fc968f4f3ec746789f752cf3df32ee9735",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "87d55ea8d6dd593b74d100fd8f4ad2fc968f4f3ec746789f752cf3df32ee9735",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "happy-eyeballs": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "d004458767145d18e70c582906ec268ad98e42fa4213bf8cb7b1866a06b1f1dc",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "d004458767145d18e70c582906ec268ad98e42fa4213bf8cb7b1866a06b1f1dc",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "mq-disk": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "13cbee0921b2e6e983ac2b8a3769510b00e3a5411eb81e4e38b78d4f2dd90c46",
+      "sourceCommit": "8de19a57b0bbb28f62fff67d30d299139914f7a1",
+      "history": [
+        {
+          "contentHash": "4ecee98163a00fbdbe872d2c49c9b4adfddcc3f0c421d7e632e9df9d00dd27f6",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "13cbee0921b2e6e983ac2b8a3769510b00e3a5411eb81e4e38b78d4f2dd90c46",
+          "sourceCommit": "8de19a57b0bbb28f62fff67d30d299139914f7a1"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          3,
+          3,
+          2,
+          3,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "chunk-overlap": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "b71c2445c2848c9b6935d98b83385ed00a2e2705f937e639e6a48b7e8cab964b",
+      "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac",
+      "history": [
+        {
+          "contentHash": "c7082eb340661feb718a9b029e363af4110ce52350d9545b60131ccc707bd063",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "b71c2445c2848c9b6935d98b83385ed00a2e2705f937e639e6a48b7e8cab964b",
+          "sourceCommit": "90cb0e6fbf5a57df06a9b899941817afd3d852ac"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "callback-mismatch": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "3d89c23e79c5bbf712cedb6086e4d02795c7d07333f1c9da64c55b7b4407b4fc",
+      "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897",
+      "history": [
+        {
+          "contentHash": "605247bd45cef0213b211c9d5c69f70ccb378bc75d5ebe9808cb58c08a751077",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "3d89c23e79c5bbf712cedb6086e4d02795c7d07333f1c9da64c55b7b4407b4fc",
+          "sourceCommit": "2dcf86f8055df43e8628610f6c27f7361f087897"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          3,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "deep-pagination": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "a4ada6f7561b40fd1b206a48fc473689c7bc9c7516382851e5b980c2021d82ac",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "18f0f9e4defe946052cd5ebde7bf0fff7ef08d5698fe17885ed079eb8a18e039",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "a4ada6f7561b40fd1b206a48fc473689c7bc9c7516382851e5b980c2021d82ac",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "rule-sprawl": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "122b999be5dad5343fe8e4b2bca7ec9ab2a65fa900b67a700f135d6ac1253d5d",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "122b999be5dad5343fe8e4b2bca7ec9ab2a65fa900b67a700f135d6ac1253d5d",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "mq-dualwrite": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "07f482d130dd5d8f3a5ec4139243a4a7cac19d74306e4d2ba5fb1e27a64dbba1",
+      "sourceCommit": "8de19a57b0bbb28f62fff67d30d299139914f7a1",
+      "history": [
+        {
+          "contentHash": "913290e2b7eb0c6763a1c1e9ca42978fb2d5eabd95a8bd9573fcd9585d57a13d",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "07f482d130dd5d8f3a5ec4139243a4a7cac19d74306e4d2ba5fb1e27a64dbba1",
+          "sourceCommit": "8de19a57b0bbb28f62fff67d30d299139914f7a1"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "probe-mismatch": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "7436a89f73caac1cc827544a3e5d69b7a16023d4d5aeffcc76d9e0aa8c83115c",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "7436a89f73caac1cc827544a3e5d69b7a16023d4d5aeffcc76d9e0aa8c83115c",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "wrong-env": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "93fb8805f112b68cdbe677db43eb5e06d40b99ab062aa1192c5bbe47d2c225ff",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "93fb8805f112b68cdbe677db43eb5e06d40b99ab062aa1192c5bbe47d2c225ff",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "bandwidth-hog": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "b719578099a0695852592e2d801d79d1792033e9caa66a8becce9380ec5130a1",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "b719578099a0695852592e2d801d79d1792033e9caa66a8becce9380ec5130a1",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "ndots-trap": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "5b48b0f4b4382f50f74a07b2845ec2466cb5f49f0ffcb10f8f7f68031092e144",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "5b48b0f4b4382f50f74a07b2845ec2466cb5f49f0ffcb10f8f7f68031092e144",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "env-contention": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "9b24614206ce43e500f3aeb002cee0a67deab1cc5b6a666a42ddc2e06d0dabcb",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "9b24614206ce43e500f3aeb002cee0a67deab1cc5b6a666a42ddc2e06d0dabcb",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "first-npe": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "7fb808cfc1c47d52ae6f6fff3c6f2d737e550efe3f92f7a9f2b39dfd81db3662",
+      "sourceCommit": "98cc581b829bb103987c1f3008abb36169039167",
+      "history": [
+        {
+          "contentHash": "48dc54d5801f7ba190c7027066a6316486aab5c232ae07a4744d532b07050c9c",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentHash": "7fb808cfc1c47d52ae6f6fff3c6f2d737e550efe3f92f7a9f2b39dfd81db3662",
+          "contentRevision": 2,
+          "sourceCommit": "98cc581b829bb103987c1f3008abb36169039167"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04a-cases.json",
+        "dimensions": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "gaps": []
+      }
+    },
+    "caused-by": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "6583cbbbd770c2db7fc2e55569cebb892d0607ebb43d8a786b4298835bd7e220",
+      "sourceCommit": "98cc581b829bb103987c1f3008abb36169039167",
+      "history": [
+        {
+          "contentHash": "6cbd2a1ab1df1af4af87d2008a21812e494884b3828b6a7ffcf3e249ba09ec73",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentHash": "6583cbbbd770c2db7fc2e55569cebb892d0607ebb43d8a786b4298835bd7e220",
+          "contentRevision": 2,
+          "sourceCommit": "98cc581b829bb103987c1f3008abb36169039167"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04a-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          1,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "field-mismatch": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "a1f9a1a9fc8691adeb148085aaa9162d3af807321feb93714f90ca820a5b4bdf",
+      "sourceCommit": "8cf50bca56aa2ec60e3c9bfa3e16c90abbea6895",
+      "history": [
+        {
+          "contentHash": "74e22a3459f7ca011526539fd4089760ba525d04ac166b678cbe1597b736280f",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "a1f9a1a9fc8691adeb148085aaa9162d3af807321feb93714f90ca820a5b4bdf",
+          "sourceCommit": "8cf50bca56aa2ec60e3c9bfa3e16c90abbea6895"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          1,
+          1,
+          1,
+          1,
+          2,
+          1
+        ],
+        "gaps": []
+      }
+    },
+    "cookie-lost": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "1e8476bddb84cd3397180425c5c75df77dc2f7e5130f809ce131e5c37fc307e8",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "3507c20ceeaec26c6cdd7275852b30a57fd1911841ef663519bafc004f0ddbb6",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "1e8476bddb84cd3397180425c5c75df77dc2f7e5130f809ce131e5c37fc307e8",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "required-field": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "0240633666cb6432a66be23a2abb9fea29e1faed9616be72be561daa360f5e4f",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "ef98d3d39aa731c755912ee8c8962a91d4d2e66b9cdbd50025cb1d63b14e49ec",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "0240633666cb6432a66be23a2abb9fea29e1faed9616be72be561daa360f5e4f",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "doc-drift": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "00e14cc0c3ceeedbc05a32ef0ce85c4d0e9ee45e875527dde6fe5828789ca32a",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "9f87178cf7a404ec565d184a315ff3e48fadd233a69341586c94f4a90b619428",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "00e14cc0c3ceeedbc05a32ef0ce85c4d0e9ee45e875527dde6fe5828789ca32a",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "config-typo": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "55c18865b8ab3423a3488627ecfca041d62ff2b2d86450ff4c2c718f99ed0bd7",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "8f4f263b90250881d9a39860ee437307ae2c72f6a7a6c725f4e91913f03c4de8",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "55c18865b8ab3423a3488627ecfca041d62ff2b2d86450ff4c2c718f99ed0bd7",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "gaps": []
+      }
+    },
+    "boot-order": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "8e7d6e8c1778540dbd36f27ea199e3d54527c8427ec29f826683419135bc567d",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "e6f4b71085ef8250fc0357eb2dc2b617b73646c5c2f6ce442f5fcb6a149ec7e4",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "8e7d6e8c1778540dbd36f27ea199e3d54527c8427ec29f826683419135bc567d",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "log-correlation": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "fa9f6f5208f891640738a806ae7b76689f92b11b9350d33c80172a49fc1dc5b5",
+      "sourceCommit": "98cc581b829bb103987c1f3008abb36169039167",
+      "history": [
+        {
+          "contentHash": "2635b1d13617414ca520b6fc6743f4fe9edeadd6c32173c97c3df2b6dee0b38b",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentHash": "fa9f6f5208f891640738a806ae7b76689f92b11b9350d33c80172a49fc1dc5b5",
+          "contentRevision": 2,
+          "sourceCommit": "98cc581b829bb103987c1f3008abb36169039167"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04a-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "waterfall-read": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "96692a12221aacdbd687831093415e35893798d3963f0cb8a192d35aaee9fe99",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "562210f221d1d3098902b9cf9d01d4652a002fe07c927fa4a3fb51fafa31c8e6",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "96692a12221aacdbd687831093415e35893798d3963f0cb8a192d35aaee9fe99",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "timeout-contract": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "813f28c418bac475f4ab4107014aad658b4c7001977b7e9b0bbb87ce4f60f0cf",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "4c90c3255248aebda0b19c1e2e974d845a47164e4836b9b10ffd8d12ff2ab2a9",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "813f28c418bac475f4ab4107014aad658b4c7001977b7e9b0bbb87ce4f60f0cf",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "hot-reload-gap": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "ab74257d0cd5aff7503a02917816f049115ce5235456a8e3a40a8e73a7d4d8aa",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "760c5d9001a7e5e459e2132eeabfae44e2d3a91324dd5d6b6a2ea9820c4b54d2",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "ab74257d0cd5aff7503a02917816f049115ce5235456a8e3a40a8e73a7d4d8aa",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "async-swallow": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "48d85f793e19fcb89d6681622e55328f0c5b013ac984a9af9f50b7b801e4e0e0",
+      "sourceCommit": "98cc581b829bb103987c1f3008abb36169039167",
+      "history": [
+        {
+          "contentHash": "2c1a8e47c9bd7378912daa4303cda6818e4d41e1936074108609bfe215985ad8",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentHash": "48d85f793e19fcb89d6681622e55328f0c5b013ac984a9af9f50b7b801e4e0e0",
+          "contentRevision": 2,
+          "sourceCommit": "98cc581b829bb103987c1f3008abb36169039167"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04a-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          1,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "poll-storm": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "a458ec9c874d949af88620f1f6cfa98736a9097a6007a9531c74a8b491353e40",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "009d6935111670716220c48b5a61a0902ffda7b73891d46a562ca36028217166",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "a458ec9c874d949af88620f1f6cfa98736a9097a6007a9531c74a8b491353e40",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "enum-drift": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "d4634c4f107ee8dd27a4331f8f5baeff2492821537655a6b3692ff0501ef1008",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "4b78ca6e240be2009e92b87c2faa029b5700d404a8bb174fe7c41d778d43d904",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "d4634c4f107ee8dd27a4331f8f5baeff2492821537655a6b3692ff0501ef1008",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          3,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "priority-clash": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "d42d386fac9fc322ecfa2f6a57259c951caa55e7bda127f1f26b30a6c9ad4760",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "e08fb1a4fc862342509d79e1c860c96524151f244184d9b5f4d3d953e4368c3a",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "d42d386fac9fc322ecfa2f6a57259c951caa55e7bda127f1f26b30a6c9ad4760",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "symptom-cluster": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "4160514ab9c6326e7e4eb1a0cdbfb97714323f0fc91bf64d07bc3060bb2dcc4c",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "f994b20fedb32826caca7c2a3d0b163a6a403cb57ff9a7b6540cb1456ac298b0",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "4160514ab9c6326e7e4eb1a0cdbfb97714323f0fc91bf64d07bc3060bb2dcc4c",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "first-domino": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "0c6db66590dc30a037a2060760ac9a8c28fc3ea29d68e24c6694d914ae3e58c5",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "232c1b1f684d186697b95d97caeb38b750f0da63a8a7b95cb8843098c6f2b175",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "0c6db66590dc30a037a2060760ac9a8c28fc3ea29d68e24c6694d914ae3e58c5",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "mock-canyon": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "ad6b91836a4a9f5cf3942ea7e5464eeb4d3b2119103f332b475e9811cf4a6c28",
+      "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6",
+      "history": [
+        {
+          "contentHash": "24188c18e66bda14e4d95906ff91aa15a52c4cf6f759b9092dd1b8dd3acc1566",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "ad6b91836a4a9f5cf3942ea7e5464eeb4d3b2119103f332b475e9811cf4a6c28",
+          "sourceCommit": "6d27ba373149e7177d729dd569eed1218707d7b6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "tri-platform": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "0b2bdbc3addf172cdddc430bbde151132f3df932f55c5e67b7a467720fa0ae2d",
+      "sourceCommit": "8cf50bca56aa2ec60e3c9bfa3e16c90abbea6895",
+      "history": [
+        {
+          "contentHash": "b0a487b394d4d8b5de90b41c9db1df8ef58bac8bde981e4d945409381b4bc5ea",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "0b2bdbc3addf172cdddc430bbde151132f3df932f55c5e67b7a467720fa0ae2d",
+          "sourceCommit": "8cf50bca56aa2ec60e3c9bfa3e16c90abbea6895"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-apprentice-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          3,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "error-contract": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "7697de7e430b2a60a7ebd3381da67f4d54207149bc86d3debf831c63290a086a",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "de77e691bce76688344f22875f76df008912e7a26406ca2e8886b9206a2f99a6",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "7697de7e430b2a60a7ebd3381da67f4d54207149bc86d3debf831c63290a086a",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "contract-review": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "11e355241726423b1ac60262ae32bd85d4abc20fd77aefdc59e25b5a117cd228",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "5325dd1dc63bab5e9547acfcde675f7fc3814912982bba76ef485428f1a2e696",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "11e355241726423b1ac60262ae32bd85d4abc20fd77aefdc59e25b5a117cd228",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "profile-maze": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "0e2af1d4840f8bd92b11a1a45df86ffdf4a4cb19faedf87b9f284a2148233904",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "e61170d0d94ea6160221fc6683ee45b2851c62278c71257cb0ad3b040c8c8a37",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "0e2af1d4840f8bd92b11a1a45df86ffdf4a4cb19faedf87b9f284a2148233904",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "gaps": []
+      }
+    },
+    "boot-storm": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "7a0f56a7293f8d1861b0719d86697a12eac980cea8a3fd1d14cf720012ba8273",
+      "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6",
+      "history": [
+        {
+          "contentHash": "3e423149d76e6b582af330fc2a3c2a34a97983bc413981a89f7f1e6156ebb589",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "7a0f56a7293f8d1861b0719d86697a12eac980cea8a3fd1d14cf720012ba8273",
+          "sourceCommit": "6c0a98432bd23b4c5cc1cf392f69afcfc49d94d6"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-engineer-cases.json",
+        "dimensions": [
+          2,
+          3,
+          2,
+          3,
+          2,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "rollback-drift": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "13a3e1e0c0f5219efc78cb45121cb13c0bb3f3488d3f7c8540f959e951c1cdfb",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "13a3e1e0c0f5219efc78cb45121cb13c0bb3f3488d3f7c8540f959e951c1cdfb",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "warmup-storm": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "81cee68e71d24c16c79cc8b453d3f570372b69344c066a365bf1220913090d9c",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "81cee68e71d24c16c79cc8b453d3f570372b69344c066a365bf1220913090d9c",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "partition-split": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "41656e6a52b0503d26c3c048f5c9e50ded0fa3cf15b5ab15f255018d5ce7cc71",
+      "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff",
+      "history": [
+        {
+          "contentHash": "8320d43bcbdeda7168c45608d591f70992b4d22bb5697e7649ec00bd59c2058a",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "41656e6a52b0503d26c3c048f5c9e50ded0fa3cf15b5ab15f255018d5ce7cc71",
+          "sourceCommit": "e788cdbdbbfacffa608494986c66803bd1247dff"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          3,
+          3,
+          2,
+          3,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "replay-surge": {
+      "contentRevision": 2,
+      "baseRevision": 1,
+      "contentHash": "f5b6744c6cf207843dfe7001b17554b6eefd0ad228ab99efdcc2acea1177b791",
+      "sourceCommit": "8de19a57b0bbb28f62fff67d30d299139914f7a1",
+      "history": [
+        {
+          "contentHash": "2f6573148d97ff3e28729124deefc3aa529beb5de1e8e8262641e187d4483a5e",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        },
+        {
+          "contentRevision": 2,
+          "contentHash": "f5b6744c6cf207843dfe7001b17554b6eefd0ad228ab99efdcc2acea1177b791",
+          "sourceCommit": "8de19a57b0bbb28f62fff67d30d299139914f7a1"
+        }
+      ],
+      "calibrationStatus": "calibrated",
+      "calibration": {
+        "status": "calibrated",
+        "record": "content/baselines/t04b-master-systems-cases.json",
+        "dimensions": [
+          3,
+          3,
+          2,
+          3,
+          3,
+          3
+        ],
+        "gaps": []
+      }
+    },
+    "mtu-blackhole": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "bb085645032830199110355a115cdab39f26448bc73c07bd65c872ec09474319",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "bb085645032830199110355a115cdab39f26448bc73c07bd65c872ec09474319",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "geo-stale": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "cd3fe7ce738979ef128734bc14d03e1eb2f7bebb89677646861a38efdc9fab56",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "cd3fe7ce738979ef128734bc14d03e1eb2f7bebb89677646861a38efdc9fab56",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "env-inherit": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "35016cea9208af98f3c43c0efd51f4451e54f79a20282e60205904750f279d0c",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "35016cea9208af98f3c43c0efd51f4451e54f79a20282e60205904750f279d0c",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    },
+    "capacity-assumption": {
+      "contentRevision": 1,
+      "baseRevision": 0,
+      "contentHash": "2521b4c67bf976670f34a3109e7a158b6e140117e5a116a43b0334010d763d3e",
+      "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8",
+      "history": [
+        {
+          "contentHash": "2521b4c67bf976670f34a3109e7a158b6e140117e5a116a43b0334010d763d3e",
+          "contentRevision": 1,
+          "sourceCommit": "6523490cc6b418070c9efbb7045f47761c7c8aa8"
+        }
+      ],
+      "calibrationStatus": "legacy",
+      "calibration": {
+        "status": "needs_review",
+        "record": null,
+        "dimensions": [],
+        "gaps": [
+          "尚缺匹配当前正文哈希的六维与双路径校准记录"
+        ]
+      }
+    }
+  }
+}

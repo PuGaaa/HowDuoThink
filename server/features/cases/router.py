@@ -5,7 +5,15 @@ from pydantic import BaseModel
 
 from core.deps import current_user, require_editor
 from features.cases import preview, service
-from features.cases.models import CaseDraftBody, CaseMetaBody, CasePayload
+from features.cases.models import (
+    CaseAdminDetail,
+    CaseAdminRow,
+    CaseDraftBody,
+    CaseMetaBody,
+    CasePayload,
+    CaseRevisionHistory,
+    PublishResult,
+)
 
 router = APIRouter(tags=["cases"])
 
@@ -14,7 +22,7 @@ class PreviewBody(BaseModel):
     payload: dict
 
 
-@router.get("/api/admin/cases")
+@router.get("/api/admin/cases", response_model=list[CaseAdminRow])
 def admin_cases(uid: str = Depends(current_user), status: str | None = None):
     if not uid:
         raise HTTPException(401, "未登录")
@@ -22,7 +30,7 @@ def admin_cases(uid: str = Depends(current_user), status: str | None = None):
     return service.list_admin_cases(status)
 
 
-@router.get("/api/admin/cases/{cid}")
+@router.get("/api/admin/cases/{cid}", response_model=CaseAdminDetail)
 def admin_case_detail(cid: str, uid: str = Depends(current_user)):
     if not uid:
         raise HTTPException(401, "未登录")
@@ -59,9 +67,15 @@ def update_case_meta(cid: str, body: CaseMetaBody, uid: str = Depends(current_us
     return service.update_case_meta(cid, body)
 
 
-@router.post("/api/cases")
+@router.post("/api/cases", response_model=PublishResult)
 def publish_case(payload: CasePayload, uid: str = Depends(current_user)):
     if not uid:
         raise HTTPException(401, "未登录")
     require_editor(uid)
     return service.publish_case(uid, payload)
+
+
+@router.get("/api/admin/cases/{cid}/revisions", response_model=CaseRevisionHistory)
+def case_revision_history(cid: str, uid: str = Depends(current_user)):
+    require_editor(uid)
+    return {"items": service.revision_history(cid)}

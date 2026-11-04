@@ -311,4 +311,53 @@ async function submitPassword() {
   margin: 0 auto;
   padding: 18px 32px 80px;
 }
+
+@media (max-width: 700px) {
+  .layout {
+    display: block;
+  }
+
+  .side {
+    width: auto;
+    height: auto;
+    padding: 12px;
+    position: relative;
+  }
+
+  .brand {
+    padding-bottom: 10px;
+  }
+
+  .nav {
+    flex-direction: row;
+    flex: none;
+    overflow-x: auto;
+  }
+
+  .nav__item {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .side__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 10px;
+  }
+
+  .foot__who {
+    margin-bottom: 0;
+  }
+
+  .pagehead {
+    padding: 18px 16px 0;
+  }
+
+  .content {
+    max-width: none;
+    padding: 16px 16px 60px;
+  }
+}
 </style>
