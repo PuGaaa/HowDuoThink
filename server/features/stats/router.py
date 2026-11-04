@@ -4,8 +4,14 @@ from fastapi import APIRouter, Depends
 
 from core.deps import current_user, require_editor
 from features.stats import service
+from features.stats.models import LearningEventBody
 
 router = APIRouter(tags=["stats"])
+
+
+@router.post("/api/me/learning-events", status_code=204)
+def record_learning_event(body: LearningEventBody, uid: str = Depends(current_user)):
+    service.record_learning_event(uid, body)
 
 
 @router.get("/api/admin/stats/overview")

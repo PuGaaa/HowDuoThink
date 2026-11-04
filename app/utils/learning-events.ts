@@ -1,6 +1,8 @@
 const KEY_EVENTS = 'think_learning_events_v1'
 const KEY_ANONYMOUS_ID = 'think_learning_anonymous_id_v1'
 const KEY_TEST_MODE = 'think_learning_test_mode_v1'
+import { API_BASE } from '../config'
+import { getToken, isLoggedIn } from './auth'
 
 export interface LearningEventRecord {
   kind: string
@@ -34,6 +36,15 @@ export function trackLearningEvent(kind: string, sessionId: string, caseId: stri
   const events: LearningEventRecord[] = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as LearningEventRecord[]
   events.push({ kind: kind, sessionId: sessionId, caseId: caseId, source: source, contentRevision: contentRevision, anonymousId: getLearningAnonymousId(), occurredAt: new Date().toISOString() })
   uni.setStorageSync(KEY_EVENTS, JSON.stringify(events))
+  if (isLoggedIn()) {
+    uni.request({
+      url: API_BASE + '/api/me/learning-events',
+      method: 'POST',
+      header: { Authorization: 'Bearer ' + getToken() } as any,
+      data: events[events.length - 1] as any,
+      timeout: 8000,
+    })
+  }
 }
 
 export function learningEvents(): LearningEventRecord[] {
