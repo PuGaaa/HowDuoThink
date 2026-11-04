@@ -3,6 +3,7 @@
     <safe-top></safe-top>
     <navbar></navbar>
     <view v-if="loaded" class="content">
+      <text v-if="previewId.length > 0" class="preview-note">草稿预览 · 本局不保存学习进度</text>
       <text class="pagetitle">诊断现场</text>
 
       <!-- 成本条 -->
@@ -174,7 +175,9 @@ import { isDailyCase, markDailyDone } from '../../utils/daily'
 import { isLoggedIn } from '../../utils/auth'
 import { openGuestLoginDialog } from '../../utils/login-guide'
 import { scheduleProgressUpload } from '../../utils/sync-progress'
-import { CaseAction, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
+import { CaseAction, DiagnosisCase, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
+import { fetchDraftPreview, getPreviewCase, savePreviewSession } from '../../utils/draft-preview'
+import { trackLearningEvent } from '../../utils/learning-events'
 import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse, bumpTask, recordSolvedLayer } from '../../utils/storage'
 import { computeGrade, shuffleCauses, MAX_WRONG_IDENTIFIES } from '../../utils/scoring'
 import {
@@ -214,6 +217,9 @@ class EvRec {
 }
 const evByAct = ref<EvRec[]>([])
 const events = ref<SessionEvent[]>([])
+const previewId = ref('')
+let startedCase: DiagnosisCase | null = null
+let startedSessionId = ''
 const mascotEvents = ref<MascotEventRec[]>([])
 const lowStreak = ref(0)
 const otterCd = ref(0)
@@ -300,6 +306,23 @@ const fabLabel = computed((): string => {
 })
 
 onLoad((query : OnLoadOptions) => {
+  const preview = query['previewId']
+  if (preview != null) {
+    previewId.value = preview as string
+    const token = query['previewToken']
+    if (token != null) {
+      fetchDraftPreview(previewId.value, token as string, (error) => {
+        if (error.length > 0) {
+          uni.showToast({ title: error, icon: 'none' })
+          return
+        }
+        initializeCase(getPreviewCase(previewId.value))
+      })
+    } else {
+      initializeCase(getPreviewCase(previewId.value))
+    }
+    return
+  }
   const id = query['id']
   const c = id != null ? getCaseById(id as string) : null
   if (c == null) {
@@ -319,12 +342,19 @@ onLoad((query : OnLoadOptions) => {
       }, 300)
       return
     }
-    uni.showToast({ title: '本章未解锁：通关上一章 1 关，或从章节页发起挑战', icon: 'none' })
+    uni.showToast({ title: '通关上一章主线，或从章节页发起跳级挑战', icon: 'none' })
     setTimeout(() => {
       uni.navigateBack({})
     }, 900)
     return
   }
+  initializeCase(c)
+})
+
+function initializeCase(source: DiagnosisCase) {
+  const c = JSON.parse(JSON.stringify(source)) as DiagnosisCase
+  startedCase = c
+  startedSessionId = String(Date.now()) + '-' + String(Math.random())
   caseId.value = c.id
   title.value = c.title
   role.value = c.scene.role
@@ -356,7 +386,8 @@ onLoad((query : OnLoadOptions) => {
     types.push(c.scene.symptoms[i].type)
   }
   appear(onSceneOpen(types))
-})
+  if (previewId.value.length === 0) trackLearningEvent('session_start', startedSessionId, c.id, 'play', c.contentRevision ?? 1)
+}
 
 function toggleDrawer() {
   drawerOpen.value = !drawerOpen.value
@@ -370,8 +401,10 @@ function toggleChecklist() {
   checklistOpen.value = !checklistOpen.value
   if (checklistOpen.value && !checklistTouched.value) {
     checklistTouched.value = true
-    bumpChecklistUse()
-    bumpTask('checkuse', 1)
+    if (previewId.value.length === 0) {
+      bumpChecklistUse()
+      bumpTask('checkuse', 1)
+    }
   }
 }
 
@@ -431,7 +464,7 @@ function submitHypotheses() {
   drawerOpen.value = false
   drawerTab.value = 'actions'
   if (selected.value.length >= 2) {
-    bumpTask('hypo', selected.value.length)
+    if (previewId.value.length === 0) bumpTask('hypo', selected.value.length)
   }
 }
 
@@ -526,6 +559,7 @@ function doExecute(a: CaseAction) {
 function pushEvent(kind: string, actionId: string, gain: string, cost: number, text: string, danger: boolean) {
   const ev: SessionEvent = { kind: kind, actionId: actionId, gain: gain, cost: cost, text: text, danger: danger }
   events.value.push(ev)
+  if (kind === 'action' && previewId.value.length === 0) trackLearningEvent('verification', startedSessionId, caseId.value, 'play', startedCase!.contentRevision ?? 1)
 }
 
 function appear(m: MascotAppearance | null) {
@@ -592,12 +626,12 @@ function confirmIdentify() {
 
 function finishAndSave() {
   const grade = computeGrade(solved.value, playerCost.value, expertCost.value, wrongCount.value)
-  const currentCase = getCaseById(caseId.value)
+  const currentCase = startedCase!
   const rec: SessionRecord = {
-    sessionId: String(Date.now()) + '-' + String(Math.random()),
+    sessionId: startedSessionId,
     caseId: caseId.value,
-    chapterId: currentCase != null ? currentCase.chapterId : '',
-    contentRevision: currentCase != null && currentCase.contentRevision != null ? currentCase.contentRevision : 1,
+    chapterId: currentCase.chapterId,
+    contentRevision: currentCase.contentRevision ?? 1,
     scoringVersion: 1,
     occurredAt: new Date().toISOString(),
     solved: solved.value,
@@ -608,6 +642,11 @@ function finishAndSave() {
     events: events.value,
     mascotEvents: mascotEvents.value,
     hStates: hStates.value,
+    caseSnapshot: currentCase,
+  }
+  if (previewId.value.length > 0) {
+    savePreviewSession(previewId.value, rec)
+    return
   }
   saveSession(rec)
   if (solved.value && currentCase != null && recordSolvedLayer(currentCase.layer)) {
@@ -623,11 +662,16 @@ function finishAndSave() {
 }
 
 function goReview() {
-  uni.redirectTo({ url: '/pages/victory/victory' })
+  uni.redirectTo({ url: '/pages/victory/victory' + (previewId.value.length > 0 ? '?previewId=' + previewId.value : '') })
 }
 </script>
 
 <style>
+.preview-note {
+  font-size: 24rpx;
+  color: #7A7290;
+  margin-bottom: 18rpx;
+}
 .page {
   display: flex;
   flex-direction: column;

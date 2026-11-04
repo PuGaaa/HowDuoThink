@@ -1,5 +1,6 @@
 <template>
   <view class="page">
+    <text v-if="previewId.length > 0" class="preview-note">草稿预览 · 本局不保存学习进度</text>
     <!-- 装饰粒子（仅破案时撒花） -->
     <view v-if="solved" class="confetti">
       <view v-for="(d, i) in dots" :key="'d' + i" class="dot" :class="'dot-' + (i % 6)" :style="d"></view>
@@ -52,8 +53,11 @@
 </template>
 
 <script setup lang="uts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { getMascotUrl } from '../../utils/remote-assets'
+import { getLastSession } from '../../utils/storage'
+import { getPreviewSession } from '../../utils/draft-preview'
 
 const solved = ref(true)
 const grade = ref('S')
@@ -61,6 +65,7 @@ const cost = ref(0)
 const expert = ref(1)
 const lessons = ref(0)
 const caseId = ref('')
+const previewId = ref('')
 
 interface MascotItem {
   src: string
@@ -95,26 +100,20 @@ function genDots() {
   dots.value = arr
 }
 
-onMounted(() => {
-  // 读取终局数据（从 storage 的 session）；失败局切换安慰态
-  try {
-    const raw = uni.getStorageSync('think_session_v1')
-    if (raw != null && (raw as string).length > 0) {
-      const session = JSON.parse(raw as string)
-      grade.value = session.grade || 'S'
-      cost.value = session.playerCost || 0
-      expert.value = session.expertCost || 1
-      solved.value = session.solved != null ? session.solved : true
-      caseId.value = session.caseId || ''
-    }
-  } catch (e) { }
-
+onLoad((query : OnLoadOptions) => {
+  previewId.value = query['previewId'] != null ? query['previewId'] as string : ''
+  const session = previewId.value.length > 0 ? getPreviewSession(previewId.value) : getLastSession()
+  if (session == null) {
+    uni.reLaunch({ url: '/pages/index/index' })
+    return
+  }
+  grade.value = session.grade
+  cost.value = session.playerCost
+  expert.value = session.expertCost
+  solved.value = session.solved
+  caseId.value = session.caseId
   if (solved.value) {
-    // 检查单数量（失败局没有检查单）
-    try {
-      const lessonsRaw = uni.getStorageSync('think_lesson_gain')
-      if (lessonsRaw != null) lessons.value = Number(lessonsRaw) || 0
-    } catch (e) { }
+    lessons.value = session.caseSnapshot?.lessons.length ?? 0
     mascots.value = mascotData
     genDots()
   } else {
@@ -124,19 +123,20 @@ onMounted(() => {
 })
 
 function replay() {
-  if (caseId.value.length > 0) {
-    uni.redirectTo({ url: '/pages/play/play?id=' + caseId.value })
-  } else {
-    uni.redirectTo({ url: '/pages/index/index' })
-  }
+  uni.redirectTo({ url: '/pages/play/play?' + (previewId.value.length > 0 ? 'previewId=' + previewId.value : 'id=' + caseId.value) })
 }
 
 function goReview() {
-  uni.redirectTo({ url: '/pages/review/review' })
+  uni.redirectTo({ url: '/pages/review/review' + (previewId.value.length > 0 ? '?previewId=' + previewId.value : '') })
 }
 </script>
 
 <style>
+.preview-note {
+  font-size: 24rpx;
+  color: #7A7290;
+  margin-bottom: 18rpx;
+}
 .page {
   display: flex;
   flex-direction: column;

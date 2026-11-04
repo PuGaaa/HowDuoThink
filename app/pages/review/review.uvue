@@ -3,6 +3,8 @@
     <safe-top></safe-top>
     <navbar></navbar>
     <view v-if="loaded" class="content">
+      <text v-if="previewId.length > 0" class="preview-note">草稿预览 · 本局不保存学习进度</text>
+      <text v-else-if="legacySnapshot" class="preview-note">历史对局未记录题目快照，以下讲解来自当前版本。</text>
       <text class="pagetitle">复盘室</text>
       <!-- 仪式卡 -->
       <view :class="grade === 'F' ? 'verdict verdict--f' : 'verdict'">
@@ -38,7 +40,7 @@
       </view>
       <view class="btnrow">
         <view class="nextbtn" @click="goNext">
-          <text class="nextbtn__text">{{ hasNext ? '下一关' : '返回地图' }}</text>
+          <text class="nextbtn__text">{{ previewId.length > 0 ? '结束预览' : needsLogin ? '登录保存并继续' : hasNext ? '下一关' : '返回地图' }}</text>
         </view>
         <view class="replaybtn" @click="replay">
           <text class="replaybtn__text">再玩一次</text>
@@ -48,7 +50,7 @@
       <!-- 心理回放 -->
       <view class="replay">
         <text class="replay__title">本局心理回放</text>
-        <view v-for="(item, i) in replayItems" :key="'r' + i" :class="item.isMascot ? 'rmascot' : 'revent'">
+        <view v-for="(item, i) in replayItems" :key="'r' + i" :class="item.isMascot ? 'rmascot' : ''">
           <view v-if="item.isMascot" class="rmascot__row">
             <image class="rmascot__avatar" :src="getMascotUrl(item.who)" mode="aspectFit"></image>
             <view class="rmascot__body">
@@ -144,6 +146,10 @@ import { onLoad } from '@dcloudio/uni-app'
 import { getCaseById, MAINLINE_CASE_IDS } from '../../data/cases'
 import { ExpertStep, Lesson } from '../../types/case'
 import { SessionRecord, SessionEvent, MascotEventRec, getLastSession } from '../../utils/storage'
+import { clearDraftPreview, getPreviewSession } from '../../utils/draft-preview'
+import { trackLearningEvent } from '../../utils/learning-events'
+import { isLoggedIn } from '../../utils/auth'
+import { openGuestLoginDialog } from '../../utils/login-guide'
 import { gradeTitle, starsOf } from '../../utils/scoring'
 import { getMascotUrl } from '../../utils/remote-assets'
 import { reviewNote } from '../../utils/mascot'
@@ -186,9 +192,13 @@ const truthText = ref('')
 
 const starImages = ref(['/static/icons/star-lemon.png', '/static/icons/star-lemon.png', '/static/icons/star-lemon.png'])
 const youPct = ref(100)
+const previewId = ref('')
+const legacySnapshot = ref(false)
+const needsLogin = ref(false)
 
-onLoad(() => {
-  const session : SessionRecord | null = getLastSession()
+onLoad((query : OnLoadOptions) => {
+  previewId.value = query['previewId'] != null ? query['previewId'] as string : ''
+  const session : SessionRecord | null = previewId.value.length > 0 ? getPreviewSession(previewId.value) : getLastSession()
   if (session == null) {
     uni.showToast({ title: '没有可复盘的对局', icon: 'none' })
     setTimeout(() => {
@@ -196,7 +206,8 @@ onLoad(() => {
     }, 800)
     return
   }
-  const c = getCaseById(session.caseId)
+  const c = session.caseSnapshot ?? getCaseById(session.caseId)
+  legacySnapshot.value = session.caseSnapshot == null
   if (c == null) {
     uni.showToast({ title: '案例数据缺失', icon: 'none' })
     setTimeout(() => {
@@ -218,6 +229,7 @@ onLoad(() => {
   chainIdx.value = 0
   lessons.value = c.lessons
   lessonCount.value = c.lessons.length
+  if (previewId.value.length === 0) trackLearningEvent('review_view', session.sessionId, c.id, 'review', session.contentRevision)
 
   const stars = starsOf(session.grade)
   const imgs: string[] = []
@@ -230,13 +242,14 @@ onLoad(() => {
 
   // 下一关：稳定主线中的下一个案例，不跟随选做题注册顺序变化
   hasNext.value = false
-  for (let i = 0; i < MAINLINE_CASE_IDS.length; i++) {
+  for (let i = 0; previewId.value.length === 0 && i < MAINLINE_CASE_IDS.length; i++) {
     if (MAINLINE_CASE_IDS[i] === session.caseId && i + 1 < MAINLINE_CASE_IDS.length) {
       hasNext.value = true
       nextId.value = MAINLINE_CASE_IDS[i + 1]
       break
     }
   }
+  needsLogin.value = previewId.value.length === 0 && !isLoggedIn() && session.caseId === 'log-correlation'
 
   // 假设板终局（旧会话无 hStates 则跳过）
   const board: HBoardVM[] = []
@@ -322,7 +335,16 @@ function eventIcon(kind: string): string {
 }
 
 function goNext() {
+  if (previewId.value.length > 0) {
+    clearDraftPreview(previewId.value)
+    uni.reLaunch({ url: '/pages/index/index' })
+    return
+  }
   if (hasNext.value) {
+    if (!isLoggedIn() && needsLogin.value) {
+      openGuestLoginDialog(nextId.value)
+      return
+    }
     uni.redirectTo({ url: '/pages/play/play?id=' + nextId.value })
   } else {
     uni.switchTab({ url: '/pages/index/index' })
@@ -330,11 +352,16 @@ function goNext() {
 }
 
 function replay() {
-  uni.redirectTo({ url: '/pages/play/play?id=' + caseId.value })
+  uni.redirectTo({ url: '/pages/play/play?' + (previewId.value.length > 0 ? 'previewId=' + previewId.value : 'id=' + caseId.value) })
 }
 </script>
 
 <style>
+.preview-note {
+  font-size: 24rpx;
+  color: #7A7290;
+  margin-bottom: 18rpx;
+}
 .page {
   display: flex;
   flex-direction: column;
@@ -555,12 +582,14 @@ function replay() {
   height: 30rpx;
   margin-right: 12rpx;
   margin-top: 4rpx;
+  flex-shrink: 0;
 }
 .revent__text {
   font-size: 23rpx;
   color: #52606D;
   line-height: 38rpx;
   flex: 1;
+  min-width: 0;
 }
 .rmascot {
   display: flex;
@@ -574,16 +603,20 @@ function replay() {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
+  flex: 1;
+  min-width: 0;
 }
 .rmascot__avatar {
   width: 56rpx;
   height: 56rpx;
   margin-right: 14rpx;
+  flex-shrink: 0;
 }
 .rmascot__body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
 }
 .rmascot__line {
   font-size: 23rpx;
