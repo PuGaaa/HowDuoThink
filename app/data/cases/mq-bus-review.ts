@@ -1,50 +1,77 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 5 章 · 消息与异步 结业评审（评审现场 L3）
- * 教学点：架构设计——事件总线的四张必答卷：保序（分区键）、隔离（消费组）、契约（schema 版本）、兜底（死信+对账）；
- * 评审现场：在故障发生之前把种子找出来。收益由作者证明，风险由评审证明。
- * 专家路径：orderproof(2) + dropprobe(2) + slowprobe(1) + schemaprobe(1) + benefit(1) + histreview(1) = 8⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const mqBusReviewCase: DiagnosisCase = {
   id: 'mq-bus-review',
   title: '订单事件总线方案评审',
-  intro: '「订单事件上总线」方案明天终审：16 个下游要订阅订单事件。方案很漂亮——你的工作是在它出事之前找出种子。',
+  intro: '16个业务订阅方都需要订单事件，Kafka方案却共用一个group。先验证交付份数，再审查实体顺序、失败恢复与契约边界。',
   domain: 'runtime',
   layer: '事件总线把一次调用变成一份承诺——发出去的每个事件都要到、要对、要有序',
   part: 'master',
   chapterId: 'messaging',
   order: 6,
-  typeTags: ['messaging', 'architecture'],
+  typeTags: [
+    'messaging',
+    'architecture',
+  ],
   difficulty: 3,
-
   scene: {
     role: '你是「鲜到家」的资深架构师，评审会上被指派"挑刺"——找出这个方案未来会出事的地方。',
-    architecture: '订单服务 → 事件总线(MQ, 单 topic: order-events) → 16 个下游订阅(库存/积分/风控/数据分析/外部合作方…)',
+    architecture: 'Kafka order-events（16分区、无key）；16个不同业务下游都要独立订阅，但草案统一group.id=order-subscribers；失败3次后commit offset丢弃。',
     tag: '评审现场',
     symptoms: [
       {
         type: 'error',
         title: '方案文档 · 关键句',
-        text: '① 单 topic 承载全部订单事件，"全局公平"不设分区键\n② 事件体：订单全量字段（60+），JSON 直传\n③ 消费失败重试 3 次（约 30s 窗口），仍失败则丢弃\n④ 订单服务只管发布——"发布成功即责任完成"',
+        text: '草案：16业务共用同group以简化offset管理；消息无orderId key；JSON全量直传无兼容约定；失败3次后提交offset；发布获Broker确认即认为全部下游完成。',
       },
       {
         type: 'text',
         title: '现网事实',
-        text: '16 个下游处理能力差异巨大：库存服务 800 条/s，数据分析平台 50 条/s；其中 3 个是外部合作方系统（网络抖动分钟级常见）。\n订单字段变更频率：每月 2~3 次。\n历史：去年大促，点对点调用架构出现过"库存慢拖垮订单"的雪崩。',
+        text: '本题合同：100笔源事件，每个业务方都要得到100笔，共1600份业务交付。库存与分析处理能力不同，发布方不能把Broker接受当16方业务完成。',
+      },
+      {
+        type: 'log',
+        title: '评审图标失败',
+        text: '[WARN] event bus diagram icon 404。',
+      },
+      {
+        type: 'log',
+        title: 'schema编辑器预览失败',
+        text: '[WARN] schema editor preview font unavailable。',
+      },
+      {
+        type: 'log',
+        title: '审计外送延期',
+        text: '[WARN] bus audit attachment upload retry。',
       },
     ],
     timeline: '方案评审明天举行 ｜ 双 11 在 30 天后 ｜ 改造动机：16 对点对点调用的维护成本已不可持续',
     impactHint: '这不是故障排查——是在故障发生之前把种子找出来。最值钱的问句仍是："什么情况下这个设计会出事？"',
   },
-
   hypotheses: [
-    { id: 'h-ordering', text: '无分区键导致同一订单的事件乱序：取消先于支付被下游处理，状态机错乱', excludeActionId: 'a-orderproof' },
-    { id: 'h-slowconsumer', text: '16 个下游共享单 topic 无隔离：50 条/s 的慢消费者积压拖垮所有下游', excludeActionId: 'a-slowprobe' },
-    { id: 'h-schema', text: '全量字段直传且无版本管理：每月改字段 = 16 个下游联锁升级', excludeActionId: 'a-schemaprobe' },
-    { id: 'h-drop', text: '重试 3 次后丢弃：外部合作方分钟级抖动必然超窗，事件丢失后下游状态永久漂移', excludeActionId: 'a-dropprobe' },
+    {
+      id: 'h-ordering',
+      text: '交付契约错配：同group分摊不能实现16份独立订阅，且无实体顺序处理机制',
+      excludeActionId: 'a-orderproof',
+    },
+    {
+      id: 'h-slowconsumer',
+      text: '只要共用topic，即使独立group也必然共享offset并互相阻塞',
+      excludeActionId: 'a-slowprobe',
+    },
+    {
+      id: 'h-schema',
+      text: '只把JSON换成二进制就自动解决所有字段兼容，不需契约规则',
+      excludeActionId: 'a-schemaprobe',
+    },
+    {
+      id: 'h-drop',
+      text: 'Kafka保留期内总有日志，失败后即使提交offset也会自动重投',
+      excludeActionId: 'a-dropprobe',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +86,7 @@ export const mqBusReviewCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '业务约束盘点',
-        text: '库存/积分/风控：按订单生命周期流转——"取消事件不能在支付事件之前被处理"是正确性要求，不是优化项。\n现网点对点时代：调用时序隐式保序；曾发生"取消先到，库存回滚了还没扣的库存"事故 2 次。\n→ 乱序不是理论风险，是发生过的事。总线化会把它放大还是解决？',
+        text: '合同要求每个订阅方各处理同100事件，即1600份交付；草案相同group实际每条记录分给组内一个消费者，合计约100份而非1600。\n同组用于同一业务的并行副本，不能拿它替代16个不同业务的独立订阅。\n噪声收线：图标不是合同或Kafka元数据，100事件1600份需求已由业务原文确认。',
       },
     },
     {
@@ -70,12 +97,19 @@ export const mqBusReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-ordering'],
-      hypotheses: [{ id: 'h-ordering', status: 'confirmed' }],
+      tests: [
+        'h-ordering',
+      ],
+      hypotheses: [
+        {
+          id: 'h-ordering',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '"单 topic 无分区键"——方案作者确认。\n追问：同一订单的"创建/支付/取消"三个事件落在不同分区、被不同消费者并行处理？\n——"理论上会，但下游应该能自己处理吧。"\n→ 下游没有时钟、没有全局序，"自己处理"无从谈起。保序责任必须由总线承担：分区键 = orderId，这是阻断级缺陷。',
+        text: '同group的assignment按分区分摊：库存只领部分，分析领另一部分，双方各缺事件。另因null key，同订单事件可分散分区，独立处理不提供实体顺序。\n用独立group满足各业务交付，按需key=orderId并定义生产、分区内处理和重试顺序；一个key本身不保证消费者任意并发也有序。',
       },
     },
     {
@@ -86,12 +120,19 @@ export const mqBusReviewCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-slowconsumer'],
-      hypotheses: [{ id: 'h-slowconsumer', status: 'confirmed' }],
+      tests: [
+        'h-slowconsumer',
+      ],
+      hypotheses: [
+        {
+          id: 'h-slowconsumer',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '16 个下游共享同一 topic、无独立消费组/队列。\n推演：数据分析（50 条/s）对 8000 QPS 的事件流必然积压 → 共享队列水位上涨 →\n库存等服务被迫与它一起排队（或被背压拖慢）。\n→ 慢消费者隔离缺失：去年"库存慢拖垮订单"的雪崩，换了个形态可以复发。',
+        text: 'Kafka独立group各自offset，一组停止处理不会自动停另一组，保留/磁盘/网络仍共享，资源超载可能间接影响。单topic不是直接共享offset或必然排队的充分条件；本案草案真正错误是把不同业务放同group。',
       },
     },
     {
@@ -102,12 +143,19 @@ export const mqBusReviewCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-schema'],
-      hypotheses: [{ id: 'h-schema', status: 'confirmed' }],
+      tests: [
+        'h-schema',
+      ],
+      hypotheses: [
+        {
+          id: 'h-schema',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '"全量字段 JSON 直传，没做版本号；字段每月改 2~3 次。"\n推演：订单服务新增/改名字段 → 16 个下游的反序列化/校验逐一适配——\n每月 2~3 次的 16 方联锁发布，任何一个下游跟不上就消费报错积压。\n→ 契约管理缺失：事件是发布给别人的承诺，不是自己的内存对象。',
+        text: 'JSON、Avro或其他编码均不能自动保证业务语义兼容；删/改名/类型变化、必填、未知字段策略都须明确。只改二进制不修承诺，排除编码万能论；全量/增量选择也不天然等于耦合或解耦。\n噪声收线：字体不改变schema字段/语义，二进制与JSON兼容规则仍按实际契约核验。',
       },
     },
     {
@@ -118,12 +166,19 @@ export const mqBusReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-drop'],
-      hypotheses: [{ id: 'h-drop', status: 'confirmed' }],
+      tests: [
+        'h-drop',
+      ],
+      hypotheses: [
+        {
+          id: 'h-drop',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '"重试 3 次（30s 窗口）后丢弃。"\n追问：合作方网络抖动分钟级常见，30s 窗口必然不够——丢掉的事件找得回来吗？\n——"……没设计补偿。"\n推演：丢事件 = 下游状态永久漂移（积分没加、风控没记），且"发布成功即责任完成"让丢失无人知晓。\n→ 兜底缺失：死信 + 对账补偿是事件总线的生存底线，不是可选项。',
+        text: '提交offset表示该组下次从后续位置继续；日志保留不使被commit跳过的失败业务自动再执行。要保留失败意图、隔离主题和重放/对账流程；保留期外也可能无法读回。\n噪声收线：附件外送不回退已提交offset，失败恢复承诺不能依赖它自动重投。',
       },
     },
     {
@@ -166,24 +221,19 @@ export const mqBusReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-ordering', 'h-slowconsumer', 'h-schema', 'h-drop'],
-      hypotheses: [
-        { id: 'h-ordering', status: 'confirmed' },
-        { id: 'h-slowconsumer', status: 'confirmed' },
-        { id: 'h-schema', status: 'confirmed' },
-        { id: 'h-drop', status: 'confirmed' },
-      ],
+      tests: [],
+      hypotheses: [],
       result: {
         type: 'text',
         title: '评审结论 · 修正清单',
-        text: '① 分区键 = orderId（保序，阻断级）\n② 下游各自消费组 + 独立队列（隔离，慢者自慢）\n③ 事件 schema 加版本号 + 只传核心增量字段 + 兼容承诺（只加不改，两版过渡）\n④ 死信队列 + 每日对账补偿替代"3 次后丢弃"\n⑤ 慢消费者配额与积压告警\n→ 五项补齐后有条件通过；保序为上线阻断项。',
+        text: '每业务独立group，实体顺序边界按需求定义；schema及兼容回归明确；失败在commit前有持久可恢复意图，按业务ID对账；为各组积压/资源配额设验证目标。\n发布方与订阅方分别承担Broker接收和业务完成的责任，不把发布成功当最终履约。',
       },
     },
     {
       id: 'a-approve',
       name: '按原方案批准上线',
       desc: '【状态变更】不做修改直接过审',
-      cost: 3,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -192,14 +242,14 @@ export const mqBusReviewCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '批准结果',
-        text: '原方案过审。双 11 预演：合作方抖动丢事件、积分与风控状态漂移、分析平台积压拖慢全体。\n你批准的不是方案，是 16 个下游的排期表故障。',
+        text: '原稿直接发布会违反已知交付份数和恢复承诺；具体事故数量与发生日未验证，不能写成双11预演已发生。',
       },
     },
     {
       id: 'a-veto',
       name: '整体否决，退回点对点架构',
       desc: '【状态变更】否决事件总线，维持现状',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -208,71 +258,90 @@ export const mqBusReviewCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '否决结果（陷阱动作）',
-        text: '方向被否，16 对点对点调用继续缠着——下次大促，"库存慢拖垮订单"的雪崩照旧。\n→ 复盘点评：发现五个缺陷的正确产出是修正清单，不是否决票。把 baby 和洗澡水一起倒掉，是评审的另一种失职。',
+        text: '拒绝整个方向不自动解决现有同步耦合；是否改造应比较成本和约束，先把明确缺口转为可验收修正，不用必然雪崩的未来故事施压。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-ordering', text: '核心阻断缺陷：单 topic 无分区键，同一订单的创建/支付/取消事件可乱序到达——下游状态机错乱（资损级），必须分区键=orderId 后才能上线', correct: true },
-    { id: 'rc-slowconsumer', text: '真实风险：16 下游共享单 topic 无隔离，慢消费者积压传染全体', correct: false },
-    { id: 'rc-schema', text: '真实风险：全量字段无版本管理，字段变更加重 16 方联锁发布', correct: false },
-    { id: 'rc-drop', text: '真实风险：重试 30s 窗口后丢弃且无对账补偿，外部抖动必丢事件', correct: false },
+    {
+      id: 'rc-ordering',
+      text: '不同业务共用Kafka group导致事件被分摊而非独立交付；无实体key/处理顺序契约又可能乱序，发布确认被误当全部订阅完成',
+      correct: true,
+    },
+    {
+      id: 'rc-slowconsumer',
+      text: '同topic的独立group必然共享offset并互相阻塞',
+      correct: false,
+    },
+    {
+      id: 'rc-schema',
+      text: '改二进制即可自动兼容所有字段变化',
+      correct: false,
+    },
+    {
+      id: 'rc-drop',
+      text: '提交offset后日志保留会自动重投失败业务',
+      correct: false,
+    },
   ],
-
-  expertCost: 8,
+  expertCost: 7,
   restartActionId: 'a-approve',
-
   expertChain: [
     {
-      thought: '评审第一问照例要业务约束：16 个下游，谁对"事件顺序"有正确性要求？',
-      update: '库存/积分/风控按生命周期流转，乱序是资损级；且点对点时代已发生 2 次同类事故——保序是硬约束。',
+      thought: '先算合同要求的交付份数。',
+      update: '100×16=1600，草案同组合计约100。',
       actionId: 'a-impact',
-      why: '1⚡ 买到设计边界：先知道谁错不起，才能判断"无分区键"是风格问题还是阻断缺陷——约束不同，评审结论完全不同。',
-      conclusion: '保序确立为正确性红线 → 检验方案怎么保证它。',
+      why: '1⚡拓扑必须先满足业务交付基数。',
+      conclusion: '核对组与顺序。',
     },
     {
-      thought: '拿红线拷问方案：分区键设计在哪？同一订单的事件会不会被并行投递？',
-      update: '实锤：单 topic 无分区键，乱序必然存在——阻断级缺陷成立。',
+      thought: '读取group和key设计。',
+      update: '业务被分摊，实体事件还可能跨分区。',
       actionId: 'a-orderproof',
-      why: '2⚡ 评审的核心动作是"把红线对到设计上"：红线有了、设计没有对应机制，缺陷就是实锤而非猜想——这一步买到的是正确性闭环。',
-      conclusion: '保序缺陷实锤 → 顺藤检查可用性与契约。',
+      why: '2⚡把独立订阅与同业务副本分开，才能评审顺序承诺。',
+      conclusion: '确认交付错配。',
     },
     {
-      thought: '正确性之外问存活与协作：慢消费者会不会拖垮别人？schema 变更谁买单？丢的事件找得回吗？',
-      update: '三项全部确认：无隔离（雪崩可复发）、无版本（16 方联锁）、3 次后丢弃（外部抖动必丢且无人知晓）。',
+      thought: '审查独立group的offset边界。',
+      update: '同topic不等于共享offset。',
+      actionId: 'a-slowprobe',
+      why: '1⚡不能把其他Broker共享队列模型套到Kafka。',
+      conclusion: '排除同topic必阻塞。',
+    },
+    {
+      thought: '反验改编码的兼容承诺。',
+      update: '编码不自动保持字段与语义。',
+      actionId: 'a-schemaprobe',
+      why: '1⚡schema和业务契约仍需可执行验证。',
+      conclusion: '排除二进制万能论。',
+    },
+    {
+      thought: '检查失败后commit的恢复行为。',
+      update: '日志还在也不会自动再执行业务。',
       actionId: 'a-dropprobe',
-      why: '2⚡ 评审要同时覆盖"会不会错"与"扛不扛得住/丢不丢得起"：丢弃+无补偿的组合在"发布即免责"的语义下最危险——错误是暂时的，丢失是永久的。',
-      conclusion: '四张答卷三张空白：隔离/契约/兜底全部缺失。',
+      why: '2⚡保留与消费进度不同，失败必须留恢复边界。',
+      conclusion: '候选全部收敛。',
     },
     {
-      thought: '方向与历史对齐：解耦收益是否真实？去年的复盘教训新方案吸收了吗？',
-      update: '收益真实、方向正确；历史教训（故障隔离）未被吸收——结论应是有条件通过，不是否决。',
-      actionId: 'a-benefit',
-      why: '1⚡ 评审的公允性来自两头都验：只挑刺会逼死好方案，只看收益会放过种子——收益与风险各归其位，结论才有分量。',
-      conclusion: '修正清单可以开出了。',
-    },
-    {
-      thought: '五项修正清单开列：保序（阻断）+ 隔离 + 契约 + 兜底 + 配额。停止追问。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【评审停止规则】四张必答卷全部核验完毕（保序/隔离/契约/兜底），继续追问不会发现新的结构性缺陷——评审的产出是清单，不是完美。',
-      conclusion: '有条件通过：分区键为上线阻断项，其余四项为双 11 前必改。检查单：事件总线的四张必答卷——保序、隔离、契约、兜底。',
+      why: '【停止规则】交付基数与组语义错配成立，独立组必共享、编码万能及commit自动重试三个命题均被反例排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '不同业务共用Kafka group导致事件被分摊而非独立交付；无实体key/处理顺序契约又可能乱序，发布确认被误当全部订阅完成',
     },
   ],
-
   lessons: [
     {
-      text: '事件总线的四张必答卷：保序（分区键）、隔离（独立消费组）、契约（schema 版本）、兜底（死信+对账）——少答一张就是未来某次故障的种子。',
-      principle: '架构设计：事件总线把一次调用变成一份长期承诺。保序答"到了要对"，隔离答"慢者自慢"，契约答"变了不炸"，兜底答"丢了能找"。四问过全，方案才算完整——与缓存设计四问同构：引入新基础设施就是引入新状态机。',
+      text: '同group并行分摊，独立group各自订阅；单topic、单队列和消费者组不是可互换概念。',
+      principle: '先写每条事件预期多少份业务交付，再选拓扑。Kafka不同group的offset独立，但仍共享Broker资源，隔离需按真实瓶颈验证。',
     },
     {
-      text: '"重试 3 次后丢弃"在"发布成功即责任完成"的语义下最危险：错误是暂时的（会重试），丢失是永久的（没人知道）。',
-      principle: '兜底设计：外部依赖的抖动时长要按分钟级评估，30s 的重试窗口是仪式不是保护。丢事件必须有去处（死信）+ 有人对账（补偿任务）+ 有告警（深度/速率）——三件套齐全，"最终一致"才有底气说出口。',
+      text: 'Broker发布确认不代表16方业务完成；commit offset后也不会因日志仍在而自动重试失败业务。',
+      principle: '每个订阅的持久任务状态、失败处理和业务ID对账要明确责任与观察期。DLQ只是去处，仍需可恢复流程和时效判断。',
     },
     {
-      text: '评审的产出是修正清单，不是否决票：发现五个缺陷的正确动作是补齐它们，把好方向连同缺陷一起否掉是评审的另一种失职。',
-      principle: '产品思维：方向收益与边界缺陷分开记账——"有条件通过 + 阻断项清单"才是专业结论。评审者的职责是用反例拷问边界，作者保留收益论证权；各司其职，方案才能在打磨中活下来。',
+      text: '顺序与兼容各有端到端前提，分区key或二进制编码都不是通用保证。',
+      principle: '按实体生产与消费处理契约验证序列；按实际schema及业务语义验证新旧消费者，不以技术名词代替通过标准。',
     },
   ],
 }

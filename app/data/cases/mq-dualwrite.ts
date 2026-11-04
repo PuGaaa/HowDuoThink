@@ -1,23 +1,22 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 5 章 · 消息与异步 第五批（双写不一致 L2）
- * 教学点：架构设计——DB 提交与 MQ 发送是两步，中间没有原子性：本地消息表/事务消息是标准解；
- * 对账兜底 + 失败显式化，三层防线各管一段。
- * 专家路径：impact(1) + codeseq(2) + brokercheck(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const mqDualWriteCase: DiagnosisCase = {
   id: 'mq-dualwrite',
   title: '订单落库了，积分消息却消失了',
-  intro: '订单落库成功，"积分发放"消息却没了：DB 提交与 MQ 发送是两步——中间进程死掉，谁也不欠谁。',
+  intro: '30个订单有提交记录，却没有积分消息。对齐可观察分支和持久意图，再区分进程退出、GC后的期限分支与真正发送失败。',
   domain: 'runtime',
   layer: '两次写入之间没有原子性——消息要和业务数据同生共死',
   part: 'master',
   chapterId: 'messaging',
   order: 9,
-  typeTags: ['messaging', 'data', 'race'],
+  typeTags: [
+    'messaging',
+    'data',
+    'race',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」订单平台的架构师，积分系统的对账差异把双写问题摆上了台面。',
     architecture: '下单服务：① DB 事务(订单落库) ② 发送 MQ(积分消息) → 积分消费者(幂等入账)',
@@ -26,25 +25,44 @@ export const mqDualWriteCase: DiagnosisCase = {
       {
         type: 'error',
         title: '积分对账差异',
-        text: '日均 230 单：订单表有记录、MQ 无积分消息——积分永远漏发。\n用户侧症状：下单成功但积分不到账（客诉集中在"重试也无效"的订单）。',
+        text: '固定30个已满足积分条件的成熟订单样本：订单提交存在，积分意图/投递缺失。此处不从缺一条发送日志直接推断从未发送。',
       },
       {
         type: 'text',
         title: '时间特征',
-        text: '丢失订单的"发送时刻"与实例重启/FullGC 时刻吻合。\n发送日志：这些订单的 send 调用根本从未发生——不是发送失败，是没走到发送。',
+        text: '22例在提交后进程退出，2例OOM终止；6例GC后恢复，但代码发现请求deadline已过直接return，跳过send。FullGC本身暂停后恢复，并不天然杀请求线程。',
+      },
+      {
+        type: 'log',
+        title: '积分图标失败',
+        text: '[WARN] loyalty badge icon 404。',
       },
     ],
-    timeline: '下单代码结构：commit() → send() 顺序两步 ｜ 每周 2~3 次发布重启 + 偶发 FullGC ｜ 问题随重启频率波动',
+    timeline: '代码commit→检查请求期限→send；没有与订单同事务持久化的消息意图。样本按事务提交、进程事件与实际分支关联，不使用重启频率×3ms伪造0.05%概率。',
     impactHint: '消息"没被发送"而不是"发送失败"——在 commit 与 send 之间的那个间隙里，世界发生了什么？',
   },
-
   hypotheses: [
-    { id: 'h-gap', text: '双写间隙：commit 与 send 两步非原子——间隙内进程死亡，消息永远不会发出', excludeActionId: 'a-codeseq' },
-    { id: 'h-sendfail', text: '发送失败但异常被静默吞掉（有 send 无记录）', excludeActionId: 'a-sendlog' },
-    { id: 'h-broker', text: 'Broker 收到后丢失（持久化缺陷）', excludeActionId: 'a-brokercheck' },
-    { id: 'h-consumer', text: '消息消费了但积分落库失败（消费侧丢）', excludeActionId: 'a-consumerside' },
+    {
+      id: 'h-gap',
+      text: '双写间隙：commit 与 send 两步非原子——间隙内进程死亡，消息永远不会发出',
+      excludeActionId: 'a-codeseq',
+    },
+    {
+      id: 'h-sendfail',
+      text: '这30个样本都已调用send，只是发送异常被吞掉',
+      excludeActionId: 'a-sendlog',
+    },
+    {
+      id: 'h-broker',
+      text: 'Broker 收到后丢失（持久化缺陷）',
+      excludeActionId: 'a-brokercheck',
+    },
+    {
+      id: 'h-consumer',
+      text: '消息消费了但积分落库失败（消费侧丢）',
+      excludeActionId: 'a-consumerside',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +77,7 @@ export const mqDualWriteCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '时刻对齐（30 个丢失样本）',
-        text: '22 例：对齐实例重启时刻（±50ms）——commit 后进程死\n6 例：对齐 FullGC 停顿（>2s）——GC 后请求线程被杀/超时中断\n2 例：对齐 OOM kill\n消费侧：同期零异常（收到的消息 100% 入账）\n→ 丢失全部聚集在"两个写入之间"的进程级事件——间隙实锤。',
+        text: '固定30个业务键：22进程退出、2OOM在commit后且send前；6个长GC后执行明确的deadline过期return分支。GC只是暂停诱因，直接跳过发送来自应用分支。受控故障注入可重现无消息意图状态。',
       },
     },
     {
@@ -70,12 +88,19 @@ export const mqDualWriteCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-gap'],
-      hypotheses: [{ id: 'h-gap', status: 'confirmed' }],
+      tests: [
+        'h-gap',
+      ],
+      hypotheses: [
+        {
+          id: 'h-gap',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '时序解剖',
-        text: 'tx.commit(order)          ← DB 已持久\nmq.send(pointsMessage)    ← 3ms 后进程被 kill\n→ 两步是"顺序"不是"事务"：没有任何机制保证"提交过的订单必有消息"。\n间隙概率模型：重启频率 × 窗口 3ms ≈ 0.05%/天 ✓ 与实测 230/46 万单吻合。\n实锤：双写不一致是结构性缺陷——修"小心"没用，要修"原子"。',
+        text: '代码：tx.commit(order);\nif (requestDeadlineExpired()) return;\nmq.send(pointsMessage);\n没有同事务的outbox。提交成功后退出，或走已过期分支，都留下订单而没有可恢复发送意图。\n顺序执行不是跨系统原子；“重启频率×3ms”没有请求分布、并发和单位就不能推日漏发率，删除原概率背书。',
       },
     },
     {
@@ -86,12 +111,19 @@ export const mqDualWriteCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-sendfail'],
-      hypotheses: [{ id: 'h-sendfail', status: 'down' }],
+      tests: [
+        'h-sendfail',
+      ],
+      hypotheses: [
+        {
+          id: 'h-sendfail',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '发送审计',
-        text: '发现并行缺陷：send 超时异常被 catch 后仅 log.info——日均另有 12 单"发送失败被吞"。\n它解释小部分丢失；主体（230 单）是"根本没走到 send"。\n→ 降权为并行缺陷：两处一起修——投递失败的显式重试与"从未发送"的兜底，机制上可以统一。',
+        text: '同键分支审计与受控断点：24个在send调用前进程终止，6个走return；没有进入send。缺普通日志不是唯一依据，本题有进程/分支关联和定点复放。排除这30个全都调用send失败的命题。\n噪声收线：图标在独立展示路径，不创建outbox也不调用send，该30样本控制流在发送前终止。',
       },
     },
     {
@@ -102,12 +134,19 @@ export const mqDualWriteCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-broker'],
-      hypotheses: [{ id: 'h-broker', status: 'excluded' }],
+      tests: [
+        'h-broker',
+      ],
+      hypotheses: [
+        {
+          id: 'h-broker',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'Broker 核对',
-        text: '发送日志与 Broker 存储逐条对得上：收到的消息零丢失（刷盘配置同步刷）。\n→ 排除 Broker：它只丢了"从未被托付"的消息。',
+        text: '该30个业务ID没有Broker入口事件，且受控在send前退出可复现；不能用其他收到消息都正常就全局宣判Broker零丢失。当前缺口发生在托付给Broker之前。',
       },
     },
     {
@@ -118,19 +157,26 @@ export const mqDualWriteCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-consumer'],
-      hypotheses: [{ id: 'h-consumer', status: 'excluded' }],
+      tests: [
+        'h-consumer',
+      ],
+      hypotheses: [
+        {
+          id: 'h-consumer',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '消费核对',
-        text: '消费者幂等+入账正常；收到的积分消息 100% 落库。\n→ 排除消费侧：断点唯一——生产端的"两步之间"。',
+        text: '消费侧从未获得该30个投递事件，没有处理/ack或积分提交；受控send前退出产生同样账差。其他收到事件的成功率只作背景，不是本样本消费因果。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急回退为同步调用积分服务',
       desc: '【状态变更】弃 MQ 改同步 RPC 保证"提交即入账"',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -139,7 +185,7 @@ export const mqDualWriteCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '回退结果（陷阱动作）',
-        text: '漏发归零（同步调用失败会抛错重试）。\n代价：解耦倒退——积分服务抖动直接拖慢下单（回到去年雪崩的老路）；削峰能力丢失。\n→ 复盘点评：一致性不该靠退回耦合解决——原子性的标准解是"消息与业务数据同库同事务"。',
+        text: '改同步积分调用不会自动原子：若仍先commit再调用，进程在二者之间退出照样漏；若先外呼后commit，又有外部完成而订单回滚风险。同步还耦合期限/容量，不能宣称漏发归零。',
       },
     },
     {
@@ -155,7 +201,7 @@ export const mqDualWriteCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 订单事务内同库写入 message_outbox（与订单同 commit——原子）\n② 独立投递器：扫表发送 → 成功标记；失败指数退避重试 → 超限进死信告警\n③ 幂等保障不变（消息 ID 去重）\n回归：重启/kill 混沌注入 100 轮——零漏发（消息随订单同生共死）。',
+        text: '订单与outbox发送意图在同库同事务提交；投递器用Broker确认及明确路由结果判断，失败/未知状态可恢复重试。\n发送后标记前崩溃仍可能重复，因此稳定业务键与消费幂等必需；outbox保证该DB事务中的意图，不自动与Broker消息或外部积分同生共死。',
       },
     },
     {
@@ -171,7 +217,7 @@ export const mqDualWriteCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '显式化',
-        text: '直接发送模式保留但失败必须落"待重试表"（与 outbox 同一归宿）。\nlog.info 吞发送异常的写法进 lint 黑名单——"失败要留下会重试的痕迹"。',
+        text: '若保留提交后快速发送，也必须先有同事务outbox意图，快速路径与后台投递使用同一稳定ID。仅在send失败后再写待重试表仍有“写表前进程退出”窗口，不能替代原子意图。',
       },
     },
     {
@@ -187,71 +233,90 @@ export const mqDualWriteCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '对账兜底',
-        text: '小时级对账：有订单无积分（且过宽限期）→ 自动补发消息。\n→ 本地消息表管"当下的原子"，对账管"历史的遗漏"——防线纵深，漏网之鱼一小时内有救。',
+        text: '对已满足积分条件且超过正常处理宽限的成熟订单，按稳定权益键核对outbox/投递/积分流水并恢复遗漏；退款/资格变化单独处理。小时调度不保证所有历史漏洞都在一小时修复，需观察失败与在途。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-gap', text: '双写间隙：DB commit 与 MQ send 两步非原子，间隙内进程死亡（重启/FullGC/OOM）则消息永远不会发出——结构性缺陷，日均 230 单漏发积分', correct: true },
-    { id: 'rc-sendfail', text: '发送失败异常被 log.info 吞掉（并行缺陷，日均 12 单）', correct: false },
-    { id: 'rc-broker', text: 'Broker 收到后持久化丢失', correct: false },
-    { id: 'rc-consumer', text: '消息消费成功但积分落库失败', correct: false },
+    {
+      id: 'rc-gap',
+      text: '订单commit与发送意图未原子保存；提交后进程退出或应用deadline分支跳过send，缺少可恢复意图造成该30个成熟订单漏积分',
+      correct: true,
+    },
+    {
+      id: 'rc-sendfail',
+      text: '该30个样本都已进入send，只是异常被吞',
+      correct: false,
+    },
+    {
+      id: 'rc-broker',
+      text: 'Broker 收到后持久化丢失',
+      correct: false,
+    },
+    {
+      id: 'rc-consumer',
+      text: '消息消费成功但积分落库失败',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 6,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '丢失全部聚集在"两个写入之间"的进程事件——先对齐时刻：它们和重启/GC 的重合度。',
-      update: '22/30 对齐重启、6 例对齐 FullGC——间隙假说有了第一层数据支撑。',
+      thought: '关联提交、进程退出与期限分支。',
+      update: '24在发送前终止，6恢复后return。',
       actionId: 'a-impact',
-      why: '1⚡︎ 时刻对齐把"偶发漏发"翻译成"间隙问题"：丢失与进程事件的强相关，直接排除"随机丢"类解释。',
-      conclusion: '嫌疑锁定：双写间隙（h-gap 升权）。',
+      why: '1⚡GC与终止不同，必须查实际控制流。',
+      conclusion: '核对持久意图。',
     },
     {
-      thought: '解剖两步时序：commit 与 send 之间有什么保障——顺便用概率模型验证间隙理论。',
-      update: '实锤：两步之间零保障；重启频率 × 3ms 窗口的理论漏发率与实测吻合——结构性缺陷。',
+      thought: '读取commit后分支。',
+      update: '没有同事务发送意图。',
       actionId: 'a-codeseq',
-      why: '2⚡︎ 代码时序 + 概率模型双重实锤：前者证明"没有机制"，后者证明"数字对得上"——结构性缺陷的修复必须是机制（原子化），不能是"提交后尽快发"这类减小窗口的安慰剂。',
-      conclusion: '根因实锤：非原子双写。',
+      why: '2⚡顺序不是原子，未托付的任务没有恢复者。',
+      conclusion: '确认双写间隙。',
     },
     {
-      thought: 'send 阶段顺藤摸瓜——"发送失败被吞"是双写问题的孪生兄弟，一起清点。',
-      update: '发现并行缺陷：12 单/天的 send 异常被 log.info 吞——两处统一到"待重试"归宿。',
+      thought: '核对send是否进入。',
+      update: '该30样本未调用send。',
       actionId: 'a-sendlog',
-      why: '1⚡︎ 孪生缺陷的清点价值：间隙问题（没走到 send）与失败问题（send 了但没人管）在修复上可以共用一套"落表重试"机制——一起修省一次改造。',
-      conclusion: '修复方案统一为本地消息表。',
+      why: '1⚡普通日志缺失不足，需分支与受控退出证据。',
+      conclusion: '排除全为send异常。',
     },
     {
-      thought: 'Broker 与消费侧各 1⚡︎ 排除——两侧清白后，"生产端两步之间"成为唯一断点。',
-      update: 'Broker 零丢失、消费 100% 入账——断点唯一，修复聚焦。',
+      thought: '核对Broker入口。',
+      update: '样本未交给Broker。',
       actionId: 'a-brokercheck',
-      why: '1⚡︎ 端到端清场防止修复发散：MQ 链路排查容易"到处加固"——两侧的无责证明让修复精准落在唯一断点。',
-      conclusion: '嫌疑收敛 → 本地消息表 + 对账兜底。',
+      why: '1⚡不以其他消息正常推Broker全局绝对零丢。',
+      conclusion: '排除Broker后丢。',
     },
     {
-      thought: '止血（回退同步是陷阱）、修复（outbox 原子化）、显式化（失败落表）、兜底（对账补发）。停止收集。',
-      update: '停止。',
+      thought: '核对消费事件与流水。',
+      update: '没有该批输入可消费。',
+      actionId: 'a-consumerside',
+      why: '1⚡明确消费边界，不能把未到达归消费失败。',
+      conclusion: '候选全部收敛。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（间隙）✓ 概率（模型吻合）✓ 防线（三层）✓——机制、量化、纵深三层闭合。',
-      conclusion: '沉淀：两次写入之间没有原子性——本地消息表让消息与业务数据同生共死，对账让历史遗漏有兜底。解耦与一致性可以兼得，但不可以兼得于"小心翼翼"。',
+      why: '【停止规则】提交与发送前终止/分支复现吻合，send异常、Broker后丢和消费提交失败均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '订单commit与发送意图未原子保存；提交后进程退出或应用deadline分支跳过send，缺少可恢复意图造成该30个成熟订单漏积分',
     },
   ],
-
   lessons: [
     {
-      text: 'DB commit 与 MQ send 之间没有原子性：进程在间隙里死亡，消息永远不会发出——"提交后尽快发"是安慰剂不是方案。',
-      principle: '架构设计：跨系统双写的原子性标准解是本地消息表（outbox）：业务数据与消息记录同库同事务提交，独立投递器扫表发送。事务消息/事件溯源同理——消息要与业务数据"同生共死"，而不是"先后出现"。',
+      text: 'FullGC暂停不天然杀线程，本题跳过send来自恢复后的deadline分支；进程终止是另一种机制。',
+      principle: '先关联真实分支和提交记录，再解释日志缺失。时间吻合不是充分因果，重启频率乘几毫秒也不是合法日漏发模型。',
     },
     {
-      text: '对账是双写的最终防线：订单表 vs 积分流水的对账让"历史遗漏"有一小时内被兜底的命运。',
-      principle: '沉淀思维：原子化机制覆盖"当下"，对账覆盖"历史的所有漏洞"（机制 bug、运维失误、未知的边界）。防线分层设计：机制防 99.95%，对账兜剩下的 0.05%——两者缺一，那 0.05% 就是客诉与资损。',
+      text: 'outbox把订单和发送意图原子保存，投递后标记前崩溃仍可能重复。',
+      principle: '稳定业务键、Broker确认和消费唯一约束负责后续边界；不能把本地事务意图保证说成跨DB/MQ/外部积分的恰好一次。',
     },
     {
-      text: '一致性不能靠退回耦合解决：同步调用"不丢消息"的代价是解耦、削峰、故障隔离全部回退——修原子性，不修解耦。',
-      principle: '架构权衡：遇到异步一致性问题时，"改回同步"是最大的陷阱——它把消息丢失换成级联故障。正确方向：让消息与业务数据原子绑定（outbox/事务消息），失败显式化（待重试落表），对账兜底。',
+      text: '同步外呼与失败后才补待重试表都仍可能留下间隙；同事务意图才覆盖提交后退出。',
+      principle: '对账按真实积分资格和成熟观察窗执行，用来恢复遗漏，不承诺固定一小时兜住所有未知故障。',
     },
   ],
 }

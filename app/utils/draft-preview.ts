@@ -11,8 +11,9 @@ function previewKey(previewId: string): string {
   return 'think_preview_' + previewId
 }
 
-function readPreview(previewId: string): DraftPreview {
-  return JSON.parse(uni.getStorageSync(previewKey(previewId)) as string) as DraftPreview
+function readPreview(previewId: string): DraftPreview | null {
+  const raw = uni.getStorageSync(previewKey(previewId))
+  return raw == null || (raw as string).length === 0 ? null : JSON.parse(raw as string) as DraftPreview
 }
 
 export function fetchDraftPreview(previewId: string, token: string, cb: (error: string) => void): void {
@@ -34,18 +35,18 @@ export function fetchDraftPreview(previewId: string, token: string, cb: (error: 
   })
 }
 
-export function getPreviewCase(previewId: string): DiagnosisCase {
-  return readPreview(previewId).payload
+export function getPreviewCase(previewId: string): DiagnosisCase | null {
+  return readPreview(previewId)?.payload ?? null
 }
 
 export function savePreviewSession(previewId: string, session: SessionRecord): void {
-  const preview = readPreview(previewId)
+  const preview = readPreview(previewId)!
   preview.session = session
   uni.setStorageSync(previewKey(previewId), JSON.stringify(preview))
 }
 
 export function getPreviewSession(previewId: string): SessionRecord | null {
-  return readPreview(previewId).session
+  return readPreview(previewId)?.session ?? null
 }
 
 export function clearDraftPreview(previewId: string): void {

@@ -1,0 +1,884 @@
+{
+  "schemaVersion": 1,
+  "kind": "t04b-master-product-calibration",
+  "frozenAt": "2026-11-04",
+  "sourceCommit": "4c5e25e4395786860988bcf850c5da9f48347def",
+  "count": 35,
+  "cases": [
+    {
+      "id": "bg-split",
+      "file": "app/data/cases/bg-split.ts",
+      "chapter": "deployment",
+      "order": 1,
+      "originalHash": "cc745c855a7670f89175790c4ab865a34a559506a51a6c8efee18807c5d487d3",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "flag-leak",
+      "file": "app/data/cases/flag-leak.ts",
+      "chapter": "deployment",
+      "order": 2,
+      "originalHash": "33dfe6a7b25103733a2c83f76fbbfa062c8e080ec4c968ddbcc102487088ace6",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "mixversion",
+      "file": "app/data/cases/mixversion.ts",
+      "chapter": "deployment",
+      "order": 3,
+      "originalHash": "779823488bc12a54e9ce1184fa9e17417747e58a4acfca4bb19130788401fc91",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "cdn-stale",
+      "file": "app/data/cases/cdn-stale.ts",
+      "chapter": "deployment",
+      "order": 4,
+      "originalHash": "2e32a36131f365c36ac8449316fc711636270dd0918b6dd22dcb477bd1ed69a8",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "deploy-migration",
+      "file": "app/data/cases/deploy-migration.ts",
+      "chapter": "deployment",
+      "order": 5,
+      "originalHash": "e34b8730558cd616144de8990e96f0ac58620882da14a27468e6a48833411a9e",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "rollback-drift",
+      "file": "app/data/cases/rollback-drift.ts",
+      "chapter": "deployment",
+      "order": 5,
+      "originalHash": "472bfc5412f1bd90bcb5179f7ca20f259fded01781fef5656c59bdc094f063fb",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "graceful-shutdown",
+      "file": "app/data/cases/graceful-shutdown.ts",
+      "chapter": "deployment",
+      "order": 6,
+      "originalHash": "0813ab5bb8eee735f197a024c3e3e69dd17d28dc9a9553554824710254a72c77",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "warmup-storm",
+      "file": "app/data/cases/warmup-storm.ts",
+      "chapter": "deployment",
+      "order": 6,
+      "originalHash": "ada1e255e6ce9a6cd63c8de5ac131780ecc4f8730c3db70893fb2d020517291c",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "config-drift",
+      "file": "app/data/cases/config-drift.ts",
+      "chapter": "deployment",
+      "order": 7,
+      "originalHash": "1b67f07912420f99d0efd8e11820ca5fece27962a471f7ac92602e0240be78a6",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "probe-mismatch",
+      "file": "app/data/cases/probe-mismatch.ts",
+      "chapter": "deployment",
+      "order": 8,
+      "originalHash": "c0e52bb6a6ffe84b4cb49749f38397bed4107d3a46969168cbb3e0871ff76965",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "wrong-env",
+      "file": "app/data/cases/wrong-env.ts",
+      "chapter": "deployment",
+      "order": 9,
+      "originalHash": "b2f5747d98fb47026eecd55e5c3e1c45e1db32719e6a7bbcf158c6f122d6b158",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "rate-limit-passthrough",
+      "file": "app/data/cases/rate-limit-passthrough.ts",
+      "chapter": "evolution",
+      "order": 1,
+      "originalHash": "21b873c87c8da5ddb0e5479321b76d5e9c47526b2c1a5915060238fd12bd0ffa",
+      "originalDifficulty": 2,
+      "originalExpertCost": 5,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "fallback-drill-fail",
+      "file": "app/data/cases/fallback-drill-fail.ts",
+      "chapter": "evolution",
+      "order": 2,
+      "originalHash": "b9f4f323afe748d949ce2eac2001b74eb58708d4f0fa0a1d5778deaa803bea43",
+      "originalDifficulty": 3,
+      "originalExpertCost": 5,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "retry-storm",
+      "file": "app/data/cases/retry-storm.ts",
+      "chapter": "evolution",
+      "order": 3,
+      "originalHash": "587a09f93768b95d8710462dec4215c373c07c9636e5d23ef4b137c6d17107ee",
+      "originalDifficulty": 2,
+      "originalExpertCost": 5,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "hpa-lag",
+      "file": "app/data/cases/hpa-lag.ts",
+      "chapter": "evolution",
+      "order": 4,
+      "originalHash": "c04876f6337f09fca8f8601d61f58cd57e1e04f1e71dbda9a628bab1adf84daf",
+      "originalDifficulty": 3,
+      "originalExpertCost": 7,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "distributed-monolith",
+      "file": "app/data/cases/distributed-monolith.ts",
+      "chapter": "evolution",
+      "order": 5,
+      "originalHash": "ad1db82a480493278b10a88c72d0e1343b69aaeb86c155e7f0b665eeee3968c9",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "api-sunset",
+      "file": "app/data/cases/api-sunset.ts",
+      "chapter": "evolution",
+      "order": 6,
+      "originalHash": "d05f077e54e7a9c4ea2550ef87b8f0dba25b0ebd1118536c31271fbb1ba04ee4",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "capacity-review",
+      "file": "app/data/cases/capacity-review.ts",
+      "chapter": "evolution",
+      "order": 7,
+      "originalHash": "da323f0ad1cdc5246cf5655163cbe699183cbed1fea221b1217ae70743463b29",
+      "originalDifficulty": 3,
+      "originalExpertCost": 8,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "rule-sprawl",
+      "file": "app/data/cases/rule-sprawl.ts",
+      "chapter": "evolution",
+      "order": 8,
+      "originalHash": "3068ceaba41b9a0a67776e5544694c3c5721e8a9a60ea0183942f8d3ae48bf92",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "log-sampling",
+      "file": "app/data/cases/log-sampling.ts",
+      "chapter": "observability",
+      "order": 1,
+      "originalHash": "7c33235a4cca5d377df72503348c46efb55ec35d54fa0d28a9bdca0bad324391",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "calibrated",
+      "calibratedHash": "7138aed85f1346faaabc1a5f1baaacb39c55e489d68040f2b422ac4ea39740b2",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "“入口500→本地ERROR→路径不匹配”两步收敛",
+        "“本地有而中央无”及新旧glob对照",
+        "“WARN允许ERROR”与filestream路径是领域机制",
+        "“心跳正常”不等于文件覆盖完整",
+        "入口日志、应用文件、采集器与索引跨系统核对",
+        "“重部署统一ERROR级别”有状态代价却不修漏采"
+      ],
+      "goal": "本地ERROR到中央索引的覆盖缺口",
+      "changes": [
+        "纠正WARN吞ERROR的级别逆序",
+        "独立入口索引与应用错误索引分开，不再既0条又查到INFO",
+        "将唯一原因改新路径不匹配旧glob，逐笔本地ERROR排除未输出/未报错",
+        "标准1+2+1=4，实际购买路径配置证据",
+        "支付成功与回调失败分开，重放须按已核对状态与幂等键"
+      ],
+      "sources": [
+        "https://logging.apache.org/log4j/2.x/manual/customloglevels.html",
+        "https://www.elastic.co/docs/reference/beats/filebeat/filebeat-input-filestream"
+      ],
+      "stop": "停止中央日志缺口诊断；灰度补正确采集路径并以测试事件验收到达，同时按业务账和原幂等键处理未完成回调，不把RPC超时日志当下游根因已查明。",
+      "expectedConfirmed": [
+        "h-host"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-hostdiff",
+            "a-sampleconf"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-sampleconf",
+            "a-hostdiff"
+          ],
+          "cost": 4
+        }
+      ]
+    },
+    {
+      "id": "avg-metric",
+      "file": "app/data/cases/avg-metric.ts",
+      "chapter": "observability",
+      "order": 2,
+      "originalHash": "38e012c8bf5c7f515890d2dcf33969b146d133b16836cb1d830c298a0ef1cd28",
+      "originalDifficulty": 2,
+      "originalExpertCost": 5,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "calibrated",
+      "calibratedHash": "cefa8055b642ae13a5992591b3e2a2bf53a4c0564124f8ab883577014f3f5c01",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        3
+      ],
+      "dimensionEvidence": [
+        "分布到组归属再到地址差异与单变量对照",
+        "“9950×55+50×5055”及最近秩需量化对账",
+        "均值/分位和代理连接超时为领域机制",
+        "P99也可能漏0.5%尾部，方向对但分位选择细节错",
+        "客户端到网关再到上游连接阶段跨两跳",
+        "“摘慢组恢复”看似根因已明，实际只隔离范围"
+      ],
+      "goal": "同口径均值/分位算术与慢组因果",
+      "changes": [
+        "将10%五秒却均值80的矛盾改成0.5%5055ms、99.5%55ms，重算P99/P99.9",
+        "明确受控完成请求分母，生产取消另记",
+        "不把缺keepalive等同跨机房握手固定5秒，改明确废弃主地址与5秒连接超时",
+        "唯一正确假设与三个根因选项对应，平均值掩盖不再又成立又错误",
+        "标准必须购买配置/对照动作，真实成本6而非原5"
+      ],
+      "sources": [
+        "https://sre.google/sre-book/monitoring-distributed-systems/",
+        "https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_connect_timeout"
+      ],
+      "stop": "完成分布算术、实例归属、连接阶段与单变量修复核验，停止诊断；保留均值并补适合0.5%尾部的延迟阈值比例/更高分位及分组告警。",
+      "expectedConfirmed": [
+        "h-node"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-histogram",
+            "a-nodelist",
+            "a-gwconf"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-nodelist",
+            "a-histogram",
+            "a-gwconf"
+          ],
+          "cost": 6
+        }
+      ]
+    },
+    {
+      "id": "alert-storm",
+      "file": "app/data/cases/alert-storm.ts",
+      "chapter": "observability",
+      "order": 3,
+      "originalHash": "ceecb97103b0e88be220b995854815414ad1151ea70f6685fb5ff8c4d04c76b7",
+      "originalDifficulty": 2,
+      "originalExpertCost": 9,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "calibrated",
+      "calibratedHash": "5102dec9ff91e64f3dda75f845a78042a9c9a018cf1bfcdb420ba45cb70df0b8",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "需将通知结构、回执与响应记录合并判断",
+        "实际路由和同输入回放为对比证据",
+        "Alertmanager路由/分组/确认升级是领域机制",
+        "到群不等于阅读，响应率也不单独给因果",
+        "通知系统、人员runbook与组织响应跨职能",
+        "“只换人”“主因报警后全抑制”看似简化却留下缺口"
+      ],
+      "goal": "通知设计、送达与响应的可证据复盘",
+      "changes": [
+        "区分1条主库规则与32次通知，23:20至01:55共32次，171分钟不当保证可救窗口",
+        "不再把固定阈值、响应率或个人处分泛化成必然事故/心理因果",
+        "原两个真实原因互判错误，改完整系统结论与三个有明确错误的替代",
+        "专家链实际购买响应与能力核验，成本7而非原9",
+        "移除523到3、380到4和处分后离职等无证据精确预言"
+      ],
+      "sources": [
+        "https://sre.google/sre-book/monitoring-distributed-systems/",
+        "https://prometheus.io/docs/alerting/latest/alertmanager/"
+      ],
+      "stop": "停止本轮归因，修分组/路由/确认升级并验证独立故障不被误抑制；保留事件证据与具体责任核查，不宣称任何人必然漏或系统改进保证零遗漏。",
+      "expectedConfirmed": [
+        "h-design"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-timeline",
+            "a-rules",
+            "a-response",
+            "a-skill"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-rules",
+            "a-skill",
+            "a-response",
+            "a-timeline"
+          ],
+          "cost": 7
+        }
+      ]
+    },
+    {
+      "id": "histogram-bucket",
+      "file": "app/data/cases/histogram-bucket.ts",
+      "chapter": "observability",
+      "order": 4,
+      "originalHash": "b9ad86a8803d454473b22ac51ca462160c9bcb68a4f2b12f1ef85a2026ec7d3e",
+      "originalDifficulty": 2,
+      "originalExpertCost": 5,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "calibrated",
+      "calibratedHash": "98d90c5862cd3da29942102e336a65d838abd38c50538a41ddd834f2f1aea190",
+      "difficulty": 3,
+      "dimensions": [
+        2,
+        3,
+        3,
+        3,
+        2,
+        3
+      ],
+      "dimensionEvidence": [
+        "集合对齐后按累计计数判断落桶与查询行为",
+        "“990落入(.1,+Inf]”和“(1000-300)/1000”量化对账",
+        "经典桶顶桶特殊规则与累计计数是反直觉机制",
+        "“全量已记入”却仍无法量出尾部，直觉方向反转",
+        "服务端计时到指标查询与大盘两跳",
+        "“+Inf占比”看似合理却恒等总量，通报健康会追认错误测量"
+      ],
+      "goal": "经典累计桶分位边界与越界比例",
+      "changes": [
+        "100ms封顶不可能独立推出45ms，统一改0.1秒读数并给真实累计计数",
+        "纠正最高桶返回规则：+Inf落点返回次高上界.1，不是75ms",
+        "纠正+Inf/count为尾部比例的错误，用差值70%",
+        "补同请求集合、单位、实际PromQL及未丢样证据",
+        "四必要动作1+2+1+1=5，两路径真实S；按量化/反直觉/陷阱四维3得到L3"
+      ],
+      "sources": [
+        "https://prometheus.io/docs/prometheus/latest/querying/functions/#histogram_quantile",
+        "https://prometheus.io/docs/practices/histograms/"
+      ],
+      "stop": "停止；重设覆盖SLO与尾部的桶并回放验证估计误差，用+Inf减最高有限桶监测越界，继续独立调查实际结算慢因，不将修尺子等同修性能。",
+      "expectedConfirmed": [
+        "h-bucket"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-bucket",
+            "a-sample",
+            "a-calc"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-sample",
+            "a-calc",
+            "a-bucket"
+          ],
+          "cost": 5
+        }
+      ]
+    },
+    {
+      "id": "metrics-review",
+      "file": "app/data/cases/metrics-review.ts",
+      "chapter": "observability",
+      "order": 5,
+      "originalHash": "01b3d73b45cc7ce4616301050e0ec784954fba5f46a5433534f5f8c505269bc1",
+      "originalDifficulty": 3,
+      "originalExpertCost": 6,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "calibrated",
+      "calibratedHash": "a9d72895cc4bdc29b207a7edbe27354d9830aa4e4b59cd2991549ef0a50a9df1",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "回放覆盖与路由时限两缺口合成完整结论",
+        "“940/1000、净增5/分钟、处置5分钟”量化时限",
+        "event loop lag、用户SLO与资源聚合属领域机制",
+        "应用最终200并不代表用户未超预算",
+        "客户端SLO/应用调度/资源预测及值班组织跨职能",
+        "“标准化全退专项”“只保lag即可”均看似合理却缺独立条件"
+      ],
+      "goal": "检测覆盖与可行动风险的完整评审",
+      "changes": [
+        "原h-template与h-p1均真却只能选其一，改完整结论与不充分替代",
+        "分清历史事故后补lag与后续同类负载回放，不伪造当时已有指标",
+        "CPU25%解释为四核中单线程占1核，应用最终200与客户端预算分开",
+        "不称跨层信息永不相交或历史指标永不得退役",
+        "首步真实1，必要四证据成本5；中位数半档向下为L2，原L3不硬保"
+      ],
+      "sources": [
+        "https://sre.google/sre-book/monitoring-distributed-systems/",
+        "https://prometheus.io/docs/alerting/latest/alertmanager/",
+        "https://nodejs.org/api/perf_hooks.html#perf_hooksmonitoreventloopdelayoptions"
+      ],
+      "stop": "停止评审，要求补端到端SLO与经验证专项覆盖、按处置时限修风险路由；以等价回放决定退役，保留已验证交接，不把任一项真实风险当错误答案。",
+      "expectedConfirmed": [
+        "h-template"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-template",
+            "a-p1",
+            "a-retire",
+            "a-handover"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-template",
+            "a-handover",
+            "a-retire",
+            "a-p1"
+          ],
+          "cost": 5
+        }
+      ]
+    },
+    {
+      "id": "error-budget",
+      "file": "app/data/cases/error-budget.ts",
+      "chapter": "observability",
+      "order": 6,
+      "originalHash": "9c0787994de8fe7e64eefded65389438ebea3945742de4921d4ee94d5f26f5b7",
+      "originalDifficulty": 3,
+      "originalExpertCost": 6,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "calibrated",
+      "calibratedHash": "166da3f3273b23b99461df256188f791ac11061045872c90c621fb9b36a47de5",
+      "difficulty": 3,
+      "dimensions": [
+        2,
+        3,
+        2,
+        3,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "区间归因、验证缺口和既定政策合并行动",
+        "“43200×.001=43.2；32+9+6.3=47.3”及67.7%量化",
+        "时间型SLI、集成回归和发布例外属领域机制",
+        "“冻结不治根所以无效”把正确治理方向反转",
+        "业务大促/发布治理/基础设施/支付依赖跨职能",
+        "“外部不计预算”“补测试替代冻结”均看似合理却绕契约"
+      ],
+      "goal": "预算口径、冻结政策与可靠性修复并行决策",
+      "changes": [
+        "删除本月剩20天却已发生D22事故的时间矛盾，改滚动窗口",
+        "冻结不能自动修测试不等于无效；正确行动遵守冻结并修根因",
+        "真实风险不再互判错误，候选改完整行动与明确错误替代",
+        "外部依赖仍计入既定端到端预算，移除不可控就不用处理",
+        "必要五动作1+2+1+1+1=6，移除覆盖92%保证回归归零及未来精确SLO预言"
+      ],
+      "sources": [
+        "https://sre.google/workbook/error-budget-policy/",
+        "https://sre.google/sre-book/service-level-objectives/"
+      ],
+      "stop": "停止争论，执行已批准的新需求冻结和受控修复例外，补已知回归与韧性验证；恢复前复核预算与门禁，不承诺覆盖率或一周冻结可消除未来回归。",
+      "expectedConfirmed": [
+        "h-regression"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-regbreak",
+            "a-infrabreak",
+            "a-thirdbreak",
+            "a-freeze"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-freeze",
+            "a-thirdbreak",
+            "a-infrabreak",
+            "a-regbreak"
+          ],
+          "cost": 6
+        }
+      ]
+    },
+    {
+      "id": "cardinality-blast",
+      "file": "app/data/cases/cardinality-blast.ts",
+      "chapter": "observability",
+      "order": 7,
+      "originalHash": "7a18ac23f559e8587b87e8419372889fc324613206b216fb9f5f3096edff692e",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "calibrated",
+      "calibratedHash": "3f18df6dfc34d8dfbb89e8ceb93decc3ceec343c2952935a516171d06258be2d",
+      "difficulty": 3,
+      "dimensions": [
+        2,
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "变更、实际序列、增量模型及输入对照合并判断",
+        "“120万×8×40=3.84亿；220万×1.5KiB≈3.15GiB”量化",
+        "head/WAL与labeldrop冲突属于反直觉存储语义",
+        "“drop/重启立即回落”可能重放或存量仍在，直觉相反",
+        "业务指标定义、采集、时序存储和排查需求跨系统",
+        "“哈希标签”“直接drop维度/删目录”看似简化却留下错误"
+      ],
+      "goal": "高基数真实组合、内存模型与恢复边界",
+      "changes": [
+        "修120万×8×40误算100倍，区分理论3.84亿与实际新增220万",
+        "将8GiB成功驻留4.2亿的不可能状态改420万头部、限定RSS增量对照",
+        "补抓取/保留/查询三候选真实购买证据，标准成本6而非原4",
+        "drop整指标阻止新输入，不承诺存量head/历史即时清除，避免labeldrop合并冲突",
+        "移除日志trace零成本和固定基数普适红线，保留平台测量边界"
+      ],
+      "sources": [
+        "https://prometheus.io/docs/practices/instrumentation/",
+        "https://prometheus.io/docs/prometheus/latest/storage/",
+        "https://prometheus.io/docs/prometheus/latest/configuration/configuration/#metric_relabel_configs"
+      ],
+      "stop": "停止根因收集；先禁错误指标输入、保留数据与现场，再按存量head/WAL制定恢复。重设计有界聚合与受控明细检索，不把drop新输入误称立即清空历史。",
+      "expectedConfirmed": [
+        "h-cardinality"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-seriescount",
+            "a-scrapeintv",
+            "a-retentioncfg",
+            "a-queryload"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-scrapeintv",
+            "a-retentioncfg",
+            "a-queryload",
+            "a-seriescount"
+          ],
+          "cost": 6
+        }
+      ]
+    },
+    {
+      "id": "trace-break",
+      "file": "app/data/cases/trace-break.ts",
+      "chapter": "observability",
+      "order": 8,
+      "originalHash": "6d6f013c29f7bb6b042670262c000fdadafd93566617b8b0f18e087a3c887a19",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "calibrated",
+      "calibratedHash": "f896f8573b1ab64e3706e046f51a2a21ef3de8f6e9ff2962d44549d733965393",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        3,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "消息载荷、代码、导出与只补注入对照两步归因",
+        "“未注入/仅补注入”与两端span对照",
+        "TraceContext与消息parent/link为领域传播机制",
+        "“新trace/缺parent”也可能是合法links，直觉反向",
+        "生产者/MQ/消费者/导出后端跨系统",
+        "“改同步让trace连上”“默认全传baggage”看似修复却改依赖/隐私边界"
+      ],
+      "goal": "消息上下文、parent/link与采样的边界核验",
+      "changes": [
+        "不以非标准parent_trace_id或新trace判定断链，纳入合法span links",
+        "限定6×100样本，不将单条消息推成全部历史100%",
+        "采样与传播分开，用明确100%导出回放排除，不虚构0.1%概率",
+        "实际购买四证据1+2+1+1=5，不沿原4成本和未买agent证据",
+        "不承诺SDK零改动、不强制敏感业务键baggage、不为追踪改同步"
+      ],
+      "sources": [
+        "https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/",
+        "https://opentelemetry.io/docs/concepts/context-propagation/",
+        "https://www.w3.org/TR/trace-context/"
+      ],
+      "stop": "停止；修消息边界inject/extract，按单消息/批量语义验parent或links与采样。保留受控业务关联键，避免把原始敏感信息默认放baggage，不为追踪重写同步架构。",
+      "expectedConfirmed": [
+        "h-context"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-msgheader",
+            "a-samplepolicy",
+            "a-asynccheck"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代顺序",
+          "actions": [
+            "a-impact",
+            "a-samplepolicy",
+            "a-msgheader",
+            "a-asynccheck"
+          ],
+          "cost": 5
+        }
+      ]
+    },
+    {
+      "id": "leaked-keys",
+      "file": "app/data/cases/leaked-keys.ts",
+      "chapter": "security",
+      "order": 1,
+      "originalHash": "92d39175b927736229f2f605cbc4aaf0c5301e44b0f4198f4ebfa08c17971e75",
+      "originalDifficulty": 1,
+      "originalExpertCost": 6,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "idor-orders",
+      "file": "app/data/cases/idor-orders.ts",
+      "chapter": "security",
+      "order": 2,
+      "originalHash": "ab706aa177e3a59ea4ce4dba20ef9c03967097ed1e1adacaae3e45586183e80a",
+      "originalDifficulty": 2,
+      "originalExpertCost": 6,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "log-pii",
+      "file": "app/data/cases/log-pii.ts",
+      "chapter": "security",
+      "order": 3,
+      "originalHash": "716de19f4f9f5448a533a01ab45007bb77755c272ee96e090f5507db2f59e9ee",
+      "originalDifficulty": 2,
+      "originalExpertCost": 6,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "ssrf-internal",
+      "file": "app/data/cases/ssrf-internal.ts",
+      "chapter": "security",
+      "order": 4,
+      "originalHash": "6685e584bb988218006b2241a907d8731cbba11c660ee1da939a50139ad82898",
+      "originalDifficulty": 2,
+      "originalExpertCost": 7,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "withdraw-race",
+      "file": "app/data/cases/withdraw-race.ts",
+      "chapter": "security",
+      "order": 5,
+      "originalHash": "ae2787b9bc25032bcb6b30a35b9c47ef298e12f2c8b982aae52cc0e4246f0568",
+      "originalDifficulty": 3,
+      "originalExpertCost": 7,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "supply-poison",
+      "file": "app/data/cases/supply-poison.ts",
+      "chapter": "security",
+      "order": 6,
+      "originalHash": "3a82ecd51d1062153c7a1fdbde72b04922197b7625663c9374facf7fee4c2fae",
+      "originalDifficulty": 3,
+      "originalExpertCost": 8,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "xss-decision",
+      "file": "app/data/cases/xss-decision.ts",
+      "chapter": "security",
+      "order": 7,
+      "originalHash": "0a2a14905cbb56cd255f7ed9ae29d3e20c12de31ed1e7498922b64a65ebd19b3",
+      "originalDifficulty": 3,
+      "originalExpertCost": 7,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    },
+    {
+      "id": "sqli-sort",
+      "file": "app/data/cases/sqli-sort.ts",
+      "chapter": "security",
+      "order": 8,
+      "originalHash": "d5ff7c63944c3c10415cf24ab7119fd4f2f506a6768314e4aeae7a5a3a328cc6",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalRevision": null,
+      "originalSourceCommit": null,
+      "status": "pending"
+    }
+  ]
+}

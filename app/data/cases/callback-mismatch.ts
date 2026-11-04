@@ -1,23 +1,22 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 1 章 · 并发迷宫 结业（并发回调结果串位 L2）
- * 教学点：程序设计——闭包捕获共享变量 × 并发交错 = 结果串位；
- * 异步回调必须携带显式上下文对象；敏感投递要有"附件与收件人一致性"断言。
- * 专家路径：impact(1) + closureread(2) + repro(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const callbackMismatchCase: DiagnosisCase = {
   id: 'callback-mismatch',
   title: 'A 的财务报表，发进了 B 的邮箱',
-  intro: '批量导出的报表偶发发错收件人：0.2% 的附件与收件人错配——并发回调里，结果串了位。',
+  intro: '少数旧批量路径把附件发给同批另一收件人。先核对render启动时与then执行时读取的绑定，再比较邮件服务收到的实际组合。',
   domain: 'concurrency',
   layer: '闭包捕获共享变量 × 并发交错 = 结果串位',
   part: 'master',
   chapterId: 'concurrency',
   order: 9,
-  typeTags: ['race', 'security', 'data'],
+  typeTags: [
+    'race',
+    'security',
+    'data',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」报表平台的后端，财务总监的一封质询邮件让整个团队脊背发凉。',
     architecture: '导出请求 → 任务池(并发 50) → 报表生成回调 → 邮件服务(按请求携带的收件人发送)',
@@ -26,25 +25,44 @@ export const callbackMismatchCase: DiagnosisCase = {
       {
         type: 'error',
         title: '审计发现',
-        text: '30 天 12 例：报表附件与收件人错配（B 收到 A 的门店财务数据）。\n全部是敏感级报表——财务/薪酬/供应商结算。',
+        text: '30天6000次报表中12次附件/收件人错配（0.2%）；发生于12个两请求旧批次，每批一个错配。其他路径用独立绑定；不能以全量两请求都用var却只0.2%当成确定比例。',
       },
       {
         type: 'text',
         title: '日志表象',
         text: '生成成功 ✓ 邮件发送成功 ✓ 每一步"看起来都对"。\n错配对的两次请求：提交时间间隔 < 50ms（同一批并发提交）。',
       },
+      {
+        type: 'log',
+        title: '邮件缩略图失败',
+        text: '[WARN] attachment preview thumbnail 404。',
+      },
     ],
     timeline: '批量导出功能上月优化：单任务循环改为并发提交（提速 8 倍）｜ 错配自此出现 ｜ 邮件服务零变更',
     impactHint: '错配只发生在"同一批并发提交"里——并发的哪一步，把 A 的结果贴给了 B 的信封？',
   },
-
   hypotheses: [
-    { id: 'h-closure', text: '循环变量被闭包共享捕获：并发回调执行时读到的是"别的请求"的上下文', excludeActionId: 'a-closureread' },
-    { id: 'h-map', text: 'requestId → 上下文 的映射表并发写冲突（非线程安全容器）', excludeActionId: 'a-mapcheck' },
-    { id: 'h-mail', text: '邮件服务端队列乱序，按提交顺序错配', excludeActionId: 'a-maillog' },
-    { id: 'h-form', text: '用户表单复用残留，本来就填错了收件人', excludeActionId: 'a-formcheck' },
+    {
+      id: 'h-closure',
+      text: '循环变量被闭包共享捕获：并发回调执行时读到的是"别的请求"的上下文',
+      excludeActionId: 'a-closureread',
+    },
+    {
+      id: 'h-map',
+      text: 'requestId → 上下文 的映射表并发写冲突（非线程安全容器）',
+      excludeActionId: 'a-mapcheck',
+    },
+    {
+      id: 'h-mail',
+      text: '邮件服务端队列乱序，按提交顺序错配',
+      excludeActionId: 'a-maillog',
+    },
+    {
+      id: 'h-form',
+      text: '用户表单复用残留，本来就填错了收件人',
+      excludeActionId: 'a-formcheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +77,7 @@ export const callbackMismatchCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '错配画像',
-        text: '12 例全部来自"批量提交"场景（单请求零错配）\n错配对：同批次内两个请求，提交间隔 < 50ms\n方向性：结果错配发生在"同批次"内——A 批的结果永远不会发到 C 批的人\n→ 错配被"批次"边界框住：串位的源头在批次内的共享结构。',
+        text: '12个旧批次各有A/B两请求，A附件发送给B；其他5976次使用独立上下文。批次内关联是线索，不能由12个样本声称跨批永远不会发生。',
       },
     },
     {
@@ -70,12 +88,19 @@ export const callbackMismatchCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-closure'],
-      hypotheses: [{ id: 'h-closure', status: 'confirmed' }],
+      tests: [
+        'h-closure',
+      ],
+      hypotheses: [
+        {
+          id: 'h-closure',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '代码解剖（Node 报表服务）',
-        text: 'for (var r of batch) {\n  pool.submit(() => render(r.data).then(\n    res => mailer.send(res, r.recipient)   ← r 是 var：整个循环共享同一个绑定\n  ))\n}\n并发语义：所有回调共享同一个 r 绑定 → 回调真正执行时，\nr 已经是循环"后来者"的值 → A 的结果 + B 的收件人。\n实锤：共享绑定 × 异步交错 = 串位。单请求（绑定不变）永远正确——与画像吻合。',
+        text: '旧路径实际代码：\nfor(var r of batch) {\n const pending = render(r.data); // 立即启动，分别生成A/B结果\n pending.then(res => mailer.send(res, r.recipient));\n}\nthen晚执行时共用var绑定已为B，所以A结果配B收件人。若把render也推迟到循环结束后的pool.submit闭包里，所有render可能都读B，不能凭那段原代码解释A结果+ B信封。',
       },
     },
     {
@@ -91,7 +116,7 @@ export const callbackMismatchCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '复现矩阵',
-        text: '串行提交（batch 逐个 await）：错配 0/1000\n并发提交（batch 50 并发）：错配 81/1000（8.1%）\n并发 + 循环内 const 副本：错配 0/1000 ✓\n→ 变量隔离完成：触发条件 = 并发 × 共享绑定；修复一行 const 即归零——但制度修复不止一行。',
+        text: '受控两个Promise，循环先启动render(A/B)，再统一resolve：var版本输出(A附件,B邮箱)/(B附件,B邮箱)，1/2错配；改for(const r of batch)后各自对应。\n无需虚构81/1000随机率；整体0.2%来自旧路径占比，与受控两任务的50%不同分母。',
       },
     },
     {
@@ -102,12 +127,19 @@ export const callbackMismatchCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-map'],
-      hypotheses: [{ id: 'h-map', status: 'excluded' }],
+      tests: [
+        'h-map',
+      ],
+      hypotheses: [
+        {
+          id: 'h-map',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '容器核对',
-        text: 'requestId → 上下文 使用 Map（单线程事件循环内无写冲突）；错配对的线程轨迹无共享写。\n→ 排除容器问题。',
+        text: '这段故障路径不读requestId映射表，结果和recipient直接来自闭包；排除Map读写冲突。JS单线程也可能有异步逻辑竞态，不能用“单线程所以所有Map事务无冲突”概括。',
       },
     },
     {
@@ -118,12 +150,19 @@ export const callbackMismatchCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-mail'],
-      hypotheses: [{ id: 'h-mail', status: 'excluded' }],
+      tests: [
+        'h-mail',
+      ],
+      hypotheses: [
+        {
+          id: 'h-mail',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '邮件服务核对',
-        text: '邮件服务收到的请求里，"附件与收件人"就已错配——它照单全发，忠实执行了错误的指令。\n→ 排除邮件服务：串位发生在它之前。',
+        text: '邮件服务入口审计已经收到A报表ID配B邮箱，后续按同一请求发送，无拆分重排；错配发生在调用之前。\n噪声收线：邮件入口收到的附件ID与邮箱已错配，缩略图是投递后的展示资源，不会重新组合附件和信封。',
       },
     },
     {
@@ -134,19 +173,26 @@ export const callbackMismatchCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-form'],
-      hypotheses: [{ id: 'h-form', status: 'excluded' }],
+      tests: [
+        'h-form',
+      ],
+      hypotheses: [
+        {
+          id: 'h-form',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '表单核对',
-        text: '12 例的表单提交记录：收件人填写与用户意图一致。\n→ 排除用户侧。',
+        text: 'A/B原始提交的报表请求ID、允许的租户范围与邮箱分别正确；旧闭包改变了发送组合。排除表单先填错。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急切回串行导出',
       desc: '【状态变更】批量导出退回逐个 await',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -171,7 +217,7 @@ export const callbackMismatchCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 循环内 const ctx = { requester, recipient, requestId } 闭包捕获副本\n② 恢复并发（提速 8 倍回归）\n③ 邮件发送前断言：res.ownerId !== ctx.requesterId → 拒发 + 告警\n回归：并发 1000 批 × 复现矩阵，错配 0；断言拦截 2 例"差点错配"（证明防线真实工作）。',
+        text: 'for(const r of batch)建立每次迭代独立绑定，保持render结果与该请求上下文关联；对象若还会被外部修改，显式复制本次必要字段。\n发送前校验结果requestId与本次requestId一致，并按已授权租户/报表范围确认收件人。报表ownerId和recipientId不是同一种身份，合法委托收件人可能不同，不能简单要求二者相等。',
       },
     },
     {
@@ -203,71 +249,97 @@ export const callbackMismatchCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '投递防线',
-        text: '投递网关统一断言：payload.ownerId === envelope.recipientId，不一致拒发并告警。\n→ "串位"类缺陷从"静默泄露"升级为"秒级拦截"——不管上游怎么错，敏感数据出不了门。',
+        text: '投递端校验附件reportRequestId与本次上下文关联，并核对收件权限/租户范围；不使用payload.ownerId==recipientId这种未经业务定义的等式。合法多收件人、代理财务等场景仍须保留。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-closure', text: '批量提交循环用 var 声明循环变量并被异步闭包共享捕获：并发回调执行时读到"别的请求"的收件人——A 的结果 + B 的信封，0.2% 敏感报表错配', correct: true },
-    { id: 'rc-map', text: 'requestId 映射容器并发写冲突', correct: false },
-    { id: 'rc-mail', text: '邮件服务队列乱序导致错配', correct: false },
-    { id: 'rc-form', text: '用户表单复用残留填错收件人', correct: false },
+    {
+      id: 'rc-closure',
+      text: '旧批次先按各自data启动render，再在then读取共享var r的recipient；循环结束r为B，A的异步结果被配给B邮箱',
+      correct: true,
+    },
+    {
+      id: 'rc-map',
+      text: 'requestId 映射容器并发写冲突',
+      correct: false,
+    },
+    {
+      id: 'rc-mail',
+      text: '邮件服务队列乱序导致错配',
+      correct: false,
+    },
+    {
+      id: 'rc-form',
+      text: '用户表单复用残留填错收件人',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 7,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '错配被"批次"边界框住——先画并发画像：串位发生在批内的哪两个请求之间。',
-      update: '错配对 = 同批 < 50ms 提交的两个请求；单请求零错配——串位源头在批内的共享结构。',
+      thought: '确定旧路径和比率分母。',
+      update: '12/6000错误，来自12个两请求旧批。',
       actionId: 'a-impact',
-      why: '1⚡︎ 边界画像省掉半次排查：错配不跨批 → 批间通信无辜；批内共享的只有循环变量与池——嫌疑空间瞬间收窄。',
-      conclusion: '嫌疑锁定：批内共享绑定（h-closure 升权）。',
+      why: '1⚡总体低频不代表每次错误代码交错低概率。',
+      conclusion: '核对真实绑定。',
     },
     {
-      thought: '解剖闭包结构：回调里的"收件人"变量，在执行那一刻到底是谁的。',
-      update: '实锤：var 循环变量被全部回调共享，执行时读"后来者"的值——A 的结果贴 B 的信封。',
+      thought: '区分立即render与then晚读。',
+      update: 'A/B先生成，recipient后来都读B。',
       actionId: 'a-closureread',
-      why: '2⚡︎ 闭包解剖是 JS 并发串位的标准刑侦：异步回调的执行时机与捕获时机的错位，是"每步看起来都对"的唯一解释——日志不会说谎，但绑定会变脸。',
-      conclusion: '根因实锤 → 复现矩阵钉死。',
+      why: '2⚡精确执行顺序决定是否能解释A附件+B信封。',
+      conclusion: '确认共享绑定。',
     },
     {
-      thought: '复现矩阵把因果与修复一起钉死：串行/并发/并发+副本 三个象限对照。',
-      update: '并发 8.1% → const 副本归零：变量隔离完成；修复验收标准（错配 0）同时产出。',
+      thought: '控制Promise完成顺序。',
+      update: 'var有一笔错，const各自匹配。',
       actionId: 'a-repro',
-      why: '1⚡︎ 三象限实验一次回答"是什么、为什么、怎么修、修没修好"——并发问题的复现矩阵是最高性价比的实验设计。',
-      conclusion: '因果钉死 → 排除旁支。',
+      why: '1⚡不依赖随机压测，单变量验证机制。',
+      conclusion: '因果闭合。',
     },
     {
-      thought: '容器/邮件/表单三个常规嫌疑各 1⚡︎ 排除——每步"看起来都对"的案例，排除证据尤其重要。',
-      update: '映射线程安全、邮件照单转发、表单无误——三个假设有证据排除。',
+      thought: '检查映射表是否在故障路径。',
+      update: '路径根本未读Map。',
       actionId: 'a-mapcheck',
-      why: '1⚡︎ "每步都对但结果错"的案例里，排除证据是防止自我怀疑的锚：每一步的无责证明串起来，剩下的闭环才是唯一的真相。',
-      conclusion: '嫌疑收敛 → 修复 + 制度防线。',
+      why: '1⚡用真实依赖排除，不用单线程万能论。',
+      conclusion: '排除Map。',
     },
     {
-      thought: '止血（串行）、修复（显式 ctx + 一致性断言）、门禁（lint）、制度（投递统一断言）。停止收集。',
-      update: '停止。',
+      thought: '查看邮件入口收到的组合。',
+      update: '入口已经错配。',
+      actionId: 'a-maillog',
+      why: '1⚡定位错误发生在投递之前。',
+      conclusion: '排除邮件重排。',
+    },
+    {
+      thought: '核对原始提交和权限范围。',
+      update: 'A/B输入正确。',
+      actionId: 'a-formcheck',
+      why: '1⚡原始输入与发送组合独立比对，反证表单先填错而非回调改变。',
+      conclusion: '候选全部收敛。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（共享绑定）✓ 复现（三象限）✓ 防线（投递断言）✓——个案、家族、兜底三层闭合。',
-      conclusion: '沉淀：异步回调必须携带显式上下文——共享绑定在并发下会变脸；敏感投递的最后一道闸是"内容与收件人一致性断言"。',
+      why: '【停止规则】受控异步绑定复现成立，映射表、邮件重排和源表单均排除；修复不将owner与recipient错误等同。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '旧批次先按各自data启动render，再在then读取共享var r的recipient；循环结束r为B，A的异步结果被配给B邮箱',
     },
   ],
-
   lessons: [
     {
-      text: '闭包捕获共享变量 × 异步交错 = 结果串位：回调执行时读到的绑定，早已不是提交时的那个。',
-      principle: '程序设计：异步回调必须携带显式上下文对象（const 副本/ctx 参数），禁止引用循环绑定与外层可变变量。静态检查拦"循环内 var 捕获"——这类缺陷的修复是一行 const，防复发是规则进 lint。',
+      text: '必须明确哪一步先执行、哪一步晚读取绑定；render(A)先启动而then晚读var，才能产生A结果配B收件人。',
+      principle: '若连render也延迟在共享绑定中执行，可能全部生成B，现象不同。用受控Promise解除时序，验证真实代码而非相似伪码。',
     },
     {
-      text: '"每步看起来都对"的错配，要用边界画像收网：错配不跨批 = 批内共享结构有鬼——边界就是嫌疑人名单。',
-      principle: '假设思维：数据串位类问题的第一动作是画"错配对的关系图"（时间/批次/空间邻居）——关系边界框住的范围就是共享结构所在。方向性（永不跨批）比错误率（0.2%）信息量大得多。',
+      text: 'for(const r of batch)提供每迭代绑定；const对象仍可被修改，必要时固定本次字段快照。',
+      principle: '静态检查针对错误的共享可变绑定，不应禁止所有异步回调引用循环变量，因为let/const合法绑定正是修复。',
     },
     {
-      text: '敏感投递的最后一道闸是内容与收件人的一致性断言：不管上游怎么错，敏感数据不能出得了门。',
-      principle: '防御式设计：投递网关统一断言 payload.ownerId === envelope.recipientId，不一致拒发告警——把"上游永远正确"的假设换成"上游错了也出不去"的保证。断言拦截记录（2 例差点错配）是防线真实工作的证明。',
+      text: '结果请求ID关联与收件权限是两种检查；ownerId不必等于收件人身份。',
+      principle: '允许的委托、多收件人与租户范围由业务授权定义。不能用看似严格但无效的ID等式替代正确关联，或声称一道断言保证所有敏感数据不外泄。',
     },
   ],
 }

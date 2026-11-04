@@ -1,9 +1,11 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 2 章 · 可观测性迷雾（日志消失 L2）
- * 教学点：日志平台看到的不是全部真相——采样、级别配置、实例覆盖都会吞日志；"查不到"不等于"没发生"。
- * 专家路径：impact(1) + platsearch(1) + hostdiff(2) = 4⚡︎
+ * 大师篇校准：本地ERROR到中央索引的覆盖缺口。
+ * 按真实技术机制教学重建，不冒充原始事故。
+ * 六维：2/2/2/2/3/2，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-hostdiff → a-sampleconf；替代顺序：a-impact → a-sampleconf → a-hostdiff。
+ * 编审依据：content/baselines/t04b-master-product-calibration.md。
  */
 export const logSamplingCase: DiagnosisCase = {
   id: 'log-sampling',
@@ -16,34 +18,23 @@ export const logSamplingCase: DiagnosisCase = {
   order: 1,
   typeTags: ['config', 'observability'],
   difficulty: 2,
-
   scene: {
     role: '你是支付服务后端，用户反馈支付失败，你在日志平台搜了十分钟，一无所获。',
-    architecture: '8 台支付实例 → Filebeat 采集 → 日志平台(ES)',
+    architecture: '8台支付回调实例 → Filebeat filestream → ES；入口访问日志独立采集',
     symptoms: [
-      {
-        type: 'text',
-        title: '用户反馈',
-        text: '3 位用户反馈支付失败（有支付流水号），但交易侧显示支付实际成功——失败发生在支付后的回调处理。',
-      },
-      {
-        type: 'error',
-        title: '日志平台搜索结果',
-        text: '按流水号搜索：0 条结果。按时间范围搜该时段 ERROR：0 条。按服务名过滤：日志量正常。',
-      },
+      { type: 'text', title: '用户反馈', text: '3 位用户反馈支付失败（有支付流水号），但交易侧显示支付实际成功——失败发生在支付后的回调处理。' },
+      { type: 'error', title: '日志平台搜索结果', text: '中央应用错误索引按3个流水号搜不到ERROR；入口访问索引能查到回调500与目标实例pay-07/08。其余实例应用日志量正常，尚不能证明新实例错误文件已覆盖。' },
     ],
     timeline: '反馈 3 例集中在 14:00~14:20 ｜ 两周前新上线 2 台扩容实例（共 8 台）',
     impactHint: '"日志里没有"有两种可能：没发生，或发生了但没被记录。先验证哪个。',
-    // 注意：症状里给的是"查不到"，不是"看到了什么"——本案的迷雾属性
+    tag: '教学重建',
   },
-
   hypotheses: [
-    { id: 'h-host', text: '报错发生在未接入日志采集的实例上', excludeActionId: 'a-hostdiff' },
+    { id: 'h-host', text: '新实例实际错误日志文件不在Filebeat采集路径中', excludeActionId: 'a-hostdiff' },
     { id: 'h-sample', text: 'ERROR 日志被采样策略丢弃', excludeActionId: 'a-sampleconf' },
     { id: 'h-level', text: '实例日志级别被调高，错误没输出', excludeActionId: 'a-hostdiff' },
     { id: 'h-noerr', text: '回调处理其实没报错（是静默失败）', excludeActionId: 'a-codepath' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -53,13 +44,11 @@ export const logSamplingCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-noerr'],
-      hypotheses: [{ id: 'h-noerr', status: 'down' }],
-      result: {
-        type: 'log',
-        title: '按流水号搜请求日志（INFO）',
-        text: '3 笔流水的回调请求日志都在：收到回调 → 开始处理 → ……然后日志戛然而止。\n→ 故障真实发生：处理中断，但 ERROR 日志消失。',
-      },
+      tests: ['h-host'],
+      hypotheses: [
+        { id: 'h-host', status: 'up' },
+      ],
+      result: { type: 'log', title: '独立账与入口证据', text: '独立入口访问记录与交易账对齐：3笔支付已成功，支付后的回调请求返回500，目标均pay-07/08。\n500证明调用失败，但不独立证明应用一定输出了ERROR；查日志缺失的同时还需核对业务最终状态。' },
     },
     {
       id: 'a-platsearch',
@@ -70,12 +59,10 @@ export const logSamplingCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-host'],
-      hypotheses: [{ id: 'h-host', status: 'up' }],
-      result: {
-        type: 'text',
-        title: '采集覆盖',
-        text: '8 台实例 Filebeat 心跳全部正常，采集管道无丢弃——平台侧覆盖完整。',
-      },
+      hypotheses: [
+        { id: 'h-host', status: 'up' },
+      ],
+      result: { type: 'text', title: '采集覆盖', text: '8台Filebeat进程心跳均正常；这仅证明Agent存活，不能证明每个文件都在paths内、被读取或写入索引。\n平台错误索引仅见1~6号；新实例入口访问日志来自另一独立输入，不能据此证明应用错误文件覆盖。' },
     },
     {
       id: 'a-hostdiff',
@@ -85,13 +72,13 @@ export const logSamplingCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-host', 'h-level'],
-      hypotheses: [{ id: 'h-level', status: 'confirmed' }, { id: 'h-host', status: 'confirmed' }],
-      result: {
-        type: 'log',
-        title: '实例本地日志对比',
-        text: '实例 1~6：各 20~40 条 ERROR\n实例 7、8（两周前新扩容）：本地文件里 ERROR 大量存在，但平台上一条都没有\n→ 实锤：7、8 两台的 ERROR 没有进平台',
-      },
+      tests: ['h-level', 'h-noerr', 'h-host'],
+      hypotheses: [
+        { id: 'h-level', status: 'excluded' },
+        { id: 'h-noerr', status: 'excluded' },
+        { id: 'h-host', status: 'up' },
+      ],
+      result: { type: 'log', title: '本地事件与平台逐笔对照', text: 'pay-07/08的/var/log/pay/errors/current.json有3条与流水号和入口500对齐的ERROR：库存RPC等待超时，回调失败。平台中无对应事件。\n同一实例确实写出了ERROR，排除“日志阈值使错误未输出”和“完全没有报错”的候选；不能仅凭本地有、平台无就确定是哪一层丢弃。' },
     },
     {
       id: 'a-sampleconf',
@@ -101,13 +88,12 @@ export const logSamplingCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-sample', 'h-level'],
-      hypotheses: [{ id: 'h-sample', status: 'excluded' }, { id: 'h-level', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '配置对比',
-        text: '实例 1~6: log.level=ERROR, 采样=off\n实例 7、8: log.level=WARN  ← 配置漂移！ERROR 级别低于 WARN 被吞\n（新扩容实例用了未更新的基础镜像）',
-      },
+      tests: ['h-host', 'h-sample'],
+      hypotheses: [
+        { id: 'h-host', status: 'confirmed' },
+        { id: 'h-sample', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '路径、处理器与受控对照', text: '同版本实际配置：旧实例错误文件/var/log/pay/error.log匹配paths:/var/log/pay/*.log；新镜像改写/var/log/pay/errors/current.json，却沿用旧glob，文件不匹配。\nAgent输入登记无该新文件；日志与采集处理器均无抽样/drop规则。受控只补正确路径后，该文件同一测试ERROR进入索引。\n应用阈值WARN仍允许ERROR；不能把WARN与ERROR严重程度写反。' },
     },
     {
       id: 'a-codepath',
@@ -119,11 +105,7 @@ export const logSamplingCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'error',
-        title: '实例 7 本地 ERROR 原文',
-        text: 'PayCallbackError: 库存服务 RPC 超时，回调处理失败 order=xxx\n→ 3 位用户的失败原因一致：依赖的库存服务瞬时超时',
-      },
+      result: { type: 'text', title: '实例 7 本地 ERROR 原文', text: '本地同流水号ERROR说明库存RPC本次等待超时，调用方500；这仍不是库存根因本身。先以交易账和幂等键核对后续业务是否已完成，再决定重放，避免把支付成功误当可重复扣款。' },
     },
     {
       id: 'a-kibanare',
@@ -135,106 +117,50 @@ export const logSamplingCase: DiagnosisCase = {
       effects: [],
       tests: ['h-host'],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '平台重搜',
-        text: '加实例名过滤重搜：gw-pay-07/08 零日志——平台里这两台实例完全隐形。',
-      },
+      result: { type: 'text', title: '平台重搜', text: '分别查应用错误索引与独立入口索引：07/08应用ERROR缺失，入口访问记录存在。不能一边说平台已有这批INFO，一边说整台实例所有日志都不可见。' },
     },
     {
       id: 'a-usercomp',
       name: '补偿 3 位用户',
       desc: '【状态变更】重放回调处理并补偿用户',
-      cost: 4,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '补偿结果',
-        text: '3 笔回调重放成功，用户支付后处理完成——被掩盖的真实故障处置完毕。',
-      },
+      result: { type: 'text', title: '补偿结果', text: '先查三笔业务最终状态与幂等处理记录；仅对确认未完成的支付后步骤按原幂等键重放。支付已成功不等于应再次扣款或直接退款，库存超时的下游根因需另查。' },
     },
     {
       id: 'a-redeploy',
       name: '统一配置并重发实例',
       desc: '【状态变更】基础镜像更新 + 全实例重部署',
-      cost: 6,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '部署结果',
-        text: '8 台实例日志级别统一为 ERROR，平台日志量恢复正常梯度。\n失败回调触发自动重试补偿，3 位用户的支付后处理完成。',
-      },
+      result: { type: 'text', title: '部署结果', text: '灰度更新采集路径，注入可识别的测试事件验证端到端到达，再扩至其余实例。统一应用ERROR阈值既不是此次修复，也不应以压掉INFO代替采集覆盖验收。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-config', text: '新扩容实例使用未更新的基础镜像，日志级别为 WARN 吞掉 ERROR，叠加库存服务瞬时超时导致故障不可见', correct: true },
-    { id: 'rc-sample', text: '日志平台采样策略丢弃了错误日志', correct: false },
-    { id: 'rc-noerr', text: '回调处理静默成功，用户反馈与支付无关', correct: false },
-    { id: 'rc-plat', text: '日志平台采集管道故障导致日志丢失', correct: false },
+    { id: 'rc-config', text: '新实例错误文件迁到未被原Filebeat glob覆盖的位置；本地已写ERROR而中央索引缺失，WARN并未吞ERROR。底层回调超时另按幂等状态处理', correct: true },
+    { id: 'rc-sample', text: 'Filebeat采样/drop处理器丢弃这批ERROR', correct: false },
+    { id: 'rc-noerr', text: '回调没有任何报错，用户反馈与真实失败无关', correct: false },
+    { id: 'rc-plat', text: '应用日志级别阻止了这些ERROR在本地输出', correct: false },
   ],
-
   expertCost: 4,
   restartActionId: 'a-redeploy',
-
   expertChain: [
-    {
-      thought: '"日志里没有"不能证明"没发生"。先按流水号搜 INFO 级请求日志——请求日志通常不采样。',
-      update: '故障真实性确认：回调处理中途日志戛然而止，ERROR 消失。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 先验证真实性再查原因——如果连 INFO 都没有，方向就会变成"请求根本没到达"。',
-      conclusion: '处理中断 + ERROR 缺失 → 排除静默成功，锁定"错误日志去哪了"。',
-    },
-    {
-      thought: '错误去哪了有三个去向：平台采样丢了、实例没输出、实例没接入。先查平台侧覆盖。',
-      update: '平台采集心跳正常 → 平台侧排除。',
-      actionId: 'a-platsearch',
-      why: '1⚡︎ 从最便宜的平台侧查起——如果采集断了就是平台问题，不用逐台登录机器。',
-      conclusion: '采集完整 → 问题在实例输出的内容或级别上。',
-    },
-    {
-      thought: '绕过平台直查实例本地文件——如果本地有而平台没有，差异就在采集链或输出级别。',
-      update: '实锤：7、8 两台本地有大量 ERROR 但平台零条。',
-      actionId: 'a-hostdiff',
-      why: '2⚡︎ 逐台对比是本案的决定性动作：本地/平台的差异直接把范围收缩到特定实例。',
-      conclusion: '新扩容的 7、8 两台输出异常 → 查它们的配置与旧实例的差异。',
-    },
-    {
-      thought: '配置对比给出机制解释：新实例日志级别 WARN，ERROR 低于阈值被吞。再读本地原文确认故障内容。',
-      update: '根因闭环：配置漂移 + 库存服务超时（真实故障被掩盖）。',
-      actionId: 'a-codepath',
-      why: '1⚡︎ 读被吞掉的日志原文——修复可观测性之外，还要处理被掩盖的真实故障，否则只修了半个案子。',
-      conclusion: '双重结案：配置漂移修复 + 库存超时补偿。检查单：扩容实例必须过日志配置基线检查。',
-    },
-    {
-      thought: '证据链闭合：配置漂移实锤 + 真实故障找到 + 修复动作确定。停止。',
-      update: '停止收集。',
-      actionId: '',
-      why: '统一配置、补偿用户、镜像基线化三个行动已明确。',
-      conclusion: '重部署统一配置 → 补偿处理 → 加入扩容基线检查清单。',
-    },
+    { actionId: 'a-impact', thought: '先用独立入口与交易账确认事件。', update: '支付成功，后续回调500落在07/08。', why: '1⚡不以查不到应用ERROR来否认入口已记录的失败。', conclusion: '区分真实业务失败和可观测性缺口。' },
+    { actionId: 'a-hostdiff', thought: '从本地找到同一流水的事件。', update: '实际ERROR存在，平台缺对应事件。', why: '2⚡逐笔对照排除没报错与阈值未输出。', conclusion: '缺口在从文件到平台的路径。' },
+    { actionId: 'a-sampleconf', thought: '核对实际路径、处理器及只改路径对照。', update: '新json文件不匹配旧glob，补路径后进入索引。', why: '1⚡从相关性推进到可复现的采集缺口机制。', conclusion: '路径漏采确认，抽样候选排除。' },
+    { actionId: '', thought: '停止中央日志缺口诊断；灰度补正确采集路径并以测试事件验收到达，同时按业务账和原幂等键处理未完成回调，不把RPC超时日志当下游根因已查明。', update: '停止收集，执行有条件的处置与复验。', why: '当前证据足以区分本题主要候选并决定处置；继续买同类材料不改变行动，修复后仍按相同条件验证。', conclusion: '停止中央日志缺口诊断；灰度补正确采集路径并以测试事件验收到达，同时按业务账和原幂等键处理未完成回调，不把RPC超时日志当下游根因已查明。' },
   ],
-
   lessons: [
-    {
-      text: '"日志里查不到"≠"没发生"：日志平台有采样、级别、覆盖三重盲区。',
-      principle: '日志平台展示的是"被采集且被允许输出"的日志，不是系统的全部输出。查不到时先验证真实性（搜不采样/不过滤的 INFO 请求日志），再怀疑覆盖。',
-    },
-    {
-      text: '扩容/新实例必须过"可观测性基线检查"：日志级别、采样、采集 Agent、指标暴露。',
-      principle: '配置漂移最常发生在新实例上——基础镜像旧、模板未同步。扩容自动化里必须包含可观测性基线校验，否则故障发生时你会"失明"。',
-    },
-    {
-      text: '修好可观测性只是半个案子：被掩盖的真实故障仍要处理与补偿。',
-      principle: '可观测性故障常与真实故障叠加：看不见错误 ≠ 没有错误。修好"看得见"之后，必须回头处理窗口期内被吞掉的真实故障。',
-    },
+    { text: 'Agent心跳正常不证明所有文件都被采集。', principle: '需要核对真实输出位置、glob匹配、文件读取状态与索引到达。同实例不同索引可能走不同输入。' },
+    { text: '常见日志严重度中ERROR高于WARN，WARN阈值仍会放行ERROR。', principle: '应用是否输出与采集链是否收走是两层判断。先找同事件本地原文，再核对采集路径，不倒置级别解释。' },
+    { text: '修复看得见之外，还要处理被掩盖的业务事件。', principle: '入口500和RPC等待超时只定位一次失败；交易已成功时，重放后续业务要核对最终状态与幂等键，避免重复金融副作用。' },
   ],
 }

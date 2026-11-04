@@ -35,8 +35,8 @@
         <text class="stat__k">专家</text>
       </view>
       <view v-if="solved" class="stat">
-        <text class="stat__v stat__v--mint">+{{ lessons }}</text>
-        <text class="stat__k">检查单</text>
+        <text class="stat__v stat__v--mint">{{ lessons }}</text>
+        <text class="stat__k">本题检查单</text>
       </view>
     </view>
 

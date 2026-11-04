@@ -1,23 +1,22 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 13 章 · 消息与异步 第六批（扩容破坏保序 L3）
- * 教学点：假设思维——"同一 key 永远同一分区"依赖分区数恒定：扩容改分区数 = 重排所有 key；
- * 保序承诺的边界 = 分区拓扑的变更管理。
- * 专家路径：impact(1) + rebalanceaudit(2) + ordercheck(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const partitionSplitCase: DiagnosisCase = {
   id: 'partition-split',
   title: '消费者扩容后，同一订单的状态乱了序',
-  intro: '为扛大促把订单 topic 从 12 分区扩到 24：扩容后同一订单的"支付/发货"事件开始乱序到达下游。',
+  intro: 'Kafka扩分区后，扩容前尚未处理的旧事件与扩容后新事件并行完成。按同一业务key核对分区、offset和处理版本。',
   domain: 'runtime',
   layer: '保序承诺的边界 = 分区拓扑——改分区数就是重排所有 key 的家',
   part: 'master',
   chapterId: 'messaging',
   order: 5,
-  typeTags: ['messaging', 'capacity', 'race'],
+  typeTags: [
+    'messaging',
+    'capacity',
+    'race',
+  ],
   difficulty: 3,
-
   scene: {
     role: '你是「鲜到家」订单事件总线的负责人，一次例行的消费者扩容撕碎了保序承诺。',
     architecture: '订单服务 → 订单事件 topic(原 12 分区, key=orderId, 分区内 FIFO) → 状态服务(按事件顺序维护订单状态机) ｜ 大促扩容: 分区 12→24, 消费者 6→12',
@@ -31,20 +30,49 @@ export const partitionSplitCase: DiagnosisCase = {
       {
         type: 'text',
         title: '时间线',
-        text: '扩容完成 14:00；乱序告警 14:05 起（扩容后新产生的事件）。\n扩容前的存量事件顺序正常——问题只发生在"扩容后新写入的事件"。',
+        text: '14:00扩分区12→24；旧p7仍有14:00前支付事件积压，14:02新发货事件入p19并先处理，14:06旧支付才到。跨切换序列出错，不是所有扩容后新事件之间都无序。',
+      },
+      {
+        type: 'log',
+        title: '控制台预览失败',
+        text: '[WARN] topic console diagram preview unavailable。',
+      },
+      {
+        type: 'log',
+        title: '旧审计格式告警',
+        text: '[WARN] producer audit formatter deprecated。',
+      },
+      {
+        type: 'log',
+        title: '指标外送重试',
+        text: '[WARN] consumer metrics push retry。',
       },
     ],
-    timeline: '分区扩容 14:00 完成（12→24，为消费者 6→12 的扩容配套）｜ 乱序 14:05 起 ｜ 事件处理代码与消费逻辑零变更',
+    timeline: '12分区本就可分给最多12个该组消费者，6→12消费者不要求先扩到24；扩分区是另一次拓扑变更，需独立评审。',
     impactHint: '扩容前正常、扩容后乱序——"同一 key 同一分区"的承诺，在分区数变化的那一刻还成立吗？',
   },
-
   hypotheses: [
-    { id: 'h-resplit', text: '分区数变化导致 key 重排：同一 orderId 的新事件按新 hash 落到新分区，与旧分区内的事件并行——跨分区无序', excludeActionId: 'a-rebalanceaudit' },
-    { id: 'h-consumer', text: '消费者扩容本身乱序：12 个消费者各领任意分区，处理速度差导致跨分区到达乱序', excludeActionId: 'a-consumerspeed' },
-    { id: 'h-producer', text: '生产端双写：扩容期间新旧分区数并存，部分实例仍按 12 分区路由', excludeActionId: 'a-producercheck' },
-    { id: 'h-bug', text: '状态服务自身的状态机 bug（与扩容巧合）', excludeActionId: 'a-ordercheck' },
+    {
+      id: 'h-resplit',
+      text: '分区数变化导致 key 重排：同一 orderId 的新事件按新 hash 落到新分区，与旧分区内的事件并行——跨分区无序',
+      excludeActionId: 'a-rebalanceaudit',
+    },
+    {
+      id: 'h-consumer',
+      text: '即使同一分区由一个串行worker处理，单纯增加同组消费者也把该分区offset倒序',
+      excludeActionId: 'a-consumerspeed',
+    },
+    {
+      id: 'h-producer',
+      text: '扩容期间相同新事件被生产者双发到新旧两个位置，重复发送才是原因',
+      excludeActionId: 'a-producercheck',
+    },
+    {
+      id: 'h-bug',
+      text: '生产事件本来就在同一分区offset倒序，与扩容跨分区无关',
+      excludeActionId: 'a-ordercheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +87,7 @@ export const partitionSplitCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '乱序样本解剖（order#88102）',
-        text: '14:00 前：支付事件 → 分区 p7（hash(orderId) % 12 = 7）→ 正常消费 ✓\n14:02：发货事件 → hash % 24 = 19 → 新分区 p19 → 另一消费者先处理！\n状态机视角：发货(14:02 处理) → 支付(14:06 才在 p7 被消费) → 非法跃迁\n→ 同一 orderId 的前后事件分家了：旧事件在旧分区、新事件在新分区——保序在分区边界上断裂。',
+        text: '同keyK的支付事件14:00前写p7/offset801，仍积压；14:02发货按新分区数写p19/offset5且先完成，14:06才处理p7旧事件。同事件ID无双发。跨分区offset不能直接比较大小，应关联实体业务序列。\n噪声收线：分区/offset来自实际记录元数据，不依赖控制台示意图渲染。',
       },
     },
     {
@@ -70,12 +98,19 @@ export const partitionSplitCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-resplit'],
-      hypotheses: [{ id: 'h-resplit', status: 'confirmed' }],
+      tests: [
+        'h-resplit',
+      ],
+      hypotheses: [
+        {
+          id: 'h-resplit',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: 'hash 域审计',
-        text: 'hash(orderId) % 12 → hash(orderId) % 24：\n不是"每个 key 平移到新分区"——是全量重排：约 50% key 的新旧落点不同。\n订单 #88102：7 → 19；订单 #88103：3 → 15；…\n关键语义：保序承诺 = "同 key 同分区且分区内 FIFO"——分区数一变，\n承诺对"跨扩容时刻的事件序列"整体失效（旧事件锁死在旧分区，新事件流向新家）。\n实锤：扩容改分区数 = 重排所有 key 的家，跨越变更时刻的 key 序列必然跨分区。',
+        text: '本案显式key分区算法positiveHash(key)%N；一个样本hash余24为19，则余12为7。均匀hash下12→24约一半落点不变、一半变为旧p+12，不是所有key都换家。\n旧记录不会自动搬迁，新记录按新N定位，两分区各自有序仍无跨分区先后保证；该实体跨切换序列可乱序，不代表一定每次都会乱。',
       },
     },
     {
@@ -86,12 +121,19 @@ export const partitionSplitCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-bug'],
-      hypotheses: [{ id: 'h-bug', status: 'excluded' }],
+      tests: [
+        'h-bug',
+      ],
+      hypotheses: [
+        {
+          id: 'h-bug',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '防御审计',
-        text: '状态机按"事件到达顺序"处理，无事件版本号、无时间戳单调性校验——\n乱序到达 = 照单全收。下游零防御放大了上游拓扑变更的伤害。',
+        text: '权威业务序列先支付后发货；旧p7与新p19各自offset内顺序正确。状态投影按到达覆盖、无版本判断是已有放大缺陷，不能说它完全无bug；本假设“源序列同分区本已倒序”被审计排除。',
       },
     },
     {
@@ -102,12 +144,19 @@ export const partitionSplitCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-consumer'],
-      hypotheses: [{ id: 'h-consumer', status: 'excluded' }],
+      tests: [
+        'h-consumer',
+      ],
+      hypotheses: [
+        {
+          id: 'h-consumer',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '速度核对',
-        text: '扩容前 12 分区 6 消费者已运行一年，状态机零乱序告警——\n同分区内 FIFO 从未因速度差乱过（同分区天然有序）。\n→ 排除消费速度：乱序只在"跨分区"出现，而跨分区只在扩容后出现。',
+        text: '实际每分区单串行worker，p7内部按offset800→801→802，p19按4→5→6处理；增加同组消费者改变分配，不会自动将单分区offset逆序。独立分区速度差会暴露跨分区先后缺口，是传播条件而不是“同分区倒序”。\n噪声收线：分区内offset顺序取自处理提交审计；指标外送不修改消费顺序。',
       },
     },
     {
@@ -118,19 +167,26 @@ export const partitionSplitCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-producer'],
-      hypotheses: [{ id: 'h-producer', status: 'excluded' }],
+      tests: [
+        'h-producer',
+      ],
+      hypotheses: [
+        {
+          id: 'h-producer',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '生产端核对',
-        text: '全部生产实例 14:00 后已按 24 分区路由（metadata 刷新确认）。\n→ 排除双写：乱序不是"路由不一致"，是"路由正确但 key 搬家"。',
+        text: '新事件ID发货F4在Broker仅一条p19记录，所有实例路由元数据已为24；支付P3只在切换前p7。排除相同新事件双发，不把旧事件未搬迁叫生产者双写。\n噪声收线：审计字段虽标记旧格式，事件ID和单一Broker落点仍完整；格式告警不等于业务事件双发。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急回退分区数到 12',
       desc: '【状态变更】topic 分区 24→12 回退',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -139,7 +195,7 @@ export const partitionSplitCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '回退结果（陷阱动作）',
-        text: '分区回退引发第二次全量 key 重排——正在跨分区过渡的事件再次搬家，\n乱序窗口反而延长；且已扩容的 12 个消费者有一半无分区可领。\n→ 复盘点评：拓扑变更不可逆——回退也是又一次重排。正确动作是"下游临时加固"，不是"拓扑回退"。',
+        text: 'Kafka标准分区管理不能把已增加分区直接减回12；该调用会被拒绝，不是自动第二次重排。若删除/新建主题或改自定义路由则是另一次迁移，存在数据和顺序风险，不能把它冒充简单回滚。',
       },
     },
     {
@@ -155,7 +211,7 @@ export const partitionSplitCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 事件体补 eventSeq（订单内单调递增），状态机丢弃 seq ≤ 已处理的乱序事件\n② 4.1% 受影响订单：按事件时间戳重放修复（1.9 万单）\n③ 乱序告警清零，非法跃迁 0。',
+        text: '若消息为完整状态快照，按权威单调版本原子更新投影可拒绝旧快照。若为必须依次执行的增量事件，不能遇到v4就丢v2/v3；需要缺口检测、有序补齐和各副作用幂等。\n修复从源事件序列重放，不能单靠跨机器时间戳排序；取消/重开也由业务版本而非状态枚举大小判断。',
       },
     },
     {
@@ -171,7 +227,7 @@ export const partitionSplitCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '拓扑纪律',
-        text: '保序 topic 的分区数 = 契约的一部分：\n扩容正解 = 新 topic（24 分区）双写过渡 → 消费端按事件版本对账 → 旧 topic 只读下线。\n原地改分区数的操作从运维手册删除——"改个数字"会重排所有 key 的家。',
+        text: '6→12消费者可先在既有12分区完成；确需更多分区时设计切换边界、旧积压处理与版本/缺口策略。新topic迁移或按实体路由epoch都是选择，但双写本身不保证保序，需明确同事件去重与切换屏障。',
       },
     },
     {
@@ -191,60 +247,86 @@ export const partitionSplitCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-resplit', text: '分区扩容 12→24 使 hash 域全量重排（约 50% key 换分区）：同一订单跨扩容时刻的事件序列分家——旧事件锁死旧分区、新事件流向新分区并行消费，状态机无版本防御照单全收，4.1% 订单非法跃迁', correct: true },
-    { id: 'rc-consumer', text: '消费者处理速度差导致跨分区常态乱序', correct: false },
-    { id: 'rc-producer', text: '扩容期间生产端新旧分区数并存双写', correct: false },
-    { id: 'rc-bug', text: '状态服务自身状态机逻辑 bug', correct: false },
+    {
+      id: 'rc-resplit',
+      text: '按hash%N的Kafka分区数12→24，使部分key新事件改落p+12，而旧积压仍在旧分区；跨分区并行完成改变实体顺序，按到达覆盖投影放大错误',
+      correct: true,
+    },
+    {
+      id: 'rc-consumer',
+      text: '消费者处理速度差导致跨分区常态乱序',
+      correct: false,
+    },
+    {
+      id: 'rc-producer',
+      text: '扩容期间生产端新旧分区数并存双写',
+      correct: false,
+    },
+    {
+      id: 'rc-bug',
+      text: '状态服务自身状态机逻辑 bug',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 6,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '扩容前正常、扩容后乱序——样本解剖先看"乱序的事件各自住在哪个分区"。',
-      update: '同一订单的支付在旧 p7、发货在新 p19——保序在分区边界上断裂。',
+      thought: '追踪同key跨切换的两条记录。',
+      update: '旧p7积压支付，新p19发货先完成。',
       actionId: 'a-impact',
-      why: '1⚡︎ 事件落位解剖是消息类故障的验尸：症状（状态机乱）→ 骨骼（事件分区分布），一张图看出"分家"。',
-      conclusion: '嫌疑锁定：分区重排（h-resplit 升权）。',
+      why: '1⚡跨分区offset不比较大小，关联业务序列。',
+      conclusion: '核对路由函数。',
     },
     {
-      thought: '审计 hash 域：12→24 不是平移，是全量重排——对每个 key 意味着什么。',
-      update: '实锤：约 50% key 换分区；保序承诺对"跨扩容时刻的序列"整体失效——机制级结论。',
+      thought: '复算hash取模与记录位置。',
+      update: '部分key从p7换p19，旧记录未搬。',
       actionId: 'a-rebalanceaudit',
-      why: '2⚡︎ 教学核心：保序 = "同 key 同分区 + 分区内 FIFO"的合取，分区数变 = 前半句失效——这个机制一旦理解，"扩容为什么会乱序"从直觉困惑变成数学必然。',
-      conclusion: '根因实锤：拓扑变更撕裂保序。',
+      why: '2⚡半数重映射是条件结论，不是所有key必乱序。',
+      conclusion: '确认跨分区边界。',
     },
     {
-      thought: '消费速度 1⚡︎ 排除——一年零告警的历史证明同分区从不乱。',
-      update: '速度差排除：乱序专属"跨分区"——进一步坐实拓扑归因。',
+      thought: '核对分区内部串行处理。',
+      update: '各自offset正序。',
       actionId: 'a-consumerspeed',
-      why: '1⚡︎ 历史数据是最便宜的排除：扩容前一年零乱序 = 同分区 FIFO 从未失信——把矛头精确指向"跨分区"这个唯一新变量。',
-      conclusion: '归因收窄完成。',
+      why: '1⚡增加消费者不自动倒置同分区offset。',
+      conclusion: '排除同分区倒序。',
     },
     {
-      thought: '生产端/状态机各 1⚡︎ 排除；拓扑回退陷阱点评；下游防御 + 拓扑纪律 + 承诺文档。停止收集。',
-      update: '停止。',
+      thought: '核对新事件唯一入队位置。',
+      update: '无双发，新路由一致。',
+      actionId: 'a-producercheck',
+      why: '1⚡旧积压不等于新事件重复生产。',
+      conclusion: '排除双写原因。',
+    },
+    {
+      thought: '核对权威实体序列和投影。',
+      update: '源顺序正确，投影无版本是放大器。',
+      actionId: 'a-ordercheck',
+      why: '1⚡排除独立源序列错，不把真实投影缺陷抹掉。',
+      conclusion: '机制闭合。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（hash 重排）✓ 放大（下游无防御）✓ 防线（版本防御+拓扑纪律+边界文档）✓——机制、放大、防线三层闭合。',
-      conclusion: '沉淀：保序承诺的边界 = 分区拓扑——改分区数就是重排所有 key 的家，消费端必须自带乱序防御。',
+      why: '【停止规则】取模、旧积压与跨分区完成顺序一致，单分区倒序、新事件双发和源业务序列错误均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '按hash%N的Kafka分区数12→24，使部分key新事件改落p+12，而旧积压仍在旧分区；跨分区并行完成改变实体顺序，按到达覆盖投影放大错误',
     },
   ],
-
   lessons: [
     {
-      text: '分区数一变，所有 key 重排家：保序 = "同 key 同分区 + 分区内 FIFO"，改分区数让前半句对跨变更序列整体失效。',
-      principle: '假设思维：保序 topic 的分区数是契约的一部分，不是容量参数。扩容正解 = 新 topic 双写迁移（事件带版本号对账），原地改分区数 = 撕裂所有跨变更时刻的序列——拓扑回退也是又一次重排，不可逆。',
+      text: '12→24约半数均匀hash换分区，不是所有key；旧记录不搬，新记录按新N定位。',
+      principle: '保序条件包括实体路由、生产与处理顺序。增加同组消费者与增加分区数是两种操作，12分区本就容纳12个活跃消费者。',
     },
     {
-      text: '下游必须自带乱序防御：事件带单调 seq + 状态机丢弃过期事件——上游承诺再硬，也硬不过拓扑变更。',
-      principle: '程序设计：任何依赖"事件顺序"的状态机都要有版本号防御（eventSeq 单调校验）。防御的收益在拓扑变更/重放/迁移时兑现——4.1% 的非法跃迁，每一单都是"上游永远有序"这个假设的欠条。',
+      text: 'Kafka通常不能直接缩减已有主题分区；删建主题或改路由是新迁移，不能包装成安全回退。',
+      principle: '迁移要明确切换边界、旧积压、去重和顺序缺口。新topic双写本身并不保证同一实体在两路间有序。',
     },
     {
-      text: '承诺要写清边界：同 key 同分区内 FIFO ✔，跨分区/拓扑变更/重放 ✘——承诺文档化，防御才有人做。',
-      principle: '架构设计：事件总线的保序承诺必须文档化边界条件。含糊的承诺（"我们保序"）让下游裸奔；显式的边界（三种不保序场景）让每个消费者自己回答"我需要什么级别的防御"——契约的清晰度决定系统的防御深度。',
+      text: '完整快照可按版本拒绝旧值，增量事件可能必须补齐每一步；不能一律丢seq≤last就承诺业务正确。',
+      principle: '重放以权威实体序列/版本核对，墙钟不代替因果。副作用幂等与状态投影更新是不同边界。',
     },
   ],
 }

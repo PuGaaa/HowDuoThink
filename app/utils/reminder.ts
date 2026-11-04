@@ -39,6 +39,7 @@ export function requestNotifyPermission(): string {
   // #ifdef WEB
   const N = (window as any).Notification
   if (!N) return 'unsupported'
+  if (N.permission === 'default') N.requestPermission()
   return N.permission as string
   // #endif
   // #ifndef WEB

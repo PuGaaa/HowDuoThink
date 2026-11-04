@@ -70,8 +70,7 @@ def update_case_meta(cid: str, body: CaseMetaBody) -> dict:
     if changed:
         with db.tx() as conn:
             conn.execute(
-                "INSERT INTO meta(meta_key, value) VALUES('casepack_version', '0') "
-                "ON CONFLICT(meta_key) DO NOTHING"
+                "INSERT INTO meta(meta_key, value) VALUES('casepack_version', '0') ON CONFLICT(meta_key) DO NOTHING"
             )
             version_row = conn.execute(
                 "SELECT value FROM meta WHERE meta_key='casepack_version' /* FOR UPDATE */"
@@ -131,9 +130,7 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
     d.pop("sourceType", None)
     d.pop("sourceCommit", None)
     with db.tx() as conn:
-        case_snapshot = conn.execute(
-            "SELECT id, submission_id FROM cases WHERE id=?", (payload.id,)
-        ).fetchone()
+        case_snapshot = conn.execute("SELECT id, submission_id FROM cases WHERE id=?", (payload.id,)).fetchone()
         sub_id = case_snapshot["submission_id"] if case_snapshot else None
         publication = None
         if sub_id:
@@ -147,9 +144,7 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
         sub_id = exists["submission_id"] if exists else None
         author_name = publication.author_name if publication else "官方"
         source_type = "community" if publication else "official"
-        source_commit = (
-            f"submission:{sub_id}:material:{publication.material_version}" if publication else None
-        )
+        source_commit = f"submission:{sub_id}:material:{publication.material_version}" if publication else None
         d["submissionId"] = sub_id
         d["authorName"] = author_name
         if exists and exists["status"] == "published":
@@ -177,8 +172,7 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
             if next_revision < 1:
                 raise HTTPException(409, "contentRevision 必须从 1 开始")
         conn.execute(
-            "INSERT INTO meta(meta_key, value) VALUES('casepack_version', '0') "
-            "ON CONFLICT(meta_key) DO NOTHING"
+            "INSERT INTO meta(meta_key, value) VALUES('casepack_version', '0') ON CONFLICT(meta_key) DO NOTHING"
         )
         version_row = conn.execute(
             "SELECT value FROM meta WHERE meta_key='casepack_version' /* FOR UPDATE */"

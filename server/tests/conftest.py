@@ -3,7 +3,6 @@
 
 import atexit
 import os
-import tempfile
 from pathlib import Path
 
 import pymysql
@@ -15,14 +14,6 @@ os.environ.pop("ENV", None)  # 确保 dev 绕行关闭
 os.environ["DB_PROVIDER"] = "mysql"
 os.environ.setdefault("MYSQL_HOST", "127.0.0.1")
 os.environ.setdefault("MYSQL_PORT", "3306")
-
-import db as dbmod  # noqa: E402  (兼容 shim)
-from core import db as coredb  # noqa: E402
-
-_TMP = Path(tempfile.mkdtemp()) / "test.db"
-# 两处都要指：函数实际读 core.db.DB_PATH；shim 只是历史兼容面
-coredb.DB_PATH = _TMP
-dbmod.DB_PATH = _TMP
 
 # MySQL 引擎：每轮会话使用全新隔离库，会话结束回收
 _MYSQL = dict(
@@ -52,17 +43,12 @@ def _drop_test_db() -> None:
 
 atexit.register(_drop_test_db)
 
-# config 在 import 时已读走 os.environ，必须直接改配置模块才能真正切到隔离库
-# （历史 bug：只改 os.environ 不生效，MySQL 测试实际跑在配置指向的业务库上）
+# 配置在导入时读取，测试库必须在导入应用与执行迁移前固定。
 from core import config as core_config  # noqa: E402
 
 core_config.MYSQL_DATABASE = _TEST_DB
 os.environ["MYSQL_DATABASE"] = _TEST_DB
 
-# 建表必须显式：legacy 靠 import main → create_app → db.init() 的隐式链，init 退役后
-# 由 Alembic boot-migrate 接管。位置约束：DB_PATH / config 补丁之后、import main 之前
-# （upgrade_head 调用时现读 core.db.DB_PATH 与 core.config，打补丁先于建表才落到隔离库）。
-# SQLite 与 MySQL 两分支共用这一次调用。
 from core import migrate  # noqa: E402
 
 migrate.upgrade_head()

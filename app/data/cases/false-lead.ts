@@ -1,25 +1,21 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * B5-2 · concurrency L3
- * 主训思维：假设思维（不锚定第一个告警——告警说 A 超时，根因可能在 B 的连接池）
- * 次训思维：验证思维（交叉验证：A→B 的调用链两端都要看）
- * 真实原型：A 调 B 超时告警，根因是 A 的 HTTP 连接池被第三个服务的长请求耗尽
- * 情绪兽设计：惊讶獭（惊讶）——"B 是无辜的"
- * 检查单：思维型 3 + 知识型 1
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const falseLeadCase: DiagnosisCase = {
   id: 'false-lead',
   title: '告警说 B 超时，根因在 A 自己',
-  intro: '告警：搜索服务调推荐服务超时。但推荐服务监控完全正常——"不是我"。你在 A 和 B 之间来回看了两轮，两边都正常。',
+  intro: '推荐调用超时，但对端处理仍快。先分开等待调度、获取socket、连接和响应耗时，再核对共享预算。',
   domain: 'concurrency',
   layer: '告警告诉你"哪里在响"，不告诉你"哪里在着火"——第一个告警是最便宜的线索，不是最准确的答案',
   part: 'master',
   chapterId: 'concurrency',
   order: 4,
-  typeTags: ['concurrency', 'troubleshooting'],
+  typeTags: [
+    'concurrency',
+    'troubleshooting',
+  ],
   difficulty: 3,
-
   scene: {
     role: '你是「鲜到家」搜索服务的负责人。告警：搜索接口调用推荐服务超时率 30%。你打开推荐服务监控——零异常。两轮排查后，你还没找到根因。',
     architecture: 'App → 搜索服务(同时调推荐/广告/ES) → 推荐服务 + 广告服务 + ES',
@@ -33,35 +29,71 @@ export const falseLeadCase: DiagnosisCase = {
       {
         type: 'text',
         title: '搜索服务现状',
-        text: '搜索服务同时调用：推荐服务 + 广告服务 + ES 集群\n三个下游的调用用同一个 HTTP 连接池（maxSockets: 50）\n→ 三个下游共享 50 个连接。',
+        text: 'Node.js18三个origin共用Agent，maxSockets=50（每origin），另显式maxTotalSockets=50（所有origin总量）。本案跨服务争用来自总预算，不是默认maxSockets自然跨origin共享。',
+      },
+      {
+        type: 'log',
+        title: '指标采集失败',
+        text: '[WARN] recommendation dashboard scrape retry=1。',
+      },
+      {
+        type: 'log',
+        title: 'DNS重试',
+        text: '[WARN] optional telemetry DNS retry=1。',
+      },
+      {
+        type: 'log',
+        title: 'ES归档延期',
+        text: '[WARN] ES audit retention task delayed。',
       },
     ],
     timeline: '广告服务昨天发布新版：新增 A/B 测试逻辑（某些请求耗时从 50ms 增到 3s）｜ 告警：推荐服务超时 ｜ 无推荐服务变更',
     impactHint: '推荐服务没问题——但调用它的请求超时了。那"堵"的到底是推荐服务，还是通往推荐服务的路？',
   },
-
   hypotheses: [
-    { id: 'h-rec', text: '推荐服务有问题（但监控正常——先排除）', excludeActionId: 'a-rec' },
-    { id: 'h-pool', text: '共享连接池被广告服务的长请求占满，推荐请求排队等连接', excludeActionId: 'a-connpool' },
-    { id: 'h-ad', text: '广告服务新版 A/B 测试导致部分请求耗时暴增', excludeActionId: 'a-ad' },
-    { id: 'h-es', text: 'ES 集群变慢拖累搜索', excludeActionId: 'a-es' },
+    {
+      id: 'h-rec',
+      text: '推荐服务有问题（但监控正常——先排除）',
+      excludeActionId: 'a-rec',
+    },
+    {
+      id: 'h-pool',
+      text: '共享连接池被广告服务的长请求占满，推荐请求排队等连接',
+      excludeActionId: 'a-connpool',
+    },
+    {
+      id: 'h-ad',
+      text: '推荐请求被错误路由到广告origin，广告慢直接成为推荐响应',
+      excludeActionId: 'a-ad',
+    },
+    {
+      id: 'h-es',
+      text: 'ES 集群变慢拖累搜索',
+      excludeActionId: 'a-es',
+    },
   ],
-
   actions: [
     {
       id: 'a-rec',
-      name: '检查推荐服务与全部下游的监控',
-      desc: '圈定是哪个下游出了问题',
+      name: '圈定超时发生在哪个阶段',
+      desc: '影响面：区分本机排队、连接与对端响应',
       cost: 1,
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-rec'],
-      hypotheses: [{ id: 'h-rec', status: 'excluded' }],
+      tests: [
+        'h-rec',
+      ],
+      hypotheses: [
+        {
+          id: 'h-rec',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '推荐服务监控',
-        text: 'QPS 正常、P99 45ms、CPU 15%、零报错——毫发无损。\n→ 第一告警指错了方向：推荐服务本身无辜。',
+        text: '推荐已到达请求P99约45ms；失败trace的3秒主要发生在分配socket前，尚未到推荐端。独立直连同一推荐目标正常。对端零告警不是充分证明，关键是本次失败尚未发送。\n噪声收线：面板采集失败不等于推荐业务慢；独立直连与业务trace已确认45ms以及失败请求尚未发送。',
       },
     },
     {
@@ -72,12 +104,19 @@ export const falseLeadCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-pool'],
-      hypotheses: [{ id: 'h-pool', status: 'confirmed' }],
+      tests: [
+        'h-pool',
+      ],
+      hypotheses: [
+        {
+          id: 'h-pool',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'text',
         title: '连接池状态',
-        text: 'maxSockets: 50\nactive: 广告服务 48（A/B 测试请求 3s+）+ 推荐服务 2 = 50/50 满\nwaiting: 推荐服务的请求在队列里等连接 → 等待 3s+ → 超时\n→ 堵的是"连接池的坑"，不是推荐服务。',
+        text: '共享Agent配置maxSockets=50/每origin，maxTotalSockets=50/总量。快照广告48活动socket、推荐2，总50；推荐新请求在Agent.requests中等待，不是排在推荐服务内部。\nNode按origin分池，未设置全局总上限时，广告用满自己50不会自动占掉推荐50。这里是显式总预算导致争用。',
       },
     },
     {
@@ -88,12 +127,19 @@ export const falseLeadCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-ad'],
-      hypotheses: [{ id: 'h-ad', status: 'confirmed' }],
+      tests: [
+        'h-ad',
+      ],
+      hypotheses: [
+        {
+          id: 'h-ad',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '广告服务 A/B 分析',
-        text: 'A/B 测试分支：50% 请求走新版个性化逻辑（调用 ML 推理服务，耗时 3s）\n→ 广告服务 50% 的请求耗时从 50ms 变成 3s，占满共享连接池的坑位。',
+        text: '请求host/port与trace均正确，推荐仍指向推荐origin；广告50%请求走3秒分支，是总预算占用的触发源，不是推荐被路由错。\n噪声收线：此解析是遥测域名，不是广告/推荐host；当前两者的请求目标与解析均正确。',
       },
     },
     {
@@ -109,7 +155,7 @@ export const falseLeadCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '广告服务 QPS 与耗时',
-        text: '广告服务被调 3000 QPS，P50 50ms 但 P99 3s+。\n50% 请求走 A/B 新版（3s），50% 走旧版（50ms）。\n→ 3s 长请求 × 1500 QPS = 持续占用 1500 个连接槽位，连接池的 50 个 socket 被轮转占满。',
+        text: '3000QPS是整个集群，不是单Agent；故障进程广告约32QPS，50%约3s，慢部分理论占用约16×3=48个socket，与快照同量级。原1500QPS×3s应为4500需求，不是1500，且不能拿集群数字套单进程。',
       },
     },
     {
@@ -120,19 +166,26 @@ export const falseLeadCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-es'],
-      hypotheses: [{ id: 'h-es', status: 'excluded' }],
+      tests: [
+        'h-es',
+      ],
+      hypotheses: [
+        {
+          id: 'h-es',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'ES 监控',
-        text: 'ES P99 12ms，查询正常。\n→ ES 无辜。',
+        text: '失败时ES已到达请求P99约12ms；与推荐相同，主要问题是显式总budget被广告占用，而不是ES自身执行变慢。\n噪声收线：归档任务没有占用本搜索索引；该索引实际请求12ms，本机等待发生在socket分配之前。',
       },
     },
     {
       id: 'a-restartsvc',
       name: '重启搜索服务止血',
       desc: '【状态变更】滚动重启释放连接池和长请求',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -154,13 +207,10 @@ export const falseLeadCase: DiagnosisCase = {
       tests: [],
       hypotheses: [],
       danger: false,
-      effects: [],
-      tests: [],
-      hypotheses: [],
       result: {
         type: 'text',
         title: '拆分验证',
-        text: '三个下游各独立连接池（推荐 50 / 广告 50 / ES 50）。\n广告服务仍慢，但推荐服务恢复 45ms P99——验证成功。',
+        text: '同构仅将每origin预算隔离并明确各自/总量，保持广告慢分支和输入不变，推荐socket排队消失。增大总上限也可能止血，但需评估FD、下游和并发容量；不必无条件建三个Agent。',
       },
     },
     {
@@ -176,68 +226,90 @@ export const falseLeadCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '广告服务 ML 调用加 500ms 超时 + 超时降级返回通用广告。\n广告服务 P99 回到 60ms，连接池不再被长请求占满。',
+        text: '按业务允许的广告期限做有界排队、请求超时及取消，必要时返回通用广告。调用500ms超时不可能无条件使所有广告P99回60ms，需实际分布验证。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-pool', text: '三个下游共享一个 HTTP 连接池（maxSockets 50）：广告服务 A/B 测试的 3s 长请求占满连接池，推荐服务的正常请求在队列里等连接等到超时——推荐服务无辜', correct: true },
-    { id: 'rc-rec', text: '推荐服务本身变慢', correct: false },
-    { id: 'rc-ad', text: '广告服务是根因（它的 A/B 测试确实引发了问题，但不是通过推荐服务的链路）', correct: false },
-    { id: 'rc-es', text: 'ES 集群变慢拖累搜索', correct: false },
+    {
+      id: 'rc-pool',
+      text: '共享Node Agent显式maxTotalSockets=50使三个origin共用全局并发预算；广告慢请求占48槽，推荐请求在发送前等待socket，非推荐端慢',
+      correct: true,
+    },
+    {
+      id: 'rc-rec',
+      text: '推荐服务本身变慢',
+      correct: false,
+    },
+    {
+      id: 'rc-ad',
+      text: '推荐被路由到广告origin，直接收到广告慢响应',
+      correct: false,
+    },
+    {
+      id: 'rc-es',
+      text: 'ES 集群变慢拖累搜索',
+      correct: false,
+    },
   ],
-
-  expertCost: 6,
+  expertCost: 7,
   restartActionId: 'a-fixad',
-
   expertChain: [
     {
-      thought: '第一个告警说推荐服务超时——但推荐服务监控全绿。告警告诉你"哪里在响"，不告诉你"哪里在着火"。全面排查所有下游和连接层。',
-      update: '推荐服务无辜 → 不是推荐服务的问题，是"调用推荐服务"这个动作出了问题。继续查连接层。',
+      thought: '先按调用阶段分解超时。',
+      update: '推荐端快，失败在分socket前。',
       actionId: 'a-rec',
-      why: '1⚡ 不锚定第一个告警：第一个告警只是"最便宜的线索"（因为最先触发），不是"最准确的答案"。去验证而不是去相信。',
-      conclusion: '推荐服务无辜 → 换视角看连接层。',
+      why: '1⚡对端指标须与实际未发送trace关联。',
+      conclusion: '排除推荐执行慢。',
     },
     {
-      thought: '三个下游共享一个连接池——如果一个下游的请求变慢占满坑位，其他下游的请求就会在队列里等到超时。',
-      update: '连接池 50/50 满：48 个被广告服务的 3s 长请求占住，推荐服务只有 2 个坑可用——排队等连接等到超时。根因实锤。',
+      thought: '读取Agent每origin和总量配置。',
+      update: '显式总50被48广告+2推荐占满。',
       actionId: 'a-connpool',
-      why: '2⚡ 连接池状态一次看清全局：谁在占坑、谁在等待、等了多久——共享连接池的隔离性缺陷在这一刻暴露。',
-      conclusion: '共享连接池被广告服务的长请求占满 → 确认广告服务 A/B 测试是触发源。',
+      why: '2⚡默认按origin与显式总预算不能混为一谈。',
+      conclusion: '确认共享预算争用。',
     },
     {
-      thought: '广告服务的 A/B 测试是触发源——但修复方式不是"回退广告服务"，而是"拆分连接池 + 广告服务加超时"。',
-      update: '停止排查。三层修复：拆连接池（隔离）+ 广告服务加超时（治根）+ 降级返回通用广告（兜底）。',
+      thought: '核对请求目标及慢分支。',
+      update: '推荐未走错host，广告只是资源触发源。',
       actionId: 'a-ad',
-      why: '2⚡ 修复方案的设计：拆池解决"互相影响"，超时解决"广告服务慢"——两个修复各管一层，不是二选一。',
-      conclusion: '三层修复上线：拆池验证推荐恢复 45ms、广告加超时后 P99 60ms、连接池不再互占。',
+      why: '2⚡真实触发因素不能误标成错误候选，应排除错误路由命题。',
+      conclusion: '排除推荐路由错。',
     },
     {
-      thought: '拆池验证成功 + 广告修复 + 无其他异常——排查闭环。',
-      update: '停止排查。根因闭环 + 双修复上线 + 隔离验证通过。',
+      thought: '核对ES执行与等待。',
+      update: 'ES自身快，未构成先行慢源。',
+      actionId: 'a-es',
+      why: '1⚡补齐下游反证，避免停止点冒称已查。',
+      conclusion: '排除ES自身慢。',
+    },
+    {
+      thought: '保持广告输入仅隔离预算。',
+      update: '推荐排队消失。',
+      actionId: 'a-separate',
+      why: '1⚡单变量隔离支持本机共享资源因果。',
+      conclusion: '证据闭合。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】拆池验证通过 ✓ 广告修复 ✓ 全部下游正常 ✓——三个闭环无剩余异常。',
-      conclusion: '检查单：共享连接池必须按下游拆分——连接池隔离是防"一个下游拖垮所有下游"的基础设施。',
+      why: '【停止规则】本机socket等待、显式总budget与隔离对照吻合，推荐/ES自身慢和错误路由均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '共享Node Agent显式maxTotalSockets=50使三个origin共用全局并发预算；广告慢请求占48槽，推荐请求在发送前等待socket，非推荐端慢',
     },
   ],
-
   lessons: [
     {
-      text: '告警告诉你"哪里在响"，不告诉你"哪里在着火"——第一个告警是最便宜的线索，不是最准确的答案。',
-      principle: '假设思维：收到告警后先验证告警所指的目标是否真的异常（推荐服务 ✓ 正常），再反向排查"为什么调它会超时"——不锚定第一个告警。',
+      text: '超时要拆成排队、连接和响应阶段；对端快不能排除本机发送前等待。',
+      principle: '用同trace的socket分配与发送事件定位，不把最先告警的目标当成最初故障。',
     },
     {
-      text: '共享连接池 = 共享命运：一个下游的 3s 长请求能占满池子，让所有下游的正常请求一起等超时。',
-      principle: '程序设计纪律：HTTP 连接池必须按下游拆分（每个下游独立 maxSockets）——连接池的隔离性是防止"一个下游拖垮所有下游"的基础设施。',
+      text: 'Node maxSockets按origin，maxTotalSockets才是Agent总量约束；共享Agent不必然跨服务共享同一个50槽池。',
+      principle: '先读真实SDK和配置再画资源图。独立Agent或分配总预算都可形成隔离，需结合FD、并发和下游容量决定。',
     },
     {
-      text: '连接池状态（active/waiting/max）一次看清全局：谁在占坑、谁在排队、坑有多少。',
-      principle: '验证思维：连接池监控必须暴露 active/waiting/max 三个数字——"池满但下游正常"这个组合，直接指向共享池被别的下游占满。',
-    },
-    {
-      text: '修复方案是三层而非一个：拆池（隔离）+ 加超时（治根）+ 降级（兜底）——每一层各管一种情况。',
-      principle: '架构设计：多下游共享基础设施的修复方案，必须同时覆盖"隔离"（防互相影响）+"治根"（修触发源）+"兜底"（降级防不可用），三层缺一不可。',
+      text: '速率和预算要在同一进程口径核算；32×50%×3≈48，而不是集群3000直接套本地池。',
+      principle: 'Little定律估算需求，不保证过载下的实际并发；快照活动数仍受50总上限约束。',
     },
   ],
 }

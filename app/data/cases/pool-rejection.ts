@@ -1,11 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 1 章 · 并发迷宫 第三批（线程池拒绝策略静默丢任务 L2）
- * 教学点：程序设计——队列是缓冲不是容量；拒绝异常被吞 = AbortPolicy 变相 DiscardPolicy；
- * 提交/执行/结果三账对齐是异步链路的对账底线。
- * 专家路径：impact(1) + rejectaudit(2) + policycheck(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-master-systems-calibration.md。 */
 export const poolRejectionCase: DiagnosisCase = {
   id: 'pool-rejection',
   title: '0.4% 的订单跳过了风控，没人知道',
@@ -15,9 +11,12 @@ export const poolRejectionCase: DiagnosisCase = {
   part: 'master',
   chapterId: 'concurrency',
   order: 8,
-  typeTags: ['race', 'resource', 'security'],
+  typeTags: [
+    'race',
+    'resource',
+    'security',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」风控平台的负责人，财务审计的一纸对账单让你的风控系统出了大丑。',
     architecture: '下单 → 提交风控预检任务(线程池: 8 线程 + 1000 队列, AbortPolicy) → 立即返回"已受理" → 异步出结果',
@@ -26,25 +25,44 @@ export const poolRejectionCase: DiagnosisCase = {
       {
         type: 'error',
         title: '风控审计对账',
-        text: '近 30 天：0.4% 订单（日均 480 单）无预检记录，全部"免检通过"。\n其中 23 笔事后被认定欺诈——本应被拦截的交易完成了支付。',
+        text: '30天业务对账：0.4%已返回受理的订单没有预检，示例日120000笔中480笔缺结果；23笔后续调查为欺诈。历史缺少逐次拒绝指标，不能声称已按水位精确测得拒绝率。',
       },
       {
         type: 'text',
         title: '诡异之处',
         text: '应用日志零异常、零 ERROR；线程池指标"健康"；\n丢失全部集中在高峰期（低峰零发生）——且是"提交时"就消失，不是执行中失败。',
       },
+      {
+        type: 'log',
+        title: '指标外送重试',
+        text: '[WARN] metrics exporter retry；风控日志同时出现。',
+      },
     ],
     timeline: '上月大促扩容：线程 4→8、队列 500→1000（"加了容量"）｜ 丢失自扩容后高峰期出现 ｜ 下单侧代码"三个月没动过"',
     impactHint: '任务在"提交时"消失 + 零日志 + 高峰限定——提交那一刻，池子里发生了什么没人记录的事？',
   },
-
   hypotheses: [
-    { id: 'h-reject', text: '队列满触发 AbortPolicy 拒绝异常，被空 catch 吞掉——任务消失且无痕', excludeActionId: 'a-rejectaudit' },
-    { id: 'h-discard', text: '拒绝策略被误配为 DiscardPolicy（静默丢弃）', excludeActionId: 'a-policycheck' },
-    { id: 'h-timeout', text: '任务执行超时被取消，结果未写回', excludeActionId: 'a-timeoutcheck' },
-    { id: 'h-callback', text: '任务执行了但结果回调丢失，"看起来"没执行', excludeActionId: 'a-callbackcheck' },
+    {
+      id: 'h-reject',
+      text: '队列满触发 AbortPolicy 拒绝异常，被空 catch 吞掉——任务消失且无痕',
+      excludeActionId: 'a-rejectaudit',
+    },
+    {
+      id: 'h-discard',
+      text: '拒绝策略被误配为 DiscardPolicy（静默丢弃）',
+      excludeActionId: 'a-policycheck',
+    },
+    {
+      id: 'h-timeout',
+      text: '任务执行超时被取消，结果未写回',
+      excludeActionId: 'a-timeoutcheck',
+    },
+    {
+      id: 'h-callback',
+      text: '任务执行了但结果回调丢失，"看起来"没执行',
+      excludeActionId: 'a-callbackcheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +77,7 @@ export const poolRejectionCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '丢失率 × 队列水位',
-        text: '队列水位 < 60%：丢失率 0\n队列水位 60~95%：丢失率 0.02%\n队列水位 = 100%（打满）：丢失率 2.1%\n高峰时段队列打满累计 3.8 小时/天——与丢失订单的时间分布完全吻合\n→ 丢失与"队列满"强相关：容量边界上的行为，就是嫌疑。',
+        text: '缺口集中在短时高峰；分钟采样水位有时不足100%也不能排除采样间瞬时满。现有指标缺少attempted/accepted/rejected，先从具体订单与提交代码核对，不能把“线程池健康”当事实。',
       },
     },
     {
@@ -70,12 +88,19 @@ export const poolRejectionCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-reject'],
-      hypotheses: [{ id: 'h-reject', status: 'confirmed' }],
+      tests: [
+        'h-reject',
+      ],
+      hypotheses: [
+        {
+          id: 'h-reject',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '提交代码解剖',
-        text: 'try {\n  executor.submit(riskTask)\n  return "已受理"\n} catch (Exception e) {\n  log.debug("submit failed", e)   ← debug 级！生产不输出\n}\n拒绝链完整还原：队列满 → AbortPolicy 抛 RejectedExecutionException\n→ catch(Exception) 吞掉（debug 日志看不见）→ 返回"已受理" → 订单免检通过。\n实锤：AbortPolicy 被 try-catch 改造成了"带日志的 DiscardPolicy"——还是看不见日志的那种。',
+        text: '实际代码：try { executor.submit(task); } catch(RejectedExecutionException e) { log.debug("submit failed",e); }\nreturn "已受理"; // return在catch之后，两条分支都返回受理\n下游把无预检结果当通过。确定性回放占满8worker和1000队列再提交，AbortPolicy抛拒绝，catch吞掉，任务未开始但上游返回受理。原来return只在try中的代码不能证明catch后也已受理。',
       },
     },
     {
@@ -86,8 +111,15 @@ export const poolRejectionCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-discard'],
-      hypotheses: [{ id: 'h-discard', status: 'excluded' }],
+      tests: [
+        'h-discard',
+      ],
+      hypotheses: [
+        {
+          id: 'h-discard',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '策略核对',
@@ -107,7 +139,7 @@ export const poolRejectionCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '容量账',
-        text: '高峰提交速率：1200 任务/秒\n消费速率：8 线程 × 单任务 9ms ≈ 900 任务/秒\n缺口 300/s → 队列 1000 满 = 约 3.3 秒——高峰一开跑队列必满\n→ 队列是缓冲不是容量：缺口不解决，队列只是延迟了拒绝的发生。',
+        text: '固定每任务持worker9ms、无其他瓶颈时理论处理率8/0.009≈888.9/s；输入1200/s，净增约311.1/s，空1000队列约3.2秒满。\n这是理想常速窗口估算，不等于全天3.8小时满载；实际到达/耗时、下游限制与调度都需测量。队列只延缓持续超载，增加worker若有资源也可能有效，不能说扩线程永远无用。\n噪声收线：exporter为独立进程，不使用预检worker池；理论缺口来自1200/s输入和9ms持有，满池回放未依赖指标外送。',
       },
     },
     {
@@ -118,12 +150,19 @@ export const poolRejectionCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-timeout'],
-      hypotheses: [{ id: 'h-timeout', status: 'excluded' }],
+      tests: [
+        'h-timeout',
+      ],
+      hypotheses: [
+        {
+          id: 'h-timeout',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '超时核对',
-        text: '预检任务无超时取消机制；丢失的订单连"任务开始"记录都没有——不是执行中失败。\n→ 排除超时。',
+        text: '样本请求关联到提交拒绝分支，任务未进入executor，没有执行或cancel记录；确定性回放也在submit同步抛错。排除执行超时后取消。',
       },
     },
     {
@@ -134,19 +173,26 @@ export const poolRejectionCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-callback'],
-      hypotheses: [{ id: 'h-callback', status: 'excluded' }],
+      tests: [
+        'h-callback',
+      ],
+      hypotheses: [
+        {
+          id: 'h-callback',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '回调核对',
-        text: '已执行任务的结果回写率 100%（有执行记录的都有结果）。\n→ 排除回调丢失：丢失发生在执行之前。',
+        text: '同一缺口样本没有任务开始记录，拒绝回放中callback根本未注册/运行。排除“已经执行，只丢结果”的命题；其他已有任务的100%回写不自动证明这些缺口属于哪类。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急切换 CallerRunsPolicy',
       desc: '【状态变更】拒绝时由提交线程自己执行任务',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -155,7 +201,7 @@ export const poolRejectionCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '切换结果',
-        text: '任务零丢失（CallerRuns 保证执行）。\n代价：高峰期下单线程被迫亲自跑风控预检（9ms×积压），下单 RT 从 80ms 涨到 300ms，吞吐下降 25%。\n→ 止血换来了"不丢"，但"慢"的压力转移到了主链路——容量缺口仍在，只是换了承担者。',
+        text: '在executor未shutdown时CallerRuns可让拒绝任务在调用线程运行，形成背压；shutdown时默认CallerRuns会丢弃，不保证所有情况零丢。同步执行会转移CPU/时延到下单，必须按期限和吞吐验证，不能直接承诺300ms或25%下降。',
       },
     },
     {
@@ -171,7 +217,7 @@ export const poolRejectionCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 提交失败不再吞：显式分支到"快速风控"（核心规则同步执行，保证高危拦截）+ WARN 日志 + 拒绝计数指标\n② 队列水位 > 80% 告警，> 95% 触发扩容联动\n③ 回归：对账差异 0.4% → 0%；高峰下单 RT 恢复 85ms（CallerRuns 撤销）。',
+        text: '提交拒绝必须对上游明确失败/待处理，不能返回已受理并让无结果等于通过；若承诺可靠受理，需先持久化任务意图并可靠派发。\n所谓快速风控只在业务明确认可规则与遗漏风险后可选，不能凭代码建议保证高危全拦。容量和有界背压另行按目标负载验证。',
       },
     },
     {
@@ -203,71 +249,97 @@ export const poolRejectionCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '对账上线',
-        text: '三账指标：submitted / executed / resulted 每分钟对齐，差异 > 0.01% 告警。\n这次的事故若有对账，第一秒就会尖叫——而不是等财务审计月后发现。',
+        text: '按任务ID对账attempted、accepted、rejected、started及终态（成功/失败/取消）；accepted与终态在同一成熟队列/观察窗核对，扣除仍在途工作。不同分钟的原始计数有差异不等于丢失，也不能承诺分钟统计第一秒发现。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-reject', text: '队列满触发 AbortPolicy 抛 RejectedExecutionException，被 log.debug 级空 catch 吞掉——拒绝无痕、订单"已受理"，0.4% 免检通过；高峰缺口 300/s 使队列必然打满', correct: true },
-    { id: 'rc-discard', text: '拒绝策略误配为 DiscardPolicy 静默丢弃', correct: false },
-    { id: 'rc-timeout', text: '任务执行超时被取消结果未写回', correct: false },
-    { id: 'rc-callback', text: '任务执行了但结果回调丢失', correct: false },
+    {
+      id: 'rc-reject',
+      text: '满池触发AbortPolicy拒绝，提交catch吞异常后统一返回已受理；任务没有执行，无结果又被当作通过，形成静默免检',
+      correct: true,
+    },
+    {
+      id: 'rc-discard',
+      text: '拒绝策略误配为 DiscardPolicy 静默丢弃',
+      correct: false,
+    },
+    {
+      id: 'rc-timeout',
+      text: '任务执行超时被取消结果未写回',
+      correct: false,
+    },
+    {
+      id: 'rc-callback',
+      text: '任务执行了但结果回调丢失',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 7,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '丢失集中在高峰、且在"提交时"消失——先对齐丢失率与队列水位：容量边界上发生了什么。',
-      update: '水位 100% 时丢失率 2.1%——强相关成立；嫌疑聚焦"队列满后的行为"。',
+      thought: '定位具体缺口与采样限制。',
+      update: '高峰相关，但采样未记录逐次拒绝。',
       actionId: 'a-impact',
-      why: '1⚡︎ 水位曲线把"高峰限定"翻译成"容量边界行为"：低峰零发生说明代码主路径是对的，边界路径（拒绝）才有鬼。',
-      conclusion: '嫌疑锁定：拒绝路径（h-reject 升权）。',
+      why: '1⚡不从平均水位推每次提交状态。',
+      conclusion: '核对受理契约。',
     },
     {
-      thought: '解剖提交代码：拒绝异常抛出后去了哪——catch 块是最大的嫌疑。',
-      update: '实锤：catch(Exception) + log.debug 吞掉拒绝异常，上游照常返回"已受理"——AbortPolicy 被改造成隐形 Discard。',
+      thought: '满池回放实际submit分支。',
+      update: '拒绝被吞后仍返回受理。',
       actionId: 'a-rejectaudit',
-      why: '2⚡︎ 代码解剖揭开"零日志"之谜：不是没有异常，是异常被降级到 debug——"日志干净"与"系统健康"是两回事，这里恰恰相反：干净的日志是最深的坑。',
-      conclusion: '根因实锤：拒绝被吞。',
+      why: '2⚡同步拒绝与返回位置直接证明未执行却受理。',
+      conclusion: '确认拒绝路径。',
     },
     {
-      thought: '策略本身单独核对——"误配 Discard"假设要关掉，才能把账算到"吞异常"头上。',
-      update: '策略是 AbortPolicy（默认值）——误配排除；但吞异常让它行为等效于 Discard，"默认值+吞异常"的组合才是全貌。',
+      thought: '读取实际拒绝策略。',
+      update: 'AbortPolicy而非Discard。',
       actionId: 'a-policycheck',
-      why: '1⚡︎ 归因的精度决定整改的精度：只怪"默认策略"会漏掉吞异常的整改，只怪吞异常会漏掉策略显式化——两个都要修，复盘叙事才完整。',
-      conclusion: '双缺陷确认 → 容量账补全。',
+      why: '1⚡区分策略与异常处理，不能把默认策略本身当静默丢弃。',
+      conclusion: '排除误配Discard。',
     },
     {
-      thought: '容量账算清：缺口 300/s，队列 3.3 秒必满——"扩容过"的错觉要被数字戳破。',
-      update: '线程 4→8、队列 500→1000 仍缺口 300/s——队列是缓冲不是容量，缺口不解决拒绝必然发生。',
+      thought: '核对吞吐和缓冲单位。',
+      update: '888.9/s能力，311.1/s缺口，约3.2秒满。',
       actionId: 'a-watermark',
-      why: '1⚡︎ 容量账防止"修复回到老路"：加线程加队列治不了缺口——修复必须同时覆盖"缺口时的行为"（降级）与"缺口的观测"（水位告警）。',
-      conclusion: '修复三层：显式降级 + 双门禁 + 三账对账。',
+      why: '1⚡注明假设，避免把瞬态估算写成全天事实。',
+      conclusion: '解释高峰条件。',
     },
     {
-      thought: '止血（CallerRuns 有代价）、修复（显式降级）、门禁（禁吞异常+策略显式化）、对账（三账齐）。停止收集。',
-      update: '停止。',
+      thought: '关联缺口样本执行记录。',
+      update: '未进入任务，无cancel。',
+      actionId: 'a-timeoutcheck',
+      why: '1⚡反证执行超时，不能仅凭看不到ERROR推断。',
+      conclusion: '排除超时取消。',
+    },
+    {
+      thought: '核对callback是否曾有机会执行。',
+      update: '拒绝分支无开始或回调。',
+      actionId: 'a-callbackcheck',
+      why: '1⚡区分未接受与执行后结果丢失。',
+      conclusion: '候选全部收敛。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（拒绝被吞）✓ 容量（缺口必满）✓ 观测（三账对齐）✓——行为、容量、防线三层闭合。',
-      conclusion: '沉淀：队列是缓冲不是容量；拒绝必须显式——被吞掉的拒绝是最贵的静默失败，因为它的代价由风控账单支付。',
+      why: '【停止规则】满池回放和返回契约确认静默拒绝，Discard误配、执行超时和回调丢失均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '满池触发AbortPolicy拒绝，提交catch吞异常后统一返回已受理；任务没有执行，无结果又被当作通过，形成静默免检',
     },
   ],
-
   lessons: [
     {
-      text: '队列是缓冲不是容量：提交速率 > 消费速率时，队列只会延迟拒绝的发生——缺口要靠容量或降级解决。',
-      principle: '程序设计：线程池容量账先于线程池配置——提交速率、单任务耗时、线程数的乘除法。缺口存在时，拒绝策略决定"谁承担过载"：Abort 抛给调用方、CallerRuns 拖慢调用方、Discard 静默丢数据——没有免费选项，只有显式选择。',
+      text: '拒绝要与可靠受理承诺一致，warn日志本身不修复“拒绝仍成功”与“无结果当通过”。',
+      principle: '可以明确失败、背压或先持久化后异步执行，按业务选择；不能未经风险确认增加快速规则替代完整风控。',
     },
     {
-      text: '被吞掉的拒绝是最贵的静默失败：log.debug 的 catch 块让 AbortPolicy 变成隐形 DiscardPolicy，连"发生过"都不留痕。',
-      principle: '程序设计：catch 块的门禁（warn 以上或 rethrow）+ 拒绝策略显式声明是底线配置。"零异常日志"不等于"零异常发生"——关键路径的失败必须至少大声一次，否则对账发现时已经是月后。',
+      text: '8个worker×每任务9ms约888.9/s，1200/s输入净积压311.1/s，1000缓冲约3.2秒满。',
+      principle: '估算注明同一常速窗口与持有时长。扩worker是否有用看CPU/下游预算，队列不是持续吞吐容量。',
     },
     {
-      text: '异步链路必须三账对账：提交量、执行量、结果量——任何两账之间的差异就是丢失，第一秒就该尖叫。',
-      principle: '可观测性设计：异步/线程池/MQ 链路的丢失天然"无痕"，对账是唯一可靠的发现手段。差异告警的阈值要远严于业务容忍度——0.4% 的丢失在财务眼里是 480 单欺诈通道。',
+      text: '异步对账要区分在途与成熟终态，按任务ID与观察窗判断丢失。',
+      principle: 'attempted、accepted、rejected、started和终态含义不同；只比同分钟submitted/executed/resulted可能把正常排队当丢失。',
     },
   ],
 }

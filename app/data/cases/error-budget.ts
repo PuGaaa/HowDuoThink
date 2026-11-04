@@ -1,17 +1,16 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * B4-4 · observability L3（决策现场皮肤）
- * 主训思维：产品思维（错误预算不是冻结令，是优先级信号——冻结的正确姿势是"冻结需求，不冻结修复"）
- * 次训思维：沉淀思维（错误预算的消耗结构分析：69% 来自重复发布的回归 bug）
- * 真实原型：SLO 99.9% 错误预算本月耗尽，业务方要求继续上线新功能
- * 情绪兽设计：垂耳兔（沮丧）——"稳定性指标在惩罚我"
- * 检查单：思维型 3 + 知识型 1
+ * 大师篇校准：预算口径、冻结政策与可靠性修复并行决策。
+ * 按真实技术机制教学重建，不冒充原始事故。
+ * 六维：2/3/2/3/3/3，中位数半档向下取整，L3。
+ * 标准路径：a-impact → a-regbreak → a-infrabreak → a-thirdbreak → a-freeze；替代顺序：a-impact → a-freeze → a-thirdbreak → a-infrabreak → a-regbreak。
+ * 编审依据：content/baselines/t04b-master-product-calibration.md。
  */
 export const errorBudgetCase: DiagnosisCase = {
   id: 'error-budget',
   title: '错误预算烧完了：冻结还是继续',
-  intro: '结算服务 SLO 99.9%（月错误预算 43 分钟），本月已消耗 47 分钟——超出预算。SRE 平台提出冻结新功能上线一周。业务方：大促在即，不能停。',
+  intro: '滚动30天可用性预算43.2分钟，已消耗47.3分钟。按事先批准的冻结政策限制新增风险，同时修复主要消耗源。',
   domain: 'runtime',
   layer: '错误预算不是冻结令，是优先级信号——正确解法是分析消耗结构，针对性止血',
   part: 'master',
@@ -19,34 +18,23 @@ export const errorBudgetCase: DiagnosisCase = {
   order: 6,
   typeTags: ['observability', 'sre'],
   difficulty: 3,
-
   scene: {
     role: '你是「鲜到家」的平台工程负责人。SRE 平台的自动冻结通知刚发到群里——业务方秒回"大促在即，不能停"。你需要在一个小时内给出决策和依据。',
-    architecture: '结算服务(SLO 99.9%, 月错误预算 43 分钟) → 错误预算政策(耗尽即冻结新功能)',
-    tag: '决策现场',
+    architecture: '端到端时间型SLI → 滚动30天SLO99.9% → 已批准错误预算政策（超支冻结新需求7天，关键修复例外受控）',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '错误预算消耗',
-        text: 'SLO 99.9%（可用性）→ 月错误预算 = 43.2 分钟（43200 分钟 × 0.1%）\n本月实际消耗：47.3 分钟（超支 9%）\n消耗结构：4 次发布回归占 32 分钟（68%）｜ 1 次基础设施抖动占 9 分钟（19%）｜ 2 次第三方抖动占 6.3 分钟（13%）',
-      },
-      {
-        type: 'text',
-        title: '业务方诉求',
-        text: '大促 D-20：本月计划上线 3 个功能（购物车优化 / 新支付渠道 / 优惠券重构）。\n"冻结一周 = 大促功能全部推迟一周，对营收影响不可估量。"',
-      },
+      { type: 'error', title: '错误预算消耗', text: '30天=43200分钟，允许不可用时间43200×0.001=43.2分钟；按同一端到端SLI并对重叠区间去重，实际47.3分钟，超预算约9.5%。\n四次发布回归32分钟、一次节点事故9分钟、两次支付依赖超时6.3分钟，三类为互不重叠的失败区间。' },
+      { type: 'text', title: '业务方诉求', text: '大促 D-20：本月计划上线 3 个功能（购物车优化 / 新支付渠道 / 优惠券重构）。\n"冻结一周 = 大促功能全部推迟一周，对营收影响不可估量。"' },
     ],
-    timeline: '本月 30 天，剩余 20 天（含大促 D-20）｜ 4 次发布回归的时间分布：D1、D8、D14、D22（平均每周 1 次）｜ SRE 政策：预算耗尽即自动冻结一周',
+    timeline: '当前滚动30天窗口 ｜ 四次回归在窗口内第1/8/14/22天 ｜ 当前大促D-20（不限定月内日期）｜ 已批准超支后冻结新需求7天，关键修复按例外门禁发布',
     impactHint: '47.3 分钟不是均匀消耗的——消耗结构里藏着"该冻结什么"的答案。',
   },
-
   hypotheses: [
-    { id: 'h-regression', text: '重复发布回归是主因：4 次发布 4 次回归 = 测试覆盖不足，冻结新功能也无法止血', excludeActionId: 'a-regbreak' },
-    { id: 'h-infra', text: '基础设施抖动是次要因素但占比 19%，需评估是否可忽略', excludeActionId: 'a-infrabreak' },
-    { id: 'h-third', text: '第三方抖动不可控：13% 属外部因素，无需处理', excludeActionId: 'a-thirdbreak' },
-    { id: 'h-freeze', text: '按政策冻结一周是正确动作：全部上线都暂停', excludeActionId: 'a-freeze' },
+    { id: 'h-regression', text: '遵守冻结新增风险的既定政策，并优先修发布验证缺口；关键修复按例外门禁，其他消耗也记账并整改', excludeActionId: 'a-freeze' },
+    { id: 'h-infra', text: '只修节点问题即可，发布回归32分钟无需改进', excludeActionId: 'a-regbreak' },
+    { id: 'h-third', text: '外部支付导致的用户失败不可控，应从既定端到端预算中剔除且无需韧性措施', excludeActionId: 'a-thirdbreak' },
+    { id: 'h-freeze', text: '冻结意味着所有部署都禁，包括紧急安全/可靠性修复；满7天无论状态如何都自动全量放行', excludeActionId: 'a-freeze' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -56,13 +44,11 @@ export const errorBudgetCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
-      result: {
-        type: 'text',
-        title: '消耗结构分析',
-        text: '发布回归 ×4 = 32 分钟（每次 8 分钟，全部在发布后 15 分钟内出现）\n基础设施抖动 ×1 = 9 分钟（K8s 节点故障，非服务自身）\n第三方抖动 ×2 = 6.3 分钟（支付渠道超时）\n→ 68% 来自"发布回归"——结构极度偏斜，不是"大促前正常的稳定性消耗"。',
-      },
+      tests: ['h-regression'],
+      hypotheses: [
+        { id: 'h-regression', status: 'up' },
+      ],
+      result: { type: 'text', title: '口径与结构对账', text: '同一时间型SLI的去重失败区间：发布32、节点9、外部依赖6.3，合计47.3分钟。发布占32/47.3≈67.7%。\n43.2是时间型30天99.9%预算，不可直接套到按请求成功率的SLI；消耗集中只是确定调查优先级，不能单独证明共同机制。' },
     },
     {
       id: 'a-regbreak',
@@ -72,13 +58,12 @@ export const errorBudgetCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-regression'],
-      hypotheses: [{ id: 'h-regression', status: 'confirmed' }],
-      result: {
-        type: 'text',
-        title: '回归根因审计',
-        text: '4 次回归全部是同模式：新代码路径在特定条件下触发未覆盖的边界。\n测试覆盖：单测覆盖 78%，集成测试只覆盖主链路——新分支路径零覆盖。\n→ 不是 4 个独立 bug，是同一类系统性缺陷：测试覆盖跟不上发布节奏。\n→ 冻结新功能无法解决这个根因——它只冻结了"发现新 bug 的速度"。',
-      },
+      tests: ['h-infra', 'h-regression'],
+      hypotheses: [
+        { id: 'h-infra', status: 'excluded' },
+        { id: 'h-regression', status: 'up' },
+      ],
+      result: { type: 'text', title: '复现输入与验证缺口', text: '逐次复现四个已知回归：各有新增边界条件未进入集成套件，原主路径通过；补入这四个输入后旧代码均失败、对应修复后通过。\n这是四个已知缺口的证据，78%代码覆盖率不能证明质量；补回归用例也不保证未来所有bug被消除。发布32分钟不能靠只修节点解决。' },
     },
     {
       id: 'a-infrabreak',
@@ -88,13 +73,11 @@ export const errorBudgetCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-infra'],
-      hypotheses: [{ id: 'h-infra', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '基础设施抖动分析',
-        text: 'K8s 节点故障：可预防性中等（定期维护+驱逐策略）。\n→ 9 分钟中约 4 分钟可通过节点维护策略避免，剩余 5 分钟属"基础设施固有风险"。\n→ 记入优化项，非本轮重点。',
-      },
+      tests: ['h-regression'],
+      hypotheses: [
+        { id: 'h-regression', status: 'up' },
+      ],
+      result: { type: 'text', title: '基础设施抖动分析', text: '9分钟节点事故计入同一用户SLI。根据已还原调度/恢复时间线提出副本分布、驱逐与恢复演练；尚未实测可避免几分钟，不能凭空切成4分钟可防+5分钟固有。' },
     },
     {
       id: 'a-thirdbreak',
@@ -105,12 +88,10 @@ export const errorBudgetCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-third'],
-      hypotheses: [{ id: 'h-third', status: 'down' }],
-      result: {
-        type: 'text',
-        title: '第三方抖动分析',
-        text: '支付渠道超时：不可控（外部服务），已有超时+重试+降级。\n→ 不可控外部因素，计入错误预算基线即可（SLO 设定时应考虑外部依赖的固有抖动）。',
-      },
+      hypotheses: [
+        { id: 'h-third', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '依赖归因与SLI责任', text: '端到端SLI事先包含支付依赖超时，外部归因不自动免预算。已配置超时/重试/降级也不证明措施有效，应核对幂等、总时限、渠道隔离与受控故障演练。\n若SLO口径将来需要改，走正式评审，不追溯删掉已发生的用户失败。' },
     },
     {
       id: 'a-freeze',
@@ -120,121 +101,70 @@ export const errorBudgetCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-freeze'],
-      hypotheses: [{ id: 'h-freeze', status: 'down' }],
-      result: {
-        type: 'text',
-        title: '冻结效果评估',
-        text: '冻结新功能 ≠ 消除发布回归：\n回归根因是测试覆盖不足——冻结新功能不增加测试覆盖。\n且冻结期间仍需发布 bug fix（不在冻结范围内）——bug fix 发布同样可能回归。\n→ 冻结只能延迟"发现下一个回归"的时间，不能减少回归本身。',
-      },
+      tests: ['h-regression', 'h-freeze'],
+      hypotheses: [
+        { id: 'h-regression', status: 'confirmed' },
+        { id: 'h-freeze', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '既定政策与完整决定', text: '本组织D0已批准政策：超支后新增需求冻结7天，紧急安全/可靠性修复经指定审批、回归、灰度与回滚预案可例外；恢复常规发布还需复核预算/风险条件，非到点自动全量。\n冻结不能自动补测试，但能限制新的风险暴露、腾出修复时间，因此不是“无效”。补测试与冻结应同时执行，业务紧急也不能自行绕政策。' },
     },
     {
       id: 'a-testcov',
-      name: '补测试覆盖与发布门禁',
-      desc: '【状态变更】新代码路径 100% 覆盖 + 发布前必须过回归门禁',
+      name: '修复：补已知回归与发布验证',
+      desc: '四个复现输入进入回归套件，新边界按风险设计验证',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复结果',
-        text: '① 新代码路径覆盖率 0% → 92%（补边界条件用例）\n② 发布门禁：集成测试必须覆盖新增代码路径（缺失则阻塞发布）\n③ 回归测试套件：4 次回归的边界条件全部补入\n→ 下次发布如有同类 bug，门禁直接拦截。',
-      },
+      result: { type: 'text', title: '修复结果', text: '先保证四个复现输入能检出旧缺陷、修复版本通过，再审新增边界、灰度与恢复能力。覆盖率是辅助信息，不承诺92%就不回归。验证和治理成本需排期，不用一键动作捏造未来事故归零。' },
     },
     {
       id: 'a-continuerelease',
-      name: '冻结需求发布但继续上线 bug fix',
-      desc: '【状态变更】区分冻结范围：新功能冻结、bug fix 与稳定性改进正常发布',
+      name: '修复：执行冻结与受控例外',
+      desc: '新增功能推迟，关键修复经审批/验证/灰度发布',
       cost: 1,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '冻结范围优化',
-        text: '冻结范围细化：\n新功能（3 个）→ 推迟至下月\nbug fix → 正常发布（过回归门禁）\n稳定性改进 → 优先发布\n→ "冻结"的正确姿势：冻结的是"会消耗错误预算的风险增量"，保护的是"减少错误预算消耗的修复"。',
-      },
+      result: { type: 'text', title: '冻结范围优化', text: '冻结新增需求7天并处理主要验证缺口；紧急安全/可靠性修复按已批准例外处理，每次仍有回归风险。恢复前评审预算与门禁；功能何时上线依真实整改进度，不无依据承诺全推一个月。' },
     },
     {
       id: 'a-ignorebudget',
       name: '忽略错误预算，大促前正常上线全部功能',
       desc: '【状态变更】大促优先，忽略 SRE 平台的冻结通知',
-      cost: 1,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '忽略结果',
-        text: '忽略冻结通知，3 个功能全部上线。\n→ 下月错误预算消耗：3 个功能 × 1~2 次回归/个 = 预计 24~48 分钟超支。\n→ 上月已超支 9%，叠加后 = 连续两月超支——SLO 将从 99.9% 降到 99.87%。\n→ 这个选项的陷阱：不是"大促功能不能上"，而是"没修测试覆盖就上线，只会继续消耗预算"。',
-      },
+      result: { type: 'text', title: '忽略结果', text: '绕过政策让三项功能直接上线会增加未经批准的暴露；没有每项故障概率和影响模型，不能推算必多24~48分钟或精确SLO跌到99.87%。先走约定例外和风险评审。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-testcov', text: '核心修复：发布回归根因 = 测试覆盖不足（新代码路径 0% 集成覆盖）——补覆盖 + 发布门禁后，回归消除，错误预算消耗回到基线', correct: true },
-    { id: 'rc-infra', text: '次要因素：K8s 节点抖动 9 分钟（19%），部分可通过维护策略避免', correct: false },
-    { id: 'rc-third', text: '外部因素：支付渠道抖动 6.3 分钟（13%），不可控', correct: false },
-    { id: 'rc-freeze', text: '按政策冻结一周新功能：无法消除发布回归根因，只能延迟发现', correct: false },
+    { id: 'rc-testcov', text: '按已批准政策冻结新增风险，优先补四次已复现的发布验证缺口；关键修复经受控例外，节点与外部依赖失败仍计入并整改，恢复前再验预算和门禁', correct: true },
+    { id: 'rc-infra', text: '仅修节点即可，发布回归32分钟无需处理', correct: false },
+    { id: 'rc-third', text: '外部支付超时可从现行端到端SLI预算直接删掉且无需治理', correct: false },
+    { id: 'rc-freeze', text: '全部部署禁行含紧急修复，满7天无条件恢复全量', correct: false },
   ],
-
   expertCost: 6,
   restartActionId: 'a-ignorebudget',
-
   expertChain: [
-    {
-      thought: '错误预算不是均匀消耗的——先拆消耗结构：47.3 分钟里什么占大头。',
-      update: '68% 来自发布回归（4 次 × 8 分钟/次，全部在发布后 15 分钟内出现）——结构极度偏斜。',
-      actionId: 'a-impact',
-      why: '1⚡ 消耗结构分析决定修复方向：如果是均匀消耗 = 正常稳定性退化；如果偏斜 = 有系统性根因。68% 偏斜指向"发布流程有系统性缺陷"。',
-      conclusion: '发布回归为主因 → 审计 4 次回归的共同模式。',
-    },
-    {
-      thought: '4 次回归的共同模式：全部是新代码路径的边界条件——测试覆盖没跟上发布节奏。',
-      update: '根因实锤：新代码路径 0% 集成测试覆盖 → 每次发布都带着未测试的边界条件上线。',
-      actionId: 'a-regbreak',
-      why: '2⚡ 根因审计揭示冻结方案的无效性：冻结新功能不增加测试覆盖——它只是让"发现回归"变慢了，回归本身的根因仍在。',
-      conclusion: '测试覆盖不足实锤 → 修复覆盖 + 门禁，而非简单冻结。',
-    },
-    {
-      thought: '基础设施 9 分钟中 4 分钟可预防、第三方 6.3 分钟不可控——次要因素分级处理，非本轮重点。',
-      update: '次要因素确认：可优化 4 分钟（节点维护策略），不可控 6.3 分钟（外部固有）。',
-      actionId: 'a-infrabreak',
-      why: '1⚡ 次要因素也要分级：可优化 vs 不可控的区分，避免把不可控因素记成"待办"造成无效工作。',
-      conclusion: '次要因素归档 → 冻结方案有效性评估。',
-    },
-    {
-      thought: '"冻结一周新功能"评估：冻结不能消除回归根因（测试覆盖不足），只能延迟发现——修复覆盖+门禁才是根治。',
-      update: '停止决策循环。方案确定：补覆盖+门禁（治根）+ 细化冻结范围（防"冻结变松"）+ 大促功能推迟一个月。',
-      actionId: '',
-      why: '【停止规则】消耗结构分析 ✓ 回归根因审计 ✓ 次要因素分级 ✓ 冻结效果评估 ✓——四项闭合，决策有理有据：治根优于冻结。',
-      conclusion: '决策：补覆盖+门禁（治根）+ 细化冻结范围（新功能推迟、修复正常发布）+ 大促功能推迟一个月（带测试覆盖的版本）。',
-    },
+    { actionId: 'a-impact', thought: '先定义SLI并对区间去重。', update: '时间预算43.2，实际47.3，发布占约67.7%。', why: '1⚡避免请求型与时间型预算或重叠区间混算。', conclusion: '先调查主要发布消耗。' },
+    { actionId: 'a-regbreak', thought: '重复回归是否有可复现验证缺口。', update: '四输入能让旧版失败，修复后通过。', why: '2⚡用实际检出能力替代只读代码覆盖率。', conclusion: '只修节点不充分。' },
+    { actionId: 'a-infrabreak', thought: '次要节点损失是否已核清。', update: '9分钟计入预算，改进收益需演练。', why: '1⚡不因占比小就丢账，也不编造可防分钟数。', conclusion: '节点改进列入有证据的后续计划。' },
+    { actionId: 'a-thirdbreak', thought: '外部归因是否可免除用户失败。', update: '现行端到端SLI包含它，措施需故障演练。', why: '1⚡区分依赖责任与用户体验预算口径。', conclusion: '不追溯改分母或剔除不利事件。' },
+    { actionId: 'a-freeze', thought: '冻结和修复是否互相替代。', update: '既定政策限制新需求并允许受控关键修复。', why: '1⚡遵守事先风险契约，同时修验证缺口，不以治根为由绕政策。', conclusion: '完整行动与恢复条件明确。' },
+    { actionId: '', thought: '停止争论，执行已批准的新需求冻结和受控修复例外，补已知回归与韧性验证；恢复前复核预算与门禁，不承诺覆盖率或一周冻结可消除未来回归。', update: '停止收集，执行有条件的处置与复验。', why: '当前证据足以区分本题主要候选并决定处置；继续买同类材料不改变行动，修复后仍按相同条件验证。', conclusion: '停止争论，执行已批准的新需求冻结和受控修复例外，补已知回归与韧性验证；恢复前复核预算与门禁，不承诺覆盖率或一周冻结可消除未来回归。' },
   ],
-
   lessons: [
-    {
-      text: '错误预算的消耗结构决定修复方向：68% 偏斜于发布回归 ≠ 正常稳定性退化，而是系统性流程缺陷。',
-      principle: '产品思维：消耗结构分析是错误预算的第一动作——均匀消耗 = 正常波动；偏斜消耗 = 系统性根因。修复方向取决于偏斜指向哪里。',
-    },
-    {
-      text: '冻结新功能 ≠ 消除错误预算消耗的根因：测试覆盖不足才是——冻结只是延迟了发现回归的时间。',
-      principle: '产品思维：错误预算政策（冻结）的正确姿势是"冻结需求，不冻结修复"——因为需求增加消耗预算，修复减少消耗。一刀切冻结等于把"减少消耗的动作"也停了。',
-    },
-    {
-      text: '测试覆盖跟不上发布节奏：4 次回归 4 次都是新代码路径的边界条件——覆盖的债最终会用错误预算来还。',
-      principle: '程序设计纪律：发布门禁 = 集成测试覆盖新增代码路径。覆盖不足时每发布一次就消耗一次错误预算——覆盖债的利息就是用户受损。',
-    },
-    {
-      text: '错误预算的分级策略：可预防的（发布回归/节点维护）主动修，不可控的（第三方抖动）计入基线。',
-      principle: '沉淀思维：错误预算分析后按"可预防/不可控"分类——可预防的列行动清单，不可控的纳入 SLO 基线重新校准（避免把外部抖动算成自己的"超支"）。',
-    },
+    { text: '错误预算先固定SLI、窗口和去重规则。', principle: '43.2分钟只适用于30天99.9%的时间型SLI；请求型预算应按请求数计算。归因分析不能随意剔除外部导致的用户失败。' },
+    { text: '冻结不是根因修复，但能限制新增风险并腾出整改时间。', principle: '遵守事前批准政策，紧急安全/可靠性修复走明确例外；不能因冻结不自动补测试就称其无效，也不能冻结所有修复。' },
+    { text: '回归检出能力比单个覆盖率数字更接近本题证据。', principle: '让历史复现输入在旧版失败、修复后通过，并按新增边界与发布风险设计验证。任何覆盖率都不保证零缺陷。' },
+    { text: '改进收益和未来损失应有测量或概率模型。', principle: '没有演练与前提，不能把节点损失精确分成可避免分钟，或推算三项功能必造成特定SLO。恢复发布按实际风险条件评审。' },
   ],
 }

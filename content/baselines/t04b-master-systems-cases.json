@@ -1,0 +1,1720 @@
+{
+  "schemaVersion": 1,
+  "kind": "t04b-master-systems-calibration",
+  "frozenAt": "2026-11-04",
+  "sourceCommit": "4c5e25e",
+  "count": 40,
+  "cases": [
+    {
+      "id": "oversell-race",
+      "file": "app/data/cases/oversell-race.ts",
+      "chapter": "concurrency",
+      "order": 1,
+      "originalHash": "fcd08194902a253c02269b75aa0112adf108eced4b8c94634a930d4028918ffe",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 6,
+      "status": "calibrated",
+      "calibratedHash": "523b1ce9f63d784afadf13ff235dfec171cfd89a1669ea2ee20ddb384921e55f",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "账本→交错；原文依据（a-orderlog）：“同一进程内trace和DB语句审计：库存剩1时，多个请求先完成普通SELECT并读到1；随后各自执行stock=stock-1，最后37次将0扣到-37。”",
+        "读值与事务对照；原文依据（a-code）：“事务中先普通SELECT stock，if>0再UPDATE stock=stock-1 WHERE id=2049，且无stock>0谓词/受保护锁读；INSERT订单与扣减同事务。UPDATE本身有行锁，但检查已在锁前发生。”",
+        "锁边界与条件更新；原文依据（a-code）：“同构将库存设1、两个事务都先读1，再依次UPDATE，两者均插单、库存-1；仅改条件UPDATE并以affected rows=1才插单，第二笔不通过。唯一订单键不能单独防不同用户超卖。”",
+        "语句成功而不变量错；原文依据（a-impact）：“订单明细137笔、不同支付流水/用户且无重试重复；活动初始DB库存100，未补货，137次有效扣减后为-37。137笔是真实承诺，不是已发出137件实物。”",
+        "缓存提示到权威DB；原文依据（scene.architecture）：“秒杀服务→MySQL权威库存和订单；Redis仅缓存库存展示/粗略读提示，不承担原子预扣或唯一准入。”",
+        "下架改变业务状态；原文依据（a-off）：“活动下架，超卖止损。已成交的 37 单走补偿方案（退款+补偿券）。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-orderlog",
+            "a-redis",
+            "a-code"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-redis",
+            "a-code",
+            "a-orderlog"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-race"
+      ],
+      "review": "人工裁定6⚡（原4、旧链6）；重建Redis非权威职责，删除严格100令牌却137独立成交与不可能的实物少37。",
+      "sources": [
+        "https://dev.mysql.com/doc/refman/8.0/en/innodb-locking-reads.html"
+      ],
+      "noise": [
+        {
+          "title": "图片预热告警",
+          "text": "[WARN] banner thumbnail prefetch 404；秒杀日志中还夹有此条。",
+          "closeActionId": "a-redis",
+          "closure": "告警仅属图片预取，不读写sku库存或准入令牌；初始库存与DB事务审计独立。"
+        }
+      ]
+    },
+    {
+      "id": "idempotent-fail",
+      "file": "app/data/cases/idempotent-fail.ts",
+      "chapter": "concurrency",
+      "order": 2,
+      "originalHash": "a285abe1eb8a854dd07c32e5f063e85e1e5ee82c2adcc3aec0acf9378bcd6507",
+      "originalDifficulty": 2,
+      "originalExpertCost": 6,
+      "originalPathCost": 6,
+      "status": "calibrated",
+      "calibratedHash": "caccce79d7a83026e493dfa60d0cfd9d1750bad2022140a44c1eb3e85923a7ef",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "基数→父trace→回放；原文依据（a-orderlist）：“O-8811两张WMS单的调用父trace均为pay_callback请求C1/C2，actor=system；同一支付业务键P1，没有人工操作或MQ消费父trace。MQ审计消息另有ID A1，不参与这两次WMS API。”",
+        "双端期限与调用归属；原文依据（a-code）：“on_callback按order.status==PAID就调用create_delivery，无唯一履约业务键。对同一P1回放两次，产生两次WMS创建；付款状态PAID不能表示已完成履约。”",
+        "跨系统幂等边界；原文依据（a-code）：“修复应使用稳定业务键（订单+履约阶段/版本）创建唯一履约意图，再可靠投递，并让WMS以同键幂等。仅先插已处理再外呼会在崩溃时丢任务，外呼后才标记又可能重复。”",
+        "200日志不等于收到；原文依据（a-impact）：“23笔业务订单各支付一次、WMS各有两张拣货单，两次触发间隔15~90秒。这提示重复输入，但不能凭“有间隔”排除跨请求并发或处理重叠。”",
+        "回调到DB与WMS；原文依据（scene.architecture）：“支付网关→我方回调处理器→履约WMS；MQ仅发送已支付审计事件，WMS创建本案不由MQ消费触发。”",
+        "作废/拦截副作用；原文依据（a-void）：“23 单全部拦截成功，未发出的直接作废，已发出的走拒收回款。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-orderlist",
+            "a-paylog",
+            "a-code"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-orderlist",
+            "a-code",
+            "a-paylog"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-retry"
+      ],
+      "review": "6⚡保留，明确MQ旁路，200晚于网关deadline；纠正唯一eventId即外部exactly-once和PAID检查充分论。",
+      "sources": [
+        "https://www.rabbitmq.com/docs/confirms",
+        "https://docs.stripe.com/webhooks#handle-duplicate-events"
+      ],
+      "noise": [
+        {
+          "title": "发票归档重试",
+          "text": "[WARN] invoice archive retry=1；订单同期日志有此条。",
+          "closeActionId": "a-orderlist",
+          "closure": "归档是另一trace的离线附件任务，不创建WMS拣货单；两单父trace均为明确支付回调。"
+        }
+      ]
+    },
+    {
+      "id": "msg-order",
+      "file": "app/data/cases/msg-order.ts",
+      "chapter": "concurrency",
+      "order": 3,
+      "originalHash": "7da8f7f25fee4f7da06c1f0674ab3f30f0961194b7eb100b936cdf18b38bf9e3",
+      "originalDifficulty": 2,
+      "originalExpertCost": 6,
+      "originalPathCost": 6,
+      "status": "calibrated",
+      "calibratedHash": "f2b1876468c36da54f4ff6397fb5cff0c21990f4a8b11a7a6feb0c521299fd72",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        3,
+        2,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "版本→重试→覆盖；原文依据（a-apiread）：“GET /order/8899/status → 200 {\"status\": \"shipping\"}  12:03:11”",
+        "事件与写审计；原文依据（a-msgtrace）：“同订单业务版本v2 shipping、v3 shipped、v4 delivered依次提交，生产记录带该版本。扩容后轮询到不同RabbitMQ队列；v2首次通知超时并重投，v4先写，v2在12:03:05完成。”",
+        "原子版本及副作用；原文依据（a-msgtrace）：“12:06对账任务读取订单库v4并补发，缓存恢复；不是无原因自己变回。时间戳经过事件ID/版本和写入确认关联，不仅凭不同机器最早日志判乱序。”",
+        "最终正确仍曾旧写；原文依据（a-impact）：“14单集中在短时多次变更；12:03时即使重开App也仍旧，12:06后刷新才恢复。重开只是重新读当时服务数据，不能当作数据未损坏或客户端清白的证明。”",
+        "源库/MQ/Redis/App；原文依据（scene.architecture）：“订单服务 → MQ(状态变更事件, 至少一次投递) → 推送服务 → Redis(最新状态) → App 轮询展示”",
+        "重推掩盖下一次回退；原文依据（a-fixseq）：“同实体路由键和有序消费约束减少乱序；独立重试队列会绕开原顺序，不能声称它还能严格保证实体顺序。缓存采用原子业务版本比较；外部notify用独立幂等键，分别验证丢弃旧状态和保留必要副作用。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-apiread",
+            "a-msgtrace",
+            "a-codepush",
+            "a-orderstate",
+            "a-redislog"
+          ],
+          "cost": 8
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-orderstate",
+            "a-redislog",
+            "a-codepush",
+            "a-msgtrace",
+            "a-apiread"
+          ],
+          "cost": 8
+        }
+      ],
+      "expectedConfirmed": [
+        "h-order"
+      ],
+      "review": "人工裁定8⚡（原6漏源库和Redis反证）。三维L3而中位数2.5向下L2；补对账恢复制造者，去掉至少一次必乱序和状态枚举递增即通用版本论。",
+      "sources": [
+        "https://www.rabbitmq.com/docs/queues#message-ordering",
+        "https://redis.io/docs/latest/develop/programmability/eval-intro/"
+      ],
+      "noise": [
+        {
+          "title": "通知图标失败",
+          "text": "[WARN] delivery icon 404；App控制台同时上报。",
+          "closeActionId": "a-apiread",
+          "closure": "图标请求不改变状态JSON；故障时API明确返回shipping，Redis写审计可独立复核。"
+        }
+      ]
+    },
+    {
+      "id": "false-lead",
+      "file": "app/data/cases/false-lead.ts",
+      "chapter": "concurrency",
+      "order": 4,
+      "originalHash": "cf51826ce0a328e433debe5aaae9d34a4b492676204de69d9d9596e0810859b2",
+      "originalDifficulty": 3,
+      "originalExpertCost": 6,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "88a45d27a5d6400717c59b63e32767584534a9ca15df4d725b195986d8b34087",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "多目标正常→阶段分解→全局预算→隔离因果链；原文依据（a-connpool）：“共享Agent配置maxSockets=50/每origin，maxTotalSockets=50/总量。快照广告48活动socket、推荐2，总50；推荐新请求在Agent.requests中等待，不是排在推荐服务内部。”",
+        "活动归属与局部QPS量化模型；原文依据（a-connpool）：“共享Agent配置maxSockets=50/每origin，maxTotalSockets=50/总量。快照广告48活动socket、推荐2，总50；推荐新请求在Agent.requests中等待，不是排在推荐服务内部。”",
+        "Node Agent每origin/总量领域机制；原文依据（a-connpool）：“Node按origin分池，未设置全局总上限时，广告用满自己50不会自动占掉推荐50。这里是显式总预算导致争用。”",
+        "告警目标正常而实际是另一目标占本机资源；原文依据（a-rec）：“推荐已到达请求P99约45ms；失败trace的3秒主要发生在分配socket前，尚未到推荐端。独立直连同一推荐目标正常。对端零告警不是充分证明，关键是本次失败尚未发送。”",
+        "本机执行器与三个远端服务跨系统关联；原文依据（scene.architecture）：“App → 搜索服务(同时调推荐/广告/ES) → 推荐服务 + 广告服务 + ES”",
+        "重启只暂时重置连接；原文依据（a-restartsvc）：“滚动重启释放连接池 + 杀掉广告服务的长请求。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-rec",
+            "a-connpool",
+            "a-ad",
+            "a-es",
+            "a-separate"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-rec",
+            "a-es",
+            "a-ad",
+            "a-separate",
+            "a-connpool"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-pool"
+      ],
+      "review": "人工裁定7⚡（原6、旧链5遗漏ES和隔离证据）；改正Node每origin分池及4500需求算术，序列化清除旧重复对象键；量化、链式归因、反向直觉及跨系统四维L3，中位数3，保留L3。",
+      "sources": [
+        "https://nodejs.org/docs/latest-v18.x/api/http.html#agentmaxsockets",
+        "https://nodejs.org/docs/latest-v18.x/api/http.html#agentmaxtotalsockets"
+      ],
+      "noise": [
+        {
+          "title": "指标采集失败",
+          "text": "[WARN] recommendation dashboard scrape retry=1。",
+          "closeActionId": "a-rec",
+          "closure": "面板采集失败不等于推荐业务慢；独立直连与业务trace已确认45ms以及失败请求尚未发送。"
+        },
+        {
+          "title": "DNS重试",
+          "text": "[WARN] optional telemetry DNS retry=1。",
+          "closeActionId": "a-ad",
+          "closure": "此解析是遥测域名，不是广告/推荐host；当前两者的请求目标与解析均正确。"
+        },
+        {
+          "title": "ES归档延期",
+          "text": "[WARN] ES audit retention task delayed。",
+          "closeActionId": "a-es",
+          "closure": "归档任务没有占用本搜索索引；该索引实际请求12ms，本机等待发生在socket分配之前。"
+        }
+      ]
+    },
+    {
+      "id": "pool-deadlock",
+      "file": "app/data/cases/pool-deadlock.ts",
+      "chapter": "concurrency",
+      "order": 5,
+      "originalHash": "e94d8d05820b1380d0db6ac89035965f861255456efd077d21256fd670d8f10d",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "06111124774ab2e7f587e80e1144d21765661921d29bcc5dcf71a7d12c8c55cb",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        3,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "归属→资源环→交错；原文依据（a-stacktrace）：“全量关联：8个父worker各submit4个子任务到同一固定8线程池，再Future.get；32子任务在队列。父任务等待的位置还未调用DB/借连接，排除SQL锁或借连接等待。”",
+        "全栈/队列/barrier；原文依据（a-stacktrace）：“全量关联：8个父worker各submit4个子任务到同一固定8线程池，再Future.get；32子任务在队列。父任务等待的位置还未调用DB/借连接，排除SQL锁或借连接等待。”",
+        "执行器资源饥饿；原文依据（a-stacktrace）：“形成资源等待环：父占全部worker→等子结果→子等worker；不是Java monitor锁的循环。”",
+        "无monitor锁也死锁；原文依据（a-impact）：“8个运行worker均为父任务A~H；32个排队任务均为它们等待的子任务。资源归属提示池饥饿，单父正常是线索，不保证少于8在所有代码结构都不死锁。”",
+        "调度器到任务执行器；原文依据（scene.architecture）：“报表调度器 → 线程池(8 workers, 无界队列) → 聚合任务(可拆分子任务并行) → DB”",
+        "串行回滚牺牲吞吐；原文依据（a-danger）：“串行版上线，卡死消失。代价：报表耗时从 2 分钟回到 7 分钟。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-stacktrace",
+            "a-repro",
+            "a-queuecfg"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-queuecfg",
+            "a-repro",
+            "a-stacktrace"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-selfwait"
+      ],
+      "review": "人工裁定5⚡（原4、旧链5但漏队列反证）。32子任务与8×4对齐，确定复现依赖barrier，纠正allOf再join就异步及Future等待>0告警。",
+      "sources": [
+        "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html",
+        "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/CompletableFuture.html"
+      ],
+      "noise": [
+        {
+          "title": "报表缩略图失败",
+          "text": "[WARN] report thumbnail fetch 404。",
+          "closeActionId": "a-queuecfg",
+          "closure": "缩略图由独立任务访问，32个等待子任务未到该步骤；内存稳定和Future归属说明不是该图像请求占满执行器。"
+        }
+      ]
+    },
+    {
+      "id": "lock-expiry",
+      "file": "app/data/cases/lock-expiry.ts",
+      "chapter": "concurrency",
+      "order": 6,
+      "originalHash": "b5db568d29dba28101984e643dbdbdfe13c8766a5313ec72982faf59b2ec6cb5",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "af4bafea8618ac9c37b4d41ad39a40a6a6be7ba6349c88b895081184147f8e33",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        3,
+        2,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "租约→完成标记→写边界；原文依据（a-ttlmath）：“锁命令SET key unique-token NX EX30，无续期；Redis服务端审计同周期A获锁、30秒后过期、35秒B获锁。A任务仍执行且周期未标DONE，B检查未完成继续执行。”",
+        "服务端命令和有效区间；原文依据（a-ttlmath）：“锁命令SET key unique-token NX EX30，无续期；Redis服务端审计同周期A获锁、30秒后过期、35秒B获锁。A任务仍执行且周期未标DONE，B检查未完成继续执行。”",
+        "租约/fencing/幂等；原文依据（a-ttlmath）：“此前20秒完成可先写DONE；2分钟长尾本就有风险，不是增长后30秒才突然变成短于2分钟。”",
+        "锁存在不保证执行权；原文依据（a-impact）：“事故 1：A T+0 获锁执行 → B T+34s 获锁”",
+        "调度/Redis/外部账务；原文依据（scene.architecture）：“每小时同周期任务投递3实例；抢锁失败者每5s重试，获锁后检查周期完成标记；Redis租约；账务外部写入。”",
+        "暂停入账影响业务；原文依据（a-danger）：“调度暂停，账务系统冻结对客入账；2,131 笔重复流水进入冲正流程。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-ttlmath",
+            "a-releasecheck",
+            "a-clockcheck"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-clockcheck",
+            "a-releasecheck",
+            "a-ttlmath"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-ttl"
+      ],
+      "review": "人工裁定5⚡（原4、旧链5遗漏时钟反证），必要续期排除合入同一锁审计；纠正30秒覆盖2分钟、T300误删T35已过期锁、看门狗保证互斥。六维中位数2.5向下L2。",
+      "sources": [
+        "https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/"
+      ],
+      "noise": [
+        {
+          "title": "财务附件重试",
+          "text": "[WARN] settlement PDF archive upload retry。",
+          "closeActionId": "a-clockcheck",
+          "closure": "附件任务不修改Redis锁或账务业务键；服务端租约命令在上传重试期间仍有完整记录。"
+        }
+      ]
+    },
+    {
+      "id": "threadlocal-leak",
+      "file": "app/data/cases/threadlocal-leak.ts",
+      "chapter": "concurrency",
+      "order": 7,
+      "originalHash": "e30cf787dcbf86fdf59fb7477d973804af19b7c744cf33a990df2c0a6bd70b3c",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "0a13f2897b31c21df9c074c73b84afcf0daf3df7582065acba1091d23f1b9f3d",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        3,
+        2,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "前情→覆盖→复现；原文依据（a-tlexamine）：“实际过滤器：UserContext.set(userId); chain.doFilter(...); UserContext.remove(); // remove只在正常返回时执行，未放finally”",
+        "身份/worker/代码序列；原文依据（a-tlexamine）：“实际过滤器：UserContext.set(userId); chain.doFilter(...); UserContext.remove(); // remove只在正常返回时执行，未放finally”",
+        "ThreadLocal生命周期；原文依据（a-tlexamine）：“前请求B抛异常由外层错误处理映射，remove被跳过；后请求A转到/internal/address-query，因排除规则不执行set，但公共组件读取旧B。”",
+        "非null也可能错身份；原文依据（a-impact）：“例 1：串数据前 1.2s，同线程（tomcat-042）刚处理过一个抛异常的请求（NPE 日志）”",
+        "网关/路由/worker/缓存；原文依据（scene.architecture）：“已认证网关把/my/address转到用户服务/internal/address-query；Tomcat复用worker；该内部路径被身份ThreadLocal过滤器排除，却仍调用UserContext读取身份。”",
+        "下线上下文大改动；原文依据（a-danger）：“上下文机制下线，全部改回显式传参——代码改动面 40 个文件，回滚包紧急发布。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-tlexamine",
+            "a-threadreplay",
+            "a-cachekey",
+            "a-gatewaylog",
+            "a-asyncshare"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-gatewaylog",
+            "a-cachekey",
+            "a-asyncshare",
+            "a-threadreplay",
+            "a-tlexamine"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-threadlocal"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5冒称排错全查）；补漏set必要条件、改正afterCompletion和HTTP指定线程论、null检查不识别旧身份。",
+      "sources": [
+        "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/lang/ThreadLocal.html",
+        "https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/HandlerInterceptor.html"
+      ],
+      "noise": [
+        {
+          "title": "头像CDN失败",
+          "text": "[WARN] profile avatar CDN 404；客服截图里还有此条。",
+          "closeActionId": "a-cachekey",
+          "closure": "头像资源与地址数据JSON是独立请求；地址缓存实际按B主体查addr:B，不能由图片404解释。"
+        }
+      ]
+    },
+    {
+      "id": "pool-rejection",
+      "file": "app/data/cases/pool-rejection.ts",
+      "chapter": "concurrency",
+      "order": 8,
+      "originalHash": "506dcc7b29f5c023eed7f1e79881dec745ecf3f15437b545e09379e6c5e7c8e2",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "49428624a9d0283e9cb9146f225d225894d00e5c097519e9a0c7a7d682f8e07b",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        3,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "缺口→提交分支→受理；原文依据（a-rejectaudit）：“实际代码：try { executor.submit(task); } catch(RejectedExecutionException e) { log.debug(\"submit failed\",e); }”",
+        "满池回放和任务ID；原文依据（a-rejectaudit）：“实际代码：try { executor.submit(task); } catch(RejectedExecutionException e) { log.debug(\"submit failed\",e); }”",
+        "拒绝与可靠受理；原文依据（a-rejectaudit）：“return \"已受理\"; // return在catch之后，两条分支都返回受理”",
+        "零ERROR不等于接受；原文依据（a-impact）：“缺口集中在短时高峰；分钟采样水位有时不足100%也不能排除采样间瞬时满。现有指标缺少attempted/accepted/rejected，先从具体订单与提交代码核对，不能把“线程池健康”当事实。”",
+        "线程池到业务放行；原文依据（scene.architecture）：“下单 → 提交风控预检任务(线程池: 8 线程 + 1000 队列, AbortPolicy) → 立即返回\"已受理\" → 异步出结果”",
+        "CallerRuns转移负载；原文依据（a-danger）：“在executor未shutdown时CallerRuns可让拒绝任务在调用线程运行，形成背压；shutdown时默认CallerRuns会丢弃，不保证所有情况零丢。同步执行会转移CPU/时延到下单，必须按期限和吞吐验证，不能直接承诺300ms或25%下降。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-rejectaudit",
+            "a-policycheck",
+            "a-watermark",
+            "a-timeoutcheck",
+            "a-callbackcheck"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-policycheck",
+            "a-timeoutcheck",
+            "a-callbackcheck",
+            "a-watermark",
+            "a-rejectaudit"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-reject"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5漏超时/回调）；修正catch返回位置、888.9/s算术、3.8小时与120000/日冲突、CallerRuns无条件保证及同分钟三账误判。",
+      "sources": [
+        "https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html"
+      ],
+      "noise": [
+        {
+          "title": "指标外送重试",
+          "text": "[WARN] metrics exporter retry；风控日志同时出现。",
+          "closeActionId": "a-watermark",
+          "closure": "exporter为独立进程，不使用预检worker池；理论缺口来自1200/s输入和9ms持有，满池回放未依赖指标外送。"
+        }
+      ]
+    },
+    {
+      "id": "callback-mismatch",
+      "file": "app/data/cases/callback-mismatch.ts",
+      "chapter": "concurrency",
+      "order": 9,
+      "originalHash": "e80a183cfafb62652589f01b250d9bd4141c19df1114add7f034c1d354faa4ec",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "b0c35ab86123bdc1122f01a566ef813cb98bdf6197d74a90ce4fcf8f345bc804",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        3,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "批次→执行顺序→受控完成；原文依据（a-closureread）：“旧路径实际代码：”",
+        "真实入口组合及Promise对照；原文依据（a-closureread）：“旧路径实际代码：”",
+        "JS闭包与迭代绑定；原文依据（a-closureread）：“for(var r of batch) {”",
+        "低总体率掩盖确定分支；原文依据（a-impact）：“12个旧批次各有A/B两请求，A附件发送给B；其他5976次使用独立上下文。批次内关联是线索，不能由12个样本声称跨批永远不会发生。”",
+        "render到投递上下文；原文依据（scene.architecture）：“导出请求 → 任务池(并发 50) → 报表生成回调 → 邮件服务(按请求携带的收件人发送)”",
+        "串行回滚影响吞吐；原文依据（a-danger）：“错配归零。代价：高峰导出排队 20 分钟，财务月结期间投诉上升。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-closureread",
+            "a-repro",
+            "a-mapcheck",
+            "a-maillog",
+            "a-formcheck"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-formcheck",
+            "a-maillog",
+            "a-mapcheck",
+            "a-repro",
+            "a-closureread"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-closure"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5漏邮件/表单），修正延迟render伪码无法解释A附件、0.2%与81/1000分母及owner==recipient无效授权断言。",
+      "sources": [
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Closures",
+        "https://tc39.es/ecma262/multipage/ecmascript-language-statements-and-declarations.html#sec-for-in-and-for-of-statements"
+      ],
+      "noise": [
+        {
+          "title": "邮件缩略图失败",
+          "text": "[WARN] attachment preview thumbnail 404。",
+          "closeActionId": "a-maillog",
+          "closure": "邮件入口收到的附件ID与邮箱已错配，缩略图是投递后的展示资源，不会重新组合附件和信封。"
+        }
+      ]
+    },
+    {
+      "id": "mq-lost",
+      "file": "app/data/cases/mq-lost.ts",
+      "chapter": "messaging",
+      "order": 1,
+      "originalHash": "7baf3f96608d3a3d6bf65be015e8372fa666de97f0963939fea1180aac3bb3a7",
+      "originalDifficulty": 1,
+      "originalExpertCost": 5,
+      "originalPathCost": 2,
+      "status": "calibrated",
+      "calibratedHash": "3766f9d60223bb5a0b4f64c5917f131cc2bb5953cc89a548b487f00cec5a4677",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "同批ID→两处丢失窗口；原文依据（a-confirmcheck）：“Node amqplib使用createChannel而非createConfirmChannel，无confirm回调或waitForConfirms；publish boolean只表示客户端背压。false也不是投递失败，应等待drain；true更不是持久化成功。”",
+        "唯一ID账本与重启关联；原文依据（a-durablecheck）：“队列durable:false，消息persistent:false；重启会丢该队列及尚未消费的瞬态消息。即使publisher confirm收到，也不使非持久化消息自动跨重启保留。”",
+        "confirm/route/persistence语义；原文依据（a-durablecheck）：“本案可靠性缺陷包含成功边界和重启保留两项，不能把持久化这个真实缺口另标为假根因。”",
+        "true不等于可靠送达；原文依据（a-impact）：“固定10000条唯一业务ID，应用都宣称成功；消费结果9700，缺300。按ID而非混合日计数关联，暂不从“没收到”推断到底丢在哪一段。”",
+        "发送端/Broker/消费者；原文依据（scene.architecture）：“库存服务(生产者) → RabbitMQ(exchange→queue) → 物流服务(消费者)”",
+        "热改durable可能属性冲突；原文依据（a-rollbackmq）：“回滚前先核对队列声明兼容性；同名队列从durable:false直接声明为true会发生属性不等价错误，不能仅热改配置承诺恢复。迁移需处理已有队列和待重发意图，并验证新流量确认。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-confirmcheck",
+            "a-durablecheck",
+            "a-msgcount",
+            "a-brokerlog",
+            "a-routecheck",
+            "a-ackcheck"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-ackcheck",
+            "a-routecheck",
+            "a-msgcount",
+            "a-durablecheck",
+            "a-confirmcheck",
+            "a-brokerlog"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-confirm",
+        "h-durable"
+      ],
+      "review": "人工裁定7⚡（原5、重复动作旧链仅2）。SDK统一amqplib、L1升L2；重建一次崩溃3%而非每天固定3%，区分confirm背压/路由/持久化，消除多真因却false。",
+      "sources": [
+        "https://amqp-node.github.io/amqplib/channel_api.html",
+        "https://www.rabbitmq.com/docs/confirms",
+        "https://www.rabbitmq.com/docs/queues#queue-properties"
+      ],
+      "noise": [
+        {
+          "title": "管理页图标失败",
+          "text": "[WARN] RabbitMQ console favicon 404。",
+          "closeActionId": "a-routecheck",
+          "closure": "图标请求不进入AMQP交换机或队列，业务路由重放与该静态资源失败独立。"
+        }
+      ]
+    },
+    {
+      "id": "mq-duplicate",
+      "file": "app/data/cases/mq-duplicate.ts",
+      "chapter": "messaging",
+      "order": 2,
+      "originalHash": "cbfc98fb1aeb040d0dd1f776ee533713385c6e4f78597ad025a94299684397ba",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "calibrated",
+      "calibratedHash": "08ef5e80cd08cb0851a73bf8ea1c21b726a7847a81f5d525482f765b6f962810",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        3,
+        2,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "交易→入队→delivery→提交；原文依据（a-paylog）：“订单 P20260929001 在支付服务只有一次支付请求（11:01:58，带防重令牌）。”",
+        "channel/连接与业务关联；原文依据（a-logcheck）：“同一入队事件/P1：11:02:11首次开始，17.2秒业务副作用已提交；17.3秒连接关闭，ack未到Broker。19秒重投；第二次完成后ack帧在中断网络未到Broker，45秒连接失效被关闭，47秒第三投递。”",
+        "ack及跨系统副作用；原文依据（a-logcheck）：“RabbitMQ消费者basic.ack通常是单向方法，没有“等Broker回ack确认超时”的二次确认。这里是连接关闭仍有unacked导致重投，8/28秒来自具体断线/重连，不是Broker内置指数退避。”",
+        "处理成功仍会重投；原文依据（a-impact）：“同一支付业务键出现2~3次流水和短信意图。8秒/28秒间隔只是形状，用户也可能隔秒重试，不能单靠间隔排除付款重复。需要相同键与Broker投递关联。”",
+        "Broker/业务DB/短信；原文依据（scene.architecture）：“RabbitMQ同一工作队列→2个竞争消费者→本地流水和短信投递；单支付业务键P1，副作用各自不幂等。”",
+        "停消费增加积压；原文依据（a-rollback）：“消费者暂停，积压消息暂存队列；财务按对账名单冲正多记流水，补发安抚短信。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-paylog",
+            "a-publish",
+            "a-topology",
+            "a-logcheck",
+            "a-idemsearch"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-topology",
+            "a-paylog",
+            "a-publish",
+            "a-idemsearch",
+            "a-logcheck"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-redeliver"
+      ],
+      "review": "人工裁定7⚡（原4），补付款/拓扑反证；移除RabbitMQ消费ack等待Broker确认、内置8/28s退避及messageId自动幂等假象。",
+      "sources": [
+        "https://www.rabbitmq.com/docs/confirms",
+        "https://www.rabbitmq.com/docs/reliability"
+      ],
+      "noise": [
+        {
+          "title": "模板预览失败",
+          "text": "[WARN] SMS template preview image 404。",
+          "closeActionId": "a-logcheck",
+          "closure": "预览图不创建短信投递意图或业务流水；三次同P1提交与连接关闭已独立关联。"
+        }
+      ]
+    },
+    {
+      "id": "mq-dlq",
+      "file": "app/data/cases/mq-dlq.ts",
+      "chapter": "messaging",
+      "order": 3,
+      "originalHash": "b1deb4a3a56be4c6dea7cb3512f8e6b34c6cd49d0e5f2fbfed05b6434177c403",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "837f507778697564642424a683080433165e25a66b587e965b9916a402eb4c7e",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "快照→样例→兼容对照；原文依据（a-sample）：“不同日期样例为ValidationError: pushTemplateId Field required；旧基线样例是手机号格式无效。JSON文本可正常解析，缺业务必填字段不是JSONDecodeError。样例说明字段校验方向，不代表全部80412条同死因。”",
+        "分层样本与累计账；原文依据（a-version）：“Python消费schema新增pushTemplateId必填，上游旧合法消息无此字段。受控旧消息在旧消费者可处理、新版在字段校验拒绝；仅提供兼容映射或撤销新增必填后同输入通过。”",
+        "schema/DLX领域机制；原文依据（a-version）：“这支持契约破坏，不以第一个错误日志或单次版本相关性判根因。”",
+        "主队列正常仍隔离失败；原文依据（a-impact）：“快照累计80412：前4天历史基线共480；D-17跳变9800；随后16天共70132（约4383/天），合计80412。时间单位与总量一致。”",
+        "生产契约/消费/通道/治理；原文依据（scene.architecture）：“订单服务 → MQ(订单通知) → 通知消费者(发短信/Push) —失败重试3次→ 死信队列 DLQ（无消费者、无监控）”",
+        "回放可能过期或重复；原文依据（a-rollback）：“回滚到旧版消费者（无新字段校验），增量通知恢复发送，DLQ 停止增长。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-sample",
+            "a-version",
+            "a-ratio",
+            "a-smslog",
+            "a-retry",
+            "a-monitor"
+          ],
+          "cost": 8
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-monitor",
+            "a-retry",
+            "a-smslog",
+            "a-ratio",
+            "a-version",
+            "a-sample"
+          ],
+          "cost": 8
+        }
+      ],
+      "expectedConfirmed": [
+        "h-format"
+      ],
+      "review": "人工裁定8⚡（原4、旧链5漏3类反证）。修复21/17天与80412总量、500条98.7%非整数、缺字段非JSON解码错误及重放条数不等于成功通知。",
+      "sources": [
+        "https://www.rabbitmq.com/docs/dlx",
+        "https://docs.pydantic.dev/latest/errors/errors/#error-messages"
+      ],
+      "noise": [
+        {
+          "title": "通道账单归档延期",
+          "text": "[WARN] SMS billing archive upload retry。",
+          "closeActionId": "a-smslog",
+          "closure": "账单归档是离线文件，字段校验失败消息尚未调用SDK；配额与请求阶段核验不依赖归档成功。"
+        }
+      ]
+    },
+    {
+      "id": "mq-delay",
+      "file": "app/data/cases/mq-delay.ts",
+      "chapter": "messaging",
+      "order": 4,
+      "originalHash": "c980a64596a75cd1e0ee6fa50f0e5b199012ddc8c9f50f2dddd585719baa5ac7",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "e5dd80fc2ba335fec39caa96767a305340c03ae789bbe30e3fe7f9463742e762",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        2,
+        3
+      ],
+      "dimensionEvidence": [
+        "多时刻→变偏差→重复扣除机制；原文依据（a-queuelog）：“三个记录delayMs为1020000/1320000/1500000（17/22/25分钟），dueAt为18:47/18:52/18:55；正确剩余均1800000。MQ是在对应dueAt后收到，提前已发生在调度字段。”",
+        "提前量与elapsed函数对账；原文依据（a-tzaudit）：“实际代码：const remaining = targetEpoch - nowEpoch;”",
+        "epoch/持续时间领域机制；原文依据（a-tzaudit）：“const delayMs = remaining - (nowEpoch - createdEpoch);”",
+        "时区看似可疑但三个epoch正确；原文依据（a-impact）：“同目标19:00、同写表18:30：创建18:17→执行18:47（提前13）；18:22→18:52（提前8）；18:25→18:55（提前5）。提前量恰等于写表前已经经过的13/8/5分钟。变化形状提示输入依赖，不足以单独排除任何机器漂移。”",
+        "调度表到消息投递两跳；原文依据（scene.architecture）：“运营创建活动→延迟服务写应用调度表dueAt→扫描dueAt<=now后发布MQ→开售执行器；时间统一为带时区解析后的epoch。”",
+        "只统一UTC看似正确却未修重复扣；原文依据（a-haltdeliver）：“延迟开售入口下线，未执行的活动转人工定时；队列中未到期消息全部废弃重建。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-queuelog",
+            "a-tzaudit",
+            "a-poller",
+            "a-ntp",
+            "a-settime"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-settime",
+            "a-ntp",
+            "a-poller",
+            "a-queuelog",
+            "a-tzaudit"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-tz"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5却遗漏queuelog/多项排错）；原时区因果无法产生不定分钟偏差，重建可复算重复扣elapsed机制。四维L3保留L3。",
+      "sources": [
+        "https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-date.parse",
+        "https://docs.python.org/3/library/datetime.html#datetime.timedelta"
+      ],
+      "noise": [
+        {
+          "title": "日历资源失败",
+          "text": "[WARN] activity calendar icon 404。",
+          "closeActionId": "a-settime",
+          "closure": "图标不改变提交的带偏移目标字符串，业务确认与epoch已核对。"
+        },
+        {
+          "title": "指标投递重试",
+          "text": "[WARN] scheduler metrics export retry。",
+          "closeActionId": "a-queuelog",
+          "closure": "调度表dueAt已从数据库快照取得，外送指标不参与delay公式或更新dueAt。"
+        },
+        {
+          "title": "通知附件重试",
+          "text": "[WARN] campaign notice attachment retry。",
+          "closeActionId": "a-poller",
+          "closure": "附件任务独立，扫描谓词只看已写dueAt；它不提前发布活动消息。"
+        }
+      ]
+    },
+    {
+      "id": "mq-slowpart",
+      "file": "app/data/cases/mq-slowpart.ts",
+      "chapter": "messaging",
+      "order": 5,
+      "originalHash": "c7f000a2910a69cbe7b5f40b386f9b3944d34b784250d4d840db1a009f1c545b",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "86650334d47ab1b507a06143c834da3aa95388543168dfe70afd04212aa318cc",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "局部/全局→成本分布→顺序等待；原文依据（a-skewstat）：“按同一窗口入队消息数量和key分布核对，16分区无显著量倾斜；但类型/耗时倾斜确实存在。排除“只有消息数量过多”的解释，不把数量均匀当内容也均匀。”",
+        "服务时间加权与积压模型；原文依据（a-handlereval）：“正常handler持有约0.48s（含I/O）；慢4分区每250条中1条人工审核约480s，无期限；同分区后续不启动。阻塞栈在风控HTTP，非fetch或CPU。”",
+        "分区串行领域机制；原文依据（a-handlereval）：“本案单分区串行处理造成应用队头阻塞，不把所有Kafka客户端都描述成Broker强制等业务回调才允许后续读取。”",
+        "CPU闲却长审核占进度；原文依据（a-impact）：“消息数量各分区偏差<6%，但慢4分区约0.4%触发8分钟人工审核，其余分区该类型接近0。局部下降80%，按4/16权重只导致全局下降约20%；不能在12/16正常且均量时说全局掉80%。”",
+        "Kafka/handler/风控与业务待审；原文依据（scene.architecture）：“Kafka16分区，应用明确按分区单任务串行处理；8实例×2处理线程，按分区追踪分配；handler同步等待风控结果。”",
+        "回滚审核会改变业务承诺；原文依据（a-rollbackmq）：“不能擅自把事前风控改成事后补审并当订单通过。止血可对待审核订单明确挂起、限制进入该路径，保留业务审核承诺；任何临时放行需业务明确接受风险。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-skewstat",
+            "a-conccfg",
+            "a-brokerio",
+            "a-handlereval",
+            "a-poisoncount"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-brokerio",
+            "a-conccfg",
+            "a-skewstat",
+            "a-poisoncount",
+            "a-handlereval"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-slowcall"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5漏并发/Broker反证）。重建250条/480秒自洽模型，局部五分之一与全局八成分开；不擅自事后风控。四维L3，中位数3，L2升L3。",
+      "sources": [
+        "https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html"
+      ],
+      "noise": [
+        {
+          "title": "归档文件失败",
+          "text": "[WARN] Kafka audit archive upload retry。",
+          "closeActionId": "a-brokerio",
+          "closure": "归档外送不在故障fetch路径，慢trace已经取得消息后才等待风控。"
+        },
+        {
+          "title": "监控标签缺失",
+          "text": "[WARN] consumer metrics label deprecated。",
+          "closeActionId": "a-conccfg",
+          "closure": "旧标签只影响展示命名，assignment与handler进度从消费者本身读取，16通道并未消失。"
+        },
+        {
+          "title": "通知图标失败",
+          "text": "[WARN] order notification thumbnail 404。",
+          "closeActionId": "a-skewstat",
+          "closure": "图像错误不改变消息入队数量/key；长审核类型与普通通知分开统计，不把图像404当量倾斜。"
+        }
+      ]
+    },
+    {
+      "id": "partition-split",
+      "file": "app/data/cases/partition-split.ts",
+      "chapter": "messaging",
+      "order": 5,
+      "originalHash": "075d2bf739e1a81e5e72570dfbbb1464694d732c4bfa2f990323b9b45480715b",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "calibrated",
+      "calibratedHash": "856176f626490bec33fa28f9b33bf46d3e726db984a1c8286e45b4a095bd1fb1",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "实体跨切换→路由→旧积压→投影；原文依据（a-rebalanceaudit）：“本案显式key分区算法positiveHash(key)%N；一个样本hash余24为19，则余12为7。均匀hash下12→24约一半落点不变、一半变为旧p+12，不是所有key都换家。”",
+        "hash余数与offset/业务序列对账；原文依据（a-rebalanceaudit）：“本案显式key分区算法positiveHash(key)%N；一个样本hash余24为19，则余12为7。均匀hash下12→24约一半落点不变、一半变为旧p+12，不是所有key都换家。”",
+        "分区路由领域机制；原文依据（a-rebalanceaudit）：“旧记录不会自动搬迁，新记录按新N定位，两分区各自有序仍无跨分区先后保证；该实体跨切换序列可乱序，不代表一定每次都会乱。”",
+        "扩容正常却打破实体顺序；原文依据（a-impact）：“同keyK的支付事件14:00前写p7/offset801，仍积压；14:02发货按新分区数写p19/offset5且先完成，14:06才处理p7旧事件。同事件ID无双发。跨分区offset不能直接比较大小，应关联实体业务序列。”",
+        "生产/Broker/消费者/投影；原文依据（scene.architecture）：“订单服务 → 订单事件 topic(原 12 分区, key=orderId, 分区内 FIFO) → 状态服务(按事件顺序维护订单状态机) ｜ 大促扩容: 分区 12→24, 消费者 6→12”",
+        "缩分区/双写看似回退但不保证；原文依据（a-danger）：“Kafka标准分区管理不能把已增加分区直接减回12；该调用会被拒绝，不是自动第二次重排。若删除/新建主题或改自定义路由则是另一次迁移，存在数据和顺序风险，不能把它冒充简单回滚。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-rebalanceaudit",
+            "a-consumerspeed",
+            "a-producercheck",
+            "a-ordercheck"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-ordercheck",
+            "a-producercheck",
+            "a-consumerspeed",
+            "a-rebalanceaudit"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-resplit"
+      ],
+      "review": "人工裁定6⚡（原4）补生产/源序列反证；纠正所有key重排、Kafka缩分区、6→12必须24及时间戳重放/无差别丢旧增量。五维L3保留L3。",
+      "sources": [
+        "https://kafka.apache.org/41/documentation/#basic_ops_modify_topic",
+        "https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html"
+      ],
+      "noise": [
+        {
+          "title": "控制台预览失败",
+          "text": "[WARN] topic console diagram preview unavailable。",
+          "closeActionId": "a-impact",
+          "closure": "分区/offset来自实际记录元数据，不依赖控制台示意图渲染。"
+        },
+        {
+          "title": "旧审计格式告警",
+          "text": "[WARN] producer audit formatter deprecated。",
+          "closeActionId": "a-producercheck",
+          "closure": "审计字段虽标记旧格式，事件ID和单一Broker落点仍完整；格式告警不等于业务事件双发。"
+        },
+        {
+          "title": "指标外送重试",
+          "text": "[WARN] consumer metrics push retry。",
+          "closeActionId": "a-consumerspeed",
+          "closure": "分区内offset顺序取自处理提交审计；指标外送不修改消费顺序。"
+        }
+      ]
+    },
+    {
+      "id": "mq-bus-review",
+      "file": "app/data/cases/mq-bus-review.ts",
+      "chapter": "messaging",
+      "order": 6,
+      "originalHash": "00defca6843820aad56f55335fc49e6e081009eeab52a1fbd5f4da48d804f128",
+      "originalDifficulty": 3,
+      "originalExpertCost": 8,
+      "originalPathCost": 6,
+      "status": "calibrated",
+      "calibratedHash": "3ab986f91e0473e4d89824e60d41c8f4d72fa9cca9f6d1ef798cab4394c3fbd5",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "合同基数→拓扑→顺序/恢复；原文依据（a-orderproof）：“同group的assignment按分区分摊：库存只领部分，分析领另一部分，双方各缺事件。另因null key，同订单事件可分散分区，独立处理不提供实体顺序。”",
+        "1600与100交付模型；原文依据（a-orderproof）：“同group的assignment按分区分摊：库存只领部分，分析领另一部分，双方各缺事件。另因null key，同订单事件可分散分区，独立处理不提供实体顺序。”",
+        "Kafka组/offset领域机制；原文依据（a-orderproof）：“用独立group满足各业务交付，按需key=orderId并定义生产、分区内处理和重试顺序；一个key本身不保证消费者任意并发也有序。”",
+        "总线化反而让业务漏订阅；原文依据（a-impact）：“合同要求每个订阅方各处理同100事件，即1600份交付；草案相同group实际每条记录分给组内一个消费者，合计约100份而非1600。”",
+        "发布/16业务/Broker进度；原文依据（scene.architecture）：“Kafka order-events（16分区、无key）；16个不同业务下游都要独立订阅，但草案统一group.id=order-subscribers；失败3次后commit offset丢弃。”",
+        "同group省管理及先commit看似便利；原文依据（a-approve）：“原稿直接发布会违反已知交付份数和恢复承诺；具体事故数量与发生日未验证，不能写成双11预演已发生。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-orderproof",
+            "a-slowprobe",
+            "a-schemaprobe",
+            "a-dropprobe"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-dropprobe",
+            "a-schemaprobe",
+            "a-slowprobe",
+            "a-orderproof"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-ordering"
+      ],
+      "review": "人工裁定7⚡（原8、旧链6却漏两类审查），把多个真缺陷误标false改成核心契约错配及三个可证伪误区；明确Kafka而非混合queue/group语义，保留L3。",
+      "sources": [
+        "https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html"
+      ],
+      "noise": [
+        {
+          "title": "评审图标失败",
+          "text": "[WARN] event bus diagram icon 404。",
+          "closeActionId": "a-impact",
+          "closure": "图标不是合同或Kafka元数据，100事件1600份需求已由业务原文确认。"
+        },
+        {
+          "title": "schema编辑器预览失败",
+          "text": "[WARN] schema editor preview font unavailable。",
+          "closeActionId": "a-schemaprobe",
+          "closure": "字体不改变schema字段/语义，二进制与JSON兼容规则仍按实际契约核验。"
+        },
+        {
+          "title": "审计外送延期",
+          "text": "[WARN] bus audit attachment upload retry。",
+          "closeActionId": "a-dropprobe",
+          "closure": "附件外送不回退已提交offset，失败恢复承诺不能依赖它自动重投。"
+        }
+      ]
+    },
+    {
+      "id": "rebalance-storm",
+      "file": "app/data/cases/rebalance-storm.ts",
+      "chapter": "messaging",
+      "order": 7,
+      "originalHash": "9ddc077f724d0dfcfffb57ebe2225c0f9494a77d2ed50dbce3155c6fbbf3d406",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "69a89bf97df11b0672535de853460d49e03314505720385c94ace9fc224c5dac",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "心跳/进度两时钟→成员协议→旧任务；原文依据（a-pollaudit）：“动态classic Java消费者在max.poll.interval内未继续poll，会因进度超时失去组成员资格；旧处理线程不会自动停止，迟到提交可能失败或副作用重复。”",
+        "批时长与期限矩阵；原文依据（a-pollaudit）：“动态classic Java消费者在max.poll.interval内未继续poll，会因进度超时失去组成员资格；旧处理线程不会自动停止，迟到提交可能失败或副作用重复。”",
+        "Kafka组进度领域机制；原文依据（a-pollaudit）：“本题慢批500条含2个160秒审核，加普通处理约40秒，总360秒>300。未提交记录可由新成员再取，不能把这叫Broker根据积压主动搬分区。”",
+        "仍有心跳却失去所有权；原文依据（a-impact）：“慢实例处理批期间，心跳在max.poll期限前仍有记录；最后poll到超期约300秒，客户端报告poll timeout并离组。其余实例poll<60秒。不是“仍有心跳所以必不能被移出”。”",
+        "worker/客户端/coordinator/副作用；原文依据（scene.architecture）：“Kafka Java classic协议，动态成员（无group.instance.id），eager RangeAssignor；24分区/6实例；max.poll.interval=300s、session.timeout=600s，Broker允许该范围。”",
+        "放宽期限延长停滞窗口；原文依据（a-danger）：“将max.poll放宽30分钟可能使当前6分钟批不再触发进度超时，但没有修复慢批或副作用重复；真正进程心跳消失仍按session检测，不能说它关闭了所有故障转移。放宽后的进度停滞窗口需明确承担。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-pollaudit",
+            "a-repro",
+            "a-sessioncfg",
+            "a-brokermove",
+            "a-deploylog"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-deploylog",
+            "a-brokermove",
+            "a-sessioncfg",
+            "a-repro",
+            "a-pollaudit"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-polltimeout"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5漏两项反证），固定classic动态协议；纠正10分钟周期与300秒、6×40=8%、N×P95硬预算及心跳绝不受GC影响。四维L3升L3。",
+      "sources": [
+        "https://kafka.apache.org/41/configuration/consumer-configs/#max.poll.interval.ms",
+        "https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html"
+      ],
+      "noise": [
+        {
+          "title": "监控推送告警",
+          "text": "[WARN] member metrics exporter retry。",
+          "closeActionId": "a-sessioncfg",
+          "closure": "指标上送失败不等于Kafka心跳失联，coordinator已有真实心跳和poll超期原因。"
+        },
+        {
+          "title": "旧日志格式提示",
+          "text": "[WARN] broker audit log format deprecated。",
+          "closeActionId": "a-brokermove",
+          "closure": "成员离组原因和topic元数据仍完整，日志格式提示不等于分区副本迁移。"
+        },
+        {
+          "title": "镜像报告重试",
+          "text": "[WARN] image scan report upload retry。",
+          "closeActionId": "a-deploylog",
+          "closure": "扫描附件上传不是Pod发布，窗口成员/进程记录没有滚动变更。"
+        }
+      ]
+    },
+    {
+      "id": "replay-surge",
+      "file": "app/data/cases/replay-surge.ts",
+      "chapter": "messaging",
+      "order": 7,
+      "originalHash": "730073ea2df993c95f712d943f00df5e51b51a0ee0c33a028a3c3ba5fd58653e",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "calibrated",
+      "calibratedHash": "28cd3118f8a132cbeb2d8afe6995072fd7ec4eb8b72650b1fea62d753ddcefda",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "候选/执行→业务权益→负载；原文依据（a-idemaudit）：“去重以msgId保留7天，候选92%超过7天；这只表示可能超出去重窗口，不等于92%都应处理或都重复。按稳定积分权益业务键关联人工和自动流水，确认27000已兑现；人工补发的不同msgId也必须归到同权益。”",
+        "账本基数与单位换算；原文依据（a-idemaudit）：“去重以msgId保留7天，候选92%超过7天；这只表示可能超出去重窗口，不等于92%都应处理或都重复。按稳定积分权益业务键关联人工和自动流水，确认27000已兑现；人工补发的不同msgId也必须归到同权益。”",
+        "幂等与任务恢复领域机制；原文依据（a-idemaudit）：“实际重复9900个业务键都有历史兑现记录，短期消息记录已无或不能关联人工补发，重放把历史当新任务。”",
+        "修复性重放引发二次事故；原文依据（a-impact）：“候选30000，已兑现27000；实际执行11000中重复9900×3=29700积分，81000是若全部重复候选再执行的潜在量。样本200条90%不能单独证明全量27000；本题该数来自兑付账本全量关联。”",
+        "消息/人工账本/权益/共享DB；原文依据（scene.architecture）：“积分平台：死信队列(3 万条积分发放失败消息) → 重放工具(批量推送) → 积分服务 → 积分 DB ｜ 同机群: 下单主链路”",
+        "全预插去重看似安全实则漏任务；原文依据（a-danger）：“中止后按实际11000执行ID对账，再评估29700重复积分的冲正/已用部分；没有依据声称回收72000。暂停减轻新增负载，恢复速度由当前队列与DB状态决定，不预先保证P99为300ms。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-idemaudit",
+            "a-dbnorm",
+            "a-stalecheck",
+            "a-fixverify"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-fixverify",
+            "a-stalecheck",
+            "a-dbnorm",
+            "a-idemaudit"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-idemwindow"
+      ],
+      "review": "人工裁定6⚡（原4、旧链4漏资格/修复反证）；统一11000实际执行、9900重复29700积分，81000只潜在；删除全预插已处理导致漏任务的错误修复，保留L3。",
+      "sources": [
+        "https://kafka.apache.org/41/javadoc/org/apache/kafka/clients/consumer/KafkaConsumer.html",
+        "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html"
+      ],
+      "noise": [
+        {
+          "title": "账单附件重试",
+          "text": "[WARN] points statement attachment upload retry。",
+          "closeActionId": "a-fixverify",
+          "closure": "附件失败不撤销已提交积分，本次11000执行与重复流水已独立核实。"
+        },
+        {
+          "title": "注销头像失败",
+          "text": "[WARN] user avatar tombstone image 404。",
+          "closeActionId": "a-stalecheck",
+          "closure": "图片404不自动决定权益失效，资格依据退款/账户与业务规则。"
+        },
+        {
+          "title": "查询指标外送延期",
+          "text": "[WARN] DB metrics archive delayed。",
+          "closeActionId": "a-dbnorm",
+          "closure": "给定预算与本地查询计数不依赖异步归档，消息速率仍需换算目标操作数。"
+        }
+      ]
+    },
+    {
+      "id": "mq-disk",
+      "file": "app/data/cases/mq-disk.ts",
+      "chapter": "messaging",
+      "order": 8,
+      "originalHash": "374ef1470c9ac763ee6a2af7b3709229b646f8a9681ba7eb1d6c6c9147de06f6",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "33c190fc34e903b33e3b94378b7282c3b54b6ee6948f4c1e1b0f355c9f36fd3d",
+      "difficulty": 3,
+      "dimensions": [
+        3,
+        3,
+        2,
+        3,
+        3,
+        2
+      ],
+      "dimensionEvidence": [
+        "物理账→配置层→扫描资格；原文依据（a-retentioncfg）：“应用expiresAt=3d只决定业务是否接受旧事件，不是Kafka原生TTL。Broker保留72h被topic显式retention.ms=-1覆盖，retention.bytes=-1，cleanup.policy=delete。”",
+        "空间/副本/净增/窗口对账；原文依据（a-retentioncfg）：“应用expiresAt=3d只决定业务是否接受旧事件，不是Kafka原生TTL。Broker保留72h被topic显式retention.ms=-1覆盖，retention.bytes=-1，cleanup.policy=delete。”",
+        "Kafka段保留领域机制；原文依据（a-retentioncfg）：“清理扫描正常运行，但没有满足保留条件的段被删除；不是Kafka默认保留无限，也不是必须另开自研删除任务。恢复保留后仍按segment/检查周期异步清理，不保证瞬时精确释放。”",
+        "配过业务TTL但日志保留无限；原文依据（a-impact）：“按全部副本物理空间同一口径：order-events约3.5TB，测试死信归档topic约3.2TB，其他约3.78TB，总日志约10.48；加系统/备份0.44约10.92TB。”",
+        "应用/Broker配置/物理存储；原文依据（scene.architecture）：“Kafka3 broker×4TB SSD（合计12TB）；消息业务expiresAt=3d；Broker默认保留72h，但topic模板显式retention.ms=-1/retention.bytes=-1。”",
+        "手删段可能损恢复；原文依据（a-danger）：“经业务owner确认后删除可废弃测试归档topic的3.2TB物理数据，理论占用10.92−3.2=7.72TB，即64.3%，不是62%。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-retentioncfg",
+            "a-volumetrend",
+            "a-dirusage",
+            "a-diskhealth",
+            "a-riskmodel"
+          ],
+          "cost": 7
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-diskhealth",
+            "a-dirusage",
+            "a-volumetrend",
+            "a-riskmodel",
+            "a-retentioncfg"
+          ],
+          "cost": 7
+        }
+      ],
+      "expectedConfirmed": [
+        "h-retention"
+      ],
+      "review": "人工裁定7⚡（原4、旧链5漏硬件/窗口）。重建12TB内10.92TB现场，纠正默认无限、TTL通用机制、page cache推断及删除后百分比；四维L3升L3。",
+      "sources": [
+        "https://kafka.apache.org/41/configuration/topic-configs/#retention.ms",
+        "https://kafka.apache.org/41/configuration/topic-configs/#cleanup.policy"
+      ],
+      "noise": [
+        {
+          "title": "备份通知重试",
+          "text": "[WARN] backup notifier webhook retry。",
+          "closeActionId": "a-dirusage",
+          "closure": "告警只是通知重试，实际目录中备份/其他仅0.44TB，不能替代10.48TB日志归属。"
+        },
+        {
+          "title": "标签弃用告警",
+          "text": "[WARN] topic metrics TTL label deprecated。",
+          "closeActionId": "a-volumetrend",
+          "closure": "旧指标标签不参与Kafka保留，写入/净增长按实际文件计数核对。"
+        },
+        {
+          "title": "监控面板资源失败",
+          "text": "[WARN] disk dashboard icon 404。",
+          "closeActionId": "a-diskhealth",
+          "closure": "图标404不是设备I/O故障，设备计数与平台限速原因可独立取得。"
+        }
+      ]
+    },
+    {
+      "id": "mq-dualwrite",
+      "file": "app/data/cases/mq-dualwrite.ts",
+      "chapter": "messaging",
+      "order": 9,
+      "originalHash": "409292e2e341a4eec2836c1fde6bf1d654ab346b32a56daa46ef5b01ba59a345",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "calibrated",
+      "calibratedHash": "ca3f844d6021c4636d7d2176215674316556bdc19ecb35749da0887ed3321b8b",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        3,
+        3
+      ],
+      "dimensionEvidence": [
+        "提交→控制流→恢复意图；原文依据（a-codeseq）：“代码：tx.commit(order);”",
+        "同键分支审计与定点复放；原文依据（a-codeseq）：“代码：tx.commit(order);”",
+        "outbox事务边界；原文依据（a-codeseq）：“if (requestDeadlineExpired()) return;”",
+        "GC不等于线程被杀；原文依据（a-impact）：“固定30个业务键：22进程退出、2OOM在commit后且send前；6个长GC后执行明确的deadline过期return分支。GC只是暂停诱因，直接跳过发送来自应用分支。受控故障注入可重现无消息意图状态。”",
+        "请求/DB/Broker/积分；原文依据（scene.architecture）：“下单服务：① DB 事务(订单落库) ② 发送 MQ(积分消息) → 积分消费者(幂等入账)”",
+        "同步外呼看似修一致性仍有双写窗；原文依据（a-danger）：“改同步积分调用不会自动原子：若仍先commit再调用，进程在二者之间退出照样漏；若先外呼后commit，又有外部完成而订单回滚风险。同步还耦合期限/容量，不能宣称漏发归零。”"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-codeseq",
+            "a-sendlog",
+            "a-brokercheck",
+            "a-consumerside"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-consumerside",
+            "a-brokercheck",
+            "a-sendlog",
+            "a-codeseq"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-gap"
+      ],
+      "review": "人工裁定6⚡（原4、旧链5漏消费者反证）。删重启频率×3ms伪概率，区分GC暂停与期限分支；纠正同步零漏、失败后补表无间隙和outbox跨系统exactly-once。",
+      "sources": [
+        "https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html",
+        "https://www.rabbitmq.com/docs/confirms"
+      ],
+      "noise": [
+        {
+          "title": "积分图标失败",
+          "text": "[WARN] loyalty badge icon 404。",
+          "closeActionId": "a-sendlog",
+          "closure": "图标在独立展示路径，不创建outbox也不调用send，该30样本控制流在发送前终止。"
+        }
+      ]
+    },
+    {
+      "id": "tcp-retrans",
+      "file": "app/data/cases/tcp-retrans.ts",
+      "chapter": "network",
+      "order": 1,
+      "originalHash": "8a1f06013c1673db27236d73da58b422d25f28aaa245c4bc4ec206f63fad034a",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "h2-hol",
+      "file": "app/data/cases/h2-hol.ts",
+      "chapter": "network",
+      "order": 2,
+      "originalHash": "538c4466b4e8617f4f7bb5a34eac4dfafb1f5eb93e7266cefa2f4beb39370d8e",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "cdn-penetration",
+      "file": "app/data/cases/cdn-penetration.ts",
+      "chapter": "network",
+      "order": 3,
+      "originalHash": "51afac0e5255135ef636255d92f556b6f7ea5fa3ea87697d332015c45daef7aa",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "proxy-headers",
+      "file": "app/data/cases/proxy-headers.ts",
+      "chapter": "network",
+      "order": 4,
+      "originalHash": "25bf5f4c688af21d34938165289b8a9507ca159ef5da55682d7e5e62a5606ee7",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "idle-reset",
+      "file": "app/data/cases/idle-reset.ts",
+      "chapter": "network",
+      "order": 5,
+      "originalHash": "e117fec49caf3246c18d3b9ec41a33c82bca86df0f3f53d74965f3dfe501032f",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "nagle-ack",
+      "file": "app/data/cases/nagle-ack.ts",
+      "chapter": "network",
+      "order": 6,
+      "originalHash": "d27cf354f27a386f962eb3b19664b5e4f22d155e3c25ba8f43d32d94104a5f75",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "happy-eyeballs",
+      "file": "app/data/cases/happy-eyeballs.ts",
+      "chapter": "network",
+      "order": 7,
+      "originalHash": "404ece2690aaf688e599d37f9803fd77f8b4c7b20b62091c96e762aecff84c3c",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "bandwidth-hog",
+      "file": "app/data/cases/bandwidth-hog.ts",
+      "chapter": "network",
+      "order": 8,
+      "originalHash": "2783c2da2e3ddc85ea0dd093aada887246b2b898d9948ecf8fd24b872124b2e0",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "ndots-trap",
+      "file": "app/data/cases/ndots-trap.ts",
+      "chapter": "network",
+      "order": 9,
+      "originalHash": "38aa7fc827c34acf44f09ae4dee2b3587d59c8a71c41849d5757748a67465b5f",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "mtu-blackhole",
+      "file": "app/data/cases/mtu-blackhole.ts",
+      "chapter": "network",
+      "order": 10,
+      "originalHash": "6e9b8305973241a80b878e6d363ab01007c3c9a60513fb1c1ff7d3b2be91795e",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "geo-stale",
+      "file": "app/data/cases/geo-stale.ts",
+      "chapter": "network",
+      "order": 11,
+      "originalHash": "a40aa0be97c06820cdee1b628d3354748648d12c0253cbcaeca4cd33f516413f",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "coverage-illusion",
+      "file": "app/data/cases/coverage-illusion.ts",
+      "chapter": "testing",
+      "order": 1,
+      "originalHash": "68b4450c0ce208ad53c3b816f2e4d04fe0fe1625a6113bd128f22590b07ee700",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "mock-leak",
+      "file": "app/data/cases/mock-leak.ts",
+      "chapter": "testing",
+      "order": 2,
+      "originalHash": "0890eb3b61a1f6107afb2f3b7fc0ffada043d9b31655d00cc4e796f4718ca790",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "flaky-test",
+      "file": "app/data/cases/flaky-test.ts",
+      "chapter": "testing",
+      "order": 3,
+      "originalHash": "0268dd6b7dccd0d09f4d043d152b814f5476b5a48362931db57692a50f4cf464",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "env-drift",
+      "file": "app/data/cases/env-drift.ts",
+      "chapter": "testing",
+      "order": 4,
+      "originalHash": "9c99a8f878f2814bf26014e08b89cf759d978d00db81bb8e88e9fdff4ed7ff92",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "loadtest-illusion",
+      "file": "app/data/cases/loadtest-illusion.ts",
+      "chapter": "testing",
+      "order": 5,
+      "originalHash": "9d8ab7add3f04a3de17af15bf0c369b22c9e0a8078da37a2832f3518970d2f00",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "testing-review",
+      "file": "app/data/cases/testing-review.ts",
+      "chapter": "testing",
+      "order": 6,
+      "originalHash": "a54dffb17ad11a8b9eea602f4404ff28e168a6e20e75e4534f0f4515d5561400",
+      "originalDifficulty": 3,
+      "originalExpertCost": 8,
+      "originalPathCost": 5,
+      "status": "pending"
+    },
+    {
+      "id": "env-contention",
+      "file": "app/data/cases/env-contention.ts",
+      "chapter": "testing",
+      "order": 7,
+      "originalHash": "d8af268b2449b57b242a37fa1e55ff4f7331873bb82d33905d9da476efdd4a01",
+      "originalDifficulty": 2,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "env-inherit",
+      "file": "app/data/cases/env-inherit.ts",
+      "chapter": "testing",
+      "order": 8,
+      "originalHash": "c5845f5ca40f5b4c3e4384ab88c3fd9250b5e88d36390d681384790ba75af44b",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    },
+    {
+      "id": "capacity-assumption",
+      "file": "app/data/cases/capacity-assumption.ts",
+      "chapter": "testing",
+      "order": 10,
+      "originalHash": "3fa5a2ca6aa50deeb817a4de4a4c5721aaa6a7587d0e9ff7514c12573c2922f7",
+      "originalDifficulty": 3,
+      "originalExpertCost": 4,
+      "originalPathCost": 4,
+      "status": "pending"
+    }
+  ]
+}
