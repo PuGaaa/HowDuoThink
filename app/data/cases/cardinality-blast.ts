@@ -1,50 +1,40 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 2 章 · 可观测性迷雾 第二批（指标基数爆炸 L2）
- * 教学点：架构设计——每个 label 组合都是一条独立时间序列：高基数信息进指标 = 监控自杀；
- * 度量设计权衡：指标答"多少"，日志/trace 答"谁"。
- * 专家路径：impact(1) + seriescount(2) + queryload(1) = 4⚡︎
+ * 大师篇校准：高基数真实组合、内存模型与恢复边界。
+ * 按真实技术机制教学重建，不冒充原始事故。
+ * 六维：2/3/3/3/3/3，中位数半档向下取整，L3。
+ * 标准路径：a-impact → a-seriescount → a-scrapeintv → a-retentioncfg → a-queryload；替代顺序：a-impact → a-scrapeintv → a-retentioncfg → a-queryload → a-seriescount。
+ * 编审依据：content/baselines/t04b-master-product-calibration.md。
  */
 export const cardinalityBlastCase: DiagnosisCase = {
   id: 'cardinality-blast',
   title: '监控自己先挂了：一个标签打爆时序库',
-  intro: '监控自己先挂了：一个 user_id 标签让时序数据库两周 OOM 三次——出事时谁也查不了问题。',
+  intro: '新增user_id指标后Prometheus头部序列从200万升至420万，8GiB实例反复OOM。先核对真实组合数与内存增量，不把理论上界当已写入量。',
   domain: 'runtime',
   layer: '指标答"多少"，日志答"谁"——高基数信息进指标就是监控自杀',
   part: 'master',
   chapterId: 'observability',
   order: 7,
   typeTags: ['resource', 'architecture', 'capacity'],
-  difficulty: 2,
-
+  difficulty: 3,
   scene: {
     role: '你是「鲜到家」平台的 SRE，最尴尬的一幕发生了：正在查线上问题，监控系统先崩了。',
-    architecture: '业务服务(暴露 metrics) → Prometheus(抓取+存储, 8GB 内存) → Grafana 大盘 / 告警',
-    tag: '故障现场',
+    architecture: '服务user_request_total{user_id,api,instance} → Prometheus(8GiB限额) → Grafana/告警',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: 'Prometheus 状态',
-        text: 'OOM 重启 3 次/周，内存 8GB → 打满 → 崩溃循环。\n活跃时间序列：200 万 → 4.2 亿（三周内翻 210 倍）。',
-      },
-      {
-        type: 'text',
-        title: '起因追溯',
-        text: '三周前"接口耗时指标"新增 user_id 标签（新同事想查"单用户慢请求"）。\n平台日均活跃用户：120 万。\n改动合入时 CI 全绿、接口正常——没人意识到标签的代价。',
-      },
+      { type: 'error', title: 'Prometheus 状态', text: '同一Prometheus实例头部序列：200万→420万，约2.1倍；RSS接近8GiB并OOM。\n不是8GiB里已成功常驻4.2亿序列，需以实际head指标和剖析核对。' },
+      { type: 'text', title: '起因追溯', text: '三周前新增user_request_total，含可持续增长的user_id。审计窗口见120万个不同user_id、8个有界api、40个instance；理论笛卡尔上界与真实出现组合必须分开。' },
     ],
     timeline: '三周前指标改动合入 ｜ 两周前监控开始 OOM ｜ 大促前 20 天——监控必须立刻恢复',
     impactHint: '每个用户 × 每个接口 = 一条独立时间序列——先算清"一个标签"值多少内存，再谈怎么救。',
   },
-
   hypotheses: [
     { id: 'h-cardinality', text: '基数爆炸：user_id（120 万）× 接口 × 实例的组合让时间序列数失控', excludeActionId: 'a-seriescount' },
     { id: 'h-scrape', text: '抓取间隔被调密，存储写入量翻倍', excludeActionId: 'a-scrapeintv' },
     { id: 'h-retention', text: '数据保留期配置过长，磁盘/内存积压', excludeActionId: 'a-retentioncfg' },
     { id: 'h-query', text: '大盘慢查询/全量扫描导致内存泄漏拖垮实例', excludeActionId: 'a-queryload' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -54,13 +44,11 @@ export const cardinalityBlastCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
-      result: {
-        type: 'code',
-        title: '增长曲线归因',
-        text: '序列数：三周前 200 万 → 4.2 亿，跳变日 = user_id 标签合入日 ✓\n旧指标总量：稳定在 200 万（无异常）\n新指标单条贡献：120 万用户 × 8 接口 × 40 实例分片 → 理论 384 亿，活跃 4.2 亿\n→ 爆炸源唯一且明确：不是"监控变重了"，是"一个标签在创造宇宙"。',
-      },
+      tests: ['h-cardinality'],
+      hypotheses: [
+        { id: 'h-cardinality', status: 'up' },
+      ],
+      result: { type: 'text', title: '真实序列与理论上界', text: '头部序列基线200万，新指标新增220万，总420万；增量起于新增指标部署。\nlabel取值观察：120万×8×40=384000000=3.84亿理论组合，不是384亿；只有实际出现并被抓取的元组才形成序列。时间相关先提供候选，不单独证明OOM原因。' },
     },
     {
       id: 'a-seriescount',
@@ -71,12 +59,10 @@ export const cardinalityBlastCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-cardinality'],
-      hypotheses: [{ id: 'h-cardinality', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '基数账单',
-        text: 'label 基数：user_id 120 万 × api 8 × instance 40 = 384 亿理论组合\n活跃序列（实际被写过的）：4.2 亿\n每序列内存开销（索引+头）：约 1KB → 仅序列头就要 400GB 级\nPrometheus 只有 8GB——这不是"配置不够"，是设计上不可能装下。\n实锤：user_id 是无界基数标签，metrics 体系的天敌。',
-      },
+      hypotheses: [
+        { id: 'h-cardinality', status: 'confirmed' },
+      ],
+      result: { type: 'code', title: '增量模型与同条件回放', text: '该指标为单一counter（非还要乘桶数的histogram），实际新标签组合220万，明显小于理论3.84亿。\n同版本、同抓取/样本窗口的隔离增量剖析：新增每序列约1.5KiB的RSS代价；220万×1.5KiB≈3.15GiB，加原4.9GiB约8.05GiB，超过8GiB限额。\n这是本题受控样本模型，不是Prometheus每序列固定常数。只移除新指标的输入回放，增长与OOM不再出现；业务输入和版本不变。' },
     },
     {
       id: 'a-costmodel',
@@ -88,11 +74,7 @@ export const cardinalityBlastCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '度量分层权衡',
-        text: '需求本质：偶尔排查"某个用户为什么慢"——是"按个体查询"，不是"统计全体"。\n指标（metrics）擅长：预聚合的统计（QPS/P99/错误率）——答"多少、多快"。\n日志/trace 擅长：个体明细与检索——答"谁、哪一次、为什么"。\n→ 用指标做个体检索 = 用错了工具：一次性排查诉求付了 400GB 常驻代价。',
-      },
+      result: { type: 'text', title: '度量分层权衡', text: '偶尔按用户排查属于明细检索需求，可使用受控日志/trace及业务关联键，按权限与保留期检索。它们也有采集、索引、存储和隐私成本，不是零常驻资源。\n聚合指标保留有界route/status等维度；把user_id哈希并不会减少不同值数量。' },
     },
     {
       id: 'a-scrapeintv',
@@ -103,12 +85,10 @@ export const cardinalityBlastCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-scrape'],
-      hypotheses: [{ id: 'h-scrape', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '抓取配置',
-        text: '全局 scrape_interval 30s，三周未变。\n→ 排除抓取频率。',
-      },
+      hypotheses: [
+        { id: 'h-scrape', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '抓取配置', text: '实际部署归档与端点抓取记录均为30秒且未变；同频率仅加新指标的对照触发头部增长。抓取间隔影响样本量，但不等于每次抓取都会生成同一标签组合的新序列。' },
     },
     {
       id: 'a-retentioncfg',
@@ -119,12 +99,10 @@ export const cardinalityBlastCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-retention'],
-      hypotheses: [{ id: 'h-retention', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '保留配置',
-        text: '保留期 30d 未变；OOM 的压力来自"活跃序列头"（内存索引），不是磁盘历史数据。\n→ 排除保留期。',
-      },
+      hypotheses: [
+        { id: 'h-retention', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '保留配置', text: '磁盘块保留30天配置未变，磁盘尚有余量；同窗口内存剖析主要新增在头部series/索引。保留期影响磁盘历史块，不应无依据当成本次RSS增量的根因；也不能声称历史/查询从不影响内存。' },
     },
     {
       id: 'a-queryload',
@@ -135,139 +113,80 @@ export const cardinalityBlastCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-query'],
-      hypotheses: [{ id: 'h-query', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '查询负载',
-        text: 'OOM 发生时段与查询高峰无相关（半夜也崩）；查询延迟在崩溃前正常。\n→ 排除查询侧：压力来自写入侧的序列爆炸。',
-      },
+      hypotheses: [
+        { id: 'h-query', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '查询负载', text: '停止大盘和手工查询的受控回放中仍随新标签组合增长而到8GiB；同负载禁入该新指标则不出现增长。\n排除本题“查询泄漏主导”的候选，比“半夜也崩”或查询延迟正常更有鉴别力。' },
     },
     {
       id: 'a-danger',
-      name: '强制 drop 新指标序列并重启',
-      desc: '【状态变更】metric_relabel_configs 丢弃 user_id 指标 + 重启',
-      cost: 1,
+      name: '删除TSDB目录后重启',
+      desc: '【状态变更】以丢弃监控历史换一次干净启动',
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '止血结果',
-        text: '新指标全量 drop，序列回落 200 万，监控恢复——大盘与告警重新可用。\n代价：进行中的"单用户慢请求"排查中断（本来也快查不动了）。\n→ 监控的可用性 > 单个排查诉求。',
-      },
+      result: { type: 'text', title: '止血结果', text: '清空数据可能暂时回落，但丢失历史且若新指标仍进入会再涨；只重启而保留WAL也不能保证旧头部元数据立即消失。先保留现场与历史、停止错误输入，再评估受控恢复，不能把删除目录作为常规首步。' },
     },
     {
       id: 'a-fixlabel',
-      name: '修复：label 白名单规范',
-      desc: '【状态变更】指标 label 基数上限评估（< 1 万）+ 高基数信息禁入',
+      name: '修复：停止高基数输入并重设计维度',
+      desc: '先drop整项错误指标，明确存量头部和历史恢复边界',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '规范 v2',
-        text: '① label 白名单：userId/orderId/token 等无界值禁止作为 label\n② 新增 label 必须评估基数：估计值 > 1 万需架构评审\n③ "单用户慢请求"改道：慢请求日志采样（带 userId）+ trace 检索，按需查询零常驻成本。',
-      },
+      result: { type: 'text', title: '规范 v2', text: '在抓取前metric_relabel按指标名drop整项user_request_total，阻止新输入；不要简单labeldrop user_id导致不同用户样本冲突。\n既有head/历史不会因新规则瞬间消失，按当前版本、WAL和存量规模计划恢复；必要时在保留旧数据的前提下启用同版本干净TSDB收新指标并明确历史可查询范围。\n业务端改有界聚合指标，个体排查走有成本与权限约束的明细；阈值按本平台容量测量制定，不把1万/10万当普适法规。' },
     },
     {
       id: 'a-fixguard',
-      name: '沉淀：基数守门告警',
+      name: '沉淀：序列增长与容量验收',
       desc: '【状态变更】新增序列速率告警 + 单指标序列数上限 + CI 指标审查清单',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '守门体系',
-        text: '① Prometheus 告警：单指标新增序列速率 > 1000/min\n② 单指标活跃序列 > 10 万告警（这次改动两周前就会亮灯）\n③ CI 指标审查：新增指标代码必须填"基数评估表"。',
-      },
+      result: { type: 'text', title: '守门体系', text: '监测head序列、新建序列速率、抓取样本与RSS，并用本服务负载测定预算；这类告警应有独立于被压垮实例的可用路径。CI检查标签定义与容量回放，不承诺任意固定阈值总能提前发现。' },
     },
     {
       id: 'a-fixedu',
       name: '沉淀：度量设计课进新人培训',
       desc: '【状态变更】"指标答多少、日志答谁"分层原则写进研发手册与新人必修',
       cost: 1,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '培训落地',
-        text: '研发手册新增"可观测性三件套分工"：metrics（统计）/ logging（明细）/ tracing（因果链）。\n新人必修课含"基数灾难"案例——用这次 400GB 的学费，换下一个人的常识。',
-      },
+      result: { type: 'text', title: '培训落地', text: '培训区分理论笛卡尔上界、实际活跃组合、样本频率与每类指标派生序列。标签哈希不降基数，日志/trace也不是免费仓库。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-cardinality', text: 'user_id（120 万无界基数）作为指标 label：120 万×8 接口×40 实例的组合让活跃序列三周膨胀 210 倍（4.2 亿），序列头内存需求 400GB 级 vs Prometheus 8GB——监控体系被一个标签击穿', correct: true },
+    { id: 'rc-cardinality', text: '可增长的user_id进入counter标签，实际新增220万头部序列；同条件增量模型约3.15GiB加原4.9GiB超过8GiB，输入隔离回放支持高基数为本次OOM主因', correct: true },
     { id: 'rc-scrape', text: '抓取间隔调密导致写入量翻倍', correct: false },
     { id: 'rc-retention', text: '数据保留期过长导致存储积压', correct: false },
     { id: 'rc-query', text: '大盘慢查询内存泄漏拖垮实例', correct: false },
   ],
-
-  expertCost: 4,
+  expertCost: 6,
   restartActionId: 'a-danger',
-
   expertChain: [
-    {
-      thought: '监控崩了要先当一次"被监控对象"的事故指挥：序列数曲线与什么变更对齐？',
-      update: '跳变日 = user_id 标签合入日，旧指标稳定——爆炸源唯一：一个标签在创造宇宙。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 变更对齐是监控类故障的第一动作：序列数是"组合数"型增长，必然有明确的起点变更——曲线会指认它。',
-      conclusion: '嫌疑锁定：label 基数（h-cardinality 升权）。',
-    },
-    {
-      thought: '把账算出来：label 基数的组合数 × 每序列内存——让数字说明"为什么 8GB 不可能装下"。',
-      update: '实锤：384 亿理论组合 / 4.2 亿活跃 / 400GB 级内存需求 vs 8GB——设计上不可能，不是配置问题。',
-      actionId: 'a-seriescount',
-      why: '2⚡︎ 基数账单是这次排查的核心一击：它把"监控崩了"翻译成"一个设计决策的代价清单"——组合数爆炸是乘法，不是加法，直觉会严重低估。',
-      conclusion: '根因实锤 → 排除配置侧嫌疑。',
-    },
-    {
-      thought: '度量设计的根本权衡要讲清楚：这个"查单用户"的需求本该用什么工具答。',
-      update: '分层确认：指标答统计，日志/trace 答个体——用错工具的代价是 400GB 常驻。',
-      actionId: 'a-costmodel',
-      why: '1⚡︎ 架构设计思维的落点：可观测性三件套不是随便选的——"统计 vs 个体"的语义分工决定载体。工具选错，再强的监控也装不下错误的需求。',
-      conclusion: '修复双线：止血 drop + 需求改道（日志采样+trace）。',
-    },
-    {
-      thought: '抓取间隔、保留期、查询负载三个配置侧嫌疑各 1⚡︎ 排除——把"不是配置能救的"钉死。',
-      update: '三项配置均未变且与爆炸无因果——配置调优救不了设计缺陷。',
-      actionId: 'a-queryload',
-      why: '1⚡︎ 排除配置侧是为了防止"加内存/调参数"式的错误修复：基数爆炸加内存只是推迟爆炸——证据把修复逼到设计层。',
-      conclusion: '嫌疑收敛 → 规范 + 守门 + 培训三层落地。',
-    },
-    {
-      thought: '止血（drop+重启）、修复（label 白名单）、守门（基数告警+CI 审查）、沉淀（分层原则进培训）。停止收集。',
-      update: '停止。',
-      actionId: '',
-      why: '【停止规则】机制（组合数爆炸）✓ 设计（载体选错）✓ 防线（守门告警）✓——技术、制度、认知三层闭合。',
-      conclusion: '沉淀：可观测性本身也需要被观测。基数守门告警是"监控的监控"——这次 400GB 的学费要变成下个人的常识。',
-    },
+    { actionId: 'a-impact', thought: '把实际头部和理论组合分开。', update: '200万+220万=420万，理论上界3.84亿。', why: '1⚡先纠正数量级，避免用不可能已驻留的数解释8GiB。', conclusion: '新指标是候选，仍需成本与对照。' },
+    { actionId: 'a-seriescount', thought: '按同条件剖析核对新增序列成本。', update: '增量约3.15GiB加基线超过限额，只禁该输入恢复。', why: '2⚡用限定样本模型和单变量回放支持因果。', conclusion: '高基数主因确认。' },
+    { actionId: 'a-scrapeintv', thought: '是否只是抓取变密。', update: '频率与实际抓取记录未变。', why: '1⚡区分序列身份数量与采样频率。', conclusion: '频率候选排除。' },
+    { actionId: 'a-retentioncfg', thought: '历史保留是否解释当前增量。', update: '保留不变、磁盘有余量，新增在head。', why: '1⚡以实际内存归因排除仅靠缩历史治RSS。', conclusion: '保留期候选排除。' },
+    { actionId: 'a-queryload', thought: '查询主导是否仍可能。', update: '暂停查询回放仍涨，禁新指标不涨。', why: '1⚡用对照而非时段相关排除查询泄漏。', conclusion: '停止输入与有序恢复方向明确。' },
+    { actionId: '', thought: '停止根因收集；先禁错误指标输入、保留数据与现场，再按存量head/WAL制定恢复。重设计有界聚合与受控明细检索，不把drop新输入误称立即清空历史。', update: '停止收集，执行有条件的处置与复验。', why: '当前证据足以区分本题主要候选并决定处置；继续买同类材料不改变行动，修复后仍按相同条件验证。', conclusion: '停止根因收集；先禁错误指标输入、保留数据与现场，再按存量head/WAL制定恢复。重设计有界聚合与受控明细检索，不把drop新输入误称立即清空历史。' },
   ],
-
   lessons: [
-    {
-      text: '每个 label 组合是一条独立时间序列：无界值（userId/orderId/token）进 label，就是让时序库按乘法爆炸。',
-      principle: '架构设计：加 label 前先算基数账（各 label 基数相乘 × 采样频率）。经验红线：单指标活跃序列 < 10 万，任意 label 基数 < 1 万且必须是有界枚举。基数守门告警（新增序列速率/单指标上限）是监控的监控。',
-    },
-    {
-      text: '可观测性三件套有分工：指标答"多少"（预聚合统计），日志答"谁与哪次"（明细检索），trace 答"因果链"——用指标做个体检索是用错工具。',
-      principle: '度量设计：需求的语义决定载体。"偶尔查某个用户"是检索需求（日志/trace）不是统计需求（metrics）。载体选错的最危险之处：改动当时一切正常，代价在三周后以更难排查的方式爆发。',
-    },
-    {
-      text: '监控系统的变更也要过变更管理：一个标签的合入能击穿整个监控体系，而它的 CI 检查是全绿的。',
-      principle: '流程设计：CI 绿只保证代码正确，不保证资源代价可接受。指标/日志这类"隐性资源消耗"的变更需要专门的审查维度（基数评估表）——没有守门的体系，每个新人的合理小需求都是潜在的下一颗雷。',
-    },
+    { text: '标签取值笛卡尔积是上界，实际只出现其中部分组合。', principle: '120万×8×40=3.84亿，不是384亿。单counter与histogram的派生序列不同；抓取频率增大增加样本，不直接增加相同标签的身份数。' },
+    { text: '容量模型要绑定版本、负载和测量方法。', principle: '每序列内存不是固定1KB常数。用同条件的RSS增量和头部剖析验证，不能把超限理论需求冒充8GiB机器已常驻事实。' },
+    { text: '停止新输入不等于立刻释放已存头部或删除历史。', principle: '重启可能重放WAL，删除TSDB会丢历史；先保留证据并限流错误输入，再制定恢复窗口。labeldrop不同身份还可能制造重复样本冲突。' },
+    { text: '个体检索与聚合统计有不同载体和成本。', principle: '有界指标看统计，日志/trace可查明细但仍有存储、权限与保留成本。哈希user_id不降低基数，固定1万/10万阈值也不能替代本平台容量评估。' },
   ],
 }

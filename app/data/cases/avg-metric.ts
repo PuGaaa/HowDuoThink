@@ -1,14 +1,16 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * 第 2 章 · 可观测性迷雾（平均值掩盖 L2）
- * 教学点：平均值是并发请求的"民主投票"，少数派的真实体验会被淹没；分位数（P95/P99）与分组才是长尾的显影液。
- * 专家路径：impact(1) + histogram(2) + nodelist(2) = 5⚡︎
+ * 大师篇校准：同口径均值/分位算术与慢组因果。
+ * 按真实技术机制教学重建，不冒充原始事故。
+ * 六维：2/3/2/2/2/3，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-histogram → a-nodelist → a-gwconf；替代顺序：a-impact → a-nodelist → a-histogram → a-gwconf。
+ * 编审依据：content/baselines/t04b-master-product-calibration.md。
  */
 export const avgMetricCase: DiagnosisCase = {
   id: 'avg-metric',
-  title: '平均 80ms 的接口，用户却在超时',
-  intro: '周会汇报接口"平均响应 80ms，性能优秀"，同一天客服收到 12 个超时投诉。两个事实打架了。',
+  title: '平均80ms，少数页面却要等5秒',
+  intro: '整体均值80ms，但用户反馈偶尔要等5秒以上。平均值与长尾可以同时为真，先把同一口径的数量对上。',
   domain: 'runtime',
   layer: '平均值是并发请求的民主投票：多数派的声音会淹没少数派的真实体验',
   part: 'master',
@@ -16,32 +18,22 @@ export const avgMetricCase: DiagnosisCase = {
   order: 2,
   typeTags: ['observability', 'capacity', 'config'],
   difficulty: 2,
-
   scene: {
     role: '你是网关负责人，周报的性能数据很漂亮，但超时投诉让你无法自圆其说。',
     architecture: '用户 → 网关(8 实例) → 商品服务',
     symptoms: [
-      {
-        type: 'error',
-        title: '客服反馈（12 例）',
-        text: '用户打开商品页 5 秒超时，重试多次偶尔成功。投诉时间分散全天，无集中时段。',
-      },
-      {
-        type: 'text',
-        title: '监控大盘',
-        text: '商品服务平均响应 80ms（周报同款数据），QPS 平稳，错误率 0.2%。\n按这个数据，不应该有超时。',
-      },
+      { type: 'error', title: '客服反馈（12 例）', text: '12位用户反馈商品页偶尔等待超过5秒，重试有时正常。后台完整完成样本的均值却约80ms，需要核对分布及归属。' },
+      { type: 'text', title: '监控大盘', text: '同一时窗、同一路由的10000次受控完成请求，均值80ms；下游商品服务5xx为0。均值达标不代表每个请求都达标，生产取消请求另记，不能混入这份完成样本。' },
     ],
-    timeline: '超时投诉持续一周 ｜ 三周前网关扩容过 2 台实例（承接 10% 流量）',
+    timeline: '投诉持续一周 ｜ 新网关gw-07/08承接约0.5%流量 ｜ 需核对新旧组配置与连接阶段',
     impactHint: '12 个投诉是少数派体验——先确认：是所有人的体验差，还是少数人极差？',
+    tag: '教学重建',
   },
-
   hypotheses: [
-    { id: 'h-node', text: '部分网关实例异常，只打到坏实例的请求超时', excludeActionId: 'a-nodelist' },
-    { id: 'h-avg', text: '平均值掩盖了长尾：整体 OK 但少数请求极慢', excludeActionId: 'a-histogram' },
-    { id: 'h-region', text: '特定地域/运营商用户网络问题', excludeActionId: 'a-region' },
+    { id: 'h-node', text: '新网关组上游地址配置差异使少量请求额外等待连接超时', excludeActionId: 'a-gwconf' },
+    { id: 'h-avg', text: '所有实例请求都很慢，只是均值计算错误造成虚假80ms', excludeActionId: 'a-histogram' },
+    { id: 'h-region', text: '服务端处理各组一致，纯粹是特定地域客户端网络慢', excludeActionId: 'a-nodelist' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -51,13 +43,11 @@ export const avgMetricCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-region'],
-      hypotheses: [{ id: 'h-region', status: 'down' }],
-      result: {
-        type: 'text',
-        title: '用户画像',
-        text: '超时用户地域/运营商/时段完全分散——无共性。\n唯一共性：全天随机出现，占比约 10%。',
-      },
+      tests: ['h-node'],
+      hypotheses: [
+        { id: 'h-node', status: 'up' },
+      ],
+      result: { type: 'text', title: '分母与影响面', text: '按地域/账号仅能看到分散投诉，不能排除所有客户端问题。建立同入口、同路由、同一完成时窗样本N=10000；gw-07/08分得50次，其余9950次，先不把投诉数直接当请求占比。' },
     },
     {
       id: 'a-histogram',
@@ -67,13 +57,12 @@ export const avgMetricCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-avg'],
-      hypotheses: [{ id: 'h-avg', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: '响应时间分布',
-        text: 'P50=60ms  P95=110ms  P99=4800ms  max=5100ms\n直方图：90% 请求 <100ms；10% 请求 >4800ms——双峰分布！\n→ 平均 80ms 是两个峰混合的假象：慢的那 10% 全部 >4.8 秒',
-      },
+      tests: ['h-avg', 'h-node'],
+      hypotheses: [
+        { id: 'h-avg', status: 'excluded' },
+        { id: 'h-node', status: 'up' },
+      ],
+      result: { type: 'code', title: '可复核的分布账', text: '同一10000次完整受控样本：9950次55ms、50次5055ms。加权均值=(9950×55+50×5055)/10000=80ms。\n采用最近秩样本分位：P50/P95/P99=55ms，P99.9=5055ms；0.5%长尾不会必然进入P99。若10%均>4800ms，均值至少480ms，不能写成80ms。' },
     },
     {
       id: 'a-nodelist',
@@ -83,29 +72,26 @@ export const avgMetricCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-node'],
-      hypotheses: [{ id: 'h-node', status: 'confirmed' }],
-      result: {
-        type: 'text',
-        title: '实例分组',
-        text: '慢请求 100% 落在 gw-07、gw-08 两台实例（三周前新扩容）；\n老实例上无慢请求。\n→ 双峰的两个峰 = 两组实例',
-      },
+      tests: ['h-region', 'h-node'],
+      hypotheses: [
+        { id: 'h-region', status: 'excluded' },
+        { id: 'h-node', status: 'up' },
+      ],
+      result: { type: 'text', title: '实例与阶段对照', text: '50个慢样本全部属于gw-07/08；其余9950次均55ms。同一探测客户端对每组交叉请求，慢的5秒在网关到上游连接阶段，商品服务处理仍55ms。\n由同客户端跨组控制及服务端分段证据排除本题纯客户端地域候选，不是仅凭地域分散就排除网络。' },
     },
     {
       id: 'a-gwconf',
-      name: '对比新旧实例的网关配置',
-      desc: '找出 gw-07/08 慢的配置差异',
+      name: '核对新组上游地址与单变量对照',
+      desc: '检查已加载配置、连接尝试及仅改错误地址的同构回放',
       cost: 1,
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
-      result: {
-        type: 'code',
-        title: '配置 diff',
-        text: 'gw-07/08 缺少配置项：proxy upstream keepalive（上游长连接复用）\n→ 每个请求都重新建 TCP+TLS 连接到商品服务，多耗 4~5 秒（跨机房握手）',
-      },
+      tests: ['h-node'],
+      hypotheses: [
+        { id: 'h-node', status: 'confirmed' },
+      ],
+      result: { type: 'code', title: '配置、阶段与受控回放', text: 'gw-07/08加载的主上游地址已废弃且静默丢包，proxy_connect_timeout=5s，超时后才尝试正确备用地址；旧组直接连正确地址。不是缺keepalive就必然增加5秒。\n同样请求只修正主地址，连接等待从5000ms消失，完整耗时5055→55ms；路由、服务代码与客户端不变。' },
     },
     {
       id: 'a-region',
@@ -116,12 +102,10 @@ export const avgMetricCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-region'],
-      hypotheses: [{ id: 'h-region', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '地域分布',
-        text: '超时用户地域/运营商完全随机——与用户侧无关，纯服务端问题。',
-      },
+      hypotheses: [
+        { id: 'h-region', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '地域分布', text: '地域分散只是弱线索；同客户端分别命中新旧网关、并测出服务端连接等待，才能排除本题纯客户端网络慢的候选。' },
     },
     {
       id: 'a-oldmetric',
@@ -132,99 +116,53 @@ export const avgMetricCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-node'],
-      hypotheses: [{ id: 'h-node', status: 'up' }],
-      result: {
-        type: 'text',
-        title: '老实例分位',
-        text: 'gw-01~06：P99=95ms，零慢请求——老实例干净，慢请求 100% 归属新扩容组。',
-      },
+      hypotheses: [
+        { id: 'h-node', status: 'up' },
+      ],
+      result: { type: 'text', title: '老实例分位', text: '老组在同一受控样本9950次均55ms；这不等于未来绝不会慢。用相同时间窗、路由和完整请求口径比较，不能从总体百分位反推每个实例。' },
     },
     {
       id: 'a-gwfix',
-      name: '补齐 keepalive 配置并验证',
-      desc: '修复 gw-07/08 配置后恢复流量',
+      name: '修复：更正上游地址并验证',
+      desc: '灰度更新地址，验连接阶段、回退行为及端到端长尾',
       cost: 2,
-      gain: 'mid',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复验证',
-        text: '补 keepalive 后 P99 回落到 110ms，重新接入流量，无超时反馈。结案。',
-      },
+      result: { type: 'text', title: '修复验证', text: '灰度修正已加载的主地址，重复相同交叉请求，原慢组恢复55ms；再独立验生产取消/失败比例及整体尾部。是否启用keepalive另行按设计评估，不能把它当所有秒级连接等待的万能修复。' },
     },
     {
       id: 'a-weight',
       name: '把 gw-07/08 权重临时归零',
       desc: '【状态变更】摘除慢实例流量',
-      cost: 4,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '摘流结果',
-        text: '权重归零后超时投诉立即停止——确认因果，剩余为实例修复问题。',
-      },
+      result: { type: 'text', title: '摘流结果', text: '摘除新组可减少当下这类慢请求，但也减少可用容量；这只隔离关联资源，不能单独证明地址或keepalive原因。先留配置与阶段证据，评估剩余容量后执行。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-keepalive', text: '新扩容的 gw-07/08 缺少上游长连接配置，10% 流量每请求重建跨机房连接导致超时', correct: true },
-    { id: 'rc-region', text: '特定地域用户网络质量问题', correct: false },
-    { id: 'rc-capacity', text: '网关整体容量不足导致全体变慢', correct: false },
+    { id: 'rc-keepalive', text: 'gw-07/08主上游地址废弃，连接等待5秒后走备用地址；仅0.5%请求额外等待，9950×55ms与50×5055ms的均值仍为80ms', correct: true },
+    { id: 'rc-region', text: '纯客户端地域网络慢，各网关上游处理没有差异', correct: false },
+    { id: 'rc-capacity', text: '所有实例请求都很慢，只因均值计算bug显示80ms', correct: false },
   ],
-
-  expertCost: 5,
+  expertCost: 6,
   restartActionId: 'a-weight',
-
   expertChain: [
-    {
-      thought: '12 个投诉 vs 平均 80ms——两个事实必有一个在骗人。平均数的骗术是"掩盖长尾"，先找超时用户的共性。',
-      update: '地域/运营商/时段全随机，共性只剩"约 10%"这个占比——指向按比例分配的服务端资源。',
-      actionId: 'a-impact',
-      why: '1⚡︎ 买画像：随机分布的少数派超时，最像"按比例分流到坏节点"，而不是地域或容量问题。',
-      conclusion: '用户画像无地域共性 → 排除 h-region，怀疑实例级差异。',
-    },
-    {
-      thought: '平均值会骗人，分布不会。看分位数与直方图——如果双峰，一切就解释通了。',
-      update: '实锤双峰：90% <100ms、10% >4.8s。平均 80ms 是混合假象。',
-      actionId: 'a-histogram',
-      why: '2⚡︎ 直方图是拆穿平均值的关键动作——两个峰的存在直接证明"两类请求、两种命运"。',
-      conclusion: '双峰实锤 → 找"10% 慢请求"的归属（实例/上游/路由）。',
-    },
-    {
-      thought: '按实例分组：如果慢请求集中在特定实例，就是实例配置/状态差异。',
-      update: '实锤：慢请求 100% 在 gw-07/08（新扩容）。',
-      actionId: 'a-nodelist',
-      why: '2⚡︎ 分组对比直接定位坏实例——网关类故障的"按实例分组"几乎总能命中。',
-      conclusion: '慢请求全部落在新扩容实例 → 对比新旧实例配置找差异。',
-    },
-    {
-      thought: '配置 diff 给出机制：新实例缺上游长连接，每请求重建跨机房连接。证据链闭合。',
-      update: '停止收集：摘流止血 + 补配置修复。',
-      actionId: '',
-      why: '根因（缺 keepalive 配置）+ 修复（补配置）+ 止血（摘流）全部明确。',
-      conclusion: '摘流止血 → 补 keepalive 配置 → 监控改为 P95/P99 分位数告警。',
-    },
+    { actionId: 'a-impact', thought: '先统一分母和观测口径。', update: '受控N=10000，新组50次，旧组9950次。', why: '1⚡避免将投诉数量、请求比例和取消样本混算。', conclusion: '分布与归属仍待核对。' },
+    { actionId: 'a-histogram', thought: '用原始分布重算均值与分位。', update: '均值80ms确实成立，P99仍是55ms。', why: '2⚡量化说明少数长尾可被均值和P99同时忽略。', conclusion: '不是所有请求慢或均值计算错。' },
+    { actionId: 'a-nodelist', thought: '同客户端跨组定位慢段。', update: '50次慢均在新组上游连接等待。', why: '2⚡把地域形状换成实例与阶段的受控证据。', conclusion: '排除纯客户端候选。' },
+    { actionId: 'a-gwconf', thought: '配置与等待时长是否能一一对应。', update: '5秒连接超时后备用成功，改主地址后55ms。', why: '1⚡只改一个地址验证因果，避免把慢组归属当根因。', conclusion: '根因与止血/修复目标明确。' },
+    { actionId: '', thought: '完成分布算术、实例归属、连接阶段与单变量修复核验，停止诊断；保留均值并补适合0.5%尾部的延迟阈值比例/更高分位及分组告警。', update: '停止收集，执行有条件的处置与复验。', why: '当前证据足以区分本题主要候选并决定处置；继续买同类材料不改变行动，修复后仍按相同条件验证。', conclusion: '完成分布算术、实例归属、连接阶段与单变量修复核验，停止诊断；保留均值并补适合0.5%尾部的延迟阈值比例/更高分位及分组告警。' },
   ],
-
   lessons: [
-    {
-      text: '平均响应时间会撒谎：双峰分布下平均数不代表任何一组用户的真实体验。',
-      principle: '性能数据必须看分布（P50/P95/P99/直方图）而不是平均值——平均 80ms 可以同时意味着"多数 60ms + 少数 5s"。平均值是最容易被长尾污染的指标。',
-    },
-    {
-      text: '按实例/分片分组对比是定位"部分用户故障"的通用解法。',
-      principle: '随机命中的少数派问题几乎都来自"按比例分配的资源"：扩容新实例、灰度节点、特定分片。分组对比让坏组自己浮出水面。',
-    },
-    {
-      text: '监控告警要用分位数：平均值达标时，P99 可能已经在燃烧。',
-      principle: 'SLA 承诺的是每个请求的体验，不是所有请求的平均体验。告警阈值必须基于 P95/P99（或分桶超时数），平均值告警只配当氛围组。',
-    },
+    { text: '长尾比例小于1%时，P99也可能看不到它。', principle: '9950次55ms与50次5055ms均值恰80ms，最近秩P99仍55ms。分位选择要覆盖业务关注的尾部，阈值超标比例可直接量化。' },
+    { text: '平均值不是错误，但观测口径必须一致。', principle: '完成请求、取消请求、下游处理和端到端耗时各有分母。不能用一组5秒样本与另一组均值拼出不存在的分布。' },
+    { text: '慢请求集中到某实例只是定位范围，阶段与受控配置对照才给原因。', principle: '本题5秒来自明确连接超时和废弃主地址，不是跨机房握手或缺长连接天然要5秒。' },
   ],
 }

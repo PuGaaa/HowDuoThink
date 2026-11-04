@@ -1,52 +1,40 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * B1-6 · observability L2
- * 主训思维：验证思维（指标是工具计算的——工具参数错了，结论就是错的）
- * 次训思维：程序设计（直方图桶边界要覆盖真实尾部）
- * 真实原型：Prometheus histogram 桶边界配置错误（最大桶 100ms），P99 严重低估
- * 情绪兽设计：惊讶獭（惊讶）——"P99 显示 45ms，用户却等了 2 秒"
- * 检查单：思维型 3 + 知识型 1
+ * 大师篇校准：经典累计桶分位边界与越界比例。
+ * 按真实技术机制教学重建，不冒充原始事故。
+ * 六维：2/3/3/3/2/3，中位数半档向下取整，L3。
+ * 标准路径：a-impact → a-bucket → a-sample → a-calc；替代顺序：a-impact → a-sample → a-calc → a-bucket。
+ * 编审依据：content/baselines/t04b-master-product-calibration.md。
  */
 export const histogramCase: DiagnosisCase = {
   id: 'histogram-bucket',
-  title: 'P99 显示 45ms，用户却等了 2 秒',
-  intro: '监控大盘上结算接口 P99 = 45ms，漂亮得不像话。但用户投诉持续、全链路 trace 显示服务端耗时 2 秒+。指标和现实，总有一个在撒谎。',
+  title: 'P99封在100ms，trace却记录了2秒',
+  intro: '同一时窗同一批请求，经典直方图P99显示100ms，服务端时长样本P99为2.4秒。先检查桶与分位估计边界。',
   domain: 'runtime',
   layer: '指标是测量工具算出来的：工具的参数错了，结论就是错的——先验证测量，再相信测量',
   part: 'master',
   chapterId: 'observability',
   order: 4,
   typeTags: ['observability', 'metrics'],
-  difficulty: 2,
-
+  difficulty: 3,
   scene: {
     role: '你是「鲜到家」支付结算服务的负责人。用户投诉超时一个月，你的监控大盘却始终"健康"——老板怀疑你在粉饰太平。',
     architecture: 'App → 支付结算服务 → Prometheus(直方图指标) → Grafana 大盘',
-    tag: '故障现场',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '指标与 trace 打架',
-        text: 'Grafana 大盘：结算接口 P99 = 45ms，30 天稳定。\n全链路 trace（同期抽样）：同一接口服务端耗时 P99 ≈ 2.4s。\n→ 同一个接口，两个"真相"。用户投诉与 trace 一致。',
-      },
-      {
-        type: 'text',
-        title: '投诉分布',
-        text: '投诉用户占比约 2%，但金额占比 30%（大客户下单链路）。\n投诉时间随机——与发布、流量高峰均无关联。',
-      },
+      { type: 'error', title: '指标与 trace 打架', text: 'Grafana经典直方图P99=0.1s；同一请求集合的独立服务端时长样本P99=2.4s。不能直接把抽样trace与全量指标不加核对就当同口径。' },
+      { type: 'text', title: '投诉分布', text: '投诉用户占比约 2%，但金额占比 30%（大客户下单链路）。\n投诉时间随机——与发布、流量高峰均无关联。' },
     ],
     timeline: '结算服务一个月前重构（重构时顺手动过指标埋点）｜ 投诉持续一个月 ｜ trace 系统上月才全量接入',
     impactHint: '指标和 trace 打架时，先别站队——去检查"指标是怎么算出来的"。',
   },
-
   hypotheses: [
-    { id: 'h-bucket', text: '直方图桶边界配置错误：最大桶 100ms，超时请求全部落最后一桶，P99 被结构性低估', excludeActionId: 'a-bucket' },
+    { id: 'h-bucket', text: '经典直方图最大有限桶0.1s，目标分位落入+Inf，返回次高桶上界0.1s而失去尾部刻度', excludeActionId: 'a-bucket' },
     { id: 'h-sample', text: '采样偏差：慢请求没被记录（采样率/丢弃）', excludeActionId: 'a-sample' },
     { id: 'h-client', text: '用户端网络问题：服务端其实快', excludeActionId: 'a-client' },
     { id: 'h-calc', text: 'P99 计算逻辑错误：查询/聚合方式有 bug', excludeActionId: 'a-calc' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -56,13 +44,12 @@ export const histogramCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [],
-      result: {
-        type: 'text',
-        title: 'trace 与指标对照',
-        text: 'trace 抽样 1000 笔结算请求：服务端耗时 P50 300ms / P99 2.4s。\n同期指标：P99 45ms。\n→ 矛盾真实且巨大：不是用户错觉，是测量在撒谎。指标与 trace 谁在撒谎，待查。',
-      },
+      tests: ['h-client', 'h-bucket'],
+      hypotheses: [
+        { id: 'h-client', status: 'excluded' },
+        { id: 'h-bucket', status: 'up' },
+      ],
+      result: { type: 'text', title: '同集合与计时边界', text: '限定同路由、同一5分钟窗口，并以1000个已完成请求ID核对两份记录：独立服务端时长P50=0.3s、P99=2.4s；指标估计P99=0.1s。\n所量的是服务端处理，不是仅客户端网络；这里只排除“服务端实际快、纯客户端慢”的候选，不否认还可能有端侧耗时。' },
     },
     {
       id: 'a-bucket',
@@ -73,12 +60,10 @@ export const histogramCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-bucket'],
-      hypotheses: [{ id: 'h-bucket', status: 'confirmed' }],
-      result: {
-        type: 'code',
-        title: 'histogram 桶配置（重构时埋点）',
-        text: 'buckets: [10, 25, 50, 75, 100]   ← 最大桶 100ms！\n→ 所有 >100ms 的请求全部落进 +Inf 桶，\n100ms 以上不再有任何刻度——P99 计算时"最后一个桶的左边界"= 75ms，\n无论真实耗时 200ms 还是 5s，读数永远不会超过 100ms。\n→ 指标不是在撒谎，是尺子只有 100mm 就封顶了。',
-      },
+      hypotheses: [
+        { id: 'h-bucket', status: 'confirmed' },
+      ],
+      result: { type: 'code', title: '累计桶与可复核估计', text: '经典累计桶，单位秒，窗口增量：le=.01:0，.025:0，.05:100，.075:200，.1:300，+Inf:1000。\n99%分位序号990落在(.1,+Inf]；histogram_quantile按经典桶规则返回第二高桶的上界0.1s，不是75ms或45ms。\n+Inf计数包含全部1000次；真正超过.1s的比例=(1000-300)/1000=70%。' },
     },
     {
       id: 'a-sample',
@@ -89,12 +74,10 @@ export const histogramCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-sample'],
-      hypotheses: [{ id: 'h-sample', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '采样核对',
-        text: '埋点为全量上报（无采样）；请求计数与网关访问数一致。\n→ 慢请求都被记录了——只是被塞进了最后一个桶。',
-      },
+      hypotheses: [
+        { id: 'h-sample', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '采样核对', text: '同一1000请求ID已与独立时长记录核对；直方图_count和+Inf窗口增量均1000，不做抽样，也无慢请求丢弃过滤。这里有ID对应与计数双证据，不能只凭总数碰巧相等证明未漏慢样本。' },
     },
     {
       id: 'a-calc',
@@ -105,12 +88,10 @@ export const histogramCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-calc'],
-      hypotheses: [{ id: 'h-calc', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '查询逻辑核对',
-        text: 'Grafana 查询 histogram_quantile(0.99, ...)，标准写法。\n→ 计算无辜：给它正确的桶，它就能给出正确的分位数。',
-      },
+      hypotheses: [
+        { id: 'h-calc', status: 'excluded' },
+      ],
+      result: { type: 'code', title: '实际PromQL与复算', text: '实际查询：histogram_quantile(0.99,sum by (le)(rate(checkout_request_duration_seconds_bucket{route="/checkout"}[5m])))。\n同route、同单位、同桶边界，保留le并先rate后sum；用上面的累计增量可复算0.1s。查询未错误聚合，但桶分位本身是估计，不会给出精确原始P99。' },
     },
     {
       id: 'a-client',
@@ -121,12 +102,10 @@ export const histogramCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-client'],
-      hypotheses: [{ id: 'h-client', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '端侧核对',
-        text: 'trace 显示服务端处理耗时 2.4s（不含端侧网络）。\n→ 服务端真的慢，与端侧无关。',
-      },
+      hypotheses: [
+        { id: 'h-client', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '端侧核对', text: '独立服务端时长同集合确有秒级处理；纯客户端解释不能成立，但服务端慢不证明所有端侧网络都没有额外代价。' },
     },
     {
       id: 'a-history',
@@ -138,103 +117,52 @@ export const histogramCase: DiagnosisCase = {
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '埋点变更考古',
-        text: '一个月前结算服务重构：埋点从旧 SDK 迁移到新 SDK。\n旧 SDK 桶：[10, 50, 100, 500, 1000, 5000]（覆盖到 5s）\n新 SDK 桶：[10, 25, 50, 75, 100]（100ms 封顶）\n→ 重构时"顺手动过指标埋点"，桶边界从覆盖 5s 变成 100ms 封顶——从此 P99 永远 ≤100ms。',
-      },
+      result: { type: 'text', title: '埋点变更考古', text: '重构将秒制桶从覆盖5秒改成最大有限桶0.1秒；对应发布归档与当前端点一致。若分位落在有限桶内仍可输出不同值，不能声称所有时刻P99永远等于封顶或固定45ms。' },
     },
     {
       id: 'a-report',
       name: '按大盘结论对外通报"服务健康"',
       desc: '【状态变更】用 45ms 的数据回应投诉与老板',
-      cost: 1,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '通报结果',
-        text: '向业务方通报"结算服务 P99 45ms，服务健康，建议用户检查网络"。\n→ 用错误的尺子为错误背书：投诉用户收到"服务一切正常"的回复，信任二次受损。\n此选项仅作为反面教学：测量没修好之前，任何"结论"都是幻觉。',
-      },
+      result: { type: 'text', title: '通报结果', text: '在测量边界尚未核清时用100ms否认已核实的秒级样本，会误导处置。通报应说明桶分位失去尾部刻度，继续承认真实用户影响。' },
     },
     {
       id: 'a-fixbucket',
-      name: '重设计桶边界并回填告警',
-      desc: '【状态变更】对数分布覆盖到 10s，加超长尾告警',
+      name: '修复：设计桶边界与越界比例告警',
+      desc: '覆盖SLO阈值与尾部，监测超最大有限桶的差值',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '修复结果',
-        text: '新桶：[10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]\n新增告警："+Inf 桶占比 > 1%"（超尺请求过多时提醒尺子不够长）。\n→ 真实 P99 = 2.4s 首次如实呈现，结算优化立项。',
-      },
+      result: { type: 'text', title: '修复结果', text: '按SLO和真实分布增加0.25/0.5/1/2.5/5/10秒边界，再用同一输入回放检验落桶及分位误差。不能保证估计恰等于原始2.4秒。\n超最大有限桶比例应为(rate(bucket{le="+Inf"})-rate(bucket{le="10"}))/rate(bucket{le="+Inf"})，按相同标签聚合；不是直接把+Inf/count当超尺比例。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-bucket', text: '结算服务重构时直方图桶边界被改为 100ms 封顶——所有超时请求落最后一桶，P99 结构性低估为 45ms，慢请求一个月不可见', correct: true },
+    { id: 'rc-bucket', text: '最大有限桶仅0.1秒，P99落入+Inf时经典histogram_quantile返回0.1秒；尾部未丢样但分辨率不足，不能呈现2.4秒尾部', correct: true },
     { id: 'rc-sample', text: '慢请求未被采样上报（采样偏差）', correct: false },
     { id: 'rc-client', text: '投诉用户端侧网络问题，服务端实际正常', correct: false },
     { id: 'rc-calc', text: 'P99 查询/聚合计算逻辑 bug', correct: false },
   ],
-
   expertCost: 5,
   restartActionId: 'a-fixbucket',
-
   expertChain: [
-    {
-      thought: '指标和 trace 打架——先别站队，把矛盾钉死：同一接口、同口径、同时间的对照。',
-      update: 'trace P99 2.4s vs 指标 P99 45ms，矛盾真实且巨大——两者必有一个在撒谎。',
-      actionId: 'a-impact',
-      why: '2⚡ 矛盾真实化是第一步：先证明"测量在撒谎"这个前提成立，才值得投入排查测量工具本身。',
-      conclusion: '矛盾实锤 → 检查指标是怎么算出来的。',
-    },
-    {
-      thought: '指标是直方图算的——去看"尺子"的刻度：桶边界配置。',
-      update: '桶边界最大 100ms：所有 >100ms 的请求全落最后一桶，P99 读数永远 ≤100ms——结构性低估实锤。',
-      actionId: 'a-bucket',
-      why: '2⚡ 直捣机制：分位数读数 ≤ 最大桶边界，这是直方图的数学性质——尺子短了，多长的东西都量成一样长。',
-      conclusion: '桶边界缺陷实锤（重构埋点引入）→ 排除其余假设，修尺子。',
-    },
-    {
-      thought: '采样/计算/端侧三个假设快速排除：全量上报 ✓、查询标准写法 ✓、服务端 trace 真慢 ✓。',
-      update: '尺子缺陷实锤 → 修复桶边界，并追溯尺子是谁刻错的。',
-      actionId: 'a-history',
-      why: '1⚡ 追溯埋点变更历史：一个月前重构时新 SDK 迁移，桶从覆盖 5s 变成 100ms 封顶——顺手的迁移成了最贵的疏忽。',
-      conclusion: '尺子刻错的时间点锁定：重构上线当日起，P99 读数永远 ≤100ms。',
-    },
-    {
-      thought: '采样/计算/端侧/历史全部闭合：修尺子 + 追溯通报 + 结算优化立项——停止收集。',
-      update: '停止收集。桶边界修复、超尺告警、结算优化三线并行。',
-      actionId: '',
-      why: '【停止规则】机制闭环：尺子 100ms 封顶 → P99 永远 ≤100ms → 慢请求不可见；三个排除项闭合、时间线锁定，无剩余假设。',
-      conclusion: '新桶对数分布覆盖 10s + 超尺告警；真实 P99 2.4s 首次如实呈现，结算优化立项。',
-    },
+    { actionId: 'a-impact', thought: '先把集合和计时范围对齐。', update: '同1000个请求的服务端时长与估计确有差异。', why: '1⚡排除口径不同和纯客户端解释，才能查测量机制。', conclusion: '继续查累计桶。' },
+    { actionId: 'a-bucket', thought: '计算99%序号落在哪个桶。', update: '990落入+Inf，按规则读0.1秒。', why: '2⚡用实际累计计数复算，不从边界猜出45ms。', conclusion: '桶范围不足已确认。' },
+    { actionId: 'a-sample', thought: '是否慢请求没有进入直方图。', update: '请求ID和count均覆盖同一1000次。', why: '1⚡排除只采了快请求的不同原因。', conclusion: '样本未丢，主要问题是尾部刻度。' },
+    { actionId: 'a-calc', thought: '保留le与rate顺序的实际查询是否正确。', update: '查询可按累计增量复算0.1秒。', why: '1⚡区分查询错误与输入桶分辨率不足。', conclusion: '错误候选全部有证据排除。' },
+    { actionId: '', thought: '停止；重设覆盖SLO与尾部的桶并回放验证估计误差，用+Inf减最高有限桶监测越界，继续独立调查实际结算慢因，不将修尺子等同修性能。', update: '停止收集，执行有条件的处置与复验。', why: '当前证据足以区分本题主要候选并决定处置；继续买同类材料不改变行动，修复后仍按相同条件验证。', conclusion: '停止；重设覆盖SLO与尾部的桶并回放验证估计误差，用+Inf减最高有限桶监测越界，继续独立调查实际结算慢因，不将修尺子等同修性能。' },
   ],
-
   lessons: [
-    {
-      text: '指标是测量工具算出来的：工具的参数（桶边界/采样率/聚合窗口）错了，指标就是错的。',
-      principle: '验证思维：相信任何指标之前，先看它的测量定义。指标与 trace/用户投诉打架时，优先怀疑"尺子"而不是现实。',
-    },
-    {
-      text: '直方图桶边界必须覆盖真实尾部：最大桶 100ms 的尺子，量不出 2 秒的灾难。',
-      principle: '程序设计纪律：延迟直方图用对数分布（10ms→10s），并在 +Inf 占比超阈值时告警——"超出尺子的请求变多了"本身就是故障信号。',
-    },
-    {
-      text: 'P99 正常不代表没问题：P999、+Inf 桶占比、全链路 trace，是指标的交叉验证。',
-      principle: '验证思维：单一指标会撒谎，交叉验证让谎言现形——用户投诉与指标打架时，永远相信 trace 和用户的体感。',
-    },
-    {
-      text: '重构时"顺手动过埋点"是最隐蔽的变更：埋点的变更评审，应该和代码变更同等严格。',
-      principle: '沉淀思维：埋点/告警/监控配置纳入代码评审范围——它们是工程师的眼睛，眼睛的度数变了，看到的世界就变了。',
-    },
+    { text: '经典直方图是累计桶，+Inf包含全部请求。', principle: '要算超最大有限桶比例，先用+Inf减该有限桶，再除总量。直接看+Inf/count会得到100%，不是长尾占比。' },
+    { text: '分位落入+Inf时，经典histogram_quantile返回次高桶上界。', principle: '本题最大有限桶.1秒，P99落入+Inf就返回.1，不是75ms或45ms。有限桶内还会插值，结果本身是估计而非原始排序精确值。' },
+    { text: 'trace和指标应先校准集合、计时范围、单位与窗口。', principle: '抽样不一样可以产生合法差异。原始时长与指标对照要有匹配依据，不能宣称永远相信某一种工具。' },
+    { text: '修监测不等于修业务慢因。', principle: '重新设计桶覆盖SLO阈值和尾部，并以回放检查误差；真实秒级处理仍需单独优化，改桶不会让它自动变快。' },
   ],
 }

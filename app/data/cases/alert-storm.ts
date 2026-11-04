@@ -1,12 +1,11 @@
 import { DiagnosisCase } from '../../types/case'
 
 /**
- * B1-5 · observability L2
- * 主训思维：产品思维（告警是为人服务的——信噪比就是可用性）
- * 次训思维：复盘思维（狼来了效应是真实的可用性事故）
- * 真实原型：一个 DB 慢查询根因触发 500+ 条连锁告警，P0 前兆被淹没
- * 情绪兽设计：恐怖蛙（恐慌）——五百条告警一起叫，人只会关掉通知
- * 检查单：思维型 3 + 知识型 1
+ * 大师篇校准：通知设计、送达与响应的可证据复盘。
+ * 按真实技术机制教学重建，不冒充原始事故。
+ * 六维：2/2/2/2/3/3，中位数半档向下取整，L2。
+ * 标准路径：a-impact → a-timeline → a-rules → a-response → a-skill；替代顺序：a-impact → a-rules → a-skill → a-response → a-timeline。
+ * 编审依据：content/baselines/t04b-master-product-calibration.md。
  */
 export const alertStormCase: DiagnosisCase = {
   id: 'alert-storm',
@@ -19,34 +18,23 @@ export const alertStormCase: DiagnosisCase = {
   order: 3,
   typeTags: ['observability', 'sre'],
   difficulty: 2,
-
   scene: {
-    role: '你是「鲜到家」平台工程组的负责人。值班工程师小王昨晚漏掉了 P0 前兆，他要背锅——但你知道，锅不在他。',
+    role: '你是平台工程负责人，要复盘昨晚未响应的主库风险信号。先核对通知链路、规则与值班条件，不预先断言个体有罪或无责。',
     architecture: '全部服务 → 统一告警群(无分级) → 值班工程师(一个人)',
-    tag: '故障现场',
+    tag: '教学重建',
     symptoms: [
-      {
-        type: 'error',
-        title: '值班群统计',
-        text: '昨晚 22:00~02:00 告警 523 条：\n"订单服务 P99 > 1s" ×187 条（同一告警每 15s 重发）\n"库存服务 timeout" ×143 条　"购物车 5xx" ×96 条　其余 ×97 条\n其中 1 条："主库慢查询数 > 50/min"——P0 前兆，无人响应。',
-      },
-      {
-        type: 'text',
-        title: '值班响应记录',
-        text: '22:10 值班工程师小王："全是超时，重启过了，观察。"\n22:40 小王把告警群设为免打扰。\n02:11 主库连接耗尽，下单全停——P0 事故。',
-      },
+      { type: 'error', title: '值班群统计', text: '22:00~02:00共523条通知：订单超时187、库存超时143、购物车5xx 96、其余97（其中主库慢查询规则32次）。\n“1条规则”不等于“只发1条通知”；需区分规则、事件和重发次数。' },
+      { type: 'text', title: '值班响应记录', text: '22:10 值班工程师小王："全是超时，重启过了，观察。"\n22:40 小王把告警群设为免打扰。\n02:11 主库连接耗尽，下单全停——P0 事故。' },
     ],
     timeline: '告警体系上线 8 个月从未分级 ｜ 近三周该群日均 300+ 条告警 ｜ 小王是本月第三位把群静音的值班工程师',
-    impactHint: '小王漏掉告警是"人"的问题吗？——如果是系统逼人忽略告警，锅应该给谁？',
+    impactHint: '平台发出了通知，不等于人已看到并理解；流程与个人响应均先核证据。',
   },
-
   hypotheses: [
-    { id: 'h-design', text: '告警体系设计缺陷：无分级、无聚合、无抑制——风暴是必然，漏看是必然', excludeActionId: 'a-rules' },
-    { id: 'h-fatigue', text: '狼来了效应：连续三周低质告警让值班员形成忽略习惯', excludeActionId: 'a-response' },
-    { id: 'h-channel', text: '通知渠道故障：P0 告警根本没送达', excludeActionId: 'a-channel' },
-    { id: 'h-skill', text: '值班员能力不足：看不懂告警', excludeActionId: 'a-skill' },
+    { id: 'h-design', text: '通知设计缺少优先级路由/聚合/升级确认，形成重复噪声且未保护可行动的主库风险信号', excludeActionId: 'a-rules' },
+    { id: 'h-fatigue', text: '只更换值班员即可解决，通知设计无需改变', excludeActionId: 'a-response' },
+    { id: 'h-channel', text: '告警未送达值班群，是通知传输失败', excludeActionId: 'a-timeline' },
+    { id: 'h-skill', text: '本次遗漏主要因为值班员不认识这条告警含义', excludeActionId: 'a-skill' },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -56,13 +44,11 @@ export const alertStormCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: [],
-      hypotheses: [{ id: 'h-design', status: 'up' }],
-      result: {
-        type: 'text',
-        title: '告警画像',
-        text: '523 条里：同一告警重发 187 次（15s 间隔无静默）；\n"订单超时/库存超时/购物车 5xx" 全部是"主库慢"的下游症状；\nP0 前兆"主库慢查询数"只有 1 条，与其他告警完全同权。\n→ 风暴 = 一个根因 × 无聚合 × 无分级。',
-      },
+      tests: ['h-design'],
+      hypotheses: [
+        { id: 'h-design', status: 'up' },
+      ],
+      result: { type: 'text', title: '通知/规则/事件分别计数', text: '523是通知次数，187是订单告警重发次数，平台共有187条规则，两种187恰好同数但不是同一统计。\n关联事件ID与请求记录：多个下游超时与主库资源压力相连；仅凭同时间或文本相似不足以把全部523条定为一个根因。' },
     },
     {
       id: 'a-timeline',
@@ -72,13 +58,12 @@ export const alertStormCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-channel'],
-      hypotheses: [{ id: 'h-channel', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '前兆时间线',
-        text: '23:20 "主库慢查询数 > 50/min" 首次触发（送达 ✓）\n23:20~02:00 同告警每 5 分钟重发 32 次，无人响应\n02:11 主库连接耗尽，下单全停\n→ 告警送达了，响应没有——从"可以救"到"救不了"，宽窗口 2 小时 51 分钟。',
-      },
+      tests: ['h-channel', 'h-design'],
+      hypotheses: [
+        { id: 'h-channel', status: 'excluded' },
+        { id: 'h-design', status: 'up' },
+      ],
+      result: { type: 'text', title: '送达与确认时间线', text: '主库风险规则23:20首次触发，至01:55按5分钟间隔共32次送达同一群；02:11连接耗尽。\n从首信号到事故相隔171分钟，但这不证明所有时刻都可挽救。平台送达回执只证明到群，没有个人阅读/确认回执或无人确认后的升级动作。' },
     },
     {
       id: 'a-rules',
@@ -89,12 +74,10 @@ export const alertStormCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-design'],
-      hypotheses: [{ id: 'h-design', status: 'confirmed' }],
-      result: {
-        type: 'text',
-        title: '告警体系审计',
-        text: '187 条告警规则：100% 固定阈值、0 分级、0 聚合、0 抑制、0 静默窗口。\n→ 无 P0~P3 分级；同源告警不聚合；关联故障无抑制；维护窗口无静默。\n风暴是体系设计的必然输出，昨夜只是第一次撞上大促前夜。',
-      },
+      hypotheses: [
+        { id: 'h-design', status: 'confirmed' },
+      ],
+      result: { type: 'text', title: '实际路由与离线回放', text: '已加载路由将全部严重度发同一群；同一事件未聚合，主库风险无人确认时也不升级。固定阈值本身不是缺陷。\n按昨夜通知记录离线回放新的分组/路由：保留全部原事件证据，聚合重复通知，主库可行动风险按runbook单独寻呼；再测试依赖抑制不会遮住独立故障。' },
     },
     {
       id: 'a-response',
@@ -105,12 +88,10 @@ export const alertStormCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-fatigue'],
-      hypotheses: [{ id: 'h-fatigue', status: 'confirmed' }],
-      result: {
-        type: 'text',
-        title: '响应率曲线',
-        text: '近三周该群告警响应率：W1 78% → W2 34% → W3 9%。\n同期日均告警量：210 → 340 → 380 条，其中 97% 为重复/低价值。\n→ 狼来了效应实锤：人对告警的响应率，是告警体系健康度的反向指标。',
-      },
+      hypotheses: [
+        { id: 'h-fatigue', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '响应记录与同输入演练', text: '近三周记录到群内确认比例78%→34%→9%，通知量210→340→380/日；这是关联，不能独立证明心理机制。\n相同历史输入的隔离演练中，4位轮值者有2位漏读原始流；改为保留事件详情的分组与风险升级后4位都确认。它支持改设计，不能承诺任何人未来都不会漏。' },
     },
     {
       id: 'a-channel',
@@ -121,12 +102,10 @@ export const alertStormCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-channel'],
-      hypotheses: [{ id: 'h-channel', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '送达核对',
-        text: '告警平台发送记录：523 条全部送达值班群（含 P0 前兆）。\n→ 渠道无辜：送到了，被淹了。',
-      },
+      hypotheses: [
+        { id: 'h-channel', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '送达核对', text: '平台与接收端回执对应523次到群；实际人员阅读、通知设备可达和升级确认是其他环节，不能把到群当已被有效处理。' },
     },
     {
       id: 'a-skill',
@@ -137,12 +116,10 @@ export const alertStormCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-skill'],
-      hypotheses: [{ id: 'h-skill', status: 'excluded' }],
-      result: {
-        type: 'text',
-        title: '小王的陈述',
-        text: '"前两周处理的全是重启就能好的超时告警，我以为这批也是。"\n"主库那条我没看到——翻到第 40 屏的时候我已经在处理第 3 次重启了。"\n→ 能力无问题：给任何人 500 条同级告警，都会漏。',
-      },
+      hypotheses: [
+        { id: 'h-skill', status: 'excluded' },
+      ],
+      result: { type: 'text', title: '小王的陈述', text: '访谈与历史处理记录显示该值班员能解释该主库规则，并曾按相同runbook正确处置；本次报告是未看到而非看不懂。\n这排除本题“主要因不认识含义”的候选，不对个人所有能力或全部责任作免检结论。' },
     },
     {
       id: 'a-benchmark',
@@ -153,104 +130,56 @@ export const alertStormCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: ['h-design'],
-      hypotheses: [{ id: 'h-design', status: 'confirmed' }],
-      result: {
-        type: 'text',
-        title: '差距清单',
-        text: '分级：P0 电话呼叫 / P1 群置顶 / P2 群普通 / P3 日报 ← 现状全无\n聚合：同源症状收敛为一个"事件" ← 现状每 15s 重发\n抑制：根因告警触发时自动静默下游症状告警 ← 现状全无\n→ 四项补齐后预估告警量：523 → 3 条（P0 前兆 1 + 事件 1 + 恢复 1）。',
-      },
+      hypotheses: [
+        { id: 'h-design', status: 'confirmed' },
+      ],
+      result: { type: 'text', title: '差距清单', text: '按组织风险与可行动性选择寻呼/工单/汇总；Alertmanager可分组、路由、抑制。抑制必须匹配真实依赖与独立异常，不能简单“主库报警就静默所有下游”。\n通知减少量需离线回放及演练测量，不预言523必变3或今后100%触达。' },
     },
     {
       id: 'a-redesign',
-      name: '重构告警分级与聚合',
-      desc: '【状态变更】分级/聚合/抑制三件套上线',
+      name: '修复：分组、路由与升级确认',
+      desc: '保留证据，按可行动风险设通知与确认升级',
       cost: 2,
-      gain: 'high',
+      gain: 'none',
       danger: false,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '重构结果',
-        text: 'P0 电话呼叫 + P1 群置顶；同源告警收敛为事件（15s 重发改事件更新）；\n主库慢查询触发时自动抑制下游超时类告警。\n灰度一周：日均告警 380 → 4 条，P0 触达 100% 电话呼叫。',
-      },
+      result: { type: 'text', title: '重构结果', text: '先回放与灰度，核对独立故障不被误抑制；对需要即时人工行动的信号设确认超时与升级，其他进入工单或汇总。记录漏检/误报及响应耗时，不以通知数量减少作为唯一验收。' },
     },
     {
       id: 'a-blame',
       name: '把小王记为事故责任人',
       desc: '【状态变更】按人因事故处理',
-      cost: 1,
+      cost: 8,
       gain: 'none',
       danger: true,
       effects: [],
       tests: [],
       hypotheses: [],
-      result: {
-        type: 'text',
-        title: '这个决定的效果',
-        text: '小王被通报批评。下个月的值班响应率进一步降到 4%，两位工程师申请调岗。\n→ 给人的系统加人的责罚，只会加速系统的崩溃。此选项仅作为反面教学：真正的修复在体系。',
-      },
+      result: { type: 'text', title: '这个决定的效果', text: '未核对规则、设备、到群/阅读/升级链路就只做个人处分，无法修复已证实的系统缺口；也不能凭这一个决定预言下月响应率或人员离职。复盘应追可改进条件与具体责任证据。' },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-design', text: '告警体系设计缺陷：187 条规则 100% 固定阈值、零分级零聚合零抑制——一个 DB 慢查询根因产出 523 条同权告警淹没 P0 前兆，漏看是体系的必然输出而非人的过失', correct: true },
-    { id: 'rc-fatigue', text: '值班工程师连续三周被低价值告警训练出忽略习惯（响应率 78%→9%）', correct: false },
-    { id: 'rc-channel', text: '通知渠道故障，P0 告警未送达', correct: false },
-    { id: 'rc-skill', text: '值班工程师能力不足，看不懂告警', correct: false },
+    { id: 'rc-design', text: '告警路由将不同风险同权发送，重复事件不聚合且无人确认不升级；送达到群未转化为可行动响应，需要系统改进并继续核对具体响应责任', correct: true },
+    { id: 'rc-fatigue', text: '只更换值班员即可，现有通知体系无需改变', correct: false },
+    { id: 'rc-channel', text: '这批告警没有送到群，完全由传输故障造成', correct: false },
+    { id: 'rc-skill', text: '本次遗漏主要因为值班员不认识主库告警含义', correct: false },
   ],
-
-  expertCost: 9,
+  expertCost: 7,
   restartActionId: 'a-blame',
-
   expertChain: [
-    {
-      thought: '先别急着定责——统计五百条告警的构成画像，看看风暴是"很多问题"还是"一个问题的一千张脸"。',
-      update: '523 条 = 一个主库慢查询根因 × 无聚合无分级；P0 前兆与其他告警完全同权。',
-      actionId: 'a-impact',
-      why: '1⚡ 告警画像是分诊第一步：风暴是"很多问题"还是"一个问题的一千张脸"，决定了修人还是修体系。',
-      conclusion: '同源风暴确认 → 还原 P0 前兆的响应时间线。',
-    },
-    {
-      thought: '还原那条被淹没的 P0 前兆：它送达了吗？什么时候送的？——"没看到"和"没送到"是两种事故。',
-      update: '告警送达了，前兆窗口 2 小时 51 分钟无人响应——"没看到"实锤，但原因待查。',
-      actionId: 'a-timeline',
-      why: '2⚡ 时间线还原区分两种事故：渠道故障（没送到）与信息淹没（送到了没看到）——前者修渠道，后者修体系。',
-      conclusion: '送达实锤 + 响应缺失 → 继续查为什么没人看。',
-    },
-    {
-      thought: '审告警规则的设计本身：分级、聚合、抑制、静默——四个能力一个一个对。',
-      update: '187 条规则全是固定阈值，四个能力全部为零——体系从设计上就无法区分 P0 和 P3。',
-      actionId: 'a-rules',
-      why: '2⚡ 体系审计直击根因：当所有告警长一个样，"漏掉重要的"就不是人的失误，而是体系的数学必然。',
-      conclusion: '体系缺陷实锤 → 对标业界量化差距。',
-    },
-    {
-      thought: '响应率曲线和小王的陈述证明：任何人在 500 条同权告警里都会漏——人因是体系缺陷的结果，不是原因。',
-      update: '停止定责。修复分级/聚合/抑制三件套；小王的"处理"选项本身就是反面教材。',
-      actionId: '',
-      why: '【停止规则】证据完全闭合：送达 ✓、淹没 ✓、体系四能力为零 ✓、狼来了效应 ✓。给体系缺陷记人过，只会加速崩溃。',
-      conclusion: '重构分级/聚合/抑制三件套（告警 380→4 条，P0 电话触达）；响应率作为告警体系健康度的常驻指标。',
-    },
+    { actionId: 'a-impact', thought: '先区分规则、事件与通知次数。', update: '重复重发与风险信号同群。', why: '1⚡明确故障信息结构，不把523直接当523个根因。', conclusion: '继续分开传输与响应。' },
+    { actionId: 'a-timeline', thought: '重建首信号、回执和无人确认链。', update: '32次到群，首信号至事故171分钟，未升级。', why: '2⚡排除传输未达，定位从到群到响应的缺口。', conclusion: '到群不是读到。' },
+    { actionId: 'a-rules', thought: '核对实际路由及同输入回放。', update: '无分组/优先路由/确认升级。', why: '2⚡用配置和演练支持通知设计缺陷，非固定阈值有罪。', conclusion: '主要系统缺陷成立。' },
+    { actionId: 'a-response', thought: '只换人是否足够。', update: '多人同输入也漏读，改设计演练改善。', why: '1⚡排除把响应率曲线直接当心理因果或个人定论。', conclusion: '需要设计修复，效果仍需灰度。' },
+    { actionId: 'a-skill', thought: '本次是否不理解告警。', update: '同规则已有正确处置记录，本次是未看到。', why: '1⚡核对具体能力候选，而不概括个人是否有责。', conclusion: '列举候选均有证据，转入改进。' },
+    { actionId: '', thought: '停止本轮归因，修分组/路由/确认升级并验证独立故障不被误抑制；保留事件证据与具体责任核查，不宣称任何人必然漏或系统改进保证零遗漏。', update: '停止收集，执行有条件的处置与复验。', why: '当前证据足以区分本题主要候选并决定处置；继续买同类材料不改变行动，修复后仍按相同条件验证。', conclusion: '停止本轮归因，修分组/路由/确认升级并验证独立故障不被误抑制；保留事件证据与具体责任核查，不宣称任何人必然漏或系统改进保证零遗漏。' },
   ],
-
   lessons: [
-    {
-      text: '告警是为人服务的：信噪比就是可用性——没有人能在 500 条同权告警里保证不漏。',
-      principle: '产品思维：告警系统的"用户"是凌晨三点半的值班工程师。日均告警量的响应率曲线是体系健康度的反向指标——响应率跌破 50%，体系已经在制造事故。',
-    },
-    {
-      text: '同源告警必须聚合：一个根因的五百个症状，应该收敛成一条带计数的事件，而不是五百条独立告警。',
-      principle: '告警三件套：分级（P0 电话/P1 置顶/P2 普通）、聚合（同源收敛为事件带计数）、抑制（根因告警触发时静默下游症状）。三者缺一，风暴只是时间问题。',
-    },
-    {
-      text: '每一条告警都必须"需要一个人类做决策"，否则它是日志，不是告警。',
-      principle: '告警资格测试：收到这条告警后，值班员应该做什么？答不出具体动作的告警，降级为日报或删除——告警的价值在于"可行动"，不在于"我记得配过它"。',
-    },
-    {
-      text: '狼来了效应是真实的可用性事故：响应率 78%→9% 的曲线，就是 P0 被漏掉的完整前史。',
-      principle: '沉淀思维：把"值班响应率"做成监控指标——它恶化是告警体系在制造麻痹，修复它比修任何一个阈值都更能提升可用性。',
-    },
+    { text: '送达到群、有人阅读与有效响应是不同环节。', principle: '通知回执不能代替确认与升级；按风险和行动时限设计通知链。' },
+    { text: '通知噪声与响应率相关，不足以单独证明心理因果。', principle: '结合实际规则、输入回放与具体响应记录评估系统缺陷；不从曲线对任何个人下全面能力结论。' },
+    { text: '分组和抑制应保留真实事件与独立故障检测。', principle: '可行动的风险信号应有明确处置与升级，其他可进工单或汇总；不是所有前兆都应寻呼，也不是主因报警后全部下游都该静默。' },
+    { text: '事后复盘要围绕可证实条件与可改进行动。', principle: '不预言处分或换人后会出现何种精确数字。用回放、漏检、误报和响应耗时验收设计，而非单看通知量下降。' },
   ],
 }
