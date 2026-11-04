@@ -670,7 +670,7 @@ A批适用A01至A16、A22、A24至A25，按该批实际交付边界验收；A15�
 | 任务 | 状态 | 负责人 | PR或提交 | 验证证据 | 待处理事项 |
 |---|---|---|---|---|---|
 | T01 | 本地实现与验收完成；远端门禁待触发 | 主实施会话 | `6254224`、`12168be` | 本地 MySQL 8.0.45 全套后端 205 passed；Ruff 检查/格式、compileall 通过；CI 配置已合入 | GitHub Actions、分支保护和密钥扫描远端拦截未实证 |
-| T02 | PNVS 本地接入完成；真实短信待外部条件 | 主实施会话 | `2a43ef0`、`c4554a8`、本轮 | PNVS SDK 参数映射与 PASS/UNKNOWN 回归；临时 MySQL 8 定向认证/迁移 18 passed；Ruff、格式与 compileall 通过。未访问真实阿里云 | 个人阿里云账号需开通 PNVS、设置系统签名/模板和 AccessKey，再用受控号码验收真实收发 |
+| T02 | PNVS 本地接入完成；真实短信待外部条件 | 主实施会话 | `2a43ef0`、`c4554a8`、`65e28fc` | PNVS SDK 参数映射与 PASS/UNKNOWN 回归；临时 MySQL 8 定向认证/迁移 18 passed；Ruff、格式与 compileall 通过。未访问真实阿里云 | 个人阿里云账号需开通 PNVS、设置系统签名/模板和 AccessKey，再用受控号码验收真实收发 |
 | T04A | 已实现，待批次独立评审 | 主实施会话 | `531cb18` | 四题 validate、基线、目录测试通过；first-npe/caused-by 已按专家路径完成校准并冻结 `calibratedHash`；log-correlation/async-swallow 明确保持 `uncalibrated` | 后两题仍需人工事实/双路径/评分走验；未校准题不得扩量 |
 | T05 | 固定主线门槛第一阶段已实现 | 主实施会话 | 工作区 | 试玩目录固定；章节完成/挑战关优先使用显式 `MAINLINE_CASE_IDS`，避免首批主线被同章选做题扩张 | 仍需接入 T03 历史解锁资格迁移，并核定其余章节的冻结必修集合 |
 | T09A | 最小版本与发布分发已实现，待批次独立评审 | 主实施会话 | `531cb18` | `content_revision/source_*` 新迁移、发布幂等与 stale baseRevision 冲突、文章投影、索引任务均在同一事务；固定 head 同步；MySQL8 定向 38 passed | 仍需补齐 App 真实有效版本读取与开局快照验收；完整内容维护归 T09B |
