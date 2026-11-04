@@ -2,6 +2,7 @@
 
 import time
 import uuid
+from typing import Any
 
 from fastapi import HTTPException
 
@@ -15,6 +16,7 @@ from features.submissions.review import (  # 跨feature只使用本模块公开�
     require_publication_review,
     save_material,
     save_review,
+    validate_publication,
 )
 
 SUBMISSION_DAILY_LIMIT = 20
@@ -48,7 +50,7 @@ def create_submission(uid: str, body: SubmissionCreate) -> dict:
     return {"id": sid, "status": "pending", "duplicate": False}
 
 
-def _view(conn, row, editor: bool = False) -> dict:
+def _view(conn: Any, row: Any, editor: bool = False) -> dict:
     case = repo.case_for_submission(conn, row)
     if case and case["status"] == "published":
         display = "published"

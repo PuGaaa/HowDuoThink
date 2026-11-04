@@ -21,7 +21,7 @@ const decisions = [{ label: '独立训练价值，可制作新题', value: 'dist
 const canReview = computed(() => [review.mechanism, review.evidence, review.reasoning].every((v) => v.trim().length >= 4) && candidates.value.every((c) => checked.value.includes(c.key)) && (review.decision !== 'merge' || review.targetId.length > 0))
 const canDraft = computed(() => detail.value?.materialConfirmed && detail.value.review.decision === 'distinct' && !detail.value.linkedCaseId && !detail.value.parentSubmissionId)
 
-const kindLabels: Record<string, string> = {material:'脱敏版本存档',review:'人工裁定存档',note:'内部备注',feedback:'编辑反馈',supplement:'作者补件',consent:'公开范围确认'}
+const kindLabels: Record<string, string> = {draft_archived:'独立草稿归档',material:'脱敏版本存档',review:'人工裁定存档',note:'内部备注',feedback:'编辑反馈',supplement:'作者补件',consent:'公开范围确认'}
 onMounted(() => load().catch((e: Error) => message.error(e.message)))
 async function load() {
   const [row, matches] = await Promise.all([submissionApi.detail(props.id), submissionApi.similar(props.id)])
