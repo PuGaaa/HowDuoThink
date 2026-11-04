@@ -152,7 +152,7 @@ def random_nickname() -> str:
 
 
 def send_sms_code(phone: str) -> dict:
-    """生成并下发验证码；60s 重发限频，通道不可用映射 503。"""
+    """请求 PNVS 生成并下发验证码；受控重发，通道不可用映射 503。"""
     import db as _db
 
     last = _db.q("SELECT created_at FROM sms_codes WHERE phone=?", (phone,))
@@ -164,36 +164,58 @@ def send_sms_code(phone: str) -> dict:
         t = datetime.datetime.strptime(created, "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
         if time.time() - t < sms_core.resend_interval_sec():
             raise HTTPException(429, "发送太频繁，稍后再试")
-    code = sms_core.new_code()
+    out_id = sms_core.new_out_id()
     expires = int(time.time()) + sms_core.code_ttl_sec()
-    _db.ex(
-        "INSERT INTO sms_codes(phone, code, expires_at, used) VALUES(?,?,?,0) "
-        "ON CONFLICT(phone) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at, used=0, created_at=datetime('now')",
-        (phone, code, expires),
-    )
     try:
-        return sms_core.send_code(phone, code)
+        result = sms_core.send_code(phone, out_id)
     except sms_core.SmsChannelUnavailable as e:
         raise HTTPException(503, str(e))
+    _db.ex(
+        "INSERT INTO sms_codes(phone, out_id, expires_at, used) VALUES(?,?,?,0) "
+        "ON CONFLICT(phone) DO UPDATE SET out_id=excluded.out_id, expires_at=excluded.expires_at, used=0, created_at=datetime('now')",
+        (phone, out_id, expires),
+    )
+    return result
 
 
-def _consume_code(conn, phone: str, code: str) -> None:
-    """在给定事务连接上原子消费验证码：单条 UPDATE 的 rowcount 判定。
-    原"先读后写"两步在并发下同一验证码可双花；失败/过期在此计一次防爆破失败。"""
+def _verify_code(phone: str, code: str) -> str:
+    """向 PNVS 核验验证码，返回关联挑战 ID；失败/过期计入防爆破。"""
+    import db as _db
+
     key = "sms:" + phone
     _throttle_check(key)
     now = int(time.time())
-    cur = conn.execute(
-        "UPDATE sms_codes SET used=1 WHERE phone=? AND used=0 AND code=? AND expires_at>?",
-        (phone, code, now),
+    rows = _db.q(
+        "SELECT out_id, expires_at FROM sms_codes WHERE phone=? AND used=0",
+        (phone,),
     )
-    if cur.rowcount != 1:
+    if not rows:
         _throttle_fail(key)
-        row = conn.execute("SELECT expires_at FROM sms_codes WHERE phone=?", (phone,)).fetchone()
-        if row and row["expires_at"] is not None and int(row["expires_at"]) <= now:
-            raise HTTPException(401, "验证码已过期，请重新获取")
+        raise HTTPException(401, "验证码错误")
+    row = rows[0]
+    if int(row["expires_at"]) <= now:
+        _throttle_fail(key)
+        raise HTTPException(401, "验证码已过期，请重新获取")
+    try:
+        valid = sms_core.verify_code(phone, row["out_id"], code)
+    except sms_core.SmsChannelUnavailable as e:
+        raise HTTPException(503, str(e))
+    if not valid:
+        _throttle_fail(key)
         raise HTTPException(401, "验证码错误")
     _throttle_clear(key)
+    return row["out_id"]
+
+
+def _consume_code(conn, phone: str, out_id: str) -> None:
+    """事务内原子消费已通过 PNVS 核验的挑战，确保同一短信只能登录/绑定一次。"""
+    now = int(time.time())
+    cur = conn.execute(
+        "UPDATE sms_codes SET used=1 WHERE phone=? AND out_id=? AND used=0 AND expires_at>?",
+        (phone, out_id, now),
+    )
+    if cur.rowcount != 1:
+        raise HTTPException(401, "验证码已失效，请重新获取")
 
 
 def phone_login(phone: str, code: str) -> dict:
@@ -202,8 +224,9 @@ def phone_login(phone: str, code: str) -> dict:
     existing = db.q("SELECT id, login, role, name FROM users WHERE phone=?", (phone,))
     if existing:
         ensure_active(existing[0]["id"])
+    out_id = _verify_code(phone, code)
     with db.tx() as conn:
-        _consume_code(conn, phone, code)
+        _consume_code(conn, phone, out_id)
         if existing:
             return {
                 "id": existing[0]["id"],
@@ -244,12 +267,15 @@ def phone_login(phone: str, code: str) -> dict:
 
 
 def bind_phone(uid: str, phone: str, code: str) -> dict:
-    """已登录用户绑定手机号：绑定后可用验证码登录同一账号（注册互通的关键）。
-    验码消费与绑定同事务：绑定冲突回滚后验证码不被烧掉。"""
+    """已登录用户绑定手机号：先检查归属，再验码并在事务内消费挑战与绑定。"""
+    rows = db.q("SELECT id FROM users WHERE phone=?", (phone,))
+    if rows and rows[0]["id"] != uid:
+        raise HTTPException(409, "该手机号已绑定其他账号")
+    out_id = _verify_code(phone, code)
     with db.tx() as conn:
-        _consume_code(conn, phone, code)
         rows = conn.execute("SELECT id FROM users WHERE phone=?", (phone,)).fetchall()
         if rows and rows[0]["id"] != uid:
             raise HTTPException(409, "该手机号已绑定其他账号")
+        _consume_code(conn, phone, out_id)
         conn.execute("UPDATE users SET phone=? WHERE id=?", (phone, uid))
     return {"ok": True, "phone": phone}

@@ -61,7 +61,7 @@
 
 | 问题 | 当前证据或表现 | 对应任务 |
 |---|---|---|
-| I01 真实短信缺失 | `server/core/sms.py` 的阿里云 Sender 仍未实现 | T02 |
+| I01 真实短信通道不适用 | 原实现走企业资质短信服务 `DysmsAPI SendSms`，不能满足个人认证账号的接入条件 | T02 |
 | I02 跨端身份断点 | Web 仅账密；校验固定查询 `pw-`，手机建号为 `ph-`；App 自造部分用户身份 | T02 |
 | I03 同步覆盖与串账号 | 手动同步先覆盖后拉取；本地玩法 key 无账号隔离；在途请求未绑定归属 | T03 |
 | I04 成绩合并错误 | 最低成本取大；累计快照无法精确合并双端新增；旧成绩缺版本 | T03 |
@@ -376,9 +376,9 @@ T04、T08、T09为工作包，各拆A/B子任务以区分首批必需能力和�
 
 文件：`server/core/sms.py`、`server/features/auth/{router,service,models}.py`、`app/utils/auth.ts`、`app/pages/login/login.uvue`、`app/pages/profile-edit/profile-edit.uvue`、`web/app.vue`、对应账号组件和依赖锁文件。
 
-- [ ] 接入阿里云同一 SDK；开发和生产只改配置，不保留本地回显作为另一套验收实现。自动测试可隔离 SDK，人工验收必须真收码。
-- [ ] App/Web 手机与账密入口返回真实身份；保留旧账号及绑定手机号能力；不新增 GitHub OAuth。
-- [ ] 修复手机账号有密码却查不到、App 拼接身份和昵称保存遗漏。
+- [x] 使用阿里云号码认证服务（PNVS）SDK 的 `SendSmsVerifyCode` 与 `CheckSmsVerifyCode`；由阿里云生成/核验验证码，数据库只存挑战流水号。开发和生产只改配置，不保留本地回显作为另一套验收实现。自动测试可隔离 SDK，人工验收必须真收码。
+- [x] App/Web 手机与账密入口返回真实身份；保留旧账号及绑定手机号能力；不新增 GitHub OAuth。
+- [x] 修复手机账号有密码却查不到、App 拼接身份和昵称保存遗漏。
 - [ ] 登录态、退出和跨端 cookie/Bearer 按实际部署域名联调。
 
 验收：新手机建号、已有手机登录、密码账号绑定手机、手机账号设置密码后账密登录均指向预期同一账号；两端资料一致；默认验证码不再自动回显。
@@ -657,7 +657,7 @@ A批适用A01至A16、A22、A24至A25，按该批实际交付边界验收；A15�
 | D03 | 正式H5、Web、API地址及部署关系 | 一套明确域名与会话策略；业务地址通过配置进入构建和运行 | T02跨端联调、T06入口、T12二维码 |
 | D04 | 成长称号首轮门槛 | 采用首关、三关、章节、跨层、错案等里程碑后定具体称号 | T08表现层，任务正确性先修 |
 | D05 | 普通接口与索引时效的性能目标 | 先量化当前分段基线，再共同确定p95/p99、错误率和资源预算 | T13架构决策，不预设重写Java |
-| D06 | 外部依赖准备情况 | 阿里云资质、签名、模板与真实测试号码；受控环境配置由负责人准备 | 真实短信验收，不阻塞内容校准和同步开发 |
+| D06 | 短信产品与账号条件 | 已确定使用适用于个人认证账号的 PNVS；仍需账号开通服务、选择系统签名/模板、配置 AccessKey 与测试号码 | 真实短信验收，不阻塞其他本地实现 |
 
 固定三题、第三题完整复盘后提示、历史无归属数据主动认领、官方TS和社区DB各自唯一源等实现细则在整体计划评审时一并确认。后续出现新的业务选择，先更新对应规则，不让不同任务各自决定。
 
@@ -670,7 +670,7 @@ A批适用A01至A16、A22、A24至A25，按该批实际交付边界验收；A15�
 | 任务 | 状态 | 负责人 | PR或提交 | 验证证据 | 待处理事项 |
 |---|---|---|---|---|---|
 | T01 | 本地实现与验收完成；远端门禁待触发 | 主实施会话 | `6254224`、`12168be` | 本地 MySQL 8.0.45 全套后端 205 passed；Ruff 检查/格式、compileall 通过；CI 配置已合入 | GitHub Actions、分支保护和密钥扫描远端拦截未实证 |
-| T02 | 本地代码完成；真实短信待外部条件 | 主实施会话 | `2a43ef0`、`c4554a8` | 手机验证码与账密入口保留；阿里云 SDK 单通道；前序 Web 登录截图和账号测试 | 资质、签名、模板、真实测试号码与收发验收仍未具备 |
+| T02 | PNVS 本地接入完成；真实短信待外部条件 | 主实施会话 | `2a43ef0`、`c4554a8`、本轮 | PNVS SDK 参数映射与 PASS/UNKNOWN 回归；临时 MySQL 8 定向认证/迁移 18 passed；Ruff、格式与 compileall 通过。未访问真实阿里云 | 个人阿里云账号需开通 PNVS、设置系统签名/模板和 AccessKey，再用受控号码验收真实收发 |
 | T04A | 已实现，待批次独立评审 | 主实施会话 | `531cb18` | 四题 validate、基线、目录测试通过；first-npe/caused-by 已按专家路径完成校准并冻结 `calibratedHash`；log-correlation/async-swallow 明确保持 `uncalibrated` | 后两题仍需人工事实/双路径/评分走验；未校准题不得扩量 |
 | T05 | 固定主线门槛第一阶段已实现 | 主实施会话 | 工作区 | 试玩目录固定；章节完成/挑战关优先使用显式 `MAINLINE_CASE_IDS`，避免首批主线被同章选做题扩张 | 仍需接入 T03 历史解锁资格迁移，并核定其余章节的冻结必修集合 |
 | T09A | 最小版本与发布分发已实现，待批次独立评审 | 主实施会话 | `531cb18` | `content_revision/source_*` 新迁移、发布幂等与 stale baseRevision 冲突、文章投影、索引任务均在同一事务；固定 head 同步；MySQL8 定向 38 passed | 仍需补齐 App 真实有效版本读取与开局快照验收；完整内容维护归 T09B |
@@ -720,7 +720,10 @@ A批适用A01至A16、A22、A24至A25，按该批实际交付边界验收；A15�
 
 外部技术依据：
 
-- [阿里云短信接入流程](https://help.aliyun.com/zh/sms/getting-started/get-started-with-sms)：签名、模板和资质是短信接入的前置条件。
+- [阿里云个人开发者短信认证指引](https://help.aliyun.com/zh/pnvs/use-cases/sms-verify-for-individual-developers)：个人认证用户可使用 PNVS 系统签名和模板接入短信认证。
+- [PNVS SendSmsVerifyCode API](https://help.aliyun.com/zh/pnvs/developer-reference/api-dypnsapi-2017-05-25-sendsmsverifycode)：发送时使用 `##code##` 由阿里云生成验证码，并返回外部流水号。
+- [PNVS CheckSmsVerifyCode API](https://help.aliyun.com/zh/pnvs/developer-reference/api-dypnsapi-2017-05-25-checksmsverifycode)：核验时检查 `Model.VerifyResult` 是否为 `PASS`。
+- [PNVS 短信认证计费与开通](https://help.aliyun.com/zh/pnvs/getting-started/sms-authentication-service-novice-guide)：短信认证独立开通和计费，短信服务套餐不能抵扣。
 - [FastAPI同步与异步执行](https://fastapi.tiangolo.com/async/)：同步路由在线程池运行，直接调用的同步工具函数不会自动变成非阻塞。
 - [FastAPI进程与内存](https://fastapi.tiangolo.com/deployment/concepts/)：多个进程通常各有模型与内存副本，扩容须结合实测预算。
 - [Sentence Transformers语义检索](https://www.sbert.net/examples/sentence_transformer/applications/semantic-search/README.html)：相似检索用于候选排序，教学重复裁定另由编辑完成。

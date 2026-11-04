@@ -18,19 +18,26 @@ alibabacloud-credentials==1.0.12
     #   alibabacloud-tea-openapi
 alibabacloud-credentials-api==1.0.1
     # via alibabacloud-credentials
-alibabacloud-dysmsapi20170525==4.6.0
+alibabacloud-dypnsapi20170525==2.0.0
     # via -r server/requirements.in
+alibabacloud-endpoint-util==0.0.4
+    # via alibabacloud-dypnsapi20170525
 alibabacloud-gateway-spi==0.0.4
     # via alibabacloud-tea-openapi
+alibabacloud-openapi-util==0.2.4
+    # via alibabacloud-dypnsapi20170525
 alibabacloud-tea==0.4.3
     # via
     #   alibabacloud-credentials
     #   alibabacloud-tea-util
     #   darabonba-core
 alibabacloud-tea-openapi==0.4.6
-    # via alibabacloud-dysmsapi20170525
+    # via alibabacloud-dypnsapi20170525
 alibabacloud-tea-util==0.3.15
-    # via alibabacloud-tea-openapi
+    # via
+    #   alibabacloud-dypnsapi20170525
+    #   alibabacloud-openapi-util
+    #   alibabacloud-tea-openapi
 aliyun-python-sdk-core==2.16.1
     # via
     #   aliyun-python-sdk-kms
@@ -79,7 +86,7 @@ cryptography==50.0.2
     #   aliyun-python-sdk-core
 darabonba-core==1.0.10
     # via
-    #   alibabacloud-dysmsapi20170525
+    #   alibabacloud-dypnsapi20170525
     #   alibabacloud-tea-openapi
 distro==1.9.0
     # via langsmith

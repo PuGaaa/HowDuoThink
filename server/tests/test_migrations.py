@@ -161,6 +161,28 @@ def test_case_revision_schema(new_database):
         engine.dispose()
 
 
+def test_0010_discards_legacy_sms_codes_and_adds_provider_challenge(new_database):
+    new_database()
+    command.upgrade(migrate._cfg(), "0009_case_revision_audit")
+    engine = sa.create_engine(config.mysql_database_url())
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                sa.text("INSERT INTO sms_codes(phone,code,expires_at,used) VALUES('13800001234','123456',9999999999,0)")
+            )
+        command.upgrade(migrate._cfg(), "head")
+        with engine.connect() as conn:
+            challenge = (
+                conn.execute(sa.text("SELECT out_id,used FROM sms_codes WHERE phone='13800001234'")).mappings().one()
+            )
+            columns = {column["name"] for column in sa.inspect(engine).get_columns("sms_codes")}
+            assert challenge == {"out_id": "", "used": 1}
+            assert {"out_id", "used"} <= columns
+            assert "code" not in columns
+    finally:
+        engine.dispose()
+
+
 def test_head_and_stamp(new_database):
     new_database()
     assert migrate.current_version() is None

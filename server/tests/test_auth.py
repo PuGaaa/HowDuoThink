@@ -231,10 +231,13 @@ def test_phone_code_rate_limited(monkeypatch):
     _restore = _set_throttle(3, 300)
     _isolate_throttle(monkeypatch)
     phone, code = "13900000001", "246810"
+    from core import sms
+
+    monkeypatch.setattr(sms, "_check_aliyun", lambda phone, out_id, submitted: submitted == code)
     db.ex(
-        "INSERT INTO sms_codes(phone, code, expires_at, used) VALUES(?,?,?,0) "
-        "ON CONFLICT(phone) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at, used=0",
-        (phone, code, int(time.time()) + 600),
+        "INSERT INTO sms_codes(phone, out_id, expires_at, used) VALUES(?, 'throttle-test', ?, 0) "
+        "ON CONFLICT(phone) DO UPDATE SET out_id='throttle-test', expires_at=excluded.expires_at, used=0",
+        (phone, int(time.time()) + 600),
     )
     try:
         with make_client() as client:

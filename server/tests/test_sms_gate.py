@@ -27,17 +27,15 @@ def test_sms_send_503_when_not_dev_mode():
         assert "devEcho" not in r.text
 
 
-def test_sms_code_not_logged_when_not_dev_mode(caplog):
-    """短信不可用时验证码值不得出现在任何日志记录里。"""
+def test_sms_send_without_credentials_stores_no_challenge():
+    """短信配置缺失时响应 503，不创建本地验证码挑战。"""
     import db as dbmod
 
     phone = _phone()
     with TestClient(main.app, raise_server_exceptions=False) as client:
         r = _send(client, phone)
         assert r.status_code == 503
-    row = dbmod.q("SELECT code FROM sms_codes WHERE phone=?", (phone,))
-    if row:
-        assert row[0]["code"] not in caplog.text
+    assert not dbmod.q("SELECT out_id FROM sms_codes WHERE phone=?", (phone,))
 
 
 def test_sms_aliyun_provider_isolates_sdk(monkeypatch):
@@ -45,7 +43,7 @@ def test_sms_aliyun_provider_isolates_sdk(monkeypatch):
     phone = _phone()
     from core import sms as sms_core
 
-    monkeypatch.setattr(sms_core, "_send_aliyun", lambda phone, code: {"ok": True})
+    monkeypatch.setattr(sms_core, "_send_aliyun", lambda phone, out_id: {"ok": True})
     with make_client() as client:
         r = _send(client, phone)
         assert r.status_code == 200, r.text

@@ -6,6 +6,7 @@ from tests.conftest import login_admin, make_client
 
 PHONE = "13800001234"
 _seq = {"n": 0}
+_SMS_CODE_FOR_TESTS = "246810"
 
 
 @pytest.fixture(autouse=True)
@@ -13,7 +14,17 @@ def _sms_provider(monkeypatch):
     """隔离阿里云 SDK；测试不伪造短信回显。"""
     from core import sms
 
-    monkeypatch.setattr(sms, "_send_aliyun", lambda phone, code: {"ok": True})
+    challenges = {}
+
+    def send(phone, out_id):
+        challenges[out_id] = (phone, _SMS_CODE_FOR_TESTS)
+        return {"ok": True}
+
+    def check(phone, out_id, code):
+        return challenges.get(out_id) == (phone, code)
+
+    monkeypatch.setattr(sms, "_send_aliyun", send)
+    monkeypatch.setattr(sms, "_check_aliyun", check)
 
 
 def _phone() -> str:
@@ -29,19 +40,24 @@ def _send(client, phone: str) -> dict:
 
 
 def _read_code(client, phone: str) -> str:
-    """测试从隔离数据库读取待消费验证码。"""
+    """确认 challenge 已存储，再返回测试 provider 固定生成的验证码。"""
     import db as dbmod
 
-    row = dbmod.q("SELECT code FROM sms_codes WHERE phone=?", (phone,))
-    assert row
-    return row[0]["code"]
+    row = dbmod.q("SELECT out_id, used FROM sms_codes WHERE phone=?", (phone,))
+    assert row and row[0]["out_id"] and row[0]["used"] == 0
+    return _SMS_CODE_FOR_TESTS
 
 
 def test_sms_send_does_not_echo_code():
     with make_client() as client:
-        out = _send(client, _phone())
+        phone = _phone()
+        out = _send(client, phone)
         assert out["ok"] is True
         assert "devEcho" not in out
+        import db as dbmod
+
+        row = dbmod.q("SELECT out_id FROM sms_codes WHERE phone=?", (phone,))[0]
+        assert row["out_id"]
 
 
 def test_sms_resend_rate_limited():

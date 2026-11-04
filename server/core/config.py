@@ -23,11 +23,11 @@ DEV_MODE = os.environ.get("ENV", "").lower() == "dev"
 # 生产 HTTPS 部署时设 COOKIE_SECURE=1，会话 cookie 仅经 HTTPS 传输
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "") == "1"
 
-# 短信：所有环境统一使用阿里云 SDK，仅配置项随部署环境变化。
-ALIYUN_SMS_ACCESS_KEY = os.environ.get("ALIYUN_SMS_ACCESS_KEY", "")
-ALIYUN_SMS_SECRET = os.environ.get("ALIYUN_SMS_SECRET", "")
-ALIYUN_SMS_SIGN = os.environ.get("ALIYUN_SMS_SIGN", "")
-ALIYUN_SMS_TEMPLATE = os.environ.get("ALIYUN_SMS_TEMPLATE", "")
+# 短信：所有环境统一使用阿里云号码认证服务（PNVS），仅配置项随部署环境变化。
+ALIYUN_PNVS_ACCESS_KEY_ID = os.environ.get("ALIYUN_PNVS_ACCESS_KEY_ID", "")
+ALIYUN_PNVS_ACCESS_KEY_SECRET = os.environ.get("ALIYUN_PNVS_ACCESS_KEY_SECRET", "")
+ALIYUN_PNVS_SIGN_NAME = os.environ.get("ALIYUN_PNVS_SIGN_NAME", "")
+ALIYUN_PNVS_TEMPLATE_CODE = os.environ.get("ALIYUN_PNVS_TEMPLATE_CODE", "")
 
 # —— AI：对话/起草走 DeepSeek（OpenAI 兼容端点）；向量默认本地字符 bigram，可选智谱 embedding-3 ——
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
