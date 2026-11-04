@@ -191,11 +191,14 @@ def test_phone_account_can_password_login_by_phone():
         _send(client, p)
         phone_login = client.post("/api/auth/login/phone", json={"phone": p, "code": _read_code(client, p)})
         assert phone_login.status_code == 200
-        assert client.post(
-            "/api/me/password",
-            json={"newPassword": "phone-pw-456"},
-            headers={"Authorization": "Bearer " + phone_login.json()["token"]},
-        ).status_code == 200
+        assert (
+            client.post(
+                "/api/me/password",
+                json={"newPassword": "phone-pw-456"},
+                headers={"Authorization": "Bearer " + phone_login.json()["token"]},
+            ).status_code
+            == 200
+        )
 
         password_login = client.post("/api/auth/login", json={"login": p, "password": "phone-pw-456"})
         assert password_login.status_code == 200
