@@ -88,6 +88,16 @@ export function confirmProgressOperations(ids: string[]): void {
   uni.setStorageSync(KEY_OPS, JSON.stringify(left))
 }
 
+export function clearProgressLocal(): void {
+  const info = uni.getStorageInfoSync()
+  for (let i = 0; i < info.keys.length; i++) {
+    const key = info.keys[i]
+    if (key.indexOf('think_case_') === 0 || key === 'think_session_v1' || key === 'think_mascots_v1' || key === 'think_streak_v1' || key === 'think_tasks_v1' || key === 'think_daily_done_v1' || key === 'think_checkuse_v1' || key === 'think_progress_ops_v1') {
+      uni.removeStorageSync(key)
+    }
+  }
+}
+
 function emptyMascotStats(): MascotStats {
   const m: MascotStats = { frog: 0, snail: 0, otter: 0, rabbit: 0, dino: 0 }
   return m

@@ -41,6 +41,7 @@ def sync_operations(uid: str, operations: list[ProgressOperation]) -> dict:
         bundle.setdefault("streak", {})
         bundle.setdefault("checkuse", 0)
         revision = int(row["revision"]) if row else 0
+        can_bootstrap = row is None
         confirmed = []
         for operation in operations:
             seen = conn.execute(
@@ -49,7 +50,9 @@ def sync_operations(uid: str, operations: list[ProgressOperation]) -> dict:
             if seen:
                 confirmed.append(operation.op_id)
                 continue
-            _apply_operation(bundle, operation)
+            if operation.kind != "bootstrap" or can_bootstrap:
+                _apply_operation(bundle, operation)
+                can_bootstrap = False
             conn.execute(
                 "INSERT INTO progress_ops(user_id, op_id, kind, payload, occurred_at) VALUES(?,?,?,?,?)",
                 (uid, operation.op_id, operation.kind, db.jdump(operation.payload), operation.occurred_at),
@@ -66,7 +69,14 @@ def sync_operations(uid: str, operations: list[ProgressOperation]) -> dict:
 
 def _apply_operation(bundle: dict, operation: ProgressOperation) -> None:
     p = operation.payload
-    if operation.kind == "session_end":
+    if operation.kind == "bootstrap":
+        bundle.clear()
+        bundle.update(p["bundle"])
+        bundle.setdefault("cases", {})
+        bundle.setdefault("mascots", {})
+        bundle.setdefault("streak", {})
+        bundle.setdefault("checkuse", 0)
+    elif operation.kind == "session_end":
         case_id = p["caseId"]
         current = bundle["cases"].setdefault(
             case_id, {"solved": False, "bestGrade": "", "bestCost": 0, "plays": 0, "fails": 0}

@@ -4,9 +4,25 @@
  *  手动同步 = 先推后拉。未登录（游客态）全部为本地，无网络行为。 */
 import { API_BASE } from '../config'
 import { getToken, isLoggedIn } from './auth'
-import { confirmProgressOperations, pendingProgressOperations, setProgressListener } from './storage'
+import { clearProgressLocal, confirmProgressOperations, exportProgressBundle, pendingProgressOperations, setProgressListener } from './storage'
 
 const KEY_LAST_SYNC = 'think_last_sync'
+const KEY_PROGRESS_UID = 'think_progress_uid'
+
+export function prepareProgressIdentity(uid: string): void {
+  const previous = uni.getStorageSync(KEY_PROGRESS_UID)
+  if (previous != null && (previous as string).length > 0 && previous !== uid) {
+    clearProgressLocal()
+  }
+  if (previous == null || (previous as string).length === 0) {
+    const bundle = exportProgressBundle()
+    const raw = uni.getStorageSync('think_progress_ops_v1')
+    const ops = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as any[]
+    ops.unshift({ opId: 'bootstrap-' + String(Date.now()) + '-' + String(Math.random()), kind: 'bootstrap', occurredAt: new Date().toISOString(), payload: { bundle: bundle } })
+    uni.setStorageSync('think_progress_ops_v1', JSON.stringify(ops))
+  }
+  uni.setStorageSync(KEY_PROGRESS_UID, uid)
+}
 
 export function lastSyncLabel(): string {
   const v = uni.getStorageSync(KEY_LAST_SYNC)
