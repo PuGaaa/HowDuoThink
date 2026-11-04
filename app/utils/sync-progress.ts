@@ -4,7 +4,7 @@
  *  手动同步 = 先推后拉。未登录（游客态）全部为本地，无网络行为。 */
 import { API_BASE } from '../config'
 import { getToken, isLoggedIn } from './auth'
-import { clearProgressLocal, confirmProgressOperations, exportProgressBundle, getUnlockedChapterIds, pendingProgressOperations, progressIdentity, progressStorageGet, progressStorageSet, setProgressIdentity, setProgressListener } from './storage'
+import { clearProgressLocal, confirmProgressOperations, exportProgressBundle, getUnlockedChapterIds, importProgressBundle, pendingProgressOperations, progressIdentity, progressStorageGet, progressStorageKey, progressStorageSet, setProgressIdentity, setProgressListener } from './storage'
 
 const KEY_LAST_SYNC = 'think_last_sync'
 
@@ -40,6 +40,59 @@ function markSynced() {
   progressStorageSet(KEY_LAST_SYNC, '今天 ' + hh + ':' + mm)
 }
 
+function replaceServerProjection(d: any): void {
+  const info = uni.getStorageInfoSync()
+  const casePrefix = progressStorageKey('think_case_')
+  for (let i = 0; i < info.keys.length; i++) {
+    if (info.keys[i].indexOf(casePrefix) === 0) uni.removeStorageSync(info.keys[i])
+  }
+  importProgressBundle({
+    cases: d.cases ?? {},
+    streak: d.streak ?? {},
+    mascots: d.mascots ?? {},
+    tasks: d.tasks ?? {},
+    dailyDone: d.dailyDone ?? '',
+    checkuse: d.checkuse ?? 0,
+    solvedLayers: [],
+    unlockedChapterIds: d.unlockedChapterIds ?? [],
+  })
+}
+
+function replayPendingOperations(operations: any[]): void {
+  for (let i = 0; i < operations.length; i++) {
+    const operation = operations[i]
+    if (operation.kind === 'bootstrap') {
+      importProgressBundle(operation.payload.bundle)
+      continue
+    }
+    if (operation.kind === 'session_end') {
+      const p = operation.payload
+      const raw = progressStorageGet('think_case_' + p.caseId)
+      const current = raw == null || (raw as string).length === 0 ? { solved: false, bestGrade: '', bestCost: 0, plays: 0, fails: 0 } : JSON.parse(raw as string)
+      const localSolved = current.solved
+      current.solved = current.solved || p.solved
+      current.plays = (current.plays ?? 0) + 1
+      current.fails = (current.fails ?? 0) + (p.solved ? 0 : 1)
+      if (p.grade === 'S' || (current.bestGrade !== 'S' && (current.bestGrade === '' || p.grade < current.bestGrade))) current.bestGrade = p.grade
+      if (p.solved && (!localSolved || current.bestCost == null || p.playerCost < current.bestCost)) current.bestCost = p.playerCost
+      progressStorageSet('think_case_' + p.caseId, JSON.stringify(current))
+      const mascots = JSON.parse((progressStorageGet('think_mascots_v1') as string) || '{}')
+      for (let j = 0; j < p.mascotEvents.length; j++) mascots[p.mascotEvents[j].id] = (mascots[p.mascotEvents[j].id] ?? 0) + 1
+      progressStorageSet('think_mascots_v1', JSON.stringify(mascots))
+      continue
+    }
+    if (operation.kind === 'checklist_use') {
+      progressStorageSet('think_checkuse_v1', String((Number(progressStorageGet('think_checkuse_v1')) || 0) + 1))
+      continue
+    }
+    if (operation.kind === 'unlocked_chapters') {
+      const ids = getUnlockedChapterIds()
+      for (let j = 0; j < operation.payload.chapterIds.length; j++) if (ids.indexOf(operation.payload.chapterIds[j]) < 0) ids.push(operation.payload.chapterIds[j])
+      progressStorageSet('think_unlocked_chapters_v1', JSON.stringify(ids))
+    }
+  }
+}
+
 /** 操作同步（登录态；游客态为空操作） */
 export function pushProgress(cb?: (r: { error: string }) => void) {
   if (!isLoggedIn()) {
@@ -48,17 +101,20 @@ export function pushProgress(cb?: (r: { error: string }) => void) {
   }
   const requestUid = progressIdentity()
   const requestToken = getToken()
+  const sentOperations = pendingProgressOperations()
   uni.request({
     url: API_BASE + '/api/me/progress/sync',
     method: 'POST',
     header: { Authorization: 'Bearer ' + getToken() } as any,
-    data: { operations: pendingProgressOperations() } as any,
+    data: { operations: sentOperations } as any,
     timeout: 8000,
     success: (res) => {
       if (requestUid !== progressIdentity() || requestToken !== getToken()) return
       if (res.statusCode === 200) {
         const d = res.data as any
         confirmProgressOperations(d.confirmedOperationIds as string[])
+        replaceServerProjection(d)
+        replayPendingOperations(pendingProgressOperations())
         markSynced()
       }
       if (cb != null) cb({ error: res.statusCode === 200 ? '' : '上传失败' })
@@ -162,6 +218,9 @@ export function pullServerProgress(cb?: (r: { error: string }) => void) {
       const mergedUnlocked = localUnlocked.slice()
       for (let i = 0; i < remoteUnlocked.length; i++) if (mergedUnlocked.indexOf(remoteUnlocked[i]) < 0) mergedUnlocked.push(remoteUnlocked[i])
       if (mergedUnlocked.length !== localUnlocked.length) progressStorageSet('think_unlocked_chapters_v1', JSON.stringify(mergedUnlocked))
+      const pending = pendingProgressOperations()
+      replaceServerProjection(d)
+      replayPendingOperations(pending)
       markSynced()
       if (cb != null) cb({ error: '' })
     },

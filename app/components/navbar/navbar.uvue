@@ -26,12 +26,7 @@
 const topStyle = uni.getWindowInfo().statusBarHeight + 8 + 'px'
 
 function back() {
-  let depth = 1
-  try {
-    depth = uni.getCurrentPages().length
-  } catch (e) {
-    depth = 1
-  }
+  const depth = getCurrentPages().length
   if (depth > 1) {
     uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/index/index' }) })
   } else {
