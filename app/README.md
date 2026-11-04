@@ -11,8 +11,9 @@
 
 ## 分享海报
 
-- `APP_H5_ORIGIN` 配置 H5 应用公开根地址，用于生成指向游客首关的海报二维码；未配置时隐藏扫码入口。
-- `APP_PUBLIC_ORIGIN` 仍是 Web 社区文章地址，与 H5 应用地址分开配置。
+- `.env.development` 与 `.env.production` 分别配置开发和生产地址，构建时按模式自动读取。
+- `APP_API_BASE` 只填 API 域名，不加 `/api`；应用请求路径本身已包含 `/api/...`。
+- `PUBLIC_WEB_ORIGIN` 配置 Web 社区地址，用于生成文章链接；`PUBLIC_H5_ORIGIN` 配置 H5 地址，用于生成海报二维码。
 
 ## 案例内容（生死管线在本端的落点）
 
