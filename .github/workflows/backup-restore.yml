@@ -1,0 +1,68 @@
+name: backup-restore
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  mysql8-restore:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: hdt_backup_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      DB_PROVIDER: mysql
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: "3306"
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ""
+      MYSQL_DATABASE: hdt_backup_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: server/requirements.lock }
+      - run: pip install -r server/requirements.lock
+      - name: Apply current schema and nonempty synthetic business fixture
+        working-directory: server
+        run: |
+          python -m alembic upgrade head
+          python ops/backup/ci-fixture.py
+      - name: Backup, restore into new database, compare every table, exercise failures
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+        run: |
+          docker cp server/ops/backup "$MYSQL_CONTAINER:/tmp/hdt-backup"
+          docker exec -i -e MYSQL_HOST=127.0.0.1 -e MYSQL_PORT=3306 -e MYSQL_USER=root \
+            -e MYSQL_DATABASE=hdt_backup_ci -e BACKUP_DIR=/tmp/backups -e DRILL_DIR=/tmp/drills \
+            "$MYSQL_CONTAINER" bash -s <<'BASH'
+          set -euo pipefail
+          artifact=$(/tmp/hdt-backup/backup.sh)
+          /tmp/hdt-backup/drill.sh "$artifact"
+          /tmp/hdt-backup/verify-failures.sh "$artifact"
+          remaining=$(mysql -h127.0.0.1 -uroot -NBe "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME LIKE 'hdt_restore_%'")
+          [[ "$remaining" == 0 ]]
+          BASH
+      - name: Keep nonsensitive verification reports
+        if: always()
+        env:
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+        run: |
+          mkdir -p backup-reports
+          docker cp "$MYSQL_CONTAINER:/tmp/drills/." backup-reports/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mysql8-backup-restore-reports
+          path: backup-reports
+          retention-days: 7
