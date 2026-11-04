@@ -10,6 +10,8 @@ export interface CaseProgress {
   plays: number
   /** 失败局数累计（玩过未破：章节地图"未破"标 + 错案重练的数据源） */
   fails: number
+  contentRevision: number
+  scoringVersion: number
 }
 
 /** 五只动物的出场统计（固定字段，便于 JSON 往返） */
@@ -230,10 +232,11 @@ export function saveSession(record: SessionRecord): void {
   let bestCost = record.solved ? record.playerCost : 0
   const prev = getCaseProgress(record.caseId)
   if (prev != null) {
-    if (prev.bestGrade === 'S' || (record.grade !== 'S' && gradeRank(prev.bestGrade) <= gradeRank(record.grade))) {
+    const sameScoreVersion = prev.contentRevision === record.contentRevision && prev.scoringVersion === record.scoringVersion
+    if (sameScoreVersion && (prev.bestGrade === 'S' || (record.grade !== 'S' && gradeRank(prev.bestGrade) <= gradeRank(record.grade)))) {
       bestGrade = prev.bestGrade
     }
-    if (prev.solved && (!record.solved || prev.bestCost < bestCost)) {
+    if (sameScoreVersion && prev.solved && (!record.solved || prev.bestCost < bestCost)) {
       bestCost = prev.bestCost
     }
   }
@@ -244,6 +247,8 @@ export function saveSession(record: SessionRecord): void {
     bestCost: bestCost,
     plays: prev != null ? prev.plays + 1 : 1,
     fails: prevFails + (record.solved ? 0 : 1),
+    contentRevision: record.contentRevision,
+    scoringVersion: record.scoringVersion,
   }
   progressStorageSet(key, JSON.stringify(progress))
 

@@ -73,8 +73,17 @@ function replayPendingOperations(operations: any[]): void {
       current.solved = current.solved || p.solved
       current.plays = (current.plays ?? 0) + 1
       current.fails = (current.fails ?? 0) + (p.solved ? 0 : 1)
-      if (p.grade === 'S' || (current.bestGrade !== 'S' && (current.bestGrade === '' || p.grade < current.bestGrade))) current.bestGrade = p.grade
-      if (p.solved && (!localSolved || current.bestCost == null || p.playerCost < current.bestCost)) current.bestCost = p.playerCost
+      const newerScoreVersion = current.contentRevision == null || p.contentRevision > current.contentRevision || (p.contentRevision === current.contentRevision && p.scoringVersion >= current.scoringVersion)
+      if (newerScoreVersion) {
+        if (current.contentRevision !== p.contentRevision || current.scoringVersion !== p.scoringVersion) {
+          current.bestGrade = ''
+          current.bestCost = 0
+        }
+        if (p.grade === 'S' || (current.bestGrade !== 'S' && (current.bestGrade === '' || p.grade < current.bestGrade))) current.bestGrade = p.grade
+        if (p.solved && (!localSolved || current.bestCost == null || p.playerCost < current.bestCost)) current.bestCost = p.playerCost
+        current.contentRevision = p.contentRevision
+        current.scoringVersion = p.scoringVersion
+      }
       progressStorageSet('think_case_' + p.caseId, JSON.stringify(current))
       const mascots = JSON.parse((progressStorageGet('think_mascots_v1') as string) || '{}')
       for (let j = 0; j < p.mascotEvents.length; j++) mascots[p.mascotEvents[j].id] = (mascots[p.mascotEvents[j].id] ?? 0) + 1
