@@ -142,3 +142,141 @@
 
 技术机制依据：[官方资料1](https://dev.mysql.com/doc/refman/8.0/en/too-many-connections.html)、[官方资料2](https://dev.mysql.com/doc/refman/8.0/en/innodb-preload-buffer-pool.html)。
 
+## required-field（contract/1）
+
+学习目标：新增请求必填字段会破坏既有调用；响应新增字段也需要验证消费者是否允许扩展。
+
+编审：人工裁定5⚡，原4漏编码反证；75%统一为35%+40%，去掉响应加字段永远安全断言。
+
+难度：L2→L2；六维[2, 2, 2, 2, 2, 2]。
+
+1. 版本边界→契约变更
+2. 请求与校验对照
+3. 兼容性与校验
+4. 新增字段破坏旧端
+5. 客户端到服务端
+6. 网关注入增加规则散落
+
+标准路径：a-impact → a-schemacheck → a-gatewayroute → a-encodingcheck，5⚡，零错S；终态确认h-required，其余全部excluded。
+
+替代路径：a-impact → a-gatewayroute → a-encodingcheck → a-schemacheck，5⚡，零错S；终态确认h-required，其余全部excluded。
+
+停止点：【停止规则】新增必填的单变量对照成立，路由、TLS和编码反证齐备。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://json-schema.org/understanding-json-schema/reference/object)、[官方资料2](https://spec.openapis.org/oas/v3.1.1.html)。
+
+## doc-drift（contract/2）
+
+学习目标：运行输出说明现状，已发布契约约束承诺；二者冲突不能自动判实现正确。
+
+编审：人工裁定5⚡，补消费者脚本反证。统一GET响应场景，列足5处类型差异；修正实现必然正确、mock同源自动发现错误等不实承诺。
+
+难度：L2→L2；六维[2, 2, 2, 2, 2, 2]。
+
+1. 差异→构建发布
+2. DTO/输出/schema三方
+3. 序列化与契约
+4. 生成过仍会过期
+5. 构建到合作方解析
+6. 只锁文档不能交付
+
+标准路径：a-impact → a-docvscode → a-versioncheck → a-scriptcheck，5⚡，零错S；终态确认h-drift，其余全部excluded。
+
+替代路径：a-impact → a-versioncheck → a-scriptcheck → a-docvscode，5⚡，零错S；终态确认h-drift，其余全部excluded。
+
+停止点：【停止规则】同版本输出与发布schema脱节已确认，版本、序列化和消费者脚本候选排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://spec.openapis.org/oas/v3.1.1.html)、[官方资料2](https://json-schema.org/understanding-json-schema/reference/object)。
+
+## timeout-contract（contract/3）
+
+学习目标：超时是递减的预算链——每层预算要覆盖下一层的最坏情况。
+
+编审：人工裁定5⚡，不保留没测的2.4倍或并行P99理论减半。8→12应增加4，40%重试按总尝试口径计算约1.67倍。
+
+难度：L2→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 分布→trace→取消
+2. 计数及受控对照
+3. 预算和协作取消
+4. 重试加重失败
+5. SDK到聚合与下游
+6. 加长超时掩盖预算
+
+标准路径：a-impact → a-timeouttable → a-p99check → a-retryaudit，5⚡，零错S；终态确认h-mismatch，其余全部excluded。
+
+替代路径：a-impact → a-p99check → a-retryaudit → a-timeouttable，5⚡，零错S；终态确认h-mismatch，其余全部excluded。
+
+停止点：【停止规则】客户端先退出且服务端继续工作已确认，网关先超时、全都慢和重试凭空制造失败已排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://grpc.io/docs/guides/deadlines/)、[官方资料2](https://grpc.io/docs/guides/cancellation/)。
+
+## enum-drift（contract/4）
+
+学习目标：枚举的语义漂移比类型漂移更毒——值合法、含义错。
+
+编审：人工裁定5⚡；重建一致的PAID→3→SHIPPED叙事，消除原追踪自我否定；修正直接改字符串的二次破坏。
+
+难度：L2→L2；六维[2, 2, 2, 3, 2, 2]。
+
+1. 三状态层→映射
+2. diff与单变量样例
+3. 序列化协议映射
+4. 类型合法语义相反
+5. 生产者到消费者
+6. 改文档追认破坏
+
+标准路径：a-impact → a-enumdiff → a-ordertrace → a-fieldmap，5⚡，零错S；终态确认h-semantic，其余全部excluded。
+
+替代路径：a-impact → a-fieldmap → a-ordertrace → a-enumdiff，5⚡，零错S；终态确认h-semantic，其余全部excluded。
+
+停止点：【停止规则】同一订单的编码对照成立，乱序、历史混写及字段误用均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://spec.openapis.org/oas/v3.1.1.html)。
+
+## error-contract（contract/5）
+
+学习目标：错误响应也是契约——message 给人看，code 给程序读。
+
+编审：保留4⚡；原“账户余额不足”仍包含关键字，不能复现；换为真实不包含的文案，3处实际影响与14处潜在风险分开。
+
+难度：L2→L2；六维[2, 2, 2, 2, 2, 2]。
+
+1. 现象→执行分支
+2. 字节和真实includes
+3. 展示与协议职责
+4. 文案变更改逻辑
+5. 错误提供方到前端
+6. 回滚只能暂时恢复
+
+标准路径：a-impact → a-erroranatomy → a-encoding，4⚡，零错S；终态确认h-nocontract，其余全部excluded。
+
+替代路径：a-impact → a-encoding → a-erroranatomy，4⚡，零错S；终态确认h-nocontract，其余全部excluded。
+
+停止点：【停止规则】真实字符串判断复现成立，无code耦合已确认，编码、缓存、网关均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/includes)、[官方资料2](https://spec.openapis.org/oas/v3.1.1.html)。
+
+## contract-review（contract/6）
+
+学习目标：把兼容、废弃、限流与语义承诺转成可执行门禁，而非仅给条款命名。
+
+编审：人工裁定6⚡（原8、实际链5且漏限流审查）；把多个真实缺陷误标false的问题改为共同缺陷与三个可证伪方案。六维中位数2，L3→L2。
+
+难度：L3→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 条款→反例→门禁
+2. 跨条款对照
+3. 契约与容量验证
+4. 完整框架仍不可执行
+5. 平台到消费者
+6. 草率批准或整包否决
+
+标准路径：a-impact → a-compatcheck → a-sunsetcheck → a-ratecheck → a-errorcheck，6⚡，零错S；终态确认h-compat，其余全部excluded。
+
+替代路径：a-impact → a-ratecheck → a-errorcheck → a-sunsetcheck → a-compatcheck，6⚡，零错S；终态确认h-compat，其余全部excluded。
+
+停止点：【停止规则】共同门禁缺失成立，延长期限、统一加阈值和格式保证三个替代方案均被具体反例排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://spec.openapis.org/oas/v3.1.1.html)、[官方资料2](https://www.rfc-editor.org/rfc/rfc6585#section-4)。
+

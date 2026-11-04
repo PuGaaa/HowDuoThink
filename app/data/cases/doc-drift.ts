@@ -1,23 +1,21 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 1 章 · 接口与契约 第二批（文档与实现漂移 L2）
- * 教学点：验证思维——文档不是事实，实现才是：联调争议用"实现序列化结果"裁决；
- * 文档必须由代码生成（CI 一致性断言），文档即 mock。
- * 专家路径：impact(1) + docvscode(2) + versioncheck(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const docDriftCase: DiagnosisCase = {
   id: 'doc-drift',
-  title: '联调三天全在对字段：文档与实现打架了',
-  intro: '合作方按 swagger 文档对接库存接口，三天连报类型错误——文档说 string，实现返回 int，谁才是事实？',
+  title: '接口与文档的字段类型对不上',
+  intro: '合作方按公开文档对接失败；先核对同版本请求、响应和契约，再定位差异如何产生。',
   domain: 'build',
-  layer: '文档不是事实，实现才是——契约由代码生成，一致性由 CI 保证',
+  layer: '运行输出说明现状，已发布契约约束承诺；二者冲突不能自动判实现正确',
   part: 'engineer',
   chapterId: 'contract',
   order: 2,
-  typeTags: ['contract', 'process'],
+  typeTags: [
+    'contract',
+    'process',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」开放平台的接口负责人，一个重要合作方的对接工程师已经三天没睡好了。',
     architecture: '合作方对接系统 → swagger 文档站(三个月前生成) → 库存接口(代码此后变更 4 次) → 库存服务',
@@ -26,7 +24,7 @@ export const docDriftCase: DiagnosisCase = {
       {
         type: 'error',
         title: '对接报错清单',
-        text: '合作方按文档传 stock: "123"（string，文档如此）→ 实现按 int 解析 → 反序列化失败\n差异字段累计 5 个类型不符 + 2 个文档有但实现没有 + 3 个实现有但文档没有',
+        text: '合作方GET库存响应按文档将stock解析为string，但接口返回number，严格解析失败。\n差异清单：5个类型变化、2个字段缺失、3个新增字段。',
       },
       {
         type: 'text',
@@ -37,14 +35,28 @@ export const docDriftCase: DiagnosisCase = {
     timeline: '文档三个月前生成 ｜ 代码 4 次变更均未更新注解 ｜ 合作方对接窗口本周截止（上线排期卡死）',
     impactHint: '文档与实现打架——但"文档错"只是结论，要紧的是：漂了 4 次没人发现，机制上少装了什么报警器？',
   },
-
   hypotheses: [
-    { id: 'h-drift', text: '文档与实现漂移：swagger 由注解生成，代码改了 4 次注解没跟上——文档是三个月前的快照', excludeActionId: 'a-docvscode' },
-    { id: 'h-version', text: '合作方用错版本文档（v1 文档对接 v2 接口）', excludeActionId: 'a-versioncheck' },
-    { id: 'h-serial', text: '全局序列化配置与注解冲突，实现的行为偏离代码本意', excludeActionId: 'a-serialconf' },
-    { id: 'h-script', text: '合作方对接脚本自身 bug，误报类型错误', excludeActionId: 'a-scriptcheck' },
+    {
+      id: 'h-drift',
+      text: 'DTO变更后未更新并发布schema，流水线持续部署过期文档，且无一致性检查',
+      excludeActionId: 'a-docvscode',
+    },
+    {
+      id: 'h-version',
+      text: '合作方用错版本文档（v1 文档对接 v2 接口）',
+      excludeActionId: 'a-versioncheck',
+    },
+    {
+      id: 'h-serial',
+      text: '全局序列化配置与注解冲突，实现的行为偏离代码本意',
+      excludeActionId: 'a-serialconf',
+    },
+    {
+      id: 'h-script',
+      text: '合作方对接脚本自身 bug，误报类型错误',
+      excludeActionId: 'a-scriptcheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -70,12 +82,24 @@ export const docDriftCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-drift'],
-      hypotheses: [{ id: 'h-drift', status: 'confirmed' }],
+      tests: [
+        'h-drift',
+        'h-serial',
+      ],
+      hypotheses: [
+        {
+          id: 'h-drift',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-serial',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '实现序列化结果（真实现场）',
-        text: 'GET /stock/889 真实响应：\n{ "stock": 123, "updateTime": 1727901234567, "price": 880,\n  "stockVersion": 7, "frozenFlag": 0, "warehouseTier": "A" }\n对照文档：类型 5 处不符 ✓、缺失 2 字段 ✓、多出 3 字段 ✓\ngit 考古：文档生成于 3 个月前 tag v1.4；此后 4 次变更（改类型×2/删字段×2/加字段×3）注解均未更新。\n实锤：文档是三个月前的快照——"事实"早已搬走，告示牌没换。',
+        text: '同一路径和版本的教学响应：{"stock":123,"updateTime":1727901234567,"price":880,"warehouseId":3,"revision":7,"stockVersion":7,"frozenFlag":0,"warehouseTier":"A"}\n文档前5项分别约定string/string/元number/string/string，实现在DTO中变为数量number/毫秒number/分number/number/number；warehouseCode、regionTag缺失，最后3项新增。\nDTO与序列化输出一致；ObjectMapper无定制覆盖。变更记录显示4次发布只改DTO，发布流水线仍部署旧schema产物。运行响应证明“现在怎样”，不能自动证明它符合已发布承诺。',
       },
     },
     {
@@ -86,12 +110,19 @@ export const docDriftCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-version'],
-      hypotheses: [{ id: 'h-version', status: 'excluded' }],
+      tests: [
+        'h-version',
+      ],
+      hypotheses: [
+        {
+          id: 'h-version',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '版本核对',
-        text: '合作方引用的正是文档站当前首页链接——只有一个版本可看，且是过期的。\n→ 排除版本误用：不是"看错了文档"，是"唯一的文档就是错的"。',
+        text: '合作方引用该路径当前公开文档；请求URL、版本头、部署接口均为v1。文档artifact仍为三个月前版本，不是合作方自行选错v2/v1。',
       },
     },
     {
@@ -102,8 +133,15 @@ export const docDriftCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-serial'],
-      hypotheses: [{ id: 'h-serial', status: 'excluded' }],
+      tests: [
+        'h-serial',
+      ],
+      hypotheses: [
+        {
+          id: 'h-serial',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '序列化核对',
@@ -118,8 +156,15 @@ export const docDriftCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-script'],
-      hypotheses: [{ id: 'h-script', status: 'excluded' }],
+      tests: [
+        'h-script',
+      ],
+      hypotheses: [
+        {
+          id: 'h-script',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '脚本复核',
@@ -130,7 +175,7 @@ export const docDriftCase: DiagnosisCase = {
       id: 'a-danger',
       name: '紧急锁定文档站为只读旧版',
       desc: '【状态变更】文档站挂"维护中"横幅，阻止继续误导',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -155,7 +200,7 @@ export const docDriftCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '① 文档改为构建期从代码生成（OpenAPI 注解缺失编译告警）\n② CI 断言：每次合并自动请求真实接口、与生成的 schema 逐字段比对，不一致拦截合并\n③ 修正后的文档当日发布给合作方——对接两天内完成（此前已耗三天）。',
+        text: '在同一构建内生成schema并发布；CI对真实路由序列化结果做schema校验，对已发布契约做兼容diff。仅从注解生成不能保证注解更新，也不会天然产生编译告警。\n对已经承诺的字段先保留兼容适配或版本化迁移，不能把改文档当作破坏性实现的追认。',
       },
     },
     {
@@ -171,7 +216,7 @@ export const docDriftCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: 'mock 服务',
-        text: 'schema → mock 端点自动生成：合作方对着 mock 开发，真实联调只剩环境验证。\n文档与实现再次漂移时，mock 会与真实接口一起漂移——两份"按文档写的代码"\n在真实联调时必然对撞，漂移无处藏身。',
+        text: 'schema生成的mock只代表声明内容；如果mock与文档同源，两者可能一起错。必须再与真实实现执行契约测试，才能发现漂移；mock不能让真实联调只剩环境验证。',
       },
     },
     {
@@ -191,60 +236,79 @@ export const docDriftCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-drift', text: 'swagger 文档由注解生成但代码 4 次变更注解未更新：文档停留在三个月前快照（5 处类型不符/2 删/3 漏）——合作方按文档对接必然失败，且无任何机制发现漂移', correct: true },
-    { id: 'rc-version', text: '合作方拿 v1 旧版文档对接 v2 接口', correct: false },
-    { id: 'rc-serial', text: '全局序列化配置与注解冲突，实现偏离代码', correct: false },
-    { id: 'rc-script', text: '合作方对接脚本自身 bug 误报', correct: false },
+    {
+      id: 'rc-drift',
+      text: 'DTO变更与文档构建发布脱节，当前公开schema仍是旧产物；缺少运行输出校验和兼容diff，调用方按公开承诺解析失败',
+      correct: true,
+    },
+    {
+      id: 'rc-version',
+      text: '合作方拿 v1 旧版文档对接 v2 接口',
+      correct: false,
+    },
+    {
+      id: 'rc-serial',
+      text: '全局序列化配置与注解冲突，实现偏离代码',
+      correct: false,
+    },
+    {
+      id: 'rc-script',
+      text: '合作方对接脚本自身 bug 误报',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 5,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '先建差异全清单：不是裁决"谁对"，而是量化"漂了多远"——漂移的范围决定它是笔误还是机制缺失。',
-      update: '5 类型 + 2 删 + 3 漏——系统性漂移：文档整体停留在三个月前。',
+      thought: '建立完整差异清单。',
+      update: '5个类型变化、2缺失、3新增。',
       actionId: 'a-impact',
-      why: '1⚡︎ 清单先行的价值：单字段差异可能是笔误，全字段漂移必然是"停更机制"问题——范围直接改变修复的层级。',
-      conclusion: '定性完成：机制性停更（h-drift 升权）。',
+      why: '1⚡量化差异，不把一个类型报错泛化成所有请求坏了。',
+      conclusion: '比对同版本真实输出。',
     },
     {
-      thought: '逐字段裁决：拿实现的真实序列化响应当裁判——文档与代码各执一词时，谁在"现场"谁说了算。',
-      update: '实锤：真实响应与代码 DTO 一致、与文档系统性不符 + git 考古确认 4 次变更未更新注解。',
+      thought: '核对DTO、序列化输出及发布产物。',
+      update: '实现与DTO一致，schema产物停留在旧版本。',
       actionId: 'a-docvscode',
-      why: '2⚡︎ "实现序列化结果"是接口契约的唯一现场证据：文档是纸面、代码是意图、响应是事实——三方对质让"文档 vs 实现"的争论一锤定音。',
-      conclusion: '根因实锤：文档快照过期。',
+      why: '2⚡数据和构建来源能定位漂移环节，但不自动追认实现符合契约。',
+      conclusion: '确认发布脱节并排除序列化冲突。',
     },
     {
-      thought: '版本误用假设 1⚡︎ 排除——"他们看错文档"是最方便的甩锅，必须用证据关掉。',
-      update: '文档站只有一个版本可看且就是过期的——甩锅叙事退场。',
+      thought: '对齐URL、版本头和文档链接。',
+      update: '合作方确在使用当前公开v1文档。',
       actionId: 'a-versioncheck',
-      why: '1⚡︎ 甩锅类假设要最先排除：它阻止真正的修复（机制）发生——证据显示"想看对文档都没得看"。',
-      conclusion: '责任归位 → 排除实现侧。',
+      why: '1⚡文档产物旧不等于合作方自行选错接口版本。',
+      conclusion: '排除版本误用。',
     },
     {
-      thought: '序列化配置与合作方脚本各 1⚡︎ 排除——两侧的"无辜证明"让修复聚焦文档生成机制。停止收集。',
-      update: '停止。',
+      thought: '检查消费者解析器。',
+      update: '严格按文档解析，独立客户端也重现。',
+      actionId: 'a-scriptcheck',
+      why: '1⚡消费者行为核验是独立反证，不能省略后声称全部无辜。',
+      conclusion: '排除脚本错误。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（注解未随代码更新）✓ 两侧（实现忠实/对接正确）✓ 防线（CI 断言+mock）✓——三方、机制、防线三层闭合。',
-      conclusion: '沉淀：文档不是事实，实现才是——契约由代码生成、由 CI 对账、由 mock 放大。让文档与实现漂移无处藏身的，是机制不是自觉。',
+      why: '【停止规则】同版本输出与发布schema脱节已确认，版本、序列化和消费者脚本候选排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: 'DTO变更与文档构建发布脱节，当前公开schema仍是旧产物；缺少运行输出校验和兼容diff，调用方按公开承诺解析失败',
     },
   ],
-
   lessons: [
     {
-      text: '文档不是事实，实现才是：契约争议的裁判是"实现的序列化结果"——纸面、意图、事实三方对质，一锤定音。',
-      principle: '验证思维：接口类争论（文档 vs 代码 vs 实际）必须落回"真实响应"裁决。curl 一次的真实输出比十份讨论记录更有法律效力——这也是 diff 溯源（git 考古）定位漂移起点的锚点。',
+      text: '运行输出是现状证据，已发布文档是对外承诺；二者冲突时先定位差异，再决定兼容修复和迁移。',
+      principle: '不能用“实现才是事实”宣判消费者错误。保留旧消费者回归、真实输出schema校验和发布契约diff，区分文档过期与实现破坏承诺。',
     },
     {
-      text: '文档必须由代码生成 + CI 一致性断言：人工维护的文档必然漂移——漂移不产生告警时，它以"联调事故"的形式提现。',
-      principle: '流程设计：OpenAPI 注解强制化 + "生成的文档 == 实现快照"的 CI 断言，让每次代码变更自动同步契约。文档即 mock：按 schema 生成 mock 端点，漂移时 mock 与实现一起漂——两份"按文档写的代码"必然对撞，无处藏身。',
+      text: '代码生成文档不能替代一致性验证，注解也会过期，构建正确的schema还必须随版本部署。',
+      principle: '把DTO、生成schema和文档artifact标识关联；CI验证实际路由和序列化输出，而非只比两份来自同一旧注解的产物。',
     },
     {
-      text: '认真的人被过期的地图坑得最深：合作方脚本完全正确才暴露了文档全错——对外契约的严肃度要与对方的专业度匹配。',
-      principle: '产品思维：对外接口是公司的脸面——对接窗口冻结契约、字段变更走评审、漂移有 CI 拦截，这三件事的成本远低于"重要合作方对接失败"的商业代价。文档站上"最后更新时间"应该像食品保质期一样醒目。',
+      text: '文档和mock同源会共同继承错误，只有接入真实实现的契约测试才能验证二者与服务是否一致。',
+      principle: '以同版本、同字段和同语义建立比较条件，记录变更意图；新增字段也要确认旧端的未知字段策略。',
     },
   ],
 }

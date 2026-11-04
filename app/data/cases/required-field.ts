@@ -1,23 +1,21 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 1 章 · 接口与契约 首批（请求契约破坏 L2）
- * 教学点：架构设计——接口变更分级铁律：响应可加字段、请求不可加必填；
- * 兼容矩阵在 CI 拦截破坏性变更；网关兜底是止血不是设计。
- * 专家路径：impact(1) + schemacheck(2) + gatewayroute(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const requiredFieldCase: DiagnosisCase = {
   id: 'required-field',
   title: '加了个必填字段，老版 App 全体 400',
-  intro: '创建订单接口加了必填的 channelSource，渗透率 35% 的老版 App 下单开始 400——向后兼容是接口的婚约。',
+  intro: '服务端发布后，75%的旧版客户端下单400，新版正常。先对比失败边界和请求契约。',
   domain: 'build',
-  layer: '接口变更分级铁律：响应可加字段，请求不可加必填',
+  layer: '新增请求必填字段会破坏既有调用；响应新增字段也需要验证消费者是否允许扩展',
   part: 'engineer',
   chapterId: 'contract',
   order: 1,
-  typeTags: ['contract', 'deploy'],
+  typeTags: [
+    'contract',
+    'deploy',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」订单服务的接口负责人，一次"很常规"的字段新增引爆了老版本用户。',
     architecture: 'App v2.6/v2.7/v2.8（渗透率 35%/40%/25%） → 网关 → 订单服务 v2.8(CreateOrderRequest: 新增 @NotNull channelSource)',
@@ -34,17 +32,31 @@ export const requiredFieldCase: DiagnosisCase = {
         text: '本次需求：渠道归因分析需要 channelSource 字段（记录下单来源渠道）。\n开发在请求 DTO 上加了 @NotNull——"反正新功能要用，就必填吧"。服务端昨天上线。',
       },
     ],
-    timeline: '服务端昨天 20:00 上线 ｜ 21:00 起老版 App 用户下单失败潮 ｜ 老 App 版本轮：用户不主动升级则长期停留 ｜ 3,500 万 DAU 中 75% 为老版本',
+    timeline: '服务端昨天 20:00 上线 ｜ 21:00 起老版 App 用户下单失败潮 ｜ 老 App 版本轮：用户不主动升级则长期停留 ｜ 教学流量 中 75% 为老版本',
     impactHint: '新客户端全好、老客户端全坏——服务端"加"了什么，让"没变"的请求变得不合法？',
   },
-
   hypotheses: [
-    { id: 'h-required', text: '请求 DTO 新增 @NotNull 必填字段：老 App 请求体无此字段，校验必然拒绝——契约破坏', excludeActionId: 'a-schemacheck' },
-    { id: 'h-gateway', text: '网关对老版本走了不同的路由或转换逻辑，改坏了请求', excludeActionId: 'a-gatewayroute' },
-    { id: 'h-encoding', text: '老 App 请求编码问题（charset 缺失），字段解析失败', excludeActionId: 'a-encodingcheck' },
-    { id: 'h-cert', text: '老 App 的 TLS 证书校验过期，时间上与上线巧合', excludeActionId: 'a-certcheck' },
+    {
+      id: 'h-required',
+      text: '请求 DTO 新增 @NotNull 必填字段：老 App 请求体无此字段，校验必然拒绝——契约破坏',
+      excludeActionId: 'a-schemacheck',
+    },
+    {
+      id: 'h-gateway',
+      text: '网关对老版本走了不同的路由或转换逻辑，改坏了请求',
+      excludeActionId: 'a-gatewayroute',
+    },
+    {
+      id: 'h-encoding',
+      text: '老 App 请求编码问题（charset 缺失），字段解析失败',
+      excludeActionId: 'a-encodingcheck',
+    },
+    {
+      id: 'h-cert',
+      text: '老 App 的 TLS 证书校验过期，时间上与上线巧合',
+      excludeActionId: 'a-certcheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -70,12 +82,19 @@ export const requiredFieldCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-required'],
-      hypotheses: [{ id: 'h-required', status: 'confirmed' }],
+      tests: [
+        'h-required',
+      ],
+      hypotheses: [
+        {
+          id: 'h-required',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '契约对照',
-        text: 'v2.8 请求体：{ …, "channelSource": "push_banner" } → 200 ✓\nv2.6 请求体：{ "skuId": 889, "num": 1, … } —— 结构完整，但没有 channelSource\n服务端校验：@NotNull channelSource → 缺字段 = 校验失败 → 400\n→ 兼容铁律：响应加字段永远安全（老客户端忽略新内容）；\n请求加必填字段永远破坏（老调用方无法预知）——这次踩了后半句。',
+        text: 'v2.8请求携带channelSource→200；v2.6/v2.7合法旧请求无此字段。服务端新增@NotNull，缺字段时Bean Validation返回400。\n同构对照仅撤销新增必填约束，旧请求恢复200，其他字段不变。响应加字段仅在旧消费者允许未知属性时兼容，严格schema/签名校验也可能拒绝，不能说永远安全。',
       },
     },
     {
@@ -86,12 +105,24 @@ export const requiredFieldCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-gateway'],
-      hypotheses: [{ id: 'h-gateway', status: 'excluded' }],
+      tests: [
+        'h-gateway',
+        'h-cert',
+      ],
+      hypotheses: [
+        {
+          id: 'h-gateway',
+          status: 'excluded',
+        },
+        {
+          id: 'h-cert',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '网关核对',
-        text: '所有版本走同一路由同一转发规则；网关日志透传请求体原样。\n→ 排除网关：它忠实转发了"注定 400"的请求。',
+        text: '同一旧请求在网关入口与服务端入口body校验和相同，路由一致；TLS握手完成，400由服务端校验器产生，排除网关转换和证书失败。',
       },
     },
     {
@@ -102,8 +133,15 @@ export const requiredFieldCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-encoding'],
-      hypotheses: [{ id: 'h-encoding', status: 'excluded' }],
+      tests: [
+        'h-encoding',
+      ],
+      hypotheses: [
+        {
+          id: 'h-encoding',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '编码核对',
@@ -118,8 +156,15 @@ export const requiredFieldCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-cert'],
-      hypotheses: [{ id: 'h-cert', status: 'excluded' }],
+      tests: [
+        'h-cert',
+      ],
+      hypotheses: [
+        {
+          id: 'h-cert',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '证书核对',
@@ -130,7 +175,7 @@ export const requiredFieldCase: DiagnosisCase = {
       id: 'a-danger',
       name: '紧急让网关为老请求注入默认值',
       desc: '【状态变更】网关识别老版本请求，注入 channelSource="legacy"',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -177,7 +222,7 @@ export const requiredFieldCase: DiagnosisCase = {
     {
       id: 'a-fixgrade',
       name: '沉淀：接口变更分级规范',
-      desc: '【状态变更】分级卡：响应加字段=兼容 / 请求加可选=兼容 / 请求加必填=破坏性（须新版本号+双跑期）',
+      desc: '【状态变更】按请求、响应和消费者约束判断兼容性，不用永远安全的口诀',
       cost: 1,
       gain: 'mid',
       danger: false,
@@ -187,56 +232,75 @@ export const requiredFieldCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '分级卡',
-        text: '接口变更分级：\n🟢 兼容：响应加字段/请求加可选字段/加新接口\n🔴 破坏性：请求加必填/删字段/改类型/改语义——必须升版本号（/v3/）+ 双跑期 + 下线 SOP\n分级卡贴在 code review 模板——"必填"两个字从此有了门槛。',
+        text: '通常响应加字段和请求加可选字段可兼容，但要检查旧消费者的未知字段策略、签名及业务语义。新增请求必填、删字段、改类型/语义须验证旧调用方；确有破坏则版本化并保留迁移期。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-required', text: '请求 DTO 新增 @NotNull channelSource：老版 App（渗透 75%）请求体无此字段被 Bean Validation 拒绝——违反"请求不可加必填"兼容铁律；响应加字段才安全', correct: true },
-    { id: 'rc-gateway', text: '网关对老版本路由/转换差异', correct: false },
-    { id: 'rc-encoding', text: '老 App 请求编码问题', correct: false },
-    { id: 'rc-cert', text: '老 App TLS 证书校验过期', correct: false },
+    {
+      id: 'rc-required',
+      text: '服务端新增@NotNull channelSource，而75%旧客户端不发送该字段；既有合法请求被400拒绝，新增请求必填破坏了旧契约',
+      correct: true,
+    },
+    {
+      id: 'rc-gateway',
+      text: '网关对老版本路由/转换差异',
+      correct: false,
+    },
+    {
+      id: 'rc-encoding',
+      text: '老 App 请求编码问题',
+      correct: false,
+    },
+    {
+      id: 'rc-cert',
+      text: '老 App TLS 证书校验过期',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 5,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '新客户端全好老客户端全坏——按版本切分失败面，分界线本身就是答案的轮廓。',
-      update: '分界线 = "是否携带新字段"；错误信息直接点名 channelSource——服务端在拒绝"缺一个上周还不存在的字段"。',
+      thought: '按版本划分成功和失败。',
+      update: '旧版75%流量缺新字段时400，新版成功。',
       actionId: 'a-impact',
-      why: '1⚡︎ 版本切分 + 错误信息对读，一步把"变更引入"实锤——剩下的只是"为什么这个字段会拒绝老请求"的机制确认。',
-      conclusion: '嫌疑锁定：@NotNull 新字段（h-required 升权）。',
+      why: '1⚡版本边界加错误信息缩小到请求契约。',
+      conclusion: '核对新增校验。',
     },
     {
-      thought: '契约对照：两版请求体与服务端校验——把"兼容铁律"的上下两半摆在一起看。',
-      update: '实锤：请求加必填字段 = 破坏老调用方（无法预知）；响应加字段 = 安全（老端忽略）。',
+      thought: '比较契约并做单变量对照。',
+      update: '新增@NotNull解释旧请求失败，撤销约束恢复。',
       actionId: 'a-schemacheck',
-      why: '2⚡︎ 契约对照是接口类排查的核心动作：把"请求侧/响应侧"的不对称性讲透——同一句"加字段"，在两侧的兼容性完全相反。',
-      conclusion: '根因实锤：违反兼容铁律后半句。',
+      why: '2⚡字段缺失与校验错误形成直接因果，不泛化响应新增永远安全。',
+      conclusion: '确认必填变更。',
     },
     {
-      thought: '网关/编码/证书三个常规嫌疑各 1⚡︎ 排除——尤其证书，"老客户端失败"最常见的误判方向。',
-      update: '路由一致、编码正常、TLS 已建立（能收到 400 即证明）——三个假设有证据排除。',
+      thought: '对照端到端传输记录。',
+      update: '请求体未变、路由一致、TLS已完成。',
       actionId: 'a-gatewayroute',
-      why: '1⚡︎ "能收到 400 = TLS 已建立"是教科书级的排除推理：协议分层让低层故障根本到不了应用层——分层的知识直接变成排除的武器。',
-      conclusion: '嫌疑收敛单点。',
+      why: '1⚡同一trace包含路由、body与握手证据，可排除两项。',
+      conclusion: '网关与证书排除。',
     },
     {
-      thought: '止血（网关注入有架构代价）、正解（字段改可选+服务端补全）、防线（兼容矩阵+分级卡）。停止收集。',
-      update: '停止。',
+      thought: '核对解析器和编码。',
+      update: '旧请求其他字段成功解析，Content-Type正确。',
+      actionId: 'a-encodingcheck',
+      why: '1⚡编码证据独立于业务校验，补齐剩余候选。',
+      conclusion: '全部候选收敛。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（必填破坏契约）✓ 铁律（响应可加/请求必填不可加）✓ 防线（矩阵+分级卡）✓——个案、铁律、防线三层闭合。',
-      conclusion: '沉淀：接口变更分级铁律——响应可加字段，请求不可加必填；破坏性变更必须升版本号 + 双跑期。',
+      why: '【停止规则】新增必填的单变量对照成立，路由、TLS和编码反证齐备。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '服务端新增@NotNull channelSource，而75%旧客户端不发送该字段；既有合法请求被400拒绝，新增请求必填破坏了旧契约',
     },
   ],
-
   lessons: [
     {
-      text: '接口变更分级铁律：响应加字段永远安全（老端忽略），请求加必填永远破坏（老端无法预知）——"加字段"在两侧的兼容性完全相反。',
-      principle: '架构设计：契约变更分级卡（🟢兼容：响应加/请求可选；🔴破坏：请求必填/删字段/改类型）贴进 review 模板。破坏性变更必须升版本号 + 双跑期 + 下线 SOP——"必填"两个字的门槛就是一套发布流程。',
+      text: '新增请求必填字段会让既有合法请求失效；响应新增字段通常兼容，但严格拒绝未知字段的客户端仍可能失败。',
+      principle: '兼容性由提供方和消费者共同决定。对仍在用的各版本做旧请求/旧消费者回归；新版本号本身不能修复旧端，必须保留迁移期。',
     },
     {
       text: '兼容性要在 CI 里用"旧请求快照"验证：拿上一版本的真实流量样本打新服务端，破坏性变更当场现形。',

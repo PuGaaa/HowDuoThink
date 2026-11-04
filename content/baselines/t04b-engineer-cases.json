@@ -356,7 +356,55 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "a26d4742c5cbbee52d53eb4455affcf248d44c4c474c2cc45975a6c136910df4",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "版本边界→契约变更",
+        "请求与校验对照",
+        "兼容性与校验",
+        "新增字段破坏旧端",
+        "客户端到服务端",
+        "网关注入增加规则散落"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-schemacheck",
+            "a-gatewayroute",
+            "a-encodingcheck"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-gatewayroute",
+            "a-encodingcheck",
+            "a-schemacheck"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-required"
+      ],
+      "review": "人工裁定5⚡，原4漏编码反证；75%统一为35%+40%，去掉响应加字段永远安全断言。",
+      "sources": [
+        "https://json-schema.org/understanding-json-schema/reference/object",
+        "https://spec.openapis.org/oas/v3.1.1.html"
+      ]
     },
     {
       "id": "doc-drift",
@@ -367,7 +415,55 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "c56c5dd5b95a17ad59ce282df742ec72c1a6e4c84b88671bfa1863b9b15eeae3",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "差异→构建发布",
+        "DTO/输出/schema三方",
+        "序列化与契约",
+        "生成过仍会过期",
+        "构建到合作方解析",
+        "只锁文档不能交付"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-docvscode",
+            "a-versioncheck",
+            "a-scriptcheck"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-versioncheck",
+            "a-scriptcheck",
+            "a-docvscode"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-drift"
+      ],
+      "review": "人工裁定5⚡，补消费者脚本反证。统一GET响应场景，列足5处类型差异；修正实现必然正确、mock同源自动发现错误等不实承诺。",
+      "sources": [
+        "https://spec.openapis.org/oas/v3.1.1.html",
+        "https://json-schema.org/understanding-json-schema/reference/object"
+      ]
     },
     {
       "id": "timeout-contract",
@@ -378,7 +474,55 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "a95a67e5be204b818d9ddeee44a94ff2d6b42562ebfef7abdf0e6388de599abe",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "分布→trace→取消",
+        "计数及受控对照",
+        "预算和协作取消",
+        "重试加重失败",
+        "SDK到聚合与下游",
+        "加长超时掩盖预算"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-timeouttable",
+            "a-p99check",
+            "a-retryaudit"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-p99check",
+            "a-retryaudit",
+            "a-timeouttable"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-mismatch"
+      ],
+      "review": "人工裁定5⚡，不保留没测的2.4倍或并行P99理论减半。8→12应增加4，40%重试按总尝试口径计算约1.67倍。",
+      "sources": [
+        "https://grpc.io/docs/guides/deadlines/",
+        "https://grpc.io/docs/guides/cancellation/"
+      ]
     },
     {
       "id": "enum-drift",
@@ -389,7 +533,54 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "c805f037c59da07ba5f90abf510426d1c58c82deacde57c1665ae5444a1be11b",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        3,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "三状态层→映射",
+        "diff与单变量样例",
+        "序列化协议映射",
+        "类型合法语义相反",
+        "生产者到消费者",
+        "改文档追认破坏"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-enumdiff",
+            "a-ordertrace",
+            "a-fieldmap"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-fieldmap",
+            "a-ordertrace",
+            "a-enumdiff"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-semantic"
+      ],
+      "review": "人工裁定5⚡；重建一致的PAID→3→SHIPPED叙事，消除原追踪自我否定；修正直接改字符串的二次破坏。",
+      "sources": [
+        "https://spec.openapis.org/oas/v3.1.1.html"
+      ]
     },
     {
       "id": "error-contract",
@@ -400,7 +591,53 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 4,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "d4a22a4af3eed23d418a8eb153cfdafc521180f2c25115ca684bac122fd7b84e",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "现象→执行分支",
+        "字节和真实includes",
+        "展示与协议职责",
+        "文案变更改逻辑",
+        "错误提供方到前端",
+        "回滚只能暂时恢复"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-erroranatomy",
+            "a-encoding"
+          ],
+          "cost": 4
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-encoding",
+            "a-erroranatomy"
+          ],
+          "cost": 4
+        }
+      ],
+      "expectedConfirmed": [
+        "h-nocontract"
+      ],
+      "review": "保留4⚡；原“账户余额不足”仍包含关键字，不能复现；换为真实不包含的文案，3处实际影响与14处潜在风险分开。",
+      "sources": [
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/includes",
+        "https://spec.openapis.org/oas/v3.1.1.html"
+      ]
     },
     {
       "id": "contract-review",
@@ -411,7 +648,57 @@
       "originalDifficulty": 3,
       "originalExpertCost": 8,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "3a482525bed545aad5e227a770f9dca183bca98a353d4507aa05235eb0d1afbd",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "条款→反例→门禁",
+        "跨条款对照",
+        "契约与容量验证",
+        "完整框架仍不可执行",
+        "平台到消费者",
+        "草率批准或整包否决"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-compatcheck",
+            "a-sunsetcheck",
+            "a-ratecheck",
+            "a-errorcheck"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-ratecheck",
+            "a-errorcheck",
+            "a-sunsetcheck",
+            "a-compatcheck"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-compat"
+      ],
+      "review": "人工裁定6⚡（原8、实际链5且漏限流审查）；把多个真实缺陷误标false的问题改为共同缺陷与三个可证伪方案。六维中位数2，L3→L2。",
+      "sources": [
+        "https://spec.openapis.org/oas/v3.1.1.html",
+        "https://www.rfc-editor.org/rfc/rfc6585#section-4"
+      ]
     },
     {
       "id": "pool-exhausted",

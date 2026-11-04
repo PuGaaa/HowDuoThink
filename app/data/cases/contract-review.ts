@@ -1,23 +1,22 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 1 章 · 接口与契约 结业评审（评审现场 L3）
- * 教学点：架构设计——契约规范的每一条都要能追溯到事故学费：兼容可执行化、废弃五步、
- * 限流分级、错误码样例验证；产品思维——规范是学费的结晶。
- * 专家路径：compatcheck(2) + sunsetcheck(1) + ratecheck(1) + errorcheck(1) + benefit(1) + minfix(2) = 8⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const contractReviewCase: DiagnosisCase = {
   id: 'contract-review',
   title: '开放平台接口契约规范终审',
-  intro: '「对外接口契约规范 v1」明天终审：版本策略、废弃流程、错误码、限流承诺——你的工作是拿四批事故学费拷问它。',
+  intro: '开放平台规范即将生效。用给定教学事故和消费方约束检查条款，判断当前草案缺失的共同发布门禁。',
   domain: 'build',
-  layer: '规范是学费的结晶——每一条都要能追溯到一次真实事故',
+  layer: '把兼容、废弃、限流与语义承诺转成可执行门禁，而非仅给条款命名',
   part: 'engineer',
   chapterId: 'contract',
   order: 6,
-  typeTags: ['contract', 'architecture', 'process'],
-  difficulty: 3,
-
+  typeTags: [
+    'contract',
+    'architecture',
+    'process',
+  ],
+  difficulty: 2,
   scene: {
     role: '你是「鲜到家」开放平台的架构委员会成员，评审会上被指派"挑刺"——用一年的接口事故学费拷问规范。',
     architecture: '开放平台(300 注册应用) → 契约规范 v1(五板块：版本/废弃/错误码/限流/兼容) → 全部对外接口',
@@ -30,21 +29,35 @@ export const contractReviewCase: DiagnosisCase = {
       },
       {
         type: 'text',
-        title: '本年度接口事故档案',
+        title: '教学事故档案',
         text: 'api-sunset：v2 下线邮件通知，2,987 单投诉（全口径盲区）\nrequired-field：请求加必填字段，老 App 全体 400（兼容铁律）\nenum-drift：重构对调枚举语义，1,204 单错误路由（语义级样例验证缺失）\ndoc-drift：文档漂移三个月，对接失败（文档与实现无对账）',
       },
     ],
     timeline: '规范评审明天终审 ｜ 通过后立即生效于全部对外接口 ｜ 五板块：版本/废弃/错误码/限流/兼容',
-    impactHint: '这份规范要解决的问题全部真实发生过——每一条条款，都要过"它能不能拦住那次事故"这一关。',
+    impactHint: '四份教学档案用来检验条款能否执行，并不声称它们是真实原始事故。',
   },
-
   hypotheses: [
-    { id: 'h-compat', text: '核心阻断缺陷："尽量兼容"无操作定义——无旧流量断言、无变更分级卡，兼容只是愿望（required-field 教训）', excludeActionId: 'a-compatcheck' },
-    { id: 'h-sunset', text: '废弃流程复刻 api-sunset 事故：邮件通知无回执、无全口径审计、无分级下线', excludeActionId: 'a-sunsetcheck' },
-    { id: 'h-rate', text: '统一 1000 QPS 无分级：容量契约按 API 一刀切（rate-limit-passthrough 教训）', excludeActionId: 'a-ratecheck' },
-    { id: 'h-errorcode', text: '错误码三段式缺"语义级样例验证"条款（enum-drift 教训：码对含义错）', excludeActionId: 'a-errorcheck' },
+    {
+      id: 'h-compat',
+      text: '共同缺陷是承诺无执行门禁：兼容、废弃、容量及语义均缺验证者和通过标准',
+      excludeActionId: 'a-compatcheck',
+    },
+    {
+      id: 'h-sunset',
+      text: '唯一问题是30天太短，只延长到90天即可解决全部发布风险',
+      excludeActionId: 'a-sunsetcheck',
+    },
+    {
+      id: 'h-rate',
+      text: '统一1000QPS本身足够，只需提高到2000即可安全发布全部接口',
+      excludeActionId: 'a-ratecheck',
+    },
+    {
+      id: 'h-errorcode',
+      text: '三段式码的外观能自动保证含义兼容，无需消费方样例',
+      excludeActionId: 'a-errorcheck',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -70,12 +83,19 @@ export const contractReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-compat'],
-      hypotheses: [{ id: 'h-compat', status: 'confirmed' }],
+      tests: [
+        'h-compat',
+      ],
+      hypotheses: [
+        {
+          id: 'h-compat',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '"尽量兼容旧调用方"——追问三连：\n① 兼容由谁验证？——"没约定"　② 怎么验证？——"没约定"　③ 什么算不兼容？——"看着办"\n档案对照：required-field（请求加必填全体 400）正是"尽量"的产物。\n→ 阻断级缺陷：兼容必须可执行——旧流量断言进 CI + 变更分级卡（响应可加/请求必填不可加）。',
+        text: '兼容条款只写“尽量”，没有验证者、旧消费者矩阵和破坏判据。required-field教学档案中新增必填不会被此条款拦截。\n其他板块同样缺执行门槛：废弃无消费确认、限流无容量依据、错误码无语义样例。共同缺陷是可执行验证缺失，不是某一个常量选错。',
       },
     },
     {
@@ -86,12 +106,19 @@ export const contractReviewCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-sunset'],
-      hypotheses: [{ id: 'h-sunset', status: 'confirmed' }],
+      tests: [
+        'h-sunset',
+      ],
+      hypotheses: [
+        {
+          id: 'h-sunset',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '"邮件通知 + 30 天"——api-sunset 档案：同样邮件通知，2,987 单投诉。\n缺陷三连：通知无回执（发送≠知晓）/ 无全口径审计（0.3% 假象）/ 无分级下线（开关式下线）。\n→ 确认缺陷：废弃五步 SOP（全口径审计→逐个确认→回执通知→缓冲层→分级下线）替换此条。',
+        text: '即使把30改90天，未通知到的活跃调用方、缺失的全口径用量审计、没有分批停用/回退仍不改变。延长日历不能代替确认和迁移，排除“只改天数解决全部风险”。',
       },
     },
     {
@@ -102,12 +129,19 @@ export const contractReviewCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-rate'],
-      hypotheses: [{ id: 'h-rate', status: 'confirmed' }],
+      tests: [
+        'h-rate',
+      ],
+      hypotheses: [
+        {
+          id: 'h-rate',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '"统一 1000 QPS"——rate-limit 档案：阈值与容量脱节，自身用户被拦。\n拷问：1000 怎么来的？——"先设个安全的值"（原话复现！）。\n→ 确认缺陷：限流按 API 分级（容量契约：压测确认→容量+余量→业务活动前评估），拒绝一刀切。',
+        text: '两个教学接口实测可持续容量分别600与3000QPS，草案没有并发/延迟目标和每应用份额。统一2000仍会压垮前者，排除“调高同一阈值即可”。需在容量以下保留预算并定义429与重试约束。',
       },
     },
     {
@@ -118,12 +152,19 @@ export const contractReviewCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-errorcode'],
-      hypotheses: [{ id: 'h-errorcode', status: 'confirmed' }],
+      tests: [
+        'h-errorcode',
+      ],
+      hypotheses: [
+        {
+          id: 'h-errorcode',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '三段式错误码（模块-类型-序号）设计合理——但 enum-drift 档案：码对含义错，类型校验全绿。\n规范缺一条：错误码必须配"语义级样例验证"（每个码走一单真实场景，消费方回读确认）。\n→ 确认补充条款：错误码发布带样例集，码与含义同源生成。',
+        text: '三段式只定义码的外观；enum-drift样例即使结构不变，PAID/SHIPPED含义仍可交换。排除“格式自动保证语义”，需旧消费方的场景样例与兼容检查。',
       },
     },
     {
@@ -150,24 +191,19 @@ export const contractReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-compat', 'h-sunset', 'h-rate', 'h-errorcode'],
-      hypotheses: [
-        { id: 'h-compat', status: 'confirmed' },
-        { id: 'h-sunset', status: 'confirmed' },
-        { id: 'h-rate', status: 'confirmed' },
-        { id: 'h-errorcode', status: 'confirmed' },
-      ],
+      tests: [],
+      hypotheses: [],
       result: {
         type: 'text',
         title: '评审结论 · 修正清单',
-        text: '① 兼容条款可执行化：旧流量断言进 CI + 变更分级卡（阻断项）\n② 废弃流程替换为五步 SOP（审计/确认/回执/缓冲/分级）\n③ 限流按 API 分级 + 容量契约流程\n④ 错误码配语义级样例验证条款\n⑤ 新增"学费回填"机制：每次对外接口事故，规范必须新增或修订对应条款\n→ 五项补齐后有条件通过；兼容条款为阻断项。',
+        text: '建议补四项门禁：兼容矩阵与变更分级、全口径用量与消费确认后分批废弃、按API容量预算限流、错误码语义样例。每项写执行者和通过标准，补齐并验收后再批准；本动作不替代前面的独立审查证据。',
       },
     },
     {
       id: 'a-approve',
       name: '按原稿批准规范生效',
       desc: '【状态变更】不做修改直接发布生效',
-      cost: 3,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -183,7 +219,7 @@ export const contractReviewCase: DiagnosisCase = {
       id: 'a-veto',
       name: '整体否决，规范退回重写',
       desc: '【状态变更】规范作废，团队从零重写',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -196,62 +232,81 @@ export const contractReviewCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-compat', text: '核心阻断缺陷：兼容条款"尽量兼容"无操作定义——无旧流量断言、无变更分级卡，兼容不可验证（required-field 事故必重演）', correct: true },
-    { id: 'rc-sunset', text: '废弃流程复刻 api-sunset：邮件无回执/无全口径审计/无分级下线', correct: false },
-    { id: 'rc-rate', text: '限流一刀切无分级，容量契约缺失', correct: false },
-    { id: 'rc-errorcode', text: '错误码缺语义级样例验证条款', correct: false },
+    {
+      id: 'rc-compat',
+      text: '规范仅陈述承诺，没有验证者、通过标准和发布门禁；兼容、废弃、容量及错误语义的承诺均无法被证明兑现',
+      correct: true,
+    },
+    {
+      id: 'rc-sunset',
+      text: '只延长废弃等待天数即可解决全部风险',
+      correct: false,
+    },
+    {
+      id: 'rc-rate',
+      text: '统一提高QPS阈值即可确保全部API安全',
+      correct: false,
+    },
+    {
+      id: 'rc-errorcode',
+      text: '错误码外观格式自动保证业务语义兼容',
+      correct: false,
+    },
   ],
-
-  expertCost: 8,
+  expertCost: 6,
   restartActionId: 'a-approve',
-
   expertChain: [
     {
-      thought: '评审判据先立：规范的价值不是"写得全"，是"拦得住"——每条条款对照一次真实事故。',
-      update: '五板块五道关确立：版本↔契约破坏、废弃↔api-sunset、错误码↔enum-drift、限流↔rate-limit、兼容↔required-field。',
+      thought: '先确定规范审查范围。',
+      update: '五板块各自要回答承诺如何兑现。',
       actionId: 'a-impact',
-      why: '1⚡ 规范评审的特殊判据：它要拦截的敌人已经全部出现过——事故档案就是考卷。对照式拷问让每条条款无处遁形。',
-      conclusion: '拷问框架确立。',
+      why: '1⚡先建审查框架，避免逐句润色却不检查执行。',
+      conclusion: '核对共同门禁缺口。',
     },
     {
-      thought: '先拷问最核心的兼容条款——"尽量"两个字，正是 required-field 事故的起点。',
-      update: '实锤：兼容无验证者、无方法、无判据——"尽量"= 不可执行的愿望。阻断级。',
+      thought: '审查兼容条款与四板块执行条件。',
+      update: '没有验证者和通过标准，共同缺陷成立。',
       actionId: 'a-compatcheck',
-      why: '2⚡ 契约规范的核心是兼容条款：它必须回答"谁验证、怎么验、什么算不兼容"三问——追问三连把愿望与机制分开。兼容可执行化 = 旧流量断言 + 分级卡。',
-      conclusion: '兼容条款阻断缺陷实锤。',
+      why: '2⚡把规范措辞映射到可执行发布条件，确认主缺陷。',
+      conclusion: '确认门禁缺失。',
     },
     {
-      thought: '废弃与限流两问并查——一个复刻 api-sunset，一个复刻 rate-limit：条款里的历史重影逐个显形。',
-      update: '两项确认：邮件 30 天 = 事故原样复刻；统一 1000 = "先设个安全的值"原话重现。',
+      thought: '反验只延长期限的方案。',
+      update: '等待更久不补审计和消费确认。',
       actionId: 'a-sunsetcheck',
-      why: '1⚡ 事故档案的对照是评审的照妖镜：条款的文字风格（"先设个安全的值"/"邮件通知即可"）与事故档案的前因逐字吻合——历史会重演，除非条款写死教训。',
-      conclusion: '两项缺陷确认。',
+      why: '1⚡用保持其他条件不变的反例排除单常量方案。',
+      conclusion: '排除只改天数。',
     },
     {
-      thought: '错误码条款的"隐性缺口"：设计合理 ≠ 完整——缺的是语义级验证（码对含义错的教训）。',
-      update: '确认补充：错误码发布必须带样例集（码与含义同源生成 + 消费方回读确认）。',
+      thought: '以两接口容量反验统一阈值。',
+      update: '2000大于600，提升阈值仍不安全。',
+      actionId: 'a-ratecheck',
+      why: '1⚡容量给定值使一刀切方案可被直接反驳。',
+      conclusion: '排除只加QPS。',
+    },
+    {
+      thought: '用语义交换样例反验格式保证。',
+      update: '格式未变仍可改变含义。',
       actionId: 'a-errorcheck',
-      why: '1⚡ 好设计也有盲区：三段式解决了"码的结构"，没解决"码的含义"——enum-drift 证明含义漂移不需要类型错误就会发生。每条条款拷两遍：结构对吗？语义会漂吗？',
-      conclusion: '四项缺陷 + 补充条款齐备。',
+      why: '1⚡结构正确与语义兼容需要独立验证。',
+      conclusion: '三个替代解释全部排除。',
     },
     {
-      thought: '框架价值评估后开修正清单：五项补齐、兼容为阻断——评审落笔。停止追问。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【评审停止规则】五板块全部拷问完毕，每条缺陷都有事故档案背书、每条修正都有可执行形态——继续追问不会发现新的结构性缺口。',
-      conclusion: '有条件通过：兼容可执行化为阻断项；"学费回填"机制让规范活起来。检查单：每条条款都能追溯到一次学费。',
+      why: '【停止规则】共同门禁缺失成立，延长期限、统一加阈值和格式保证三个替代方案均被具体反例排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '规范仅陈述承诺，没有验证者、通过标准和发布门禁；兼容、废弃、容量及错误语义的承诺均无法被证明兑现',
     },
   ],
-
   lessons: [
     {
       text: '规范的价值不是"写得全"，是"拦得住"：每条条款都要过"它能不能拦截那次已发生的事故"这一关。',
-      principle: '架构设计：规范条款的可执行性检验三问——谁执行、怎么验证、什么算违反。"尽量兼容""先设个安全的值"这类措辞是愿望不是条款——愿望写进规范，事故就有了重播授权。',
+      principle: '把谁执行、验证样例、通过标准和失败时禁止发布写进条款。样例和容量数字是本题教学给定条件，不能包装成未经验证的生产证据。',
     },
     {
-      text: '事故档案是规范评审的考卷：四起事故 = 四道对照题——条款若拦不住历史事故，就拦不住下一次。',
+      text: '教学事故可用来反验规范是否有拦截能力；它们是已知反例，不能替代当前API的负载与消费者验证。',
       principle: '沉淀思维："学费回填"机制让规范成为活文档：每次对外事故，规范必须新增或修订对应条款。规范与事故档案的对照表（条款 ↔ 学费）是团队最贵的资产——它证明每一条都不是拍脑袋。',
     },
     {

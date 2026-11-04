@@ -1,23 +1,22 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 1 章 · 接口与契约 第三批（超时预算链 L2）
- * 教学点：架构设计——超时是三方契约：client/gateway/server/下游 需要递减预算链；
- * 上游先放弃时下游要收到取消；重试是放大器要配退避。
- * 专家路径：impact(1) + timeouttable(2) + gatewaytimeout(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const timeoutContractCase: DiagnosisCase = {
   id: 'timeout-contract',
   title: '客户端 3 秒超时，服务端要跑 5 秒',
-  intro: '库存查询客户端 3s 超时、服务端 P99 5s：每一次"超时重试"都注定失败——超时是三方契约，不是单方配置。',
+  intro: '部分聚合请求在客户端3秒超时，服务端仍继续执行。检查延迟分布、取消和重试，建立可兑现的预算。',
   domain: 'build',
   layer: '超时是递减的预算链——每层预算要覆盖下一层的最坏情况',
   part: 'engineer',
   chapterId: 'contract',
   order: 3,
-  typeTags: ['contract', 'capacity', 'architecture'],
+  typeTags: [
+    'contract',
+    'capacity',
+    'architecture',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」库存服务的负责人，大促压测发现：服务端被自己的客户端"逼"出了雪崩。',
     architecture: '客户端 SDK(timeout 3s) → 网关(timeout 10s) → 库存聚合服务(P99 5s: 串行聚合 12 个下游) → 下游×12',
@@ -26,7 +25,7 @@ export const timeoutContractCase: DiagnosisCase = {
       {
         type: 'error',
         title: '大促压测现象',
-        text: '聚合查询 P99 5s：客户端 3s 就放弃并立即重试——服务端还在为"已放弃"的请求继续算。\n重试请求占服务端负载 40%：同样的计算做 2.4 遍，雪上加霜。',
+        text: '聚合请求P99为5s，其中22%超过3s；客户端到3s就放弃。服务端追踪显示断开后仍计算，重试占服务端接收尝试的40%。',
       },
       {
         type: 'text',
@@ -34,17 +33,31 @@ export const timeoutContractCase: DiagnosisCase = {
         text: '客户端 SDK：3s（写死在封装里，"感觉 3 秒够"）\n网关：10s（默认模板）\n服务端：无内部预算（聚合要等多久算多久）',
       },
     ],
-    timeline: '库存聚合上月新增 5 个下游（8→12 个），P99 从 2s 涨到 5s ｜ 客户端超时从未调整 ｜ 大促 12 天后',
+    timeline: '库存聚合上月新增4个下游（8→12），P99从2s升至5s；客户端超时未调整；大促12天后。',
     impactHint: '三个层各自"配置合理"，拼起来却互相拆台——超时的预算表，谁先放弃、放弃后下游知不知道？',
   },
-
   hypotheses: [
-    { id: 'h-mismatch', text: '超时契约失配：client 3s < server P99 5s——慢于 3s 的服务端工作注定白做，重试放大 2.4×', excludeActionId: 'a-timeouttable' },
-    { id: 'h-gateway', text: '网关 10s 超时比客户端还长：客户端断开后网关继续悬挂等下游', excludeActionId: 'a-gatewaytimeout' },
-    { id: 'h-server', text: '服务端 5s 本身不合理：串行聚合可并行化', excludeActionId: 'a-p99check' },
-    { id: 'h-retry', text: '重试无退避放大脉冲（retry-storm 同构）', excludeActionId: 'a-retryaudit' },
+    {
+      id: 'h-mismatch',
+      text: '预算失配且不传播取消，客户端3s先退出；无预算的聚合继续执行，重试放大负载',
+      excludeActionId: 'a-timeouttable',
+    },
+    {
+      id: 'h-gateway',
+      text: '仅网关提前到达自身超时，返回504；客户端自身计时器没有触发',
+      excludeActionId: 'a-gatewaytimeout',
+    },
+    {
+      id: 'h-server',
+      text: '所有服务端请求都超过3s，因此只要等更久即可，无需预算或优化',
+      excludeActionId: 'a-p99check',
+    },
+    {
+      id: 'h-retry',
+      text: '首次请求都正常，只有客户端重试逻辑凭空制造了超时',
+      excludeActionId: 'a-retryaudit',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +72,7 @@ export const timeoutContractCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '超时预算表（现状）',
-        text: '客户端 SDK：  3s（写死）\n网关：        10s（默认模板）\n服务端聚合：  无预算（P99 5s，串行 12 下游）\n失败分布：>3s 的请求 22%——全部被客户端放弃；\n重试占服务端负载 40%，其中 92% 的重试也会失败（服务端依然 >3s）。\n→ 重试不是恢复手段，是负载放大器。',
+        text: '客户端3s、网关10s、聚合无总预算；分布中22%超过3s，P99为5s。\n本窗口600次首次尝试+400次重试=1000次服务端接收，重试占40%；尝试放大1000/600≈1.67倍，不能推出2.4倍计算量。',
       },
     },
     {
@@ -70,12 +83,24 @@ export const timeoutContractCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-mismatch'],
-      hypotheses: [{ id: 'h-mismatch', status: 'confirmed' }],
+      tests: [
+        'h-mismatch',
+        'h-gateway',
+      ],
+      hypotheses: [
+        {
+          id: 'h-mismatch',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-gateway',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '契约对账',
-        text: '① client 3s < server P99 5s：>3s 的聚合注定白做（客户端已走）\n② 取消传播：无——客户端断开后，服务端不知情继续算 5s\n③ 重试：立即重试（无退避），同一秒内第二个请求加入队列\n实锤：超时是"三方契约"，三方各配各的 = 预算链断裂。\n正确形态：预算递减（client ≥ gw ≥ server ≥ 下游）+ 取消传播 + 重试退避。',
+        text: '单trace：t=0发起，t=3.000客户端计时器触发并重试；网关尚未到10s，服务端第一份工作直到t=5.000完成。未转发剩余预算，聚合也未观察取消。\n同构保持工作负载不变，启用剩余预算和协作取消后，客户端放弃的工作按预算终止。取消是否真正停止DB/SDK工作还取决于具体调用是否支持，HTTP断开不会自动中断所有任务。',
       },
     },
     {
@@ -86,12 +111,19 @@ export const timeoutContractCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-gateway'],
-      hypotheses: [{ id: 'h-gateway', status: 'down' }],
+      tests: [
+        'h-gateway',
+      ],
+      hypotheses: [
+        {
+          id: 'h-gateway',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '网关核对',
-        text: '客户端 3s 断开后，网关继续等下游最长 10s——悬挂连接占满网关连接池（高峰等待）。\n→ 确认为次因：网关超时应短于客户端（先放弃的是它），10s 的默认值让它在客户端之后才放弃。',
+        text: '追踪没有网关先返回504；是客户端3s定时器先触发，网关10s预算尚未耗尽。长等待是浪费因素，但“仅网关先超时”与记录相反。',
       },
     },
     {
@@ -102,12 +134,19 @@ export const timeoutContractCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-server'],
-      hypotheses: [{ id: 'h-server', status: 'down' }],
+      tests: [
+        'h-server',
+      ],
+      hypotheses: [
+        {
+          id: 'h-server',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '聚合解剖',
-        text: '12 个下游串行调用：5s；其中 8 个互不依赖可并行 → 理论 P99 2.5s。\n→ 降权为优化项：并行化把 P99 压回 3s 预算内——它是"让契约成立"的手段之一，与预算重排配合。',
+        text: '样本78%在3s内，22%更慢，故不是所有请求都需5s。12下游依赖图中8个互不依赖，但P99不能由8个独立调用的各自分位数直接相加或保证减半，须在受控并发下实测聚合延迟。',
       },
     },
     {
@@ -118,19 +157,26 @@ export const timeoutContractCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-retry'],
-      hypotheses: [{ id: 'h-retry', status: 'down' }],
+      tests: [
+        'h-retry',
+      ],
+      hypotheses: [
+        {
+          id: 'h-retry',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '重试审计',
-        text: '立即重试、无退避、无上限次数——retry-storm 的同构缺陷（第 12 章教训）。\n→ 列入整改：指数退避 + 抖动 + 最多 1 次。',
+        text: '关闭重试的同构对照中，首次请求仍有22%在3s超时，故重试不是凭空制造首个超时。原SDK立即重试、最多一次；重试是放大器。600首次+400重试说明本窗口放大约1.67倍尝试，未证明等比例CPU工作量。',
       },
     },
     {
       id: 'a-danger',
       name: '紧急把客户端超时调到 10s 对齐',
       desc: '【状态变更】客户端 3s → 10s',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -139,7 +185,7 @@ export const timeoutContractCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '对齐结果（陷阱动作）',
-        text: '重试消失（不再超时）——但用户前端要等 10s 才有响应：\n"修复了服务端指标，炸了用户体验"——超时预算从体验端爆掉。\n→ 复盘点评：对齐的方向错了——预算应该从用户体验倒推（8s），逐层向内收紧。',
+        text: '客户端直接调到10s，只会扩大等待上限，不保证服务端不再超时，也没有补总预算和取消。体验目标若为8s，此改动还超过目标；先明确目标与尾延迟，再分配预算。',
       },
     },
     {
@@ -155,7 +201,7 @@ export const timeoutContractCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '预算链 v2',
-        text: '从用户体验倒推：用户可接受 8s →\nclient 8s ≥ gw 6s ≥ server 5s ≥ 单下游 1s（每层预算 ≥ 内层最坏情况）。\n聚合并行化：8 个独立下游并行 → P99 5s → 2.5s（预算内）。\n压测回归：重试占比 40% → 3%，服务端负载减半，P99 2.4s 稳定。',
+        text: '教学预算：客户端8s、网关6s、服务端总预算5s；发往下游时按剩余时间扣除本层处理和回传余量，再设单调用上限1s。串行阶段、并行波次、排队与重试共同消耗5s，不能只检查8≥6≥5≥1就宣称必然满足。\n并行优化后必须负载测试整体P99，不能直接从拓扑推导2.5s。',
       },
     },
     {
@@ -171,7 +217,7 @@ export const timeoutContractCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '取消传播',
-        text: '网关对客户端断开事件传播 cancel（HTTP abort 信号），服务端聚合监听取消立即中断。\n→ "上游放弃"这件事本身要成为契约的一部分——不知道被放弃的计算，是纯浪费。',
+        text: '沿链路显式传递deadline/取消信号，聚合器与可取消的下游调用协作终止。对不支持取消的SDK限制并发并观测残留工作，不能承诺HTTP abort自动停止全部数据库计算。',
       },
     },
     {
@@ -207,56 +253,75 @@ export const timeoutContractCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-mismatch', text: '超时契约失配：client 3s < server P99 5s（聚合 12 下游串行）——慢于 3s 的工作注定白做，立即重试无取消传播，负载放大 2.4×；网关 10s 悬挂连接为次因', correct: true },
-    { id: 'rc-gateway', text: '网关 10s 超时比客户端长，悬挂连接占池（次因）', correct: false },
-    { id: 'rc-server', text: '服务端串行聚合可并行化（优化项非根因）', correct: false },
-    { id: 'rc-retry', text: '重试无退避放大脉冲（次因）', correct: false },
+    {
+      id: 'rc-mismatch',
+      text: '客户端3s预算短于部分聚合耗时，链路无剩余预算及协作取消；首请求超时后仍计算，立即重试进一步放大尝试数',
+      correct: true,
+    },
+    {
+      id: 'rc-gateway',
+      text: '网关 10s 超时比客户端长，悬挂连接占池（次因）',
+      correct: false,
+    },
+    {
+      id: 'rc-server',
+      text: '服务端串行聚合可并行化（优化项非根因）',
+      correct: false,
+    },
+    {
+      id: 'rc-retry',
+      text: '重试无退避放大脉冲（次因）',
+      correct: false,
+    },
   ],
-
-  expertCost: 4,
+  expertCost: 5,
   restartActionId: 'a-danger',
-
   expertChain: [
     {
-      thought: '三个层各自"配置合理"却互相拆台——先画超时预算表：三个数字放一张桌子上。',
-      update: 'client 3s < server P99 5s + 重试占负载 40% + 重试再失败 92%——放大器机制可见。',
+      thought: '先建立延迟和尝试数口径。',
+      update: '22%超过3s，重试占接收尝试40%，约1.67倍尝试。',
       actionId: 'a-impact',
-      why: '1⚡︎ 预算表把三个"单看合理"的数字放在一起——契约问题只有对表才能看见：单点审查永远发现不了"组合错误"。',
-      conclusion: '嫌疑锁定：契约失配（h-mismatch 升权）。',
+      why: '1⚡分位数不是每次耗时，重试比例不能当计算放大倍数。',
+      conclusion: '核对同一请求时间线。',
     },
     {
-      thought: '契约对账三问：谁先放弃？放弃后下游知道吗？重试怎么发？',
-      update: '实锤：client 先放弃、无取消传播、立即重试——预算链断裂 + 浪费机制完整。',
+      thought: '追踪谁先超时及剩余工作。',
+      update: '客户端先退出，服务端未获取消继续完成。',
       actionId: 'a-timeouttable',
-      why: '2⚡︎ 契约对账的三问是本关核心：超时的正确形态是"递减预算 + 取消传播 + 退避重试"三位一体——缺任何一位，其他两位都会变成放大器。',
-      conclusion: '根因实锤：预算链断裂。',
+      why: '2⚡同trace与同构对照确认预算断裂，排除网关先超时。',
+      conclusion: '确认核心机制。',
     },
     {
-      thought: '网关 10s 与聚合并行化空间单独定权——它们是次因与优化项，防止修复方案发散。',
-      update: '网关悬挂确认（次因）、聚合可并行化（优化项 P99 5→2.5s）——定权后修复清单各就各位。',
-      actionId: 'a-gatewaytimeout',
-      why: '1⚡︎ 定权的价值：并行化很诱人但不解决契约问题——只有配合预算重排才成立。区分"根因/次因/优化项"让修复不贪多。',
-      conclusion: '定权完成 → 预算重排。',
+      thought: '审查分布和聚合依赖图。',
+      update: '多数请求低于3s，并行收益仍需实测。',
+      actionId: 'a-p99check',
+      why: '1⚡避免把P99当全部请求或根据依赖数虚构分位数。',
+      conclusion: '排除全都慢的解释。',
     },
     {
-      thought: '重试审计收尾——退避规范的缺失是放大器的燃料。止血陷阱（对齐到 10s）点评后进入预算重排。停止收集。',
-      update: '停止。',
+      thought: '关闭重试复验首个超时。',
+      update: '首请求仍超时，重试只是放大器。',
+      actionId: 'a-retryaudit',
+      why: '1⚡控制变量区分首次失败与失败后负载。',
+      conclusion: '其余候选排除。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】断裂（client<server）✓ 放大（无取消+无退避）✓ 防线（登记表+递减断言）✓——机制、放大、防线三层闭合。',
-      conclusion: '沉淀：超时是递减的预算链——从用户体验倒推逐层收紧，取消传播让放弃被知晓，退避让重试只兜底不放大。',
+      why: '【停止规则】客户端先退出且服务端继续工作已确认，网关先超时、全都慢和重试凭空制造失败已排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '客户端3s预算短于部分聚合耗时，链路无剩余预算及协作取消；首请求超时后仍计算，立即重试进一步放大尝试数',
     },
   ],
-
   lessons: [
     {
-      text: '超时是三方契约：client/gateway/server/下游 的预算必须递减——每层预算要覆盖内层最坏情况，否则"各配各的"就是互相拆台。',
-      principle: '架构设计：超时预算表（每条链路四值）+ 递减断言进 CI。预算从用户体验倒推（8s → 6s → 5s → 1s），而不是从"单点感觉"出发——单点合理的数字组合起来可以是灾难。',
+      text: '预算要从体验目标倒推，并沿调用链传递剩余时间；P99是分布特征，不是单请求最坏耗时。',
+      principle: '外层预算应覆盖内层工作和回传余量，但递减不等于充分。串行、排队、重试和并行波次都消耗总预算，需在相同负载下验证尾延迟。',
     },
     {
       text: '上游放弃时下游要被告知：没有取消传播的架构里，每个被放弃的请求都在白算——重试把它变成双倍白算。',
-      principle: '程序设计：取消传播（abort 信号沿调用链传递）与超时同权——"上游已放弃"本身是契约的一部分。聚合类服务必须响应取消中断计算，否则重试的每一秒都在加倍浪费。',
+      principle: '取消必须由业务与具体SDK协作支持，客户端断开并不自动结束所有DB查询或计算。重试先限制次数，并在总预算内退避与抖动；对写操作还需幂等。',
     },
     {
       text: '对齐超时的方向从用户体验倒推：把 client 调到 10s "对齐服务端"，是修好指标炸掉体验——预算链的锚点在用户。',

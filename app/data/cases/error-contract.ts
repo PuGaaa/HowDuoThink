@@ -1,23 +1,21 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 1 章 · 接口与契约 第五批（错误响应契约缺失 L2）
- * 教学点：架构设计——错误响应也是契约：message 是给人看的文案，code 才是给程序读的协议；
- * 文案与逻辑解耦（i18n），错误码表与 schema 同源生成。
- * 专家路径：impact(1) + erroranatomy(2) + encoding(1) = 4⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const errorContractCase: DiagnosisCase = {
   id: 'error-contract',
-  title: '后端改了个标点，前端的充值流程崩了',
-  intro: '前端按错误文案"余额不足"做分支，后端文案改成"账户余额不足"——message 从来不是契约，code 一直是空的。',
+  title: '后端换了措辞，充值引导消失',
+  intro: '余额不足错误换了展示文案，充值引导不再出现。对比真实字符串和前端分支，别先假设匹配失败。',
   domain: 'build',
   layer: '错误响应也是契约——message 给人看，code 给程序读',
   part: 'engineer',
   chapterId: 'contract',
   order: 5,
-  typeTags: ['contract', 'config'],
+  typeTags: [
+    'contract',
+    'config',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」支付链路的负责人，一个文案微调让前端的充值引导全部失灵。',
     architecture: '支付服务(错误响应: { message }) → 前端(按 message.includes("余额不足") 分支) → 充值引导页',
@@ -26,7 +24,7 @@ export const errorContractCase: DiagnosisCase = {
       {
         type: 'error',
         title: '故障表现',
-        text: '余额不足的用户：不再看到"去充值"引导，而是收到"支付失败请重试"——重试永远失败。\n文案微调：后端把"余额不足，请充值"改为"账户余额不足，请先充值"（合规要求）。',
+        text: '后端将“余额不足，请充值”改为“可用资金不足，请先充值”；前端仍执行message.includes("余额不足")，充值引导不再出现。',
       },
       {
         type: 'text',
@@ -35,16 +33,30 @@ export const errorContractCase: DiagnosisCase = {
       },
     ],
     timeline: '文案微调昨天上线（合规整改）｜ 前端分支失效今天客服报上来 ｜ 错误码表：设计稿里有，从未实现',
-    impactHint: '一个标点的改动崩了 14 处逻辑——文案从来不是契约。错误响应的"另一半契约"长什么样？',
+    impactHint: '这次影响余额不足分支；全仓14处文案判断是潜在风险，不能都算本次已坏。',
   },
-
   hypotheses: [
-    { id: 'h-nocontract', text: '错误响应无 code 契约：前端被迫按 message 文本匹配做逻辑分支——文案即契约的幻觉', excludeActionId: 'a-erroranatomy' },
-    { id: 'h-encoding', text: '前后端文案编码不一致，includes 匹配失败（与本例无关的编码问题）', excludeActionId: 'a-encoding' },
-    { id: 'h-mapping', text: '前端缓存了旧的错误映射表', excludeActionId: 'a-mappingcache' },
-    { id: 'h-gw', text: '网关改写了错误响应体', excludeActionId: 'a-gwbody' },
+    {
+      id: 'h-nocontract',
+      text: '错误响应无 code 契约：前端被迫按 message 文本匹配做逻辑分支——文案即契约的幻觉',
+      excludeActionId: 'a-erroranatomy',
+    },
+    {
+      id: 'h-encoding',
+      text: '前后端字符编码不一致，导致解码后的关键字损坏',
+      excludeActionId: 'a-encoding',
+    },
+    {
+      id: 'h-mapping',
+      text: '前端缓存了旧的错误映射表',
+      excludeActionId: 'a-mappingcache',
+    },
+    {
+      id: 'h-gw',
+      text: '网关改写了错误响应体',
+      excludeActionId: 'a-gwbody',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -59,7 +71,7 @@ export const errorContractCase: DiagnosisCase = {
       result: {
         type: 'code',
         title: '欠账清单',
-        text: '前端搜索：message.includes / message == 做逻辑分支 = 14 处\n覆盖场景：余额不足×3 / 超时×4 / 风控拦截×2 / 限购×2 / 其他×3\n本次故障：后端文案微调（合规要求）→ includes("余额不足") 匹配失败 → 分支走默认重试\n→ 一处文案微调崩 14 处逻辑——这不是 bug，是"契约缺失"的整体状态。',
+        text: '本次受影响是3处余额不足引导，旧文案“余额不足，请充值”匹配true，新文案“可用资金不足，请先充值”匹配false。\n另外11处文案判断本次未失效，只是同类风险。若改成“账户余额不足”，includes("余额不足")仍为true，不能用它声称故障。',
       },
     },
     {
@@ -70,12 +82,24 @@ export const errorContractCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-nocontract'],
-      hypotheses: [{ id: 'h-nocontract', status: 'confirmed' }],
+      tests: [
+        'h-nocontract',
+        'h-mapping',
+      ],
+      hypotheses: [
+        {
+          id: 'h-nocontract',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-mapping',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '错误响应解剖',
-        text: '现状：{ "message": "账户余额不足，请先充值" } —— 只有人读的文案\n设计稿（从未实现）：{ "code": "PAYMENT_INSUFFICIENT_BALANCE", "message": "…" }\nmessage 的本质：给人看的展示层——它会因合规/多语言/措辞优化而变；\ncode 的本质：给程序读的协议——一旦定义恒定不变。\n实锤：前端被迫用"展示层"做"协议判断"——错误响应的另一半契约从未出生。',
+        text: '错误响应只有message，无机器可读code。调用链每次直接执行message.includes("余额不足")，无缓存映射；同构只替换文案即可重现true→false。\n设计稿code从未落地。稳定code适合程序判断，message用于展示；code语义也需要契约维护，不能保证永恒不变。',
       },
     },
     {
@@ -86,12 +110,24 @@ export const errorContractCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-encoding'],
-      hypotheses: [{ id: 'h-encoding', status: 'excluded' }],
+      tests: [
+        'h-encoding',
+        'h-gw',
+      ],
+      hypotheses: [
+        {
+          id: 'h-encoding',
+          status: 'excluded',
+        },
+        {
+          id: 'h-gw',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '编码核对',
-        text: '两侧均 UTF-8；includes 的问题是"文案变了"不是"比对坏了"。\n→ 排除编码。',
+        text: '同一请求的服务端响应字节、网关出口和浏览器解码字符串相同，均为UTF-8的“可用资金不足，请先充值”。网关未改body；JS直接执行includes得到false。排除编码损坏与网关改写。',
       },
     },
     {
@@ -102,8 +138,15 @@ export const errorContractCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-mapping'],
-      hypotheses: [{ id: 'h-mapping', status: 'excluded' }],
+      tests: [
+        'h-mapping',
+      ],
+      hypotheses: [
+        {
+          id: 'h-mapping',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '缓存核对',
@@ -118,8 +161,15 @@ export const errorContractCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-gw'],
-      hypotheses: [{ id: 'h-gw', status: 'excluded' }],
+      tests: [
+        'h-gw',
+      ],
+      hypotheses: [
+        {
+          id: 'h-gw',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '网关核对',
@@ -146,7 +196,7 @@ export const errorContractCase: DiagnosisCase = {
       id: 'a-danger',
       name: '紧急回滚后端文案到旧版',
       desc: '【状态变更】文案回滚"余额不足，请充值"，前端分支恢复',
-      cost: 1,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -207,48 +257,60 @@ export const errorContractCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-nocontract', text: '错误响应无 code 契约：前端按 message.includes("余额不足") 做逻辑分支 ×14 处——后端合规文案微调即全线失效；message 是展示层会变，code 是协议层恒定', correct: true },
-    { id: 'rc-encoding', text: '前后端文案编码不一致', correct: false },
-    { id: 'rc-mapping', text: '前端缓存旧错误映射表', correct: false },
-    { id: 'rc-gw', text: '网关改写错误响应体', correct: false },
+    {
+      id: 'rc-nocontract',
+      text: '错误响应缺少稳定机器code，充值引导按message.includes("余额不足")分支；文案改为“可用资金不足”后匹配false，3处引导失效',
+      correct: true,
+    },
+    {
+      id: 'rc-encoding',
+      text: '前后端文案编码不一致',
+      correct: false,
+    },
+    {
+      id: 'rc-mapping',
+      text: '前端缓存旧错误映射表',
+      correct: false,
+    },
+    {
+      id: 'rc-gw',
+      text: '网关改写错误响应体',
+      correct: false,
+    },
   ],
-
   expertCost: 4,
-  restartActionId: 'a-fixcodes',
-
+  restartActionId: 'a-danger',
   expertChain: [
     {
-      thought: '一处文案微调崩 14 处逻辑——先量化欠账：还有多少逻辑挂在文案上。',
-      update: '14 处 message.includes 分支、错误响应无 code 字段——"文案即契约"是整体欠账。',
+      thought: '先实际运行前后字符串判断。',
+      update: '旧文案true，新文案false，3处受影响。',
       actionId: 'a-impact',
-      why: '1⚡︎ 欠账清单决定修复层级：单处误匹配修一处即可；14 处意味着"错误响应契约缺失"的体系问题——修一张码表，不是修 14 个字符串。',
-      conclusion: '定性完成：契约缺失（h-nocontract 升权）。',
+      why: '1⚡执行真实includes，不能凭措辞变化虚构失败。',
+      conclusion: '检查分支依赖。',
     },
     {
-      thought: '解剖错误响应的完整结构——它有哪些字段、缺了哪个，设计稿里"本该有"的是什么。',
-      update: '实锤：message 是给人看的展示层（会变），code 是给程序读的协议（恒定）——后者从未出生。',
+      thought: '跟踪错误结构和使用点。',
+      update: '无code、无缓存，文案是唯一判断依据。',
       actionId: 'a-erroranatomy',
-      why: '2⚡︎ 教学核心：错误响应也是契约，且有两半——文案给人看（可变），code 给程序读（恒定）。前端被迫用展示层做协议判断，等于把逻辑建在流沙上。',
-      conclusion: '根因实锤：另一半契约缺失。',
+      why: '2⚡结构与单变量文案复验共同证明耦合，排除缓存。',
+      conclusion: '确认契约缺失。',
     },
     {
-      thought: '编码/缓存/网关三个常规嫌疑各 1⚡︎ 排除——"字符串匹配失败"的三种技术性解释全部清场。',
-      update: '编码一致、无缓存、网关透传——嫌疑收敛到契约结构本身。',
+      thought: '对照同请求端到端字节。',
+      update: 'UTF-8一致，网关未改写。',
       actionId: 'a-encoding',
-      why: '1⚡︎ 技术性解释先排除：编码/缓存/改写都是"匹配失败"的合理嫌疑——留证清场后，结构性缺陷的结论才无可辩驳。',
-      conclusion: '嫌疑收敛 → 码表落地。',
+      why: '1⚡同一次抓包链给出编码与网关各自反证。',
+      conclusion: '其余候选排除。',
     },
     {
-      thought: '修复（码表+code 字段）、双闸（双端 lint）、解耦（i18n）、契约补全（错误码进文档）。停止收集。',
-      update: '停止。',
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【停止规则】机制（无 code 契约）✓ 欠账（14 处）✓ 防线（双闸+同源文档）✓——个案、体系、防线三层闭合。',
-      conclusion: '沉淀：错误响应也是契约——message 给人看，code 给程序读；文案与逻辑解耦，才是"改文案不炸逻辑"的底气。',
+      why: '【停止规则】真实字符串判断复现成立，无code耦合已确认，编码、缓存、网关均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '错误响应缺少稳定机器code，充值引导按message.includes("余额不足")分支；文案改为“可用资金不足”后匹配false，3处引导失效',
     },
   ],
-
   lessons: [
     {
       text: '错误响应也是契约，且有两半：message 给人看（会因合规/多语言/措辞而变），code 给程序读（恒定不变）。',

@@ -68,3 +68,12 @@ test('配置题限定刷新与绑定语义，不制造字段RefreshScope和任�
 test('恢复风暴分别核算连接与查询，并区分尝试和成功连接',()=>{
  const c=load('app/data/cases/boot-storm.ts');assert.equal(50*20,1000);assert.equal(50*240/60,200);assert.ok(50*10<800);assert.equal(800+200,1000);assert.match(c.actions.find(a=>a.id==='a-impact').result.text,/建立800、拒绝200/);assert.match(c.actions.find(a=>a.id==='a-fixstagger').result.text,/共9分钟/);assert.equal(c.expertCost,6)
 })
+test('错误文案必须实际让includes变化；14处风险不等于14处本次失败',()=>{
+ assert.equal('账户余额不足，请先充值'.includes('余额不足'),true);assert.equal('可用资金不足，请先充值'.includes('余额不足'),false);const c=load('app/data/cases/error-contract.ts');assert.match(c.scene.symptoms[0].text,/可用资金不足/);assert.match(c.actions.find(a=>a.id==='a-impact').result.text,/另外11处.*未失效/)
+})
+test('枚举题业务PAID始终映射3后被旧消费者解释SHIPPED，修正数字为字符串仍需迁移',()=>{
+ const c=load('app/data/cases/enum-drift.ts');assert.match(c.actions.find(a=>a.id==='a-enumdiff').result.text,/PAID→3，SHIPPED→2/);assert.match(c.actions.find(a=>a.id==='a-ordertrace').result.text,/生成唯一事件E1→发送status=3/);assert.match(c.actions.find(a=>a.id==='a-fixenum').result.text,/number直接改string也是破坏性/)
+})
+test('超时40%重试按总尝试计算，不能写成2.4倍；响应扩展不保证兼容',()=>{
+ assert.equal((600+400)/600,5/3);const c=load('app/data/cases/timeout-contract.ts');assert.match(c.actions.find(a=>a.id==='a-impact').result.text,/≈1.67倍/);assert.match(c.actions.find(a=>a.id==='a-fixbudget').result.text,/串行阶段、并行波次、排队与重试/);assert.match(load('app/data/cases/required-field.ts').actions.find(a=>a.id==='a-schemacheck').result.text,/严格schema/)
+})
