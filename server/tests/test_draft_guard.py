@@ -61,7 +61,7 @@ def test_published_case_rejects_transcript_overwrite():
         tampered = dict(payload)
         tampered["title"] = "被转稿篡改"
         with pytest.raises(HTTPException) as ei:
-            sub_service.create_draft_with_payload("pw-admin", "s-none", tampered)
+            sub_service.create_draft_with_payload("pw-admin", "s-none", tampered, source_material={})
         assert ei.value.status_code == 409
         import db
 
