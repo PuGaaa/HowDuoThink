@@ -206,10 +206,12 @@ function showReminderSheet() {
         setReminder({ on: false, hh: 21, mm: 30 })
       } else {
         // #ifdef WEB
-        const perm = requestNotifyPermission()
-        if (perm === 'default') {
-          const N = (window as any).Notification
-          if (N) N.requestPermission()
+        const permission = requestNotifyPermission()
+        if (permission === 'denied') {
+          setReminder({ on: false, hh: 21, mm: 30 })
+          uni.showToast({ title: '浏览器已拒绝通知权限，提醒未开启', icon: 'none' })
+          refresh()
+          return
         }
         // #endif
         const times: number[][] = [[20, 0], [21, 0], [21, 30], [22, 0]]
