@@ -29,8 +29,11 @@ export const WEEKLY_TASKS: TaskDef[] = [
 
 /** 成长任务：进度来自永久统计（rankOf/getTotals），不走 progress 存储 */
 export const GROWTH_TASKS: TaskDef[] = [
-  { id: 'g-rank', type: 'growth', title: '晋升「主治工程师」', goal: 3, metric: 'rank', icon: 'medal-coral' },
-  { id: 'g-all', type: 'growth', title: '全部章节通关', goal: 11, metric: 'allcases', icon: 'map-sky' },
+  { id: 'g-first', type: 'growth', title: '完成首关：建立排错习惯', goal: 1, metric: 'solved', icon: 'target-coral' },
+  { id: 'g-three', type: 'growth', title: '破案 3 关：晋升「主治工程师」', goal: 3, metric: 'solved', icon: 'medal-coral' },
+  { id: 'g-chapter', type: 'growth', title: '完成首章：收下第一份层契约', goal: 1, metric: 'chapters', icon: 'map-sky' },
+  { id: 'g-rank', type: 'growth', title: '破案 6 关：晋升「首席诊断官」', goal: 6, metric: 'solved', icon: 'medal-coral' },
+  { id: 'g-all', type: 'growth', title: '全部章节通关', goal: 16, metric: 'chapters', icon: 'map-sky' },
 ]
 
 export function taskById(id: string): TaskDef | null {

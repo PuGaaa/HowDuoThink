@@ -83,6 +83,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { DAILY_TASKS, WEEKLY_TASKS, GROWTH_TASKS } from '../../data/tasks'
 import { getTaskDaily, getTaskWeekly, getCaseProgress, getChecklistUse, getStreak } from '../../utils/storage'
 import { getEffectiveCases } from '../../data/cases'
+import { CHAPTERS, casesInChapter } from '../../data/chapters'
 
 class TaskVM {
   id: string = ''
@@ -150,10 +151,16 @@ function buildLists() {
     const p = getCaseProgress(cases[i].id)
     if (p != null && p.solved) solved++
   }
+  let completedChapters = 0
+  for (let i = 0; i < CHAPTERS.length; i++) {
+    const chapterCases = casesInChapter(CHAPTERS[i].id)
+    if (chapterCases.length > 0 && chapterCases.every((c) => getCaseProgress(c.id)?.solved === true)) completedChapters++
+  }
   for (let i = 0; i < GROWTH_TASKS.length; i++) {
     const t = GROWTH_TASKS[i]
-    const goal = t.metric === 'allcases' ? cases.length : t.goal
-    const cur = solved > goal ? goal : solved
+    const current = t.metric === 'chapters' ? completedChapters : solved
+    const goal = t.goal
+    const cur = current > goal ? goal : current
     var g = new TaskVM()
     g.id = t.id
     g.iconImg = '/static/icons/' + t.icon + '.png'
@@ -161,7 +168,7 @@ function buildLists() {
     g.goal = goal
     g.cur = cur
     g.pct = goal > 0 ? Math.min(100, Math.round((cur * 100) / goal)) : 0
-    g.done = solved >= goal
+    g.done = current >= goal
     gl.push(g)
   }
   growthList.value = gl

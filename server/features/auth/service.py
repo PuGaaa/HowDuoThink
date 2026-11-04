@@ -152,7 +152,7 @@ def random_nickname() -> str:
 
 
 def send_sms_code(phone: str) -> dict:
-    """生成并下发验证码；60s 重发限频。dev 模式响应带 devEcho 供联调；通道不可用映射 503。"""
+    """生成并下发验证码；60s 重发限频，通道不可用映射 503。"""
     import db as _db
 
     last = _db.q("SELECT created_at FROM sms_codes WHERE phone=?", (phone,))

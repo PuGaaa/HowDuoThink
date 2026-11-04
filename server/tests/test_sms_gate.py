@@ -1,4 +1,4 @@
-"""auth 域·短信通道门禁：dev 回显仅 ENV=dev；非 dev 环境 503 降级，验证码不回显、不进日志。"""
+"""auth 域·短信通道门禁：统一真实 provider，缺配置时 503，验证码不回显、不进日志。"""
 
 from fastapi.testclient import TestClient
 
@@ -19,7 +19,7 @@ def _send(client, phone: str) -> object:
 
 
 def test_sms_send_503_when_not_dev_mode():
-    """生产形态（ENV≠dev）：dev 回显通道被门禁挡下 → 503，响应体不含验证码。"""
+    """缺少真实短信配置时返回 503，响应体不含验证码。"""
     phone = _phone()
     with TestClient(main.app, raise_server_exceptions=False) as client:
         r = _send(client, phone)
@@ -28,7 +28,7 @@ def test_sms_send_503_when_not_dev_mode():
 
 
 def test_sms_code_not_logged_when_not_dev_mode(caplog):
-    """生产形态：验证码值不得出现在任何日志记录里（dev 回显日志被门禁挡下）。"""
+    """短信不可用时验证码值不得出现在任何日志记录里。"""
     import db as dbmod
 
     phone = _phone()
@@ -40,26 +40,13 @@ def test_sms_code_not_logged_when_not_dev_mode(caplog):
         assert row[0]["code"] not in caplog.text
 
 
-def test_sms_dev_echo_present_in_dev_mode(monkeypatch):
-    """dev 形态（ENV=dev）：回显可用，前端联调不破。"""
-    from core import config
-
+def test_sms_aliyun_provider_isolates_sdk(monkeypatch):
+    """阿里云 SDK 由测试隔离，HTTP 层不暴露验证码。"""
     phone = _phone()
-    monkeypatch.setattr(config, "DEV_MODE", True)
+    from core import sms as sms_core
+
+    monkeypatch.setattr(sms_core, "_send_aliyun", lambda phone, code: {"ok": True})
     with make_client() as client:
         r = _send(client, phone)
         assert r.status_code == 200, r.text
-        assert r.json()["devEcho"].isdigit() and len(r.json()["devEcho"]) == 6
-
-
-def test_sms_aliyun_provider_isolates_sdk(monkeypatch):
-    """provider=aliyun 通过 provider 接口发送；SDK 由测试隔离。"""
-    from core import sms as sms_core
-
-    phone = _phone()
-    monkeypatch.setattr(sms_core, "PROVIDER", "aliyun")
-    monkeypatch.setattr(sms_core, "_send_aliyun", lambda phone, code: {"ok": True})
-    with TestClient(main.app, raise_server_exceptions=False) as client:
-        r = _send(client, phone)
-        assert r.status_code == 200
         assert r.json() == {"ok": True}
