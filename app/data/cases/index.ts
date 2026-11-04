@@ -1,4 +1,4 @@
-import { DiagnosisCase } from '../../types/case'
+import { CaseCatalogMeta, DiagnosisCase } from '../../types/case'
 import { getCaseProgress } from '../../utils/storage'
 import { getRemoteCases } from '../../utils/sync'
 import { sslChainCase } from './ssl-chain'
@@ -267,6 +267,20 @@ export const ALL_CASES: DiagnosisCase[] = [
   envInheritCase,
   capacityAssumptionCase,
 ]
+
+/** 稳定试玩与课程主线只由目录配置决定，不依赖 ALL_CASES 的注册顺序。 */
+export const TRIAL_CASE_IDS = ['first-npe', 'caused-by', 'log-correlation'] as const
+export const MAINLINE_CASE_IDS = TRIAL_CASE_IDS
+
+/** 本地 TS 案例均为官方来源；只有首批试玩题进入当前稳定主线，其余均为选做。 */
+export const CASE_CATALOG: Record<string, CaseCatalogMeta> = {}
+for (let i = 0; i < ALL_CASES.length; i++) {
+  const id = ALL_CASES[i].id
+  CASE_CATALOG[id] = {
+    source: 'official',
+    track: MAINLINE_CASE_IDS.indexOf(id as (typeof MAINLINE_CASE_IDS)[number]) >= 0 ? 'mainline' : 'optional',
+  }
+}
 
 export function getCaseById(id: string): DiagnosisCase | null {
   for (let i = 0; i < ALL_CASES.length; i++) {

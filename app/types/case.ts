@@ -101,6 +101,15 @@ export type PartId = string
 /** 故障机理标签词表（初版 8 个，可扩展）：config/dependency/race/resource/capacity/cert/timing/data */
 export type TypeTag = string
 
+/** 案例来源与课程属性分开管理，不能用来源推导是否必修。 */
+export type CaseSource = 'official' | 'community'
+export type CaseTrack = 'mainline' | 'optional'
+
+export interface CaseCatalogMeta {
+  source: CaseSource
+  track: CaseTrack
+}
+
 export interface DiagnosisCase {
   id: string
   title: string

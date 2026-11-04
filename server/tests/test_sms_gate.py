@@ -52,12 +52,14 @@ def test_sms_dev_echo_present_in_dev_mode(monkeypatch):
         assert r.json()["devEcho"].isdigit() and len(r.json()["devEcho"]) == 6
 
 
-def test_sms_aliyun_unimplemented_maps_503(monkeypatch):
-    """provider=aliyun（占位未实现）：映射 503 而不是 500。"""
+def test_sms_aliyun_provider_isolates_sdk(monkeypatch):
+    """provider=aliyun 通过 provider 接口发送；SDK 由测试隔离。"""
     from core import sms as sms_core
 
     phone = _phone()
     monkeypatch.setattr(sms_core, "PROVIDER", "aliyun")
+    monkeypatch.setattr(sms_core, "_send_aliyun", lambda phone, code: {"ok": True})
     with TestClient(main.app, raise_server_exceptions=False) as client:
         r = _send(client, phone)
-        assert r.status_code == 503
+        assert r.status_code == 200
+        assert r.json() == {"ok": True}

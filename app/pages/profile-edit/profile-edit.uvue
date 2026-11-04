@@ -78,14 +78,20 @@ function save() {
   busy.value = true
   const presetPath = presets.value[selIdx.value].path
   if (isLoggedIn()) {
-    busy.value = true
-    updateAvatar(presetPath, (r) => {
-      busy.value = false
-      if (r.error.length > 0) {
-        uni.showToast({ title: r.error, icon: 'none' })
+    updateName(name, (nameResult) => {
+      if (nameResult.error.length > 0) {
+        busy.value = false
+        uni.showToast({ title: nameResult.error, icon: 'none' })
         return
       }
-      uni.navigateBack({})
+      updateAvatar(presetPath, (avatarResult) => {
+        busy.value = false
+        if (avatarResult.error.length > 0) {
+          uni.showToast({ title: avatarResult.error, icon: 'none' })
+          return
+        }
+        uni.navigateBack({})
+      })
     })
     return
   }

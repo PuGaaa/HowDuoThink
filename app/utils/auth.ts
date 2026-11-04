@@ -143,7 +143,7 @@ export function login(loginName: string, password: string, cb: (r: LoginResult) 
         return
       }
       uni.setStorageSync(KEY_TOKEN, token)
-      uni.setStorageSync(KEY_USER, JSON.stringify({ id: 'pw-' + d.login, login: d.login, name: d.login, avatar: '', role: d.role } as AppUser))
+      uni.setStorageSync(KEY_USER, JSON.stringify({ id: d.userId, login: d.login, name: d.name, avatar: d.avatar ?? '', role: d.role } as AppUser))
       cb({ error: '' })
     },
     fail: () => {
@@ -206,7 +206,7 @@ export function smsLogin(phone: string, code: string, cb: (r: LoginResult) => vo
       }
       uni.setStorageSync(KEY_TOKEN, token)
       const realName = typeof d.name === 'string' && (d.name as string).length > 0 ? d.name as string : d.login
-      uni.setStorageSync(KEY_USER, JSON.stringify({ id: typeof d.userId === 'string' ? d.userId : 'ph', login: d.login, name: realName, avatar: '', role: d.role } as AppUser))
+      uni.setStorageSync(KEY_USER, JSON.stringify({ id: d.userId, login: d.login, name: realName, avatar: d.avatar ?? '', role: d.role } as AppUser))
       cb({ error: '' })
     },
     fail: () => {

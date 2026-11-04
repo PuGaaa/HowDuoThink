@@ -159,3 +159,44 @@ def test_concurrent_login_same_code_single_winner():
         for t in threads:
             t.join()
         assert results.count(200) == 1, results
+
+
+def test_phone_account_password_login_uses_same_user_id():
+    """手机号建号设置密码后，账密入口仍登录同一用户，不依赖 ID 前缀。"""
+    with make_client() as client:
+        p = _phone()
+        _send(client, p)
+        phone_login = client.post("/api/auth/login/phone", json={"phone": p, "code": _read_code(client, p)})
+        assert phone_login.status_code == 200
+        uid = phone_login.json()["userId"]
+        login_name = phone_login.json()["login"]
+        password = "phone-pw-123"
+
+        r = client.post(
+            "/api/me/password",
+            json={"oldPassword": "", "newPassword": password},
+            headers={"Authorization": "Bearer " + phone_login.json()["token"]},
+        )
+        assert r.status_code == 200
+
+        password_login = client.post("/api/auth/login", json={"login": login_name, "password": password})
+        assert password_login.status_code == 200
+        assert password_login.json()["userId"] == uid
+        assert password_login.json()["name"] == phone_login.json()["name"]
+
+
+def test_phone_account_can_password_login_by_phone():
+    with make_client() as client:
+        p = _phone()
+        _send(client, p)
+        phone_login = client.post("/api/auth/login/phone", json={"phone": p, "code": _read_code(client, p)})
+        assert phone_login.status_code == 200
+        assert client.post(
+            "/api/me/password",
+            json={"newPassword": "phone-pw-456"},
+            headers={"Authorization": "Bearer " + phone_login.json()["token"]},
+        ).status_code == 200
+
+        password_login = client.post("/api/auth/login", json={"login": p, "password": "phone-pw-456"})
+        assert password_login.status_code == 200
+        assert password_login.json()["userId"] == phone_login.json()["userId"]

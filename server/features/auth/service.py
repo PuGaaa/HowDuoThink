@@ -40,10 +40,24 @@ def _throttle_clear(key: str) -> None:
 
 
 def verify_login(login: str, password: str) -> dict:
-    """账密校验（带防爆破频控）；历史无盐哈希在登录成功时静默升级为 bcrypt。返回 {id, role}。"""
+    """账密校验（带防爆破频控）；按已有 login 或绑定 phone 查询。"""
     key = "pw:" + login.lower()
     _throttle_check(key)
-    rows = db.q("SELECT id, password_hash, role, status FROM users WHERE id=?", ("pw-" + login,))
+    rows = db.q(
+        "SELECT id, login, name, avatar, password_hash, role, status FROM users WHERE login=?",
+        (login,),
+    )
+    if not rows:
+        rows = db.q(
+            "SELECT id, login, name, avatar, password_hash, role, status FROM users WHERE phone=?",
+            (login,),
+        )
+    if not rows:
+        # 兼容历史种子账号：旧数据曾把登录名写成 pw-<login>，仅作为存量读取路径。
+        rows = db.q(
+            "SELECT id, login, name, avatar, password_hash, role, status FROM users WHERE id=?",
+            ("pw-" + login,),
+        )
     if not rows or not rows[0]["password_hash"] or not security.verify_password(password, rows[0]["password_hash"]):
         _throttle_fail(key)
         raise HTTPException(401, "账号或密码错误")
@@ -54,7 +68,13 @@ def verify_login(login: str, password: str) -> dict:
     _throttle_clear(key)
     if security.is_legacy_hash(rows[0]["password_hash"]):
         db.ex("UPDATE users SET password_hash=? WHERE id=?", (security.hash_password(password), rows[0]["id"]))
-    return {"id": rows[0]["id"], "role": rows[0]["role"]}
+    return {
+        "id": rows[0]["id"],
+        "login": rows[0]["login"],
+        "name": rows[0]["name"] or rows[0]["login"],
+        "avatar": rows[0]["avatar"] or "",
+        "role": rows[0]["role"],
+    }
 
 
 def ensure_active(uid: str) -> None:
@@ -175,7 +195,7 @@ def _consume_code(conn, phone: str, code: str) -> None:
 
 
 def phone_login(phone: str, code: str) -> dict:
-    """验证码登录：验码 → 按手机号找用户/创建（ph- 前缀）→ 返回 {id, login, role, created}。
+    """验证码登录：验码 → 按手机号找用户/创建 → 返回真实资料。
     验码消费与账号写入同事务（建号失败验证码不被烧掉）；被封禁用户在消费前拦截。"""
     existing = db.q("SELECT id, login, role, name FROM users WHERE phone=?", (phone,))
     if existing:

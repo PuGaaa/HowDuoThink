@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "kind": "t04a-content-baseline",
+  "frozenAt": "2026-11-04",
+  "source": "app/data/cases",
+  "hash": "sha256(canonical正文字段；数组顺序保留；对象键排序)",
+  "contentFields": [
+    "title",
+    "intro",
+    "domain",
+    "layer",
+    "scene",
+    "hypotheses",
+    "actions",
+    "rootCauses",
+    "expertCost",
+    "restartActionId",
+    "expertChain",
+    "lessons"
+  ],
+  "metadataFields": [
+    "part",
+    "chapterId",
+    "order",
+    "typeTags",
+    "difficulty"
+  ],
+  "cases": [
+    {
+      "id": "first-npe",
+      "file": "app/data/cases/first-npe.ts",
+      "contentHash": "8180a42e497b6f84351e82f0ba02d86fad5265059288547f63c43fd602d13ea7",
+      "metadata": {
+        "part": "apprentice",
+        "chapterId": "error-reading",
+        "order": 1,
+        "typeTags": [
+          "config",
+          "data"
+        ],
+        "difficulty": 1
+      },
+      "expertCost": 4,
+      "expertPathCost": 5,
+      "status": "uncalibrated",
+      "reasons": [
+        "核实 user/account 假设效应与老用户偶发的异步延迟机制",
+        "标准专家链成本需人工确认"
+      ]
+    },
+    {
+      "id": "caused-by",
+      "file": "app/data/cases/caused-by.ts",
+      "contentHash": "5de242edb5421c08b5806a6363e218693a402f54e3791ae7d4398d452d1878df",
+      "metadata": {
+        "part": "apprentice",
+        "chapterId": "error-reading",
+        "order": 2,
+        "typeTags": [
+          "resource",
+          "capacity"
+        ],
+        "difficulty": 2
+      },
+      "expertCost": 4,
+      "expertPathCost": 5,
+      "status": "uncalibrated",
+      "reasons": [
+        "核实异常包装、连接池资源机制，避免把最底层异常等同业务根因",
+        "标准专家链成本需人工确认"
+      ]
+    },
+    {
+      "id": "log-correlation",
+      "file": "app/data/cases/log-correlation.ts",
+      "contentHash": "a6afacf11166883e5e3a6acb73a4dbc642cac5e0ef046b7cfb54b975f759345f",
+      "metadata": {
+        "part": "apprentice",
+        "chapterId": "error-reading",
+        "order": 3,
+        "typeTags": [
+          "observability",
+          "process"
+        ],
+        "difficulty": 2
+      },
+      "expertCost": 4,
+      "expertPathCost": 4,
+      "status": "uncalibrated",
+      "reasons": [
+        "补齐 requestId 到具体实例的关联证据，避免以时间相关替代因果"
+      ]
+    },
+    {
+      "id": "async-swallow",
+      "file": "app/data/cases/async-swallow.ts",
+      "contentHash": "75fe91a9291c465e09e43defb3a15b309bdd6b6ed06ce4b058aa237d86ebef9d",
+      "metadata": {
+        "part": "apprentice",
+        "chapterId": "error-reading",
+        "order": 4,
+        "typeTags": [
+          "resource",
+          "data",
+          "observability"
+        ],
+        "difficulty": 2
+      },
+      "expertCost": 4,
+      "expertPathCost": 4,
+      "status": "uncalibrated",
+      "reasons": [
+        "核实 Future、异常处理器与状态机失败分支的技术事实"
+      ]
+    }
+  ]
+}

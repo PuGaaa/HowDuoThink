@@ -4,7 +4,7 @@
 
 | 子目录 | 职责 |
 |---|---|
-| `pipeline/` | Node 机检脚本 `validate.mjs`：schema 完整性、红线 checklist 可自动化部分、成本一致性（证据自洽/双路径/噪声质量仍需人工走验） |
+| `pipeline/` | Node 机检脚本 `validate.mjs` 与 T04A 基线检查 `baseline.mjs`：schema、红线 checklist 可自动化部分、成本一致性和按 ID+正文哈希冻结的存量状态（证据自洽/双路径/噪声质量仍需人工走验） |
 | `tools/` | `export-case.mjs`：把 `app/data/cases/*.ts` 全量导出为 `server/seed/*.json`（供 seed.py 入库 + casepack 增量同步）；其余为设计资产工具 |
 | `prompts/` | **预留空目录**。AI 起草 prompt 实际维护在 `server/features/ai/service.py`（SYSTEM_PROMPT / DRAFT_PROMPT），从 `docs/案例写作规范.md` 派生 |
 | `seeds/` | **预留空目录**。AI 生成的待审草稿实际直接落库 `cases` 表（status='draft'），经管理端审核/润色后发布 |
@@ -13,7 +13,7 @@
 
 1. 写作：按 `docs/案例写作规范.md` 写 TS 案例文件
 2. 走验：作者以玩家身份在 app 里完整玩一遍（拷进 `app/data/cases/` 体验）
-3. 机检：`node content/pipeline/validate.mjs <文件>`，红线项人工过 checklist
+3. 机检：`node content/pipeline/validate.mjs <文件>`；T04A 四题另运行 `node content/pipeline/baseline.mjs --check`，红线项人工过 checklist
 4. 入库：注册进 `app/data/cases/index.ts` → `node content/tools/export-case.mjs` 导出 `server/seed/*.json` → `server/seed.py` 过 gate 门禁后 upsert 进库（published）
 
 > `server/seed/*.json` 是**不入 git 的构建产物**（唯一内容源是 `app/data/cases/`，改 JSON 会被下次导出覆盖）。

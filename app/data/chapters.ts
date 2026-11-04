@@ -1,7 +1,7 @@
 /** 篇-章-关三级内容架构。
  *  篇 = 学习阶段（三篇）；章 = 层的契约（可无限加，6~12 关封顶）；
  *  关 = 案例（带 part/typeTags/order），章内容按 layerKey 动态聚合——加第 101 关只需打标，不改本章。 */
-import { ALL_CASES } from './cases'
+import { ALL_CASES, MAINLINE_CASE_IDS, TRIAL_CASE_IDS } from './cases'
 import { DiagnosisCase } from '../types/case'
 import { getCaseProgress } from '../utils/storage'
 import { getRemoteCases } from '../utils/sync'
@@ -47,6 +47,8 @@ export const CHAPTERS: ChapterDef[] = [
   { id: 'testing', part: 'master', no: '第 8 章', name: '测试与质量', pact: '测试是代码的镜子——照不出问题的时候，问题最大' },
 ]
 
+export { MAINLINE_CASE_IDS, TRIAL_CASE_IDS }
+
 /** 章内关卡：按 chapterId 动态聚合 + order 排序；本地与远端（casepack）合并，按 id 去重 */
 export function casesInChapter(chapterId: string): DiagnosisCase[] {
   const merged: DiagnosisCase[] = []
@@ -65,7 +67,16 @@ export function casesInChapter(chapterId: string): DiagnosisCase[] {
     const c = remote[i]
     if (c != null && c.chapterId === chapterId && seen.indexOf(c.id) < 0) push(c)
   }
-  return merged.sort((a, b) => a.order - b.order)
+  return merged.sort((a, b) => {
+    const aMainline = MAINLINE_CASE_IDS.indexOf(a.id as (typeof MAINLINE_CASE_IDS)[number])
+    const bMainline = MAINLINE_CASE_IDS.indexOf(b.id as (typeof MAINLINE_CASE_IDS)[number])
+    if (aMainline >= 0 || bMainline >= 0) {
+      if (aMainline < 0) return 1
+      if (bMainline < 0) return -1
+      return aMainline - bMainline
+    }
+    return a.order - b.order
+  })
 }
 
 /** 篇内全部章 */
