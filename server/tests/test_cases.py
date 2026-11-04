@@ -3,9 +3,27 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from features.cases import gate
 from features.cases.models import CasePayload
+from tests.case_fixtures import community_payload
 from tests.conftest import load_seed, login_admin, make_client
+
+
+@pytest.fixture(autouse=True)
+def clean_created_cases():
+    import db
+
+    existing = {row["id"] for row in db.q("SELECT id FROM cases")}
+    yield
+    created = {row["id"] for row in db.q("SELECT id FROM cases")} - existing
+    for cid in created:
+        db.ex("DELETE FROM index_tasks WHERE case_id=?", (cid,))
+        db.ex("DELETE FROM case_revisions WHERE case_id=?", (cid,))
+        db.ex("DELETE FROM case_previews WHERE case_id=?", (cid,))
+        db.ex("DELETE FROM articles WHERE source_type='case' AND source_id=?", (cid,))
+        db.ex("DELETE FROM cases WHERE id=?", (cid,))
 
 
 def test_gate_accepts_official_case():
@@ -35,9 +53,16 @@ def test_publish_requires_editor():
 
 
 def test_publish_roundtrip_and_idempotent():
+    import db
+
     with make_client() as client:
         login_admin(client)
-        payload = load_seed()
+        payload = community_payload()
+        payload.update(
+            sourceType="official",
+            sourceCommit="a" * 40,
+            sourceHash="b" * 64,
+        )
         r1 = client.post("/api/cases", json=payload)
         assert r1.status_code == 200, r1.text
         v1 = r1.json()["version"]
@@ -47,6 +72,17 @@ def test_publish_roundtrip_and_idempotent():
         assert r2.json()["version"] == v1
         assert r2.json()["unchanged"] is True
         assert r2.json()["contentRevision"] == 1
+        detail = client.get("/api/admin/cases/" + payload["id"]).json()
+        assert detail["sourceType"] == "community"
+        assert detail["sourceCommit"] is None
+        assert detail["payload"]["sourceType"] == "community"
+        assert detail["payload"]["sourceCommit"] is None
+        assert detail["payload"]["sourceHash"] != "b" * 64
+        revisions = client.get(f"/api/admin/cases/{payload['id']}/revisions").json()["items"]
+        assert len(revisions) == 1
+        assert revisions[0]["sourceType"] == "community"
+        assert revisions[0]["sourceCommit"] is None
+        assert db.q("SELECT COUNT(*) AS n FROM index_tasks WHERE case_id=?", (payload["id"],))[0]["n"] == 1
         # article 投影存在
         assert client.get("/api/solutions/a-" + payload["id"]).status_code == 200
 
@@ -54,16 +90,80 @@ def test_publish_roundtrip_and_idempotent():
 def test_publish_rejected_by_gate_422():
     with make_client() as client:
         login_admin(client)
-        d = load_seed()
+        d = community_payload()
         d["title"] = "字" * 41  # 超过 40 字上限
         r = client.post("/api/cases", json=d)
         assert r.status_code == 422
 
 
+def test_official_import_requires_exact_manifest_metadata():
+    from fastapi import HTTPException
+
+    import db
+    from features.cases import content, service
+    from features.cases.models import OfficialRelease
+
+    payload = CasePayload.model_validate(load_seed("first-npe"))
+    release = OfficialRelease.model_validate(content.OFFICIAL_PUBLICATIONS[payload.id])
+    before = db.current_version()
+    forged = release.model_copy(update={"source_commit": "a" * 40})
+    with pytest.raises(HTTPException) as exc:
+        service.import_official(payload, forged)
+    assert exc.value.status_code == 409
+    assert db.current_version() == before
+    assert db.q("SELECT COUNT(*) AS n FROM cases WHERE id=?", (payload.id,))[0]["n"] == 0
+    db.ex(
+        "INSERT INTO cases(id,title,domain,layer,difficulty,version,status,payload,content_revision,source_type) "
+        "VALUES(?,?,?,?,?,0,'published',?,1,'community')",
+        (
+            payload.id,
+            payload.title,
+            payload.domain,
+            payload.layer,
+            payload.difficulty,
+            db.jdump(payload.model_dump(by_alias=True)),
+        ),
+    )
+    with pytest.raises(HTTPException) as exc:
+        service.import_official(payload, release)
+    assert exc.value.status_code == 409
+    db.ex("DELETE FROM cases WHERE id=?", (payload.id,))
+    imported = service.import_official(payload, release)
+    assert imported["contentRevision"] == release.content_revision
+    assert db.q("SELECT source_type,source_commit FROM cases WHERE id=?", (payload.id,))[0] == {
+        "source_type": "official",
+        "source_commit": release.source_commit,
+    }
+    assert db.q("SELECT published_by,legacy_snapshot FROM case_revisions WHERE case_id=?", (payload.id,))[0] == {
+        "published_by": "git-import",
+        "legacy_snapshot": 0,
+    }
+
+
+def test_publish_failure_rolls_back_article_revision_cursor_and_index(monkeypatch):
+    import db
+    from features.cases import repo, service
+
+    payload = CasePayload.model_validate(community_payload())
+    before = db.current_version()
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("revision write failed")
+
+    monkeypatch.setattr(repo, "save_revision", fail)
+    with pytest.raises(RuntimeError, match="revision write failed"):
+        service.publish_case("pw-admin", payload)
+    assert db.current_version() == before
+    assert db.q("SELECT COUNT(*) AS n FROM cases WHERE id=?", (payload.id,))[0]["n"] == 0
+    assert db.q("SELECT COUNT(*) AS n FROM articles WHERE source_id=?", (payload.id,))[0]["n"] == 0
+    assert db.q("SELECT COUNT(*) AS n FROM case_revisions WHERE case_id=?", (payload.id,))[0]["n"] == 0
+    assert db.q("SELECT COUNT(*) AS n FROM index_tasks WHERE case_id=?", (payload.id,))[0]["n"] == 0
+
+
 def test_admin_cases_list_and_detail():
     with make_client() as client:
         login_admin(client)
-        payload = load_seed()
+        payload = community_payload()
         client.post("/api/cases", json=payload)
         lst = client.get("/api/admin/cases")
         assert lst.status_code == 200, lst.text
@@ -80,7 +180,7 @@ def test_publish_revision_conflict_and_index_task():
 
     with make_client() as client:
         login_admin(client)
-        payload = load_seed()
+        payload = community_payload()
         first = client.post("/api/cases", json=payload)
         assert first.status_code == 200
         changed = {**payload, "title": "修订后的标题", "baseRevision": 1}
@@ -99,7 +199,7 @@ def test_publish_revision_conflict_and_index_task():
 def test_admin_cases_list_filters_by_status():
     with make_client() as client:
         login_admin(client)
-        payload = load_seed()
+        payload = community_payload()
         client.post("/api/cases", json=payload)
         drafts = client.get("/api/admin/cases", params={"status": "draft"})
         assert drafts.status_code == 200
@@ -118,7 +218,7 @@ def test_case_preview_is_scoped_and_does_not_accept_normal_session():
 
     with make_client() as client:
         login_admin(client)
-        payload = load_seed()
+        payload = community_payload()
         payload["id"] = "preview-" + uuid.uuid4().hex[:10]
         assert client.post("/api/admin/cases", json={"id": payload["id"], "payload": payload}).status_code == 200
         created = client.post(f"/api/admin/cases/{payload['id']}/preview", json={"payload": payload})
@@ -153,7 +253,7 @@ def test_case_preview_is_scoped_and_does_not_accept_normal_session():
 def test_draft_is_not_in_public_casepack_but_can_be_previewed():
     with make_client() as client:
         login_admin(client)
-        payload = load_seed()
+        payload = community_payload()
         payload["id"] = "preview-draft-" + uuid.uuid4().hex[:8]
         assert client.post("/api/admin/cases", json={"id": payload["id"], "payload": payload}).status_code == 200
         preview = client.post(f"/api/admin/cases/{payload['id']}/preview", json={"payload": payload})
@@ -167,23 +267,37 @@ def test_admin_cases_require_editor():
         assert client.get("/api/admin/cases").status_code in (401, 403)
 
 
-def test_update_meta_bumps_casepack_version():
-    """meta 变更必须进 casepack 增量流（version bump），否则 App 永远拉不到章归属/排序调整。"""
+def test_published_meta_requires_atomic_republication():
     import db
 
     with make_client() as client:
         login_admin(client)
-        payload = load_seed()
-        r = client.post("/api/cases", json=payload)
-        assert r.status_code == 200, r.text
-        cid = payload["id"]
+        payload = community_payload()
+        assert client.post("/api/admin/cases", json={"id": payload["id"], "payload": payload}).status_code == 200
+        before = db.current_version()
+        assert client.patch(f"/api/admin/cases/{payload['id']}/meta", json={"order": 42}).status_code == 200
+        assert db.current_version() == before
+        draft = client.get(f"/api/admin/cases/{payload['id']}").json()["payload"]
+        assert draft["order"] == 42
+        assert client.post("/api/cases", json=draft).status_code == 200
         since = db.current_version()
-        r = client.patch(f"/api/admin/cases/{cid}/meta", json={"order": 42})
-        assert r.status_code == 200, r.text
-        assert db.current_version() > since  # 版本推进
+        assert client.patch(f"/api/admin/cases/{payload['id']}/meta", json={"order": 43}).status_code == 409
+        assert db.current_version() == since
+        changed = dict(draft, order=43, baseRevision=1)
+        result = client.post("/api/cases", json=changed)
+        assert result.status_code == 200, result.text
+        assert result.json()["contentRevision"] == 2
         pack = client.get(f"/api/casepack?since={since}").json()
-        hit = [c for c in pack["cases"] if c["id"] == cid]
-        assert hit and hit[0]["order"] == 42  # casepack 项即 payload，order 在顶层
+        assert next(item for item in pack["cases"] if item["id"] == payload["id"])["order"] == 43
+        tasks = db.q(
+            "SELECT content_revision,payload FROM index_tasks WHERE case_id=? ORDER BY content_revision",
+            (payload["id"],),
+        )
+        assert [row["content_revision"] for row in tasks] == [1, 2]
+        assert db.jload(tasks[-1]["payload"], {})["order"] == 43
+        history = client.get(f"/api/admin/cases/{payload['id']}/revisions").json()["items"]
+        assert [row["contentRevision"] for row in history] == [2, 1]
+        assert history[0]["payload"]["order"] == 43 and history[1]["payload"]["order"] == 42
 
 
 def test_update_meta_unknown_case_404_no_version_bump():

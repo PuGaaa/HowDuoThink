@@ -1,14 +1,31 @@
 """cases/submissions 域·草稿写路径 status 守卫：非 draft 案例不可经草稿/转稿覆盖正文。"""
 
+from uuid import uuid4
+
 import pytest
 from fastapi import HTTPException
 
-from tests.conftest import load_seed, login_admin, make_client
+from tests.case_fixtures import community_payload
+from tests.conftest import login_admin, make_client
 
 
-def _publish(client, case_id: str) -> dict:
-    payload = load_seed()
-    payload["id"] = case_id
+@pytest.fixture(autouse=True)
+def clean_created_cases():
+    import db
+
+    existing = {row["id"] for row in db.q("SELECT id FROM cases")}
+    yield
+    created = {row["id"] for row in db.q("SELECT id FROM cases")} - existing
+    for cid in created:
+        db.ex("DELETE FROM index_tasks WHERE case_id=?", (cid,))
+        db.ex("DELETE FROM case_revisions WHERE case_id=?", (cid,))
+        db.ex("DELETE FROM case_previews WHERE case_id=?", (cid,))
+        db.ex("DELETE FROM articles WHERE source_type='case' AND source_id=?", (cid,))
+        db.ex("DELETE FROM cases WHERE id=?", (cid,))
+
+
+def _publish(client) -> dict:
+    payload = community_payload("c-guard-" + uuid4().hex[:12])
     r = client.post("/api/cases", json=payload)
     assert r.status_code == 200, r.text
     return payload
@@ -18,7 +35,7 @@ def test_published_case_rejects_draft_overwrite():
     """已发布案例经草稿接口保存：409 拒绝，正文保持原样（发布门禁的唯一旁路被堵）。"""
     with make_client() as client:
         login_admin(client)
-        payload = _publish(client, "cache-drift")
+        payload = _publish(client)
         tampered = dict(payload)
         tampered["title"] = "被草稿路径篡改的标题"
         r = client.post("/api/admin/cases", json={"id": payload["id"], "payload": tampered})
@@ -57,7 +74,7 @@ def test_published_case_rejects_transcript_overwrite():
 
     with make_client() as client:
         login_admin(client)
-        payload = _publish(client, "cache-drift")
+        payload = _publish(client)
         tampered = dict(payload)
         tampered["title"] = "被转稿篡改"
         with pytest.raises(HTTPException) as ei:
@@ -70,32 +87,25 @@ def test_published_case_rejects_transcript_overwrite():
 
 
 def test_draft_overwrite_races_publish(monkeypatch):
-    """check 与 write 之间案例被并发发布：条件 UPDATE（AND status='draft'）仍然拒绝。
-    原修复是无谓词 UPDATE + 事务外预检，可被 TOCTOU 打穿：任一次"发布干净版 ×
-    草稿保存恶意版"请求对交错成功，未过门禁的 payload 即进入已发布案例。"""
-    import db as dbmod
+    """写入前读取已经发布的最新行，不再使用事务外旧快照。"""
+    import db
+    from features.cases import repo
     from features.cases import service as cases_service
     from features.cases.models import CaseDraftBody
 
     with make_client() as client:
         login_admin(client)
-        body = {"id": "c-race-guard-x", "payload": {"id": "c-race-guard-x", "title": "竞态草稿"}}
-        assert client.post("/api/admin/cases", json=body).status_code == 200
-        real_q = dbmod.q
+        cid = "c-race-guard-x"
+        assert client.post("/api/admin/cases", json={"id": cid, "payload": {"title": "竞态草稿"}}).status_code == 200
+        original = repo.get
 
-        def q_then_publish(sql, params=()):
-            rows = real_q(sql, params)
-            if sql.startswith("SELECT id, status"):
-                # 模拟并发发布抢先提交（在预检读到 draft 之后、写入之前）；ex 自带提交
-                dbmod.ex("UPDATE cases SET status='published' WHERE id=?", ("c-race-guard-x",))
-            return rows
+        def published_before_lock(conn, case_id, lock=False):
+            if lock:
+                db.ex("UPDATE cases SET status='published' WHERE id=?", (cid,))
+            return original(conn, case_id, lock)
 
-        monkeypatch.setattr(dbmod, "q", q_then_publish)
-        draft_body = CaseDraftBody(id="c-race-guard-x", payload={"id": "c-race-guard-x", "title": "被篡改"})
-        with pytest.raises(HTTPException) as ei:
-            cases_service.save_case_draft("pw-admin", draft_body)
-        assert ei.value.status_code == 409
-        monkeypatch.undo()
-        row = dbmod.q("SELECT status, payload FROM cases WHERE id=?", ("c-race-guard-x",))[0]
-        assert row["status"] == "published"
-        assert dbmod.jload(row["payload"], {})["title"] == "竞态草稿"  # 正文未被覆盖
+        monkeypatch.setattr(repo, "get", published_before_lock)
+        with pytest.raises(HTTPException) as exc:
+            cases_service.save_case_draft("pw-admin", CaseDraftBody(id=cid, payload={"title": "被篡改"}))
+        assert exc.value.status_code == 409
+        assert db.jload(db.q("SELECT payload FROM cases WHERE id=?", (cid,))[0]["payload"], {})["title"] == "竞态草稿"

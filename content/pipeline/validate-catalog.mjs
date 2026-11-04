@@ -15,7 +15,7 @@ export function validateCatalog(projectRoot = root) {
 
   const casesDir = resolve(projectRoot, 'app/data/cases')
   const cases = []
-  for (const file of readdirSync(casesDir).filter((name) => name.endsWith('.ts') && name !== 'index.ts')) {
+  for (const file of readdirSync(casesDir).filter((name) => name.endsWith('.ts') && !['index.ts', 'publication-revisions.ts'].includes(name))) {
     const source = readFileSync(resolve(casesDir, file), 'utf8')
     const id = source.match(/\n  id: '([^']+)'/)?.[1]
     const part = source.match(/\n  part: '([^']+)'/)?.[1]

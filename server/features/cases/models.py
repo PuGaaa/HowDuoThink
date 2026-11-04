@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 GAINS = {"high", "mid", "low", "none"}
 DOMAINS = {"network", "deploy", "data", "runtime", "build", "concurrency"}
@@ -139,9 +139,23 @@ class CasePayload(BaseModel):
         return self
 
 
+class CaseDraftPayload(BaseModel):
+    """草稿允许未完成的部件；已填写的索引字段在入口明确类型。"""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+    title: str = Field(default="", max_length=255)
+    domain: str = Field(default="", max_length=32)
+    layer: str = Field(default="", max_length=200)
+    difficulty: int = Field(default=1, ge=1, le=3)
+    part: Literal["apprentice", "engineer", "master"] = "engineer"
+    chapter_id: str = Field(default="", max_length=40, alias="chapterId")
+    order: int = Field(default=1, ge=0, le=999)
+    type_tags: list[str] = Field(default_factory=list, alias="typeTags")
+
+
 class CaseDraftBody(BaseModel):
     id: str = Field(pattern=r"^[a-zA-Z0-9_-]{3,40}$")
-    payload: dict = Field(default_factory=dict)
+    payload: CaseDraftPayload = Field(default_factory=CaseDraftPayload)
     submission_id: str | None = Field(default=None, alias="submissionId")
 
 
@@ -150,3 +164,72 @@ class CaseMetaBody(BaseModel):
     chapter_id: str | None = Field(default=None, max_length=40, alias="chapterId")
     order: int | None = Field(default=None, ge=0, le=999)
     type_tags: list[str] | None = Field(default=None, alias="typeTags")
+
+
+class OfficialRelease(BaseModel):
+    """受信导出清单，只有本地导入服务接收；HTTP 没有此权限入口。"""
+
+    content_revision: int = Field(ge=1, alias="contentRevision")
+    calibration_status: Literal["calibrated", "legacy", "needs_review"] = Field(alias="calibrationStatus")
+    base_revision: int = Field(ge=0, alias="baseRevision")
+    source_commit: str = Field(pattern=r"^[0-9a-f]{40}$", alias="sourceCommit")
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$", alias="contentHash")
+
+
+class ArticleStep(BaseModel):
+    observe: str
+    act: str
+    found: str
+
+
+class ArticleProjection(BaseModel):
+    id: str
+    title: str
+    layer: str
+    domain: str
+    author: str
+    steps: list[ArticleStep]
+    lessons: list[str]
+
+
+class CaseAdminRow(BaseModel):
+    id: str
+    title: str
+    domain: str
+    layer: str
+    difficulty: int
+    version: int
+    status: str
+    contentRevision: int | None
+    sourceType: Literal["official", "community"]
+    sourceCommit: str | None
+    readOnly: bool
+    submissionId: str | None
+
+
+class CaseAdminDetail(CaseAdminRow):
+    payload: dict
+
+
+class CaseRevision(BaseModel):
+    contentRevision: int
+    contentHash: str
+    sourceType: str | None
+    sourceCommit: str | None
+    publishedBy: str | None
+    publishedAt: str | None
+    recordedAt: str
+    legacySnapshot: bool
+    payload: dict
+
+
+class CaseRevisionHistory(BaseModel):
+    items: list[CaseRevision]
+
+
+class PublishResult(BaseModel):
+    id: str
+    version: int
+    contentRevision: int
+    articleId: str
+    unchanged: bool

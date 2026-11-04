@@ -1,4 +1,5 @@
 import { CaseCatalogMeta, DiagnosisCase } from '../../types/case'
+import { OFFICIAL_PUBLICATIONS } from './publication-revisions'
 import { getCaseProgress } from '../../utils/storage'
 import { getRemoteCases } from '../../utils/sync'
 import { MAINLINE_CASE_IDS } from '../course'
@@ -268,6 +269,14 @@ export const ALL_CASES: DiagnosisCase[] = [
   envInheritCase,
   capacityAssumptionCase,
 ]
+
+for (const item of ALL_CASES) {
+  const publication = OFFICIAL_PUBLICATIONS[item.id]
+  item.contentRevision = publication.contentRevision
+  item.sourceType = 'official'
+  item.sourceCommit = publication.sourceCommit
+  item.sourceHash = publication.contentHash
+}
 
 /** 稳定试玩与课程主线只由目录配置决定，不依赖 ALL_CASES 的注册顺序。 */
 export const TRIAL_CASE_IDS = ['first-npe', 'caused-by', 'log-correlation'] as const
