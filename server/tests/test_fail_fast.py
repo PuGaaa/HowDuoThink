@@ -18,13 +18,10 @@ def test_refuse_ephemeral_jwt_secret_in_prod(monkeypatch):
 
 
 def test_refuse_when_mysql_unreachable(monkeypatch):
-    """DB_PROVIDER=mysql 且 MYSQL_HOST=127.0.0.1 MYSQL_PORT=1（必拒）：抛 RuntimeError 含 'MySQL'。
-    探针必须真实拨号（评审 I-1）：sqlite 导入环境下 core.db 的 _mysql_conn/_MySqlConn 未定义
-    （仅 _provider=="mysql" 时创建），只 patch config 会 NameError 被 ③ 包装成目标文案的假阳性；
-    故 patch _mysql_conn 直连必拒端口（真实 pymysql 拨号），并补 _MySqlConn 占位
-    （CPython 先解析可调用名再求值实参，不补则拨号前就 NameError），随后断言 __cause__
-    是 pymysql 连接异常，锁死"真拨号"语义。"""
-    monkeypatch.setattr(config, "DB_PROVIDER", "mysql")
+    """MYSQL_HOST=127.0.0.1 MYSQL_PORT=1（必拒）：抛 RuntimeError 含 'MySQL'。
+    探针必须真实拨号（评审 I-1）：patch _mysql_conn 直连必拒端口（真实 pymysql 拨号），
+    并补 _MySqlConn 占位（CPython 先解析可调用名再求值实参，不补则拨号前就 NameError），
+    随后断言 __cause__ 是 pymysql 连接异常，锁死"真拨号"语义。"""
     monkeypatch.setattr(config, "MYSQL_HOST", "127.0.0.1")
     monkeypatch.setattr(config, "MYSQL_PORT", 1)
     monkeypatch.setattr(
@@ -42,8 +39,7 @@ def test_refuse_when_mysql_unreachable(monkeypatch):
 def test_refuse_when_schema_behind(monkeypatch):
     """schema 版本断言：upgrade_head 被 no-op 且 current_version() 读到 None
     （模拟从未迁移/被清空版本表的老库，None != head）→ 抛 RuntimeError 含 'schema'。
-    机制必须 provider 无关：MySQL 测试轮下 core.config 指向共享隔离库，
-    不能靠 DB_PATH 造空库来制造 None（那是 sqlite 分支专属机制）。"""
+    用 monkeypatch 而不是造空库：MySQL 测试轮下 core.config 指向共享隔离库。"""
     monkeypatch.setattr(migrate, "upgrade_head", lambda: None)
     monkeypatch.setattr(migrate, "current_version", lambda: None)
     with pytest.raises(RuntimeError, match="schema"):
