@@ -24,6 +24,12 @@ def ai_reindex(body: models.ReindexBody | None = None, uid: str = Depends(curren
     return service.reindex_all()
 
 
+@router.post("/api/admin/ai/index-tasks/run")
+def ai_index_tasks(uid: str = Depends(current_user)):
+    require_editor(uid)
+    return service.process_index_tasks()
+
+
 @router.get("/api/admin/ai/usage/users")
 def ai_usage_top_users(days: int = 30, uid: str = Depends(current_user)):
     require_editor(uid)
