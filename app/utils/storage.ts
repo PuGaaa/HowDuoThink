@@ -183,7 +183,8 @@ export function saveSession(record: SessionRecord): void {
   uni.setStorageSync(KEY_SESSION, JSON.stringify(record))
   // 连续天数只认破案：失败局不再续活跃
   if (record.solved) {
-    touchStreak()
+    const streak = touchStreak()
+    enqueueOperation('streak_touch', { day: streak.last })
     bumpTask('win', 1)
     bumpTask('casewin7', 1)
   }

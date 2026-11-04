@@ -127,6 +127,14 @@ def _apply_operation(bundle: dict, operation: ProgressOperation) -> None:
     elif operation.kind == "daily_done":
         if p["day"] > bundle.get("dailyDone", ""):
             bundle["dailyDone"] = p["day"]
+    elif operation.kind == "streak_touch":
+        current = bundle["streak"]
+        day = p["day"]
+        if day > current.get("last", ""):
+            previous = _beijing_time(operation.occurred_at) - datetime.timedelta(days=1)
+            yesterday = previous.strftime("%Y-%m-%d")
+            count = current.get("count", 0) + 1 if current.get("last", "") == yesterday else 1
+            bundle["streak"] = {"last": day, "count": count}
 
 
 def _grade_rank(grade: str) -> int:

@@ -95,3 +95,25 @@ def test_session_sync_creates_one_learning_event():
 
         rows = db.q("SELECT COUNT(*) AS n FROM learning_events WHERE id=?", ("session_end:pw-admin:event-session-1",))
         assert rows[0]["n"] == 1
+
+
+def test_streak_sync_rebuilds_from_beijing_event_days():
+    with make_client() as client:
+        login_admin(client)
+        ops = [
+            {
+                "opId": "streak-1",
+                "kind": "streak_touch",
+                "occurredAt": "2026-11-03T16:00:00.000Z",
+                "payload": {"day": "2026-11-04"},
+            },
+            {
+                "opId": "streak-2",
+                "kind": "streak_touch",
+                "occurredAt": "2026-11-04T16:00:00.000Z",
+                "payload": {"day": "2026-11-05"},
+            },
+        ]
+        response = client.post("/api/me/progress/sync", json={"operations": ops})
+        assert response.status_code == 200
+        assert response.json()["streak"] == {"last": "2026-11-05", "count": 2}
