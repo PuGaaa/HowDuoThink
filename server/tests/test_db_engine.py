@@ -12,3 +12,14 @@ def test_mysql_connect_kwargs_pin_utc_timezone():
     assert kwargs["charset"] == "utf8mb4"
     assert kwargs["autocommit"] is False
     assert kwargs["database"] == coredb.config.MYSQL_DATABASE
+
+
+def test_current_read_marker_translates_only_at_mysql_boundary():
+    import sqlite3
+
+    from core.db import _translate
+
+    sql = "SELECT 1 AS owner WHERE ?=1 /* FOR UPDATE */"
+    assert _translate(sql) == "SELECT 1 AS owner WHERE %s=1 FOR UPDATE"
+    with sqlite3.connect(":memory:") as conn:
+        assert conn.execute(sql, (1,)).fetchone() == (1,)
