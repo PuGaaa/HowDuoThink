@@ -1,211 +1,60 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useMessage } from 'naive-ui'
-import { NButton, NCard, NInput, NModal, NTag } from 'naive-ui'
-import { contentApi, type Submission } from '../api/content'
+import { NButton, NCard, NTag, useMessage } from 'naive-ui'
+import { contentApi } from '../api/content'
+import { submissionApi, statusLabels, type SubmissionDetail } from '../api/submissions'
+import SubmissionReview from '../components/SubmissionReview.vue'
 
 const router = useRouter()
 const message = useMessage()
-
-const subs = ref<Submission[]>([])
-const cases = ref<{ status: string }[]>([])
+const subs = ref<SubmissionDetail[]>([])
 const loading = ref(true)
 const busyId = ref('')
-const filter = ref<'all' | 'pending'>('all')
-const rejectTarget = ref<Submission | null>(null)
-const rejectNote = ref('')
-
-const shown = computed(() =>
-  filter.value === 'all' ? subs.value : subs.value.filter((s) => s.status === 'pending'),
-)
-const pendingCount = computed(() => subs.value.filter((s) => s.status === 'pending').length)
-const draftCount = computed(() => cases.value.filter((c) => c.status === 'draft').length)
-const pubCount = computed(() => cases.value.filter((c) => c.status === 'published').length)
-
+const filter = ref('all')
+const selectedId = ref('')
+const detailVersion = ref(0)
+const shown = computed(() => filter.value === 'all' ? subs.value : subs.value.filter((s) => s.displayStatus === filter.value))
 onMounted(load)
-
 async function load() {
   loading.value = true
-  try {
-    const [s, c] = await Promise.all([contentApi.submissions(), contentApi.cases()])
-    subs.value = s
-    cases.value = c
-  } catch (e: any) {
-    message.error(e?.message || '加载失败')
-  } finally {
-    loading.value = false
-  }
+  try { subs.value = await submissionApi.list() } catch (e) { message.error((e as Error).message) } finally { loading.value = false }
 }
-
-async function makeDraft(s: Submission) {
-  busyId.value = s.id
+async function refresh() { await load(); detailVersion.value++ }
+async function draft(id: string, ai: boolean) {
+  busyId.value = id
   try {
-    const r = await contentApi.makeDraft(s.id)
-    s.status = 'accepted'
-    message.success('已生成 Case 草稿')
-    router.push('/cases/' + r.caseId)
-  } catch (e: any) {
-    message.error(e?.message || '转草稿失败')
-  } finally {
-    busyId.value = ''
-  }
-}
-
-async function makeAiDraft(s: Submission) {
-  busyId.value = s.id
-  try {
-    const r = await contentApi.makeAiDraft(s.id)
-    s.status = 'accepted'
-    if (r.warnings?.length) message.warning('AI 起草有提示：' + r.warnings.join('；'))
-    else message.success('AI 起草完成')
-    router.push('/cases/' + r.caseId)
-  } catch (e: any) {
-    message.error(e?.message || 'AI 起草失败')
-  } finally {
-    busyId.value = ''
-  }
-}
-
-function askReject(s: Submission) {
-  rejectTarget.value = s
-  rejectNote.value = ''
-}
-
-async function confirmReject() {
-  const s = rejectTarget.value
-  if (!s) return
-  try {
-    await contentApi.setSubmissionStatus(s.id, 'rejected', rejectNote.value || '暂不采用')
-    s.status = 'rejected'
-    message.success('已驳回')
-  } catch (e: any) {
-    message.error(e?.message || '驳回失败')
-  } finally {
-    rejectTarget.value = null
-  }
+    const result = await (ai ? contentApi.makeAiDraft(id) : contentApi.makeDraft(id))
+    if (result.warnings?.length) message.warning(result.warnings.join('；'))
+    else message.success('已生成草稿，进入编辑与试玩')
+    router.push('/cases/' + result.caseId)
+  } catch (e) { message.error((e as Error).message) } finally { busyId.value = '' }
 }
 </script>
 
 <template>
   <div>
-    <div class="stat-row">
-      <div class="statbox">
-        <div class="statbox__n">{{ pendingCount }}</div>
-        <div class="statbox__k">待审投稿</div>
-      </div>
-      <div class="statbox">
-        <div class="statbox__n">{{ draftCount }}</div>
-        <div class="statbox__k">Case 草稿</div>
-      </div>
-      <div class="statbox">
-        <div class="statbox__n">{{ pubCount }}</div>
-        <div class="statbox__k">已上线</div>
-      </div>
-    </div>
-
-    <div class="toolbar">
-      <NButton size="small" :type="filter === 'all' ? 'primary' : 'default'" secondary @click="filter = 'all'">
-        全部（{{ subs.length }}）
-      </NButton>
-      <NButton size="small" :type="filter === 'pending' ? 'primary' : 'default'" secondary @click="filter = 'pending'">
-        待审（{{ pendingCount }}）
-      </NButton>
-    </div>
-
-    <NCard v-if="loading" size="small">加载中……</NCard>
-    <p v-else-if="shown.length === 0" class="empty">暂无投稿。</p>
-
-    <NCard v-for="s in shown" :key="s.id" size="small" class="sub">
-      <div class="sub__head">
-        <b>{{ s.title }}</b>
-        <NTag size="small" :type="s.status === 'pending' ? 'warning' : s.status === 'accepted' ? 'success' : 'default'">
-          {{ s.status }}
-        </NTag>
-      </div>
-      <div class="sub__meta">
-        作者 @{{ s.author || '?' }} · {{ s.createdAt }} · 标签 {{ s.stackTags.join('/') || '无' }}
-      </div>
-      <details class="sub__detail">
-        <summary>展开全文</summary>
-        <p><b>现象：</b>{{ s.symptom }}</p>
-        <p v-if="s.keyError"><b>报错：</b><code>{{ s.keyError }}</code></p>
-        <p v-if="s.timeline"><b>时间线：</b>{{ s.timeline }}</p>
-        <p><b>解决过程：</b>{{ s.resolution }}</p>
-        <p v-if="s.lessons.length"><b>经验：</b>{{ s.lessons.join(' / ') }}</p>
-      </details>
-      <div class="sub__actions">
-        <NButton
-          v-if="s.status === 'pending'"
-          type="primary"
-          size="small"
-          :loading="busyId === s.id"
-          @click="makeDraft(s)"
-        >
-          通过并生成 Case 草稿
-        </NButton>
-        <NButton
-          v-if="s.status === 'pending'"
-          size="small"
-          type="primary"
-          secondary
-          :loading="busyId === s.id"
-          @click="makeAiDraft(s)"
-        >
-          AI 预填草稿
-        </NButton>
-        <NButton v-if="s.status === 'pending'" size="small" quaternary type="error" @click="askReject(s)">
-          驳回
-        </NButton>
-        <NButton v-if="s.status === 'accepted'" size="small" tag="a" @click="router.push('/cases/' + s.id.replace('s-', 'c-'))">
-          编辑 Case
-        </NButton>
-      </div>
-    </NCard>
-
-    <NModal
-      :show="!!rejectTarget"
-      preset="dialog"
-      title="驳回投稿"
-      positive-text="确认驳回"
-      negative-text="取消"
-      @positive-click="confirmReject"
-      @negative-click="rejectTarget = null"
-      @close="rejectTarget = null"
-    >
-      <NInput v-model:value="rejectNote" type="textarea" placeholder="驳回备注（留给作者的话）" />
-    </NModal>
+    <div class="toolbar"><NButton v-if="selectedId" size="small" @click="selectedId = ''">← 返回投稿列表</NButton><NButton size="small" @click="refresh">刷新</NButton><span v-if="busyId">正在起草，请稍候……</span></div>
+    <SubmissionReview v-if="selectedId" :key="selectedId + detailVersion" :id="selectedId" @updated="load" @draft="draft" />
+    <template v-else>
+      <div class="toolbar"><NButton v-for="(label, value) in {all:'全部',...statusLabels}" :key="value" size="small" :type="filter === value ? 'primary' : 'default'" @click="filter = value">{{ label }}（{{ value === 'all' ? subs.length : subs.filter(s => s.displayStatus === value).length }}）</NButton></div>
+      <p class="muted">原稿、作者补件、脱敏公开范围与内部审阅分别留存。采纳只表示进入制作，发布以正式案例状态为准。</p>
+      <NCard v-if="loading" size="small">加载中……</NCard><p v-else-if="!shown.length">暂无投稿。</p>
+      <NCard v-for="s in shown" :key="s.id" size="small" class="sub">
+        <div class="sub__head"><b>{{ s.title }}</b><NTag>{{ statusLabels[s.displayStatus] }}</NTag></div>
+        <p class="muted">作者 {{ s.author }} · {{ s.createdAt }} · {{ s.id }}</p>
+        <p class="excerpt">{{ s.symptom }}</p><p v-if="s.reviewNote" class="muted">给作者的反馈：{{ s.reviewNote }}</p>
+        <div class="toolbar"><NButton size="small" type="primary" secondary @click="selectedId = s.id">查看与编审</NButton><NButton v-if="s.caseId" size="small" @click="router.push('/cases/' + s.caseId)">查看关联案例</NButton></div>
+      </NCard>
+    </template>
   </div>
 </template>
 
 <style scoped>
-.sub {
-  margin-bottom: 10px;
-}
-.sub__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-.sub__meta {
-  color: var(--ink3);
-  font-size: 12px;
-  margin: 6px 0;
-}
-.sub__detail summary {
-  cursor: pointer;
-  color: var(--ink3);
-  font-size: 13px;
-}
-.sub__detail p {
-  margin: 6px 0;
-  font-size: 13px;
-  line-height: 1.6;
-}
-.sub__actions {
-  margin-top: 10px;
-  display: flex;
-  gap: 8px;
-}
+.sub { margin-bottom: 12px; }
+.sub__head,.toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sub__head { justify-content: space-between; }
+.toolbar { margin-bottom: 16px; }
+.muted { color: var(--ink3); font-size: 12px; line-height: 1.6; }
+.excerpt { white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>
