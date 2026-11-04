@@ -31,6 +31,16 @@ export interface StatsOverview {
   }
 }
 
+export interface LearningMetrics {
+  asOf: string
+  funnel: { startedUsers: number; finishedUsers: number; solvedUsers: number }
+  d1: { eligibleUsers: number; retainedUsers: number }
+  d7: { eligibleUsers: number; retainedUsers: number }
+  threeCase7d: { eligibleUsers: number; completedUsers: number }
+  weeklySolvedUsers: number
+}
+
 export const statsApi = {
   overview: (days: number): Promise<StatsOverview> => api.get(`/api/admin/stats/overview?days=${days}`),
+  learning: (): Promise<LearningMetrics> => api.get('/api/admin/stats/learning'),
 }

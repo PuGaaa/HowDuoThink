@@ -70,7 +70,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import navbar from '../../components/navbar/navbar.uvue'
 import { getStoredUser, login, smsLogin, sendSmsCode, LoginResult } from '../../utils/auth'
 import { prepareProgressIdentity, pullServerProgress, pushProgress } from '../../utils/sync-progress'
-import { flushLearningEvents } from '../../utils/learning-events'
+import { claimLearningEvents, flushLearningEvents } from '../../utils/learning-events'
 
 const tab = ref('sms')
 const phone = ref('')
@@ -132,6 +132,7 @@ function finish(r: LoginResult) {
   uni.showToast({ title: '登录成功', icon: 'none' })
   const u = getStoredUser()
   if (u != null) prepareProgressIdentity(u.id)
+  claimLearningEvents()
   flushLearningEvents()
   // 登录后：后端为唯一事实源，拉取账号的全量数据覆盖本地
   pushProgress((saved) => {

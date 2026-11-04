@@ -77,6 +77,92 @@ def test_learning_event_requires_login_and_is_idempotent():
     assert db.jload(rows[0]["payload"], {})["contentRevision"] == 2
 
 
+def test_guest_learning_event_claims_once_and_event_id_is_idempotent():
+    uid, login = _mkuser(password=_PW)
+    body = {
+        "eventId": "evt-guest-1",
+        "kind": "session_start",
+        "sessionId": "session-guest-1",
+        "caseId": "first-npe",
+        "source": "play",
+        "anonymousId": "anon-guest-1",
+        "occurredAt": "2026-11-04T10:00:00+08:00",
+    }
+    with make_client() as c:
+        assert c.post("/api/learning-events", json=body).status_code == 204
+        assert c.post("/api/learning-events", json=body).status_code == 204
+        assert c.post("/api/auth/login", json={"login": login, "password": _PW}).status_code == 200
+        assert c.post("/api/me/learning-events/claim", json={"anonymousId": "anon-guest-1"}).status_code == 204
+    import db
+
+    rows = db.q("SELECT id, user_id FROM learning_events WHERE id='client:evt-guest-1'")
+    assert rows == [{"id": "client:evt-guest-1", "user_id": uid}]
+
+
+def test_learning_metrics_use_verified_end_events_and_mature_windows():
+    import db
+    from features.stats import service
+
+    samples = [
+        (
+            "m-start",
+            "metrics-start",
+            "session_start",
+            "2026-11-01T09:00:00+08:00",
+            {"sessionId": "s-start", "caseId": "c1"},
+        ),
+        (
+            "m-review",
+            "metrics-start",
+            "review_view",
+            "2026-11-02T09:00:00+08:00",
+            {"sessionId": "s-start", "caseId": "c1"},
+        ),
+        (
+            "m-unverified",
+            "metrics-unverified",
+            "session_start",
+            "2026-11-01T09:00:00+08:00",
+            {"sessionId": "s-unverified", "caseId": "c1"},
+        ),
+        (
+            "m-unverified-end",
+            "metrics-unverified",
+            "session_end",
+            "2026-11-02T09:00:00+08:00",
+            {"sessionId": "s-unverified", "caseId": "c1", "solved": True},
+        ),
+        (
+            "m-effective",
+            "metrics-effective",
+            "session_start",
+            "2026-11-01T09:00:00+08:00",
+            {"sessionId": "s-effective", "caseId": "c1"},
+        ),
+        (
+            "m-effective-v",
+            "metrics-effective",
+            "verification",
+            "2026-11-02T09:00:00+08:00",
+            {"sessionId": "s-effective", "caseId": "c1"},
+        ),
+        (
+            "m-effective-end",
+            "metrics-effective",
+            "session_end",
+            "2026-11-02T09:00:00+08:00",
+            {"sessionId": "s-effective", "caseId": "c1", "solved": True},
+        ),
+    ]
+    for event_id, user_id, kind, occurred_at, payload in samples:
+        db.ex(
+            "INSERT INTO learning_events(id,user_id,anonymous_id,kind,occurred_at,payload) VALUES(?,?,?,?,?,?)",
+            (event_id, user_id, "anon-metrics", kind, occurred_at, db.jdump(payload)),
+        )
+    metrics = service.learning_metrics("2026-11-04")
+    assert metrics["d1"] == {"eligibleUsers": 3, "retainedUsers": 1}
+
+
 def test_overview_endpoint():
     import db
 

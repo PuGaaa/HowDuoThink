@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import { NButton, NCard, NSelect, NTag } from 'naive-ui'
 import { ArrowRight } from 'lucide-vue-next'
-import { statsApi, type StatsOverview } from '../api/stats'
+import { statsApi, type LearningMetrics, type StatsOverview } from '../api/stats'
 
 const message = useMessage()
 const days = ref(30)
@@ -14,12 +14,15 @@ const daysOptions = [
 ]
 
 const data = ref<StatsOverview | null>(null)
+const learning = ref<LearningMetrics | null>(null)
 const loading = ref(true)
 
 async function load() {
   loading.value = true
   try {
-    data.value = await statsApi.overview(days.value)
+    const [overview, metrics] = await Promise.all([statsApi.overview(days.value), statsApi.learning()])
+    data.value = overview
+    learning.value = metrics
   } catch (e: any) {
     message.error(e?.message || '加载失败')
   } finally {
@@ -119,6 +122,18 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
       </div>
     </NCard>
 
+    <NCard size="small" title="学习批次（北京时间）" class="section" v-if="learning">
+      <div class="learning-grid">
+        <div><b>{{ learning.funnel.startedUsers }}</b><span>有效开局用户</span></div>
+        <div><b>{{ learning.funnel.finishedUsers }}</b><span>结束对局用户</span></div>
+        <div><b>{{ learning.funnel.solvedUsers }}</b><span>成功破案用户</span></div>
+        <div><b>{{ learning.weeklySolvedUsers }}</b><span>本周破案用户</span></div>
+        <div><b>{{ learning.d1.retainedUsers }} / {{ learning.d1.eligibleUsers }}</b><span>D1 留存 / 成熟样本</span></div>
+        <div><b>{{ learning.d7.retainedUsers }} / {{ learning.d7.eligibleUsers }}</b><span>D7 留存 / 成熟样本</span></div>
+        <div><b>{{ learning.threeCase7d.completedUsers }} / {{ learning.threeCase7d.eligibleUsers }}</b><span>七日三题 / 成熟样本</span></div>
+      </div>
+    </NCard>
+
     <p class="hint">活跃 = 登录或上传进度；完关率 = 有进度用户的 solved 总数 ÷（有进度用户数 × 已上线案例数），App 端进度结构对齐后可细分到章节。</p>
   </div>
 </template>
@@ -162,5 +177,23 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
 }
 .spacer {
   flex: 1;
+}
+.learning-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.learning-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.learning-grid b {
+  font-size: 20px;
+  color: var(--ink);
+}
+.learning-grid span {
+  font-size: 12px;
+  color: var(--ink3);
 }
 </style>

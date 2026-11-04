@@ -157,6 +157,7 @@ export function logout() {
   setProgressIdentity('guest')
   uni.removeStorageSync(KEY_TOKEN)
   uni.removeStorageSync(KEY_USER)
+  uni.removeStorageSync('think_learning_anonymous_id_v1')
   uni.removeStorageSync('think_last_sync')
 }
 
