@@ -288,6 +288,8 @@ export function saveSession(record: SessionRecord): void {
     playerCost: record.playerCost,
     expertCost: record.expertCost,
     mascotEvents: record.mascotEvents,
+    eventId: 'event-session-end-' + record.sessionId,
+    testMode: uni.getStorageSync('think_learning_test_mode_v1') === '1',
   }, record.occurredAt)
   notifyProgressDirty()
 }

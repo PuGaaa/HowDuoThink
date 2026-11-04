@@ -39,17 +39,19 @@ export function trackLearningEvent(kind: string, sessionId: string, caseId: stri
   if (isLearningTestMode()) return
   const raw = uni.getStorageSync(eventsKey())
   const events: LearningEventRecord[] = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as LearningEventRecord[]
-  events.push({ eventId: 'event-' + String(Date.now()) + '-' + String(Math.random()), kind: kind, sessionId: sessionId, caseId: caseId, source: source, contentRevision: contentRevision, anonymousId: getLearningAnonymousId(), occurredAt: new Date().toISOString() })
-  uni.setStorageSync(eventsKey(), JSON.stringify(events))
-  if (isLoggedIn()) {
-    sendLearningEvent(events[events.length - 1])
-  }
+  const eventId = kind === 'session_end' ? 'event-session-end-' + sessionId : 'event-' + String(Date.now()) + '-' + String(Math.random())
+  events.push({ eventId: eventId, kind: kind, sessionId: sessionId, caseId: caseId, source: source, contentRevision: contentRevision, anonymousId: getLearningAnonymousId(), occurredAt: new Date().toISOString() })
+  const queueKey = eventsKey()
+  uni.setStorageSync(queueKey, JSON.stringify(events))
+  sendLearningEvent(events[events.length - 1], queueKey, getToken())
 }
 
 export function flushLearningEvents(): void {
   if (!isLoggedIn()) return
-  const events = learningEvents()
-  for (const event of events) sendLearningEvent(event)
+  const queueKey = eventsKey()
+  const token = getToken()
+  const events = readLearningEvents(queueKey)
+  for (const event of events) sendLearningEvent(event, queueKey, token)
 }
 
 export function claimLearningEvents(): void {
@@ -63,17 +65,23 @@ export function claimLearningEvents(): void {
   })
 }
 
-function sendLearningEvent(event: LearningEventRecord): void {
+function readLearningEvents(queueKey: string): LearningEventRecord[] {
+  const raw = uni.getStorageSync(queueKey)
+  return raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as LearningEventRecord[]
+}
+
+function sendLearningEvent(event: LearningEventRecord, queueKey: string, token: string): void {
   uni.request({
-    url: (isLoggedIn() ? API_BASE + '/api/me/learning-events' : API_BASE + '/api/learning-events'),
+    url: (token.length > 0 ? API_BASE + '/api/me/learning-events' : API_BASE + '/api/learning-events'),
     method: 'POST',
-    header: isLoggedIn() ? { Authorization: 'Bearer ' + getToken() } as any : {} as any,
+    header: token.length > 0 ? { Authorization: 'Bearer ' + token } as any : {} as any,
     data: event as any,
     timeout: 8000,
     success: (response) => {
       if (response.statusCode !== 204) return
-      const events = learningEvents().filter((item) => item.eventId !== event.eventId)
-      uni.setStorageSync(eventsKey(), JSON.stringify(events))
+      if (queueKey !== eventsKey() || (token.length > 0 && token !== getToken())) return
+      const events = readLearningEvents(queueKey).filter((item) => item.eventId !== event.eventId)
+      uni.setStorageSync(queueKey, JSON.stringify(events))
     },
   })
 }

@@ -95,6 +95,8 @@ class SessionPayload(Model):
     wrong_identifies: int = Field(default=0, ge=0, alias="wrongIdentifies")
     mascot_events: list[MascotEvent] = Field(default_factory=list, alias="mascotEvents")
     anonymous_id: str | None = Field(default=None, alias="anonymousId")
+    event_id: str | None = Field(default=None, alias="eventId")
+    test_mode: bool = Field(default=False, alias="testMode")
 
 
 class ImportPayload(Model):

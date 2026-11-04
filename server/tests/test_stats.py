@@ -79,6 +79,7 @@ def test_learning_event_requires_login_and_is_idempotent():
 
 def test_guest_learning_event_claims_once_and_event_id_is_idempotent():
     uid, login = _mkuser(password=_PW)
+    other_uid, other_login = _mkuser(password=_PW)
     body = {
         "eventId": "evt-guest-1",
         "kind": "session_start",
@@ -93,10 +94,19 @@ def test_guest_learning_event_claims_once_and_event_id_is_idempotent():
         assert c.post("/api/learning-events", json=body).status_code == 204
         assert c.post("/api/auth/login", json={"login": login, "password": _PW}).status_code == 200
         assert c.post("/api/me/learning-events/claim", json={"anonymousId": "anon-guest-1"}).status_code == 204
+    late = {**body, "eventId": "evt-guest-late", "kind": "review_view"}
+    with make_client() as guest:
+        assert guest.post("/api/learning-events", json=late).status_code == 204
+    with make_client() as b:
+        assert b.post("/api/auth/login", json={"login": other_login, "password": _PW}).status_code == 200
+        assert b.post("/api/me/learning-events/claim", json={"anonymousId": "anon-guest-1"}).status_code == 204
     import db
 
     rows = db.q("SELECT id, user_id FROM learning_events WHERE id='client:evt-guest-1'")
     assert rows == [{"id": "client:evt-guest-1", "user_id": uid}]
+    late_rows = db.q("SELECT user_id FROM learning_events WHERE id='client:evt-guest-late'")
+    assert late_rows == [{"user_id": uid}]
+    assert other_uid != uid
 
 
 def test_learning_metrics_use_verified_end_events_and_mature_windows():

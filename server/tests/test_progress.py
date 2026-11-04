@@ -90,6 +90,28 @@ def test_same_operation_retry_and_session_alias_settle_once(client, account):
     assert db.q("SELECT COUNT(*) AS n FROM learning_events WHERE user_id=?", (account,))[0]["n"] == 1
 
 
+def test_anonymous_session_end_event_and_progress_fact_share_one_learning_row(client, account):
+    event_id = "event-session-end-shared"
+    db.ex(
+        "INSERT INTO learning_events(id,user_id,anonymous_id,kind,occurred_at,payload) VALUES(?,?,?,?,?,?)",
+        (
+            "client:" + event_id,
+            account,
+            "anon-shared",
+            "session_end",
+            "2026-11-04T10:00:00Z",
+            db.jdump({"eventId": event_id}),
+        ),
+    )
+    sync(client, [session("shared", eventId=event_id, anonymousId="anon-shared")])
+    assert db.q("SELECT COUNT(*) AS n FROM learning_events WHERE id=?", ("client:" + event_id,))[0]["n"] == 1
+
+
+def test_test_mode_session_end_is_excluded_from_learning_events(client, account):
+    sync(client, [session("test-session", testMode=True)])
+    assert not db.q("SELECT id FROM learning_events WHERE user_id=? AND kind='session_end'", (account,))
+
+
 def test_first_two_requests_serialize_without_losing_operations(account):
     barrier = Barrier(2)
 

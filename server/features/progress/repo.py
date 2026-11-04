@@ -114,10 +114,19 @@ def add_operation(conn: Any, uid: str, operation: ProgressOperation) -> bool:
 
 
 def add_session_event(conn: Any, uid: str, operation: SessionOperation) -> None:
+    if operation.payload.test_mode:
+        return
+    event_id = operation.payload.event_id
+    event_key = (
+        "client:" + event_id
+        if event_id
+        else "session_end:" + hashlib.sha256((uid + ":" + operation.payload.session_id).encode()).hexdigest()
+    )
     conn.execute(
-        "INSERT INTO learning_events(id,user_id,anonymous_id,kind,occurred_at,payload) VALUES(?,?,?,?,?,?)",
+        "INSERT INTO learning_events(id,user_id,anonymous_id,kind,occurred_at,payload) VALUES(?,?,?,?,?,?) "
+        "ON CONFLICT(id) DO NOTHING",
         (
-            "session_end:" + hashlib.sha256((uid + ":" + operation.payload.session_id).encode()).hexdigest(),
+            event_key,
             uid,
             operation.payload.anonymous_id,
             "session_end",

@@ -648,6 +648,7 @@ function finishAndSave() {
     savePreviewSession(previewId.value, rec)
     return
   }
+  trackLearningEvent('session_end', rec.sessionId, rec.caseId, 'play', rec.contentRevision)
   saveSession(rec)
   if (solved.value && recordSolvedLayer(currentCase.chapterId)) {
     bumpTask('layers2', 1)

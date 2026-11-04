@@ -31,20 +31,40 @@ def record_guest_learning_event(body: LearningEventBody) -> None:
     if body.test_mode:
         return
     event_id = body.event_id or f"{body.session_id}:{body.kind}:{body.source}:{body.occurred_at.isoformat()}"
-    guest_id = "guest:" + (body.anonymous_id or "")
     payload = body.model_dump(mode="json", by_alias=True)
-    db.ex(
-        "INSERT INTO learning_events(id,user_id,anonymous_id,kind,occurred_at,payload) VALUES(?,?,?,?,?,?) "
-        "ON CONFLICT(id) DO NOTHING",
-        ("client:" + event_id, guest_id, body.anonymous_id, body.kind, body.occurred_at.isoformat(), db.jdump(payload)),
-    )
+    with db.tx() as conn:
+        identity = conn.execute(
+            "SELECT user_id FROM learning_event_identities WHERE anonymous_id=?", (body.anonymous_id,)
+        ).fetchone()
+        owner = identity["user_id"] if identity else "guest:" + (body.anonymous_id or "")
+        conn.execute(
+            "INSERT INTO learning_events(id,user_id,anonymous_id,kind,occurred_at,payload) VALUES(?,?,?,?,?,?) "
+            "ON CONFLICT(id) DO NOTHING",
+            (
+                "client:" + event_id,
+                owner,
+                body.anonymous_id,
+                body.kind,
+                body.occurred_at.isoformat(),
+                db.jdump(payload),
+            ),
+        )
 
 
 def claim_guest_learning_events(uid: str, anonymous_id: str) -> None:
-    db.ex(
-        "UPDATE learning_events SET user_id=? WHERE user_id=? AND anonymous_id=?",
-        (uid, "guest:" + anonymous_id, anonymous_id),
-    )
+    with db.tx() as conn:
+        conn.execute(
+            "INSERT INTO learning_event_identities(anonymous_id,user_id) VALUES(?,?) "
+            "ON CONFLICT(anonymous_id) DO NOTHING",
+            (anonymous_id, uid),
+        )
+        owner = conn.execute(
+            "SELECT user_id FROM learning_event_identities WHERE anonymous_id=?", (anonymous_id,)
+        ).fetchone()["user_id"]
+        conn.execute(
+            "UPDATE learning_events SET user_id=? WHERE user_id=? AND anonymous_id=?",
+            (owner, "guest:" + anonymous_id, anonymous_id),
+        )
 
 
 def today_str(offset_days: int = 0) -> str:
@@ -143,7 +163,10 @@ def event_details(kind: str | None = None, limit: int = 100) -> list[dict]:
 
 def learning_metrics(as_of: str | None = None) -> dict:
     today = as_of or today_str()
-    rows = db.q("SELECT user_id, kind, occurred_at, payload FROM learning_events WHERE user_id NOT LIKE 'test:%'")
+    rows = db.q(
+        "SELECT user_id, kind, occurred_at, payload FROM learning_events "
+        "WHERE user_id NOT LIKE 'test:%' AND user_id NOT IN (SELECT id FROM users WHERE role='test')"
+    )
     by_user: dict[str, list[dict]] = defaultdict(list)
     for row in rows:
         by_user[row["user_id"]].append(row)
