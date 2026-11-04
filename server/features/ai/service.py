@@ -351,19 +351,7 @@ def ai_draft_from_submission(uid: str, sid: str) -> dict:
         result["warnings"] = ["AI 未配置，使用机械骨架"]
         return result
 
-    rows = db.q("SELECT * FROM submissions WHERE id=?", (sid,))
-    if not rows:
-        raise ValueError("投稿不存在")
-    s = rows[0]
-    material = {
-        "title": s["title"],
-        "symptom": s["symptom"],
-        "resolution": s["resolution"],
-        "keyError": s["key_error"],
-        "timeline": s["timeline"],
-        "lessons": db.jload(s["lessons"], []),
-        "domainHint": s["domain_hint"],
-    }
+    material = sub_service.authorized_draft_source(sid)
     warnings: list[str] = []
     generated, w = node_draft(material, uid=uid)
     warnings.extend(w)
@@ -432,7 +420,7 @@ def ai_draft_from_submission(uid: str, sid: str) -> dict:
     else:
         aiGenerated = False
 
-    result = sub_service.create_draft_with_payload(uid, sid, payload)
+    result = sub_service.create_draft_with_payload(uid, sid, payload, source_material=material)
     result["aiGenerated"] = aiGenerated
     result["warnings"] = warnings
     return result
