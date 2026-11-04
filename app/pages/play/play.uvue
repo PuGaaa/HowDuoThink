@@ -649,7 +649,7 @@ function finishAndSave() {
     return
   }
   saveSession(rec)
-  if (solved.value && currentCase != null && recordSolvedLayer(currentCase.layer)) {
+  if (solved.value && recordSolvedLayer(currentCase.chapterId)) {
     bumpTask('layers2', 1)
   }
   // 每日一题：今日题通关 → 标记完成 + 任务计数

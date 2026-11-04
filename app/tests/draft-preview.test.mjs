@@ -25,6 +25,7 @@ function harness() {
   const requests = []
   const calls = []
   const tracked = []
+  const layers = new Set()
   let loggedIn = true
   const hooks = new Map()
   const cache = new Map()
@@ -32,8 +33,8 @@ function harness() {
   const getLastSession = () => values.has('real-user-session') ? JSON.parse(values.get('real-user-session')) : null
   const storage = {
     saveSession, getLastSession,
-    bumpChecklistUse: () => calls.push('checklist'), bumpTask: () => calls.push('task'),
-    recordSolvedLayer: () => { calls.push('layer'); return true },
+    bumpChecklistUse: () => calls.push('checklist'), bumpTask: metric => calls.push('task:' + metric),
+    recordSolvedLayer: id => { calls.push('layer:' + id); const added = !layers.has(id); layers.add(id); return added },
   }
   const mocks = {
     'app/config.ts': { API_BASE: 'http://preview.review.test' },
@@ -153,4 +154,15 @@ test('第三关完整复盘后进入登录引导，携带第四关目标并保�
   review.goNext()
   assert.deepEqual(h.calls, ['login:async-swallow'])
   assert.deepEqual(h.getLastSession(), record)
+})
+
+test('同章不同题不完成跨层任务，层以chapterId去重', () => {
+  const h = harness()
+  const play = h.page('play', { id: h.original.id })
+  play.solved.value = true
+  play.finishAndSave()
+  play.initializeCase({ ...h.original, id: 'same-chapter-practice', layer: '另一条训练原则' })
+  play.finishAndSave()
+  assert.equal(h.calls.filter(item => item === 'task:layers2').length, 1)
+  assert.equal(h.calls.filter(item => item === 'layer:error-reading').length, 2)
 })
