@@ -77,3 +77,9 @@ test('枚举题业务PAID始终映射3后被旧消费者解释SHIPPED，修正�
 test('超时40%重试按总尝试计算，不能写成2.4倍；响应扩展不保证兼容',()=>{
  assert.equal((600+400)/600,5/3);const c=load('app/data/cases/timeout-contract.ts');assert.match(c.actions.find(a=>a.id==='a-impact').result.text,/≈1.67倍/);assert.match(c.actions.find(a=>a.id==='a-fixbudget').result.text,/串行阶段、并行波次、排队与重试/);assert.match(load('app/data/cases/required-field.ts').actions.find(a=>a.id==='a-schemacheck').result.text,/严格schema/)
 })
+test('连接池题20条长SQL才能解释20个持有者，读库正常不排除主库',()=>{
+ const c=load('app/data/cases/pool-exhausted.ts');assert.match(c.actions.find(a=>a.id==='a-slowquery').result.text,/20条同类/);assert.match(c.actions.find(a=>a.id==='a-impact').result.text,/读库正常不能排除主库故障/);assert.equal(c.expertCost,8)
+})
+test('filesort不等于必然落盘，缓存命中旧价不靠扩容或回源互斥解决',()=>{
+ const c=load('app/data/cases/slow-query.ts');assert.match(c.actions.find(a=>a.id==='a-explain').result.text,/可能在内存完成/);assert.equal(c.actions.find(a=>a.id==='a-fixindex').danger,true);const cache=load('app/data/cases/cache-review.ts');assert.match(cache.actions.find(a=>a.id==='a-stampede').result.text,/一直hit旧值/);assert.match(cache.actions.find(a=>a.id==='a-benefit').result.text,/尚未实测/)
+})

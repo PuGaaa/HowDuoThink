@@ -709,7 +709,56 @@
       "originalDifficulty": 2,
       "originalExpertCost": 6,
       "originalPathCost": 6,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "72bd2551f8fb9e2b3d68382db13d39430a99a54bd3af30ff30f7d15816c13661",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "池报错→持有者→SQL",
+        "池/线程/DB关联",
+        "池租借与并发",
+        "CPU闲而请求排队",
+        "应用池到主库",
+        "重启不阻止job重跑"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-poolstat",
+            "a-slowquery",
+            "a-stack",
+            "a-mysql"
+          ],
+          "cost": 8
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-mysql",
+            "a-stack",
+            "a-poolstat",
+            "a-slowquery"
+          ],
+          "cost": 8
+        }
+      ],
+      "expectedConfirmed": [
+        "h-slow"
+      ],
+      "review": "人工裁定8⚡，原6缺泄漏/主库反证且6条SQL无法占20连接；改成20条关联持有记录，不以“池满”直接排除流量。",
+      "sources": [
+        "https://dev.mysql.com/doc/refman/8.0/en/explain-output.html"
+      ]
     },
     {
       "id": "cache-drift",
@@ -720,7 +769,54 @@
       "originalDifficulty": 2,
       "originalExpertCost": 4,
       "originalPathCost": 6,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "1b4aebad277581635fbb9690ae052e504f972a09ef109aca7b7bafdf6dc267a3",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "端差异→副本→失效",
+        "同主键对照+diff",
+        "Cache-Aside时效",
+        "成功上传仍旧值",
+        "应用/Redis/DB/CDN",
+        "回滚要清受影响值"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-userprobe",
+            "a-gitlog",
+            "a-imgurl"
+          ],
+          "cost": 5
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-imgurl",
+            "a-gitlog",
+            "a-userprobe"
+          ],
+          "cost": 5
+        }
+      ],
+      "expectedConfirmed": [
+        "h-cache"
+      ],
+      "review": "人工裁定5⚡（原4、旧链6）；移除重复DB证明但增加独立图片反证，限制真实影响群和刷新上限。",
+      "sources": [
+        "https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside"
+      ]
     },
     {
       "id": "slow-query",
@@ -731,7 +827,58 @@
       "originalDifficulty": 2,
       "originalExpertCost": 5,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "a1c9367cacb141aed96ba39dc42a721ecf4085b86bd0c3db59cd9c66754db1f3",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "慢化→计划→索引",
+        "计划/定义/等待与对照",
+        "索引与排序",
+        "ALL不等于磁盘排序",
+        "应用到存储计划",
+        "DDL同样有锁风险"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-explain",
+            "a-tablestruct",
+            "a-lockcheck",
+            "a-hostmetric"
+          ],
+          "cost": 6
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-lockcheck",
+            "a-hostmetric",
+            "a-explain",
+            "a-tablestruct"
+          ],
+          "cost": 6
+        }
+      ],
+      "expectedConfirmed": [
+        "h-index"
+      ],
+      "review": "人工裁定6⚡（原5），移除重复慢日志读取，补锁/资源反证；DDL标危险9⚡且不计定位成本。修正filesort和高扫描比过度推断。",
+      "sources": [
+        "https://dev.mysql.com/doc/refman/8.0/en/explain-output.html",
+        "https://dev.mysql.com/doc/refman/8.0/en/order-by-optimization.html",
+        "https://dev.mysql.com/doc/refman/8.0/en/innodb-online-ddl-limitations.html"
+      ]
     },
     {
       "id": "cache-review",
@@ -742,7 +889,56 @@
       "originalDifficulty": 2,
       "originalExpertCost": 8,
       "originalPathCost": 5,
-      "status": "pending"
+      "status": "calibrated",
+      "calibratedHash": "2c2e8bfa230488cbd9b3a93f9809257907477290f453e6c28f2246f963d13abd",
+      "difficulty": 2,
+      "dimensions": [
+        2,
+        3,
+        2,
+        2,
+        2,
+        2
+      ],
+      "dimensionEvidence": [
+        "约束→样例→收费",
+        "多反例对照",
+        "缓存时效与结算",
+        "容量好仍能值错",
+        "展示与订单收费",
+        "原稿批准跳过红线"
+      ],
+      "paths": [
+        {
+          "name": "标准路径",
+          "actions": [
+            "a-impact",
+            "a-orderpath",
+            "a-avalanche",
+            "a-stampede",
+            "a-capacity"
+          ],
+          "cost": 8
+        },
+        {
+          "name": "替代路径",
+          "actions": [
+            "a-impact",
+            "a-capacity",
+            "a-stampede",
+            "a-avalanche",
+            "a-orderpath"
+          ],
+          "cost": 8
+        }
+      ],
+      "expectedConfirmed": [
+        "h-price"
+      ],
+      "review": "人工裁定8⚡保留：每项建议需独立边界核验，原专家链5⚡却声称三风险全查。改成价格路径和三个可证伪替代方案，不再把真实风险标false。",
+      "sources": [
+        "https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside"
+      ]
     },
     {
       "id": "midnight-rollback",

@@ -1,22 +1,21 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 设计评审关试点（皮肤演进：故障排查 → 事前评审）。
- * 训练理念设计层：架构设计思维（故障的种子是设计取舍）+ 程序设计思维（防御式设计）。
- * 结构与排查关完全同构：假设 = 设计缺陷假设，验证动作 = 评审会上的追问。
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const cacheReviewCase: DiagnosisCase = {
   id: 'cache-review',
   title: '上线前的缓存方案评审',
-  intro: '明天商品详情页改造方案过终审。方案逻辑自洽、收益诱人——但你的工作，是找出它会在什么时候出事。',
+  intro: '商品详情缓存拟上线，价格要求一分钟内更新。审查旧价格能否流入成交，再把容量风险与当前正确性缺口分开。',
   domain: 'data',
   layer: '缓存设计的取舍：先问业务时效，再定技术参数',
   part: 'engineer',
   chapterId: 'data',
   order: 4,
-  typeTags: ['data', 'architecture'],
+  typeTags: [
+    'data',
+    'architecture',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」的后端负责人，评审会上被指派"挑刺"——找出这个方案未来会出事的地方。',
     architecture: 'App → 详情页服务 → Redis(方案新增) → MySQL(商品表 500 万行)',
@@ -30,20 +29,34 @@ export const cacheReviewCase: DiagnosisCase = {
       {
         type: 'text',
         title: '现网事实',
-        text: '商品价格由运营在促销期批量改价——去年双 11 预热 10 分钟内改了 1200 个 SKU，业务要求改价分钟级生效。\n历史：一次促销改价后，"下单价格与页面不一致"的客服投诉 5 分钟内翻倍。',
+        text: '业务要求促销改价一分钟内生效，结算必须使用当前有效价格；这是本次发布的明确验收条件。去年改价投诉作为教学背景，不是本题已验证生产事实。',
       },
     ],
     timeline: '方案评审明天举行 ｜ 双 11 预热 11 天后开始 ｜ 去年大促出现过价格投诉与一次临时救火',
     impactHint: '这不是故障排查——是在故障发生之前，把种子找出来。最值钱的问句是："什么情况下这个设计会出事？"',
   },
-
   hypotheses: [
-    { id: 'h-price', text: '价格时效与缓存冲突：改价后 30 分钟内用户看到旧价并可下单——资损窗口' },
-    { id: 'h-avalanche', text: '无预热 + 统一 TTL：大促零点缓存集中过期，瞬时流量全量回源压垮 DB' },
-    { id: 'h-stampede', text: '热点 key 失效瞬间无回源保护：大量请求同时重建缓存——击穿无防护' },
-    { id: 'h-cap', text: '容量按日常 QPS 估算：大促 3 倍峰值 + 无降级预案——峰值下不可用' },
+    {
+      id: 'h-price',
+      text: '没有主动失效，且结算直接用30分钟缓存价，存在违反现价成交约束的路径',
+      excludeActionId: 'a-orderpath',
+    },
+    {
+      id: 'h-avalanche',
+      text: '只有缓存集中过期时才会价格错，平稳低流量无价格风险',
+      excludeActionId: 'a-avalanche',
+    },
+    {
+      id: 'h-stampede',
+      text: '只要互斥回源即可保证改价一分钟生效，不必主动失效',
+      excludeActionId: 'a-stampede',
+    },
+    {
+      id: 'h-cap',
+      text: '只要Redis与DB容量够大，就能消除命中旧值的成交风险',
+      excludeActionId: 'a-capacity',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -54,7 +67,12 @@ export const cacheReviewCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: [],
-      hypotheses: [{ id: 'h-price', status: 'up' }],
+      hypotheses: [
+        {
+          id: 'h-price',
+          status: 'up',
+        },
+      ],
       result: {
         type: 'text',
         title: '业务约束',
@@ -69,12 +87,19 @@ export const cacheReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-price'],
-      hypotheses: [{ id: 'h-price', status: 'confirmed' }],
+      tests: [
+        'h-price',
+      ],
+      hypotheses: [
+        {
+          id: 'h-price',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'code',
         title: '下单链路代码',
-        text: 'createOrder() {\n  price = cache.get("sku:" + id).price   ← 下单也读缓存\n  charge(price)\n}\n→ 下单与展示读同一份缓存：改价后 30 分钟内，用户可按旧价成交。\n资损路径闭环，实锤。',
+        text: '方案结算代码直接读取sku缓存price并charge，无有效价版本校验。教学样例：t0价格100，t1运营改DB为80，缓存仍100且到t0+30min才到期；t1+2min低流量订单仍按100收费。\n该路径违反当前有效价成交和一分钟展示时效；是否最终产生资损还取决于促销方向和赔付口径，不预先编金额。',
       },
     },
     {
@@ -101,12 +126,19 @@ export const cacheReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-avalanche'],
-      hypotheses: [{ id: 'h-avalanche', status: 'confirmed' }],
+      tests: [
+        'h-avalanche',
+      ],
+      hypotheses: [
+        {
+          id: 'h-avalanche',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '预热？——"还没做，上线后再说。"\n差异化 TTL？——"统一 30 分钟。"\n→ 双 11 零点：新建缓存冷启动 + 存量集中过期，瞬时全量回源 DB（500 万行热点表）。\n雪崩路径确认。',
+        text: '教学单用户回放：无并发、无批量过期，缓存稳定命中旧价仍在2分钟后收费100。故价格错误不依赖雪崩。\n统一TTL仅在写入/预热时刻集中时才会集中到期；没有预热本身不意味着旧缓存同时过期。雪崩应另做容量回放。',
       },
     },
     {
@@ -117,12 +149,19 @@ export const cacheReviewCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-stampede'],
-      hypotheses: [{ id: 'h-stampede', status: 'confirmed' }],
+      tests: [
+        'h-stampede',
+      ],
+      hypotheses: [
+        {
+          id: 'h-stampede',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '互斥锁 / 逻辑过期 / 单飞？——"没有，失效了就都去查库吧。"\n→ 爆款商品 key 失效瞬间：并发回源无保护。击穿无防护，确认。',
+        text: '互斥回源只在缓存miss时协调重建；本样例一直hit旧值，不进入锁或回源路径。仅加互斥不改变30分钟旧价窗口，排除其能单独保证一分钟生效。',
       },
     },
     {
@@ -133,12 +172,19 @@ export const cacheReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-cap'],
-      hypotheses: [{ id: 'h-cap', status: 'confirmed' }],
+      tests: [
+        'h-cap',
+      ],
+      hypotheses: [
+        {
+          id: 'h-cap',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '评审追问记录',
-        text: '容量按多少估的？——"按当前峰值 8000 QPS。"\n大促 3 倍呢？——"……没算。"\n降级预案？——"没有。"\n→ 容量按日常估算、无降级：大促峰值下不可用，确认。',
+        text: '同一低流量样例中Redis和DB均有容量余量，但hit仍返回旧价100。扩容不会主动失效，排除容量足够就能消除旧值成交风险。\n大促3倍峰值的容量与限流仍需独立验证，未压测不能说一定不可用。',
       },
     },
     {
@@ -149,8 +195,15 @@ export const cacheReviewCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-price'],
-      hypotheses: [{ id: 'h-price', status: 'up' }],
+      tests: [
+        'h-price',
+      ],
+      hypotheses: [
+        {
+          id: 'h-price',
+          status: 'up',
+        },
+      ],
       result: {
         type: 'text',
         title: '事故工单归档',
@@ -170,7 +223,7 @@ export const cacheReviewCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '收益评估',
-        text: '读加速收益真实：95% 命中预估合理，DB 压力下降可观。\n→ 评审结论不是推翻方案——是保留收益、补上边界设计。',
+        text: '高读写比说明缓存可能减轻DB负担，但95%命中率和P99<50ms均只是方案目标，尚未实测。收益方向可讨论，数值不能当已验证事实。',
       },
     },
     {
@@ -181,24 +234,19 @@ export const cacheReviewCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-price', 'h-avalanche', 'h-stampede', 'h-cap'],
-      hypotheses: [
-        { id: 'h-price', status: 'confirmed' },
-        { id: 'h-avalanche', status: 'confirmed' },
-        { id: 'h-stampede', status: 'confirmed' },
-        { id: 'h-cap', status: 'confirmed' },
-      ],
+      tests: [],
+      hypotheses: [],
       result: {
         type: 'text',
         title: '评审结论 · 修正清单',
-        text: '① 改价事件主动失效缓存（不等 TTL）\n② TTL 差异化 + 大促预热\n③ 热点 key 互斥回源\n④ 按 3 倍峰值重估容量 + 降级预案\n→ 四项补齐后有条件通过；价格时效为上线阻断项。',
+        text: '先补阻断项：改价事务提交后触发可靠失效/版本更新，并在结算按当前有效价校验，验证一分钟时效和并发更新。\n再独立验证缓存集中到期、热点miss回源及峰值容量。修正清单是建议，不能代替这些验证已执行。',
       },
     },
     {
       id: 'a-approve',
       name: '按原方案批准上线',
       desc: '【状态变更】不做修改直接过审',
-      cost: 4,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -211,48 +259,74 @@ export const cacheReviewCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-price', text: '核心阻断缺陷：价格时效（分钟级）与缓存 TTL 30 分钟冲突、且无主动失效——旧价下单资损窗口，必须修复后才能上线', correct: true },
-    { id: 'rc-avalanche', text: '真实风险但非阻断：无预热 + 统一 TTL 的集中过期，大促前补预热与差异化 TTL 即可', correct: false },
-    { id: 'rc-stampede', text: '真实风险但非阻断：热点 key 无回源互斥保护，击穿防护列入大促前清单', correct: false },
-    { id: 'rc-cap', text: '真实风险但非阻断：容量按日常估算且无降级预案，大促前重估', correct: false },
+    {
+      id: 'rc-price',
+      text: '结算直接使用30分钟缓存旧价，改价没有主动失效或现价校验；低流量下也能违反一分钟生效与当前有效价成交约束',
+      correct: true,
+    },
+    {
+      id: 'rc-avalanche',
+      text: '价格错只会在缓存雪崩时发生，平稳流量无风险',
+      correct: false,
+    },
+    {
+      id: 'rc-stampede',
+      text: '仅加互斥回源即可保证改价一分钟生效',
+      correct: false,
+    },
+    {
+      id: 'rc-cap',
+      text: '容量足够即可消除命中旧价格的成交风险',
+      correct: false,
+    },
   ],
-
   expertCost: 8,
   restartActionId: 'a-approve',
-
   expertChain: [
     {
-      thought: '评审不是走过场——第一问先要业务约束：这个页面什么数据错不起、多久不能错。',
-      update: '价格是资损红线、要求分钟级生效 → "TTL 30 分钟"与它直接冲突，头号嫌疑成立。',
+      thought: '先确认时效和结算约束。',
+      update: '一分钟展示、当前有效价成交。',
       actionId: 'a-impact',
-      why: '1⚡ 买到的是设计边界：资损红线决定所有技术参数的优先级——没有业务输入，TTL 就是拍脑袋。',
-      conclusion: '分钟级时效确立 → 任何缓存策略必须先回答这个问题。',
+      why: '1⚡业务约束使TTL参数有评判依据。',
+      conclusion: '追踪价格到收费。',
     },
     {
-      thought: '时效要求明确了，验证旧价能不能真的流到用户手里——别停在"看起来有问题"。',
-      update: '下单与展示读同一份缓存 → 旧价可成交，资损路径闭环。',
+      thought: '执行低流量的改价样例。',
+      update: 'DB80而缓存100，2分钟后仍按100收费。',
       actionId: 'a-orderpath',
-      why: '2⚡ 把嫌疑变成实锤：下单是资损的最后一道闸，链路查一次就知道闸门开没开。',
-      conclusion: '旧价下单窗口真实存在 → 核心阻断缺陷确认。',
+      why: '2⚡错误价格真实流入收费，比单说TTL长更有决定性。',
+      conclusion: '确认当前发布阻断。',
     },
     {
-      thought: '单点缺陷之外看系统性风险：大促零点这批缓存会发生什么——正确性之外还要问存活。',
-      update: '无预热 + 统一 TTL + 无互斥 + 容量按日常估算 → 雪崩/击穿/容量三项风险全部确认。',
+      thought: '去掉过期风暴仍复现。',
+      update: '单用户稳定命中也出错。',
       actionId: 'a-avalanche',
-      why: '2⚡ 买到的是容量视角：评审要同时覆盖"会不会出错"与"扛不扛得住"——方案只答了前者。',
-      conclusion: '雪崩/击穿/容量三项列入大促前必补清单。',
+      why: '2⚡反例排除价格问题只来自雪崩。',
+      conclusion: '排除仅过期风暴。',
     },
     {
-      thought: '资损路径 + 系统风险 + 历史前科（去年人肉救过火）——三点齐了，评审结论可以下了。',
-      update: '停止追问。方案方向正确（读加速收益真实），缺的是边界与防护——结论是有条件通过。',
+      thought: '检查命中时互斥是否执行。',
+      update: 'hit不走回源，锁无法改变旧值。',
+      actionId: 'a-stampede',
+      why: '1⚡机制边界反证单加互斥即可达标。',
+      conclusion: '排除仅加互斥。',
+    },
+    {
+      thought: '在容量有余的相同样例复验。',
+      update: '无资源瓶颈仍旧价收费。',
+      actionId: 'a-capacity',
+      why: '2⚡容量可用与值新鲜是独立约束。',
+      conclusion: '其余候选排除。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '【评审停止规则】修正清单已经能开出：改价主动失效 + 差异化 TTL + 预热 + 互斥回源 + 3 倍容量。继续追问不会再发现新缺陷——评审的产出是清单，不是完美。',
-      conclusion: '有条件通过：价格时效为上线阻断项，其余列入大促前清单。检查单：缓存参数必须先有业务时效输入。',
+      why: '【停止规则】低流量旧价成交路径成立，雪崩唯一解释、互斥单独解决和容量解决三种方案均被反例排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '结算直接使用30分钟缓存旧价，改价没有主动失效或现价校验；低流量下也能违反一分钟生效与当前有效价成交约束',
     },
   ],
-
   lessons: [
     {
       text: '缓存参数不是技术题：TTL 多少分钟，答案在业务时效里——先问"什么数据错不起、多久不能错"，再写技术方案。',
@@ -264,7 +338,7 @@ export const cacheReviewCase: DiagnosisCase = {
     },
     {
       text: '评审会上最值钱的问句是"什么情况下这个设计会出事"，而不是"这个设计有什么好处"。',
-      principle: '方案的作者只会论证收益；评审者的职责是用反例拷问边界。收益由作者证明，风险由评审证明——各司其职才叫评审。',
+      principle: '评审需要作者与评审者共同论证收益与风险，不能把“作者只会讲好处”当人性定律。以可复验样例及明确约束裁决，不把预测事故写成必然事实。',
     },
     {
       text: '历史救火记录是免费的评审意见：上次靠人肉救火的地方，这次一定还会着。',

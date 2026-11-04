@@ -1,11 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 2 章 · 数据的脾气（连接池）：数据库连接池耗尽
- * 教学点：池是共享资源；"慢查询吃掉连接"是池耗尽的头号成因；无超时的连接等于泄漏。
- * 专家路径：impact(1) + dblog(1) + poolstat(2) + slowquery(2) = 6⚡︎
- * 双路径：poolstat 与 slowquery 可互换；errorlog 与 impact 可互换
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const poolExhaustedCase: DiagnosisCase = {
   id: 'pool-exhausted',
   title: '下单体突然卡死',
@@ -15,9 +11,11 @@ export const poolExhaustedCase: DiagnosisCase = {
   part: 'engineer',
   chapterId: 'data',
   order: 1,
-  typeTags: ['resource', 'capacity'],
+  typeTags: [
+    'resource',
+    'capacity',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」电商的下单服务后端，今晚运营有大促预热活动。',
     architecture: '用户 App → 下单服务 → 连接池(max=20) → MySQL 主库',
@@ -36,14 +34,28 @@ export const poolExhaustedCase: DiagnosisCase = {
     timeline: '20:10 大促预热活动开始后 10 分钟内故障 ｜ 无任何发版（最近一次发布在三天前）',
     impactHint: '下单全挂，但商品浏览正常——范围先画清楚。',
   },
-
   hypotheses: [
-    { id: 'h-slow', text: '某类慢查询占住连接不放，池被吃光', excludeActionId: 'a-slowquery' },
-    { id: 'h-leak', text: '代码漏还连接（连接泄漏）', excludeActionId: 'a-stack' },
-    { id: 'h-mysql', text: 'MySQL 本身故障或过载', excludeActionId: 'a-mysql' },
-    { id: 'h-traffic', text: '流量太大，池太小', excludeActionId: 'a-poolstat' },
+    {
+      id: 'h-slow',
+      text: '某类慢查询占住连接不放，池被吃光',
+      excludeActionId: 'a-slowquery',
+    },
+    {
+      id: 'h-leak',
+      text: '代码漏还连接（连接泄漏）',
+      excludeActionId: 'a-stack',
+    },
+    {
+      id: 'h-mysql',
+      text: 'MySQL 本身故障或过载',
+      excludeActionId: 'a-mysql',
+    },
+    {
+      id: 'h-traffic',
+      text: '普通订单流量骤增，单纯超过20连接的日常容量',
+      excludeActionId: 'a-poolstat',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -54,11 +66,11 @@ export const poolExhaustedCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: [],
-      hypotheses: [{ id: 'h-mysql', status: 'down' }],
+      hypotheses: [],
       result: {
         type: 'text',
         title: '影响范围',
-        text: '仅下单/支付等写接口超时；商品浏览、搜索全部正常（同样走 MySQL 读库）。\nCPU 15%、内存平稳——"机器很闲，业务却卡死"。',
+        text: '下单/支付使用该主库连接池，发生借连接超时；浏览/搜索走独立只读库正常。CPU15%、内存平稳。读库正常不能排除主库故障，下一步定位借连接阶段和持有者。',
       },
     },
     {
@@ -85,12 +97,19 @@ export const poolExhaustedCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-traffic'],
-      hypotheses: [{ id: 'h-traffic', status: 'down' }],
+      tests: [
+        'h-traffic',
+      ],
+      hypotheses: [
+        {
+          id: 'h-traffic',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '连接池指标',
-        text: 'active=20/20（满）  idle=0  wait=87\n20:00 之前：active=4~6，idle=14\n→ 20:10 后连接被全部借走且不归还',
+        text: 'active=20/20、idle=0、wait=87；借出超过180s的20个连接均归属本次批量导出job。普通订单QPS与故障前相同；导出任务一次提交24个并行子任务，与订单共用池。\n池满本身不排除流量过大；这里依据普通流量未增长和长期持有记录，排除“正常订单峰值超过既定容量”。',
       },
     },
     {
@@ -101,12 +120,19 @@ export const poolExhaustedCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-slow'],
-      hypotheses: [{ id: 'h-slow', status: 'confirmed' }],
+      tests: [
+        'h-slow',
+      ],
+      hypotheses: [
+        {
+          id: 'h-slow',
+          status: 'confirmed',
+        },
+      ],
       result: {
         type: 'log',
         title: 'processlist 关键行',
-        text: 'Time=180s  State=Sending data\nSQL: SELECT ... FROM orders WHERE user_id IN (...5000 个参数...) —— 大促批量导出任务\n共 6 条同类查询，各占住 1 个连接，耗时 3~5 分钟',
+        text: 'MySQL processlist与池connectionId关联：20条同类orders批量导出SQL，每条Time180~300s，占20个连接；另外4个导出子任务和87个业务请求在借连接前排队。\n对应查询缺少匹配索引，扫描量大。暂停该job并等现有查询结束的受控回放中，active回落4~6、订单恢复。20条足以占满20池，不用6条声称打满20。',
       },
     },
     {
@@ -117,12 +143,19 @@ export const poolExhaustedCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-leak', 'h-slow'],
-      hypotheses: [{ id: 'h-leak', status: 'excluded' }],
+      tests: [
+        'h-leak',
+      ],
+      hypotheses: [
+        {
+          id: 'h-leak',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: '线程堆栈抽样',
-        text: '87 个线程全部 WAITING 在 GetConnection（排队等连接）\n拿到连接的 20 个线程：18 个在等待 SQL 响应（网络读），2 个在执行批量导出\n→ 连接都有归还路径，只是"还得很慢"——不是泄漏',
+        text: '20个已借出连接均可关联到仍执行中的导出SQL，线程阻塞在驱动读取结果；代码在try-with-resources中关闭连接。受控查询完成后借出记录全部消失，无失联连接。87个业务线程等待借连接，不是泄漏持有者。',
       },
     },
     {
@@ -133,12 +166,19 @@ export const poolExhaustedCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-mysql'],
-      hypotheses: [{ id: 'h-mysql', status: 'excluded' }],
+      tests: [
+        'h-mysql',
+      ],
+      hypotheses: [
+        {
+          id: 'h-mysql',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: 'MySQL 侧',
-        text: 'CPU 8%，连接数 23/500，无锁等待。数据库自己很健康——它只是被 6 条大查询占着干活。',
+        text: '故障同窗主库CPU8%，连接23/500、无锁等待；同主库独立诊断连接的小查询延迟正常。仅20条导出扫描慢，排除数据库整体故障或所有SQL同时退化。',
       },
     },
     {
@@ -149,8 +189,15 @@ export const poolExhaustedCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-mysql'],
-      hypotheses: [{ id: 'h-mysql', status: 'down' }],
+      tests: [
+        'h-mysql',
+      ],
+      hypotheses: [
+        {
+          id: 'h-mysql',
+          status: 'down',
+        },
+      ],
       result: {
         type: 'text',
         title: '网络包抽样',
@@ -161,7 +208,7 @@ export const poolExhaustedCase: DiagnosisCase = {
       id: 'a-restart',
       name: '重启下单服务',
       desc: '【状态变更】重启释放所有连接',
-      cost: 8,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -174,55 +221,74 @@ export const poolExhaustedCase: DiagnosisCase = {
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-slow', text: '大促批量导出任务的慢查询长时间占用连接，池被打满，正常下单借不到连接', correct: true },
-    { id: 'rc-leak', text: '代码缺陷导致连接借出后未归还（连接泄漏）', correct: false },
-    { id: 'rc-mysql', text: 'MySQL 数据库故障导致所有 SQL 变慢', correct: false },
-    { id: 'rc-traffic', text: '大促流量上涨，20 个连接的池配太小不够用', correct: false },
+    {
+      id: 'rc-slow',
+      text: '一次并行导出占用共用池的20个连接，每条SQL持续180~300s；普通订单无法借连接，形成超时排队',
+      correct: true,
+    },
+    {
+      id: 'rc-leak',
+      text: '代码缺陷导致连接借出后未归还（连接泄漏）',
+      correct: false,
+    },
+    {
+      id: 'rc-mysql',
+      text: 'MySQL 数据库故障导致所有 SQL 变慢',
+      correct: false,
+    },
+    {
+      id: 'rc-traffic',
+      text: '大促流量上涨，20 个连接的池配太小不够用',
+      correct: false,
+    },
   ],
-
-  expertCost: 6,
+  expertCost: 8,
   restartActionId: 'a-restart',
-
   expertChain: [
     {
-      thought: '下单全挂但商品浏览正常——读库正常，先圈定问题在写链路。',
-      update: '范围画圈：不是全局故障，聚焦下单服务的写链路。',
+      thought: '圈定主库池与读库边界。',
+      update: '只有共用写池的路径受影响。',
       actionId: 'a-impact',
-      why: '1⚡︎ 买形状：写挂读好的故障，候选假设立刻从"全局灾难"收缩到"写链路独有资源"。',
-      conclusion: '只有写接口挂 → 聚焦下单服务与写连接。',
+      why: '1⚡读库正常不能直接替主库做健康证明。',
+      conclusion: '核对池持有者。',
     },
     {
-      thought: '报错集中在"借连接超时"，没有任何 SQL 执行报错——问题不在数据库，在池。',
-      update: '假设空间收缩：池耗尽成为主嫌疑，数据库故障降权。',
-      actionId: 'a-errorlog',
-      why: '1⚡︎ 分层：借不到连接和 SQL 慢是两类完全不同的问题，先分层再深挖。',
-      conclusion: 'pool active=20/20 → 池被打满，接下来查"谁占着"。',
-    },
-    {
-      thought: '池满有两种可能：流量真大（池太小）或有连接被长期占用。先看池的实时指标对比 20 分钟前。',
-      update: 'h-traffic 与 h-slow 并列，先做便宜的区分。',
+      thought: '按connectionId和job统计长持有。',
+      update: '20个长持有都来自24并发导出，普通订单流量稳定。',
       actionId: 'a-poolstat',
-      why: '2⚡︎ 直接区分"池太小"和"被占住"：idle=0 且 active 满，流量类假设降权。',
-      conclusion: '20:10 前 active 只有 4~6 → 不是流量不够，是连接被占住不还。',
+      why: '2⚡占满的算术与流量反证都来自实际持有记录。',
+      conclusion: '排除普通订单峰值。',
     },
     {
-      thought: '连接被占住 = 有人在跑慢 SQL 或泄漏。看 processlist 直接找元凶。',
-      update: 'h-slow 升权为第一嫌疑。',
+      thought: '关联processlist与导出job。',
+      update: '20条慢SQL占20连接，受控停止后恢复。',
       actionId: 'a-slowquery',
-      why: '2⚡︎ 实锤动作：processlist 直接列出正在执行的 SQL 与耗时——比翻代码快且确定。',
-      conclusion: '6 条批量导出慢查询各占 1 连接 3~5 分钟 → 实锤：慢查询吃光连接池。',
+      why: '2⚡20/20能对账，相关性加受控恢复支持因果。',
+      conclusion: '确认慢查询饥饿。',
     },
     {
-      thought: '证据链闭合了吗？池满（实锤）+ 元凶（processlist）+ 时间线（活动开始）三点齐。停。',
-      update: '停止收集，转入处置。',
+      thought: '核对持有线程及完成后归还。',
+      update: '连接仍在执行并最终归还。',
+      actionId: 'a-stack',
+      why: '2⚡有finally不等于没有泄漏，还需持有归属及归还证据。',
+      conclusion: '排除泄漏。',
+    },
+    {
+      thought: '从主库侧核对独立小查询。',
+      update: '主库资源、锁和小查询正常。',
+      actionId: 'a-mysql',
+      why: '1⚡借连接失败不能单凭错误层级排除后端数据库故障。',
+      conclusion: '排除主库整体故障。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '继续查堆栈/数据库都不会改变行动（杀掉导出任务 + 慢查询治理）。',
-      conclusion: '处置：杀掉批量导出任务，池立即恢复；导出任务改到读从库 + 加慢查询熔断。',
+      why: '【停止规则】20条长查询与20池持有者吻合、受控回放恢复；普通流量、失联泄漏和主库整体故障均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '一次并行导出占用共用池的20个连接，每条SQL持续180~300s；普通订单无法借连接，形成超时排队',
     },
   ],
-
   lessons: [
     {
       text: '"机器不忙业务卡死"先查资源池：池满时一切请求都在排队。',

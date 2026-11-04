@@ -1,11 +1,7 @@
 import { DiagnosisCase } from '../../types/case'
 
-/**
- * 第 2 章 · 数据的脾气（慢查询 L2）
- * 教学点：EXPLAIN 是 SQL 排查的显影液；"全表扫描"与"索引失效"要靠表结构区分；
- * 数据增长不是根因，是放大器。
- * 专家路径：impact(1) + slowlog(1) + explain(2) + tablestruct(1) = 5⚡︎
- */
+/** 技术机制教学重建；情境、日志和数值为教学样本，非真实原始工单或生产实测。
+ * 逐题编审与技术来源见 content/baselines/t04b-engineer-calibration.md。 */
 export const slowQueryCase: DiagnosisCase = {
   id: 'slow-query',
   title: '商品列表页越来越慢',
@@ -15,9 +11,12 @@ export const slowQueryCase: DiagnosisCase = {
   part: 'engineer',
   chapterId: 'data',
   order: 3,
-  typeTags: ['data', 'capacity', 'config'],
+  typeTags: [
+    'data',
+    'capacity',
+    'config',
+  ],
   difficulty: 2,
-
   scene: {
     role: '你是「鲜到家」电商的商品服务后端，运营把一张慢页面截图甩进了值班群。',
     architecture: 'App → 商品服务 → MySQL(商品表 products，500 万行)',
@@ -36,14 +35,28 @@ export const slowQueryCase: DiagnosisCase = {
     timeline: '近两周逐渐恶化 ｜ 三周前上线"按最新排序"功能 ｜ 商品总量从 300 万涨到 500 万',
     impactHint: '只有一条 SQL 慢，还是整个库都慢？这两个答案通向完全不同的排查方向。',
   },
-
   hypotheses: [
-    { id: 'h-index', text: '查询条件缺少匹配索引，每次都在全表扫描', excludeActionId: 'a-explain' },
-    { id: 'h-volume', text: '商品数据量自然增长，查询变慢是必然的', excludeActionId: 'a-volumecmp' },
-    { id: 'h-lock', text: '其他大事务锁表，读请求被阻塞', excludeActionId: 'a-lockcheck' },
-    { id: 'h-hw', text: '数据库服务器资源不足（CPU/IO 打满）', excludeActionId: 'a-hostmetric' },
+    {
+      id: 'h-index',
+      text: '查询条件缺少匹配索引，每次都在全表扫描',
+      excludeActionId: 'a-explain',
+    },
+    {
+      id: 'h-volume',
+      text: '商品数据量自然增长，查询变慢是必然的',
+      excludeActionId: 'a-volumecmp',
+    },
+    {
+      id: 'h-lock',
+      text: '其他大事务锁表，读请求被阻塞',
+      excludeActionId: 'a-lockcheck',
+    },
+    {
+      id: 'h-hw',
+      text: '数据库服务器资源不足（CPU/IO 打满）',
+      excludeActionId: 'a-hostmetric',
+    },
   ],
-
   actions: [
     {
       id: 'a-impact',
@@ -54,7 +67,12 @@ export const slowQueryCase: DiagnosisCase = {
       danger: false,
       effects: [],
       tests: [],
-      hypotheses: [{ id: 'h-hw', status: 'down' }],
+      hypotheses: [
+        {
+          id: 'h-hw',
+          status: 'down',
+        },
+      ],
       result: {
         type: 'text',
         title: '影响范围',
@@ -74,7 +92,7 @@ export const slowQueryCase: DiagnosisCase = {
       result: {
         type: 'log',
         title: '慢查询日志',
-        text: 'Query_time: 3.2  Rows_sent: 20  Rows_examined: 4800000\n→ 扫了 480 万行只返回 20 条，比值 24 万倍——全表扫描的指纹。',
+        text: 'Rows_examined4800000/Rows_sent20=240000，说明访问很多行才返回少量结果。这个比例本身不能证明无索引（低选择性索引也可能扫描多），需结合EXPLAIN与索引定义。',
       },
     },
     {
@@ -85,12 +103,19 @@ export const slowQueryCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-index'],
-      hypotheses: [{ id: 'h-index', status: 'up' }],
+      tests: [
+        'h-index',
+      ],
+      hypotheses: [
+        {
+          id: 'h-index',
+          status: 'up',
+        },
+      ],
       result: {
         type: 'code',
         title: 'EXPLAIN 输出',
-        text: 'type: ALL\nkey: NULL\nrows: 4800000\nExtra: Using where; Using filesort\n→ type=ALL 且 key=NULL：没有命中任何索引，\n还附带 filesort（排序也在内存外完成）。',
+        text: 'type=ALL，key=NULL，估算rows=4800000，Extra=Using where; Using filesort。\n本计划采用全表访问和额外排序。filesort表示不能直接由索引满足顺序，可能在内存完成，也可能用临时磁盘文件，不能仅凭这个词断言落盘。',
       },
     },
     {
@@ -101,12 +126,24 @@ export const slowQueryCase: DiagnosisCase = {
       gain: 'high',
       danger: false,
       effects: [],
-      tests: ['h-index'],
-      hypotheses: [{ id: 'h-index', status: 'confirmed' }],
+      tests: [
+        'h-index',
+        'h-volume',
+      ],
+      hypotheses: [
+        {
+          id: 'h-index',
+          status: 'confirmed',
+        },
+        {
+          id: 'h-volume',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'code',
         title: 'SHOW INDEX FROM products',
-        text: 'Key_name: PRIMARY(id), idx_title(title)\ncategory_id: INT，查询传入也是 INT（无隐式转换）\n→ 索引根本不存在，不是"存在但失效"。\n缺 (category_id, status, created_at) 复合索引。',
+        text: '现有索引PRIMARY(id)、idx_title(title)，缺(category_id,status,created_at)；字段与参数均INT。\n同一500万行同构副本、相同负载，仅增加匹配索引后查询不再全表访问，整体P99由3.5s降至180ms。增长放大扫描代价，但慢并非数据增长不可避免。',
       },
     },
     {
@@ -117,12 +154,19 @@ export const slowQueryCase: DiagnosisCase = {
       gain: 'low',
       danger: false,
       effects: [],
-      tests: ['h-lock'],
-      hypotheses: [{ id: 'h-lock', status: 'excluded' }],
+      tests: [
+        'h-lock',
+      ],
+      hypotheses: [
+        {
+          id: 'h-lock',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '锁等待监控',
-        text: '无任何锁等待记录；且 SELECT 在 RC 隔离级别下是无锁读（MVCC 快照读）。\n→ 不是被锁，是真的在一行行扫。',
+        text: '同窗performance_schema无该查询的行锁或元数据锁等待，慢日志Lock_time为0；该普通SELECT使用RC一致性读。本案证据不支持锁阻塞，MVCC也不意味着任何情况下都不等元数据锁。',
       },
     },
     {
@@ -133,12 +177,19 @@ export const slowQueryCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-hw'],
-      hypotheses: [{ id: 'h-hw', status: 'down' }],
+      tests: [
+        'h-hw',
+      ],
+      hypotheses: [
+        {
+          id: 'h-hw',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '服务器水位',
-        text: 'CPU 35%、磁盘 IO util 45%、内存无 swap。\n机器很闲——是这条 SQL 自己在空转，不是资源不够。',
+        text: '同窗CPU35%、磁盘util45%、无swap；独立点查延迟稳定，增加索引的同负载对照消除该查询慢化。排除整体CPU/IO饱和是主因，但单独一个平均利用率不足以排除资源问题。',
       },
     },
     {
@@ -149,12 +200,19 @@ export const slowQueryCase: DiagnosisCase = {
       gain: 'mid',
       danger: false,
       effects: [],
-      tests: ['h-volume'],
-      hypotheses: [{ id: 'h-volume', status: 'down' }],
+      tests: [
+        'h-volume',
+      ],
+      hypotheses: [
+        {
+          id: 'h-volume',
+          status: 'excluded',
+        },
+      ],
       result: {
         type: 'text',
         title: '增长曲线 vs 慢化曲线',
-        text: '数据 300 万 → 500 万（三周），页面延迟 200ms → 3.5s。\n回看历史慢日志：300 万行时同样是 type=ALL，当时 80ms"还不算慢"。\n→ 增长只是放大器：问题一直存在，是数据量让它从可容忍变成灾难。',
+        text: '数据300万→500万，新增排序查询后扫描代价被放大；在相同500万行副本只增加索引即可降延迟，反证“增长必然只能变慢”。不再用300万行80ms与500万行3.5s假装只有行数变化。',
       },
     },
     {
@@ -177,7 +235,7 @@ export const slowQueryCase: DiagnosisCase = {
       id: 'a-fixindex',
       name: '在线添加复合索引',
       desc: '【状态变更】低峰期为 products 添加 (category_id, status, created_at) 复合索引',
-      cost: 6,
+      cost: 9,
       gain: 'none',
       danger: true,
       effects: [],
@@ -186,67 +244,86 @@ export const slowQueryCase: DiagnosisCase = {
       result: {
         type: 'text',
         title: '修复结果',
-        text: '低峰期 Online DDL 添加复合索引（500 万行约 4 分钟，期间控制 IO）。\nEXPLAIN 复查：type=ref, key=idx_cat_status_time, rows: 420。\n列表页 P99 回落到 180ms，filesort 消失。',
+        text: '经评审在低峰增加复合索引并观察锁、IO与回退条件；Online DDL也可能短暂等待元数据锁，不能承诺无阻塞或固定4分钟。\n本题同构对照P99为180ms，不代表所有500万行表的保证。新增索引还需评估写放大、空间和现有索引冗余。',
       },
     },
   ],
-
   rootCauses: [
-    { id: 'rc-index', text: '查询条件 (category_id, status, created_at) 无匹配索引，500 万行全表扫描 + filesort', correct: true },
-    { id: 'rc-volume', text: '商品数据量自然增长，查询变慢不可避免', correct: false },
-    { id: 'rc-lock', text: '其他大事务锁表阻塞了读请求', correct: false },
-    { id: 'rc-hw', text: '数据库服务器 CPU/IO 资源不足', correct: false },
+    {
+      id: 'rc-index',
+      text: '查询条件 (category_id, status, created_at) 无匹配索引，500 万行全表扫描 + filesort',
+      correct: true,
+    },
+    {
+      id: 'rc-volume',
+      text: '商品数据量自然增长，查询变慢不可避免',
+      correct: false,
+    },
+    {
+      id: 'rc-lock',
+      text: '其他大事务锁表阻塞了读请求',
+      correct: false,
+    },
+    {
+      id: 'rc-hw',
+      text: '数据库服务器 CPU/IO 资源不足',
+      correct: false,
+    },
   ],
-
-  expertCost: 5,
+  expertCost: 6,
   restartActionId: 'a-fixindex',
-
   expertChain: [
     {
-      thought: '列表页慢但按 ID 查正常——先分岔：是这一条 SQL 的问题，还是整个库在退化。',
-      update: '只有列表页这一条 SQL 慢 → 排除数据库整体问题，聚焦这条 SQL 自身。',
+      thought: '区分单查询和全库。',
+      update: '列表慢，独立点查正常。',
       actionId: 'a-impact',
-      why: '1⚡︎ 圈范围决定排查方向：单条 SQL 慢看执行计划，全库慢才看服务器资源——顺序反了会白烧预算。',
-      conclusion: '单条 SQL 慢 → 排查方向锁定这条 SQL 的执行方式。',
+      why: '1⚡范围帮助排序假设，不能直接宣布资源候选排除。',
+      conclusion: '核对计划。',
     },
     {
-      thought: '慢查询日志里 Rows_examined/Rows_sent = 24 万倍，先确认扫描效率。',
-      update: '扫 480 万行返回 20 条——全表扫描的指纹，接下来看执行计划证实。',
-      actionId: 'a-slowlog',
-      why: '1⚡︎ 扫描行数与返回行数的比值是慢查询第一指纹，一条日志就能判断"扫多了"，成本极低。',
-      conclusion: '全表扫描方向确认 → 用 EXPLAIN 看完整执行计划。',
-    },
-    {
-      thought: 'EXPLAIN 是显影液：走没走索引、扫多少行、排序怎么做的，一次全暴露。',
-      update: 'type=ALL + key=NULL + filesort → 三指纹齐全，但 key=NULL 有两种可能：索引不存在，或索引存在却失效（隐式转换/函数包裹）。',
+      thought: '阅读访问方式和排序。',
+      update: 'ALL、keyNULL与额外排序。',
       actionId: 'a-explain',
-      why: '2⚡︎ EXPLAIN 一次执行同时暴露索引命中、扫描行数、排序方式，是 SQL 排查里信息密度最高的单个动作。',
-      conclusion: '没走任何索引 + filesort → 还需区分"没有索引"还是"索引失效"。',
+      why: '2⚡计划定位访问路径，不把filesort误读成必然落盘。',
+      conclusion: '缺匹配索引成为主候选。',
     },
     {
-      thought: '查表结构和现有索引：如果索引存在，要查类型转换和函数包裹；如果不存在，就是建索引的事。',
-      update: '现有索引只有主键和 title；category_id 是 INT、传入也是 INT，无隐式转换——索引根本不存在。',
+      thought: '核对索引并做同数据对照。',
+      update: '缺匹配索引；仅加索引使同数据延迟下降。',
       actionId: 'a-tablestruct',
-      why: '1⚡︎ "不存在"与"失效"的修法完全不同（建新索引 vs 改写 SQL），表结构一查就定，避免修复方向走错。',
-      conclusion: '索引不存在实锤 → 修复方案：新建 (category_id, status, created_at) 复合索引。',
+      why: '1⚡已有诊断材料与同构对照证明可优化，反证增长必然。',
+      conclusion: '确认索引，排除增长不可避免。',
     },
     {
-      thought: '证据闭合：全表扫描（EXPLAIN）+ 索引不存在（表结构）+ 数据增长只是放大器（历史对比）。停止收集。',
-      update: '停止。修复：低峰期 Online DDL 加复合索引，等值列在前、排序列在后。',
+      thought: '核对实际锁等待。',
+      update: '行锁和元数据锁等待均无。',
+      actionId: 'a-lockcheck',
+      why: '1⚡MVCC不是无条件免锁，实际等待证据才是反证。',
+      conclusion: '排除锁等待。',
+    },
+    {
+      thought: '核对同窗资源与独立点查。',
+      update: '整体资源未饱和，点查稳定。',
+      actionId: 'a-hostmetric',
+      why: '1⚡资源与对照证据联合支持排除整体资源故障。',
+      conclusion: '其余候选排除。',
+    },
+    {
+      thought: '证据已覆盖候选解释，停止继续取证；修复和复验作为后续操作。',
+      update: '定位完成，尚未执行修复。',
       actionId: '',
-      why: '根因与修复方案都已明确；继续查锁、查服务器都是已排除的方向，不再产生新信息。',
-      conclusion: '加索引后 P99 回落 180ms。检查单：新 SQL 上线前必须 EXPLAIN，数据量翻倍前复查慢查询。',
+      why: '【停止规则】匹配索引缺失及同数据优化对照成立，增长必然、锁和整体资源解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。',
+      conclusion: '查询条件 (category_id, status, created_at) 无匹配索引，500 万行全表扫描 + filesort',
     },
   ],
-
   lessons: [
     {
-      text: 'Rows_examined / Rows_sent 的比值是慢查询第一指纹：比值越大越缺索引。',
-      principle: '扫描行数与返回行数的比值直接反映索引效率——比值接近 1 是理想状态，比值上万则几乎必然在逐行扫描。读慢日志先看这两个数，比看执行时间更能定位问题。',
+      text: '扫描/返回比240000说明访问放大，不能单独证明缺索引；聚合、低选择性与排序也会提高这个比值。',
+      principle: '结合实际SQL、EXPLAIN及SHOW INDEX判断。EXPLAIN的rows是估算，慢日志Rows_examined是执行统计，不能把两者当同一精确计数。',
     },
     {
       text: 'EXPLAIN 是 SQL 排查的显影液：type=ALL + key=NULL + Using filesort 三指纹同时出现必须处理。',
-      principle: 'EXPLAIN 一次执行同时暴露索引命中（type/key）、预估扫描行数（rows）、排序方式（Extra）——单个动作的信息密度最高，是 SQL 排查的标配第二步。',
+      principle: 'Using filesort不代表必然磁盘排序；ALL也不是任何小表都必须整改。本题500万行且超出业务延迟目标，才有明确优化必要。',
     },
     {
       text: 'key=NULL 有两种可能：索引不存在，或索引存在但失效（隐式转换/函数包裹/前导通配）——表结构一查就定。',

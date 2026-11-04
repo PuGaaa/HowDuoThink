@@ -280,3 +280,95 @@
 
 技术机制依据：[官方资料1](https://spec.openapis.org/oas/v3.1.1.html)、[官方资料2](https://www.rfc-editor.org/rfc/rfc6585#section-4)。
 
+## pool-exhausted（data/1）
+
+学习目标：连接池：池是共享资源，任何租户不还，所有人都借不到。
+
+编审：人工裁定8⚡，原6缺泄漏/主库反证且6条SQL无法占20连接；改成20条关联持有记录，不以“池满”直接排除流量。
+
+难度：L2→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 池报错→持有者→SQL
+2. 池/线程/DB关联
+3. 池租借与并发
+4. CPU闲而请求排队
+5. 应用池到主库
+6. 重启不阻止job重跑
+
+标准路径：a-impact → a-poolstat → a-slowquery → a-stack → a-mysql，8⚡，零错S；终态确认h-slow，其余全部excluded。
+
+替代路径：a-impact → a-mysql → a-stack → a-poolstat → a-slowquery，8⚡，零错S；终态确认h-slow，其余全部excluded。
+
+停止点：【停止规则】20条长查询与20池持有者吻合、受控回放恢复；普通流量、失联泄漏和主库整体故障均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://dev.mysql.com/doc/refman/8.0/en/explain-output.html)。
+
+## cache-drift（data/2）
+
+学习目标：缓存与数据库之间，永远隔着一致性窗口。
+
+编审：人工裁定5⚡（原4、旧链6）；移除重复DB证明但增加独立图片反证，限制真实影响群和刷新上限。
+
+难度：L2→L2；六维[2, 2, 2, 2, 2, 2]。
+
+1. 端差异→副本→失效
+2. 同主键对照+diff
+3. Cache-Aside时效
+4. 成功上传仍旧值
+5. 应用/Redis/DB/CDN
+6. 回滚要清受影响值
+
+标准路径：a-impact → a-userprobe → a-gitlog → a-imgurl，5⚡，零错S；终态确认h-cache，其余全部excluded。
+
+替代路径：a-impact → a-imgurl → a-gitlog → a-userprobe，5⚡，零错S；终态确认h-cache，其余全部excluded。
+
+停止点：【停止规则】旧缓存返回与失效变更对照成立，数据库写入和新图片访问证据齐备。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside)。
+
+## slow-query（data/3）
+
+学习目标：EXPLAIN 是 SQL 排查的显影液；数据增长不是根因，是放大器。
+
+编审：人工裁定6⚡（原5），移除重复慢日志读取，补锁/资源反证；DDL标危险9⚡且不计定位成本。修正filesort和高扫描比过度推断。
+
+难度：L2→L2；六维[2, 2, 2, 2, 2, 2]。
+
+1. 慢化→计划→索引
+2. 计划/定义/等待与对照
+3. 索引与排序
+4. ALL不等于磁盘排序
+5. 应用到存储计划
+6. DDL同样有锁风险
+
+标准路径：a-impact → a-explain → a-tablestruct → a-lockcheck → a-hostmetric，6⚡，零错S；终态确认h-index，其余全部excluded。
+
+替代路径：a-impact → a-lockcheck → a-hostmetric → a-explain → a-tablestruct，6⚡，零错S；终态确认h-index，其余全部excluded。
+
+停止点：【停止规则】匹配索引缺失及同数据优化对照成立，增长必然、锁和整体资源解释均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://dev.mysql.com/doc/refman/8.0/en/explain-output.html)、[官方资料2](https://dev.mysql.com/doc/refman/8.0/en/order-by-optimization.html)、[官方资料3](https://dev.mysql.com/doc/refman/8.0/en/innodb-online-ddl-limitations.html)。
+
+## cache-review（data/4）
+
+学习目标：缓存设计的取舍：先问业务时效，再定技术参数。
+
+编审：人工裁定8⚡保留：每项建议需独立边界核验，原专家链5⚡却声称三风险全查。改成价格路径和三个可证伪替代方案，不再把真实风险标false。
+
+难度：L2→L2；六维[2, 3, 2, 2, 2, 2]。
+
+1. 约束→样例→收费
+2. 多反例对照
+3. 缓存时效与结算
+4. 容量好仍能值错
+5. 展示与订单收费
+6. 原稿批准跳过红线
+
+标准路径：a-impact → a-orderpath → a-avalanche → a-stampede → a-capacity，8⚡，零错S；终态确认h-price，其余全部excluded。
+
+替代路径：a-impact → a-capacity → a-stampede → a-avalanche → a-orderpath，8⚡，零错S；终态确认h-price，其余全部excluded。
+
+停止点：【停止规则】低流量旧价成交路径成立，雪崩唯一解释、互斥单独解决和容量解决三种方案均被反例排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
+
+技术机制依据：[官方资料1](https://learn.microsoft.com/en-us/azure/architecture/patterns/cache-aside)。
+
