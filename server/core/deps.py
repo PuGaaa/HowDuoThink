@@ -15,9 +15,10 @@ def _uid_from_token(token: str | None) -> str | None:
 
 
 def current_user(web_token: SessionCookie = None, authorization: Annotated[str | None, Header()] = None) -> str:
-    uid = _uid_from_token(web_token)
-    if not uid and authorization and authorization.lower().startswith("bearer "):
-        uid = _uid_from_token(authorization[7:].strip())
+    token = web_token
+    if authorization is not None:
+        token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else None
+    uid = _uid_from_token(token)
     if not uid:
         raise HTTPException(401, "未登录")
     # 封禁即时生效：每个请求查一次主键（量级小），banned 一律 403
