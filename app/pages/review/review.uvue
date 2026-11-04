@@ -151,7 +151,7 @@ import { getCaseById, MAINLINE_CASE_IDS } from '../../data/cases'
 import { CaseAction, ExpertStep, Lesson } from '../../types/case'
 import { SessionRecord, SessionEvent, MascotEventRec, getLastSession } from '../../utils/storage'
 import { clearDraftPreview, getPreviewSession } from '../../utils/draft-preview'
-import { trackLearningEvent } from '../../utils/learning-events'
+import { trackLearningEvent, trackIdentityLearningEvent } from '../../utils/learning-events'
 import { isLoggedIn } from '../../utils/auth'
 import { openGuestLoginDialog } from '../../utils/login-guide'
 import { API_BASE } from '../../config'
@@ -272,6 +272,7 @@ onLoad((query : OnLoadOptions) => {
     }
   }
   needsLogin.value = previewId.value.length === 0 && !isLoggedIn() && session.caseId === 'log-correlation'
+  if (needsLogin.value) trackIdentityLearningEvent('save_prompt', 'third_review', session.caseId)
 
   // 假设板终局（旧会话无 hStates 则跳过）
   const board: HBoardVM[] = []
@@ -363,14 +364,14 @@ function goNext() {
       openGuestLoginDialog(nextId.value)
       return
     }
-    uni.redirectTo({ url: '/pages/play/play?id=' + nextId.value })
+    uni.redirectTo({ url: '/pages/play/play?id=' + nextId.value + '&source=continue' })
   } else {
     uni.switchTab({ url: '/pages/index/index' })
   }
 }
 
 function replay() {
-  uni.redirectTo({ url: '/pages/play/play?' + (previewId.value.length > 0 ? 'previewId=' + previewId.value : 'id=' + caseId.value) })
+  uni.redirectTo({ url: '/pages/play/play?' + (previewId.value.length > 0 ? 'previewId=' + previewId.value : 'id=' + caseId.value + '&source=replay') })
 }
 </script>
 

@@ -252,7 +252,7 @@ function onRow(label: string, value: string) {
     return
   }
   if (label === '每日一题') {
-    uni.navigateTo({ url: '/pages/play/play?id=' + dailyCase().id })
+    uni.navigateTo({ url: '/pages/play/play?id=' + dailyCase().id + '&source=daily' })
     return
   }
   if (label === '学习提醒') {

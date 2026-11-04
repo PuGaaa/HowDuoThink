@@ -1,9 +1,11 @@
 /** 游客留存门禁的统一登录引导：章页锁定关 / 首页锁定章 / play 直入共用一个弹窗文案与跳转。 */
 import { CHAPTERS, TRIAL_CASE_IDS } from '../data/chapters'
 import { ConfirmDialogOptions, openConfirmDialog } from './confirm-dialog'
+import { trackIdentityLearningEvent } from './learning-events'
 
 /** 弹出"登录解锁"引导，确认后进登录页。仅在游客态调用。 */
 export function openGuestLoginDialog(targetCaseId: string = '') {
+  trackIdentityLearningEvent('save_prompt', 'continue_gate', targetCaseId.length > 0 ? targetCaseId : 'map')
   const freeCh = CHAPTERS.find((x) => x.id === 'error-reading')
   const opt = {
     title: '登录后继续闯关',

@@ -68,9 +68,9 @@ import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import navbar from '../../components/navbar/navbar.uvue'
-import { getStoredUser, login, smsLogin, sendSmsCode, LoginResult } from '../../utils/auth'
+import { getStoredUser, getToken, login, smsLogin, sendSmsCode, LoginResult } from '../../utils/auth'
 import { prepareProgressIdentity, pullServerProgress, pushProgress } from '../../utils/sync-progress'
-import { claimLearningEvents, flushLearningEvents } from '../../utils/learning-events'
+import { claimLearningEvents, flushLearningEvents, trackIdentityLearningEvent } from '../../utils/learning-events'
 
 const tab = ref('sms')
 const phone = ref('')
@@ -125,7 +125,9 @@ function finish(r: LoginResult) {
   }
   uni.showToast({ title: '登录成功', icon: 'none' })
   const u = getStoredUser()
+  const loginToken = getToken()
   if (u != null) prepareProgressIdentity(u.id)
+  trackIdentityLearningEvent('login_success', 'login')
   claimLearningEvents()
   flushLearningEvents()
   // 登录后：后端为唯一事实源，拉取账号的全量数据覆盖本地
@@ -134,14 +136,16 @@ function finish(r: LoginResult) {
       errMsg.value = '登录成功，但进度保存失败：' + saved.error
       return
     }
+    trackIdentityLearningEvent('progress_saved', 'login')
     pullServerProgress((pulled) => {
       if (pulled.error.length > 0) {
         errMsg.value = '登录成功，但账号进度拉取失败：' + pulled.error
         return
       }
       setTimeout(() => {
+        if (loginToken !== getToken()) return
         if (returnCaseId.value.length > 0) {
-          uni.navigateTo({ url: '/pages/play/play?id=' + returnCaseId.value })
+          uni.navigateTo({ url: '/pages/play/play?id=' + returnCaseId.value + '&source=login_return' })
         } else {
           uni.navigateBack({})
         }

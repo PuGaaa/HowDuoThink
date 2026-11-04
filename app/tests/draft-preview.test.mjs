@@ -26,6 +26,7 @@ function harness() {
   const packRequests = []
   const calls = []
   const tracked = []
+  const trackedIdentity = []
   const layers = new Set()
   let loggedIn = true
   let playable = true
@@ -46,7 +47,10 @@ function harness() {
     'app/utils/storage.ts': storage,
     'app/utils/auth.ts': { isLoggedIn: () => loggedIn },
     'app/utils/login-guide.ts': { openGuestLoginDialog: id => calls.push('login:' + id) },
-    'app/utils/learning-events.ts': { trackLearningEvent: (...args) => tracked.push(args) },
+    'app/utils/learning-events.ts': {
+      trackLearningEvent: (...args) => tracked.push(args),
+      trackIdentityLearningEvent: (...args) => trackedIdentity.push(args),
+    },
     'app/utils/remote-assets.ts': { getMascotUrl: () => '' },
     'app/utils/daily.ts': { isDailyCase: () => true, markDailyDone: () => calls.push('daily') },
     'app/utils/sync-progress.ts': { scheduleProgressUpload: () => calls.push('upload') },
@@ -95,7 +99,7 @@ function harness() {
     hooks.get(file)(query)
     return api
   }
-  return { original, values, requests, packRequests, navigations, calls, tracked, page, load, getLastSession, resolvePack: (error = '') => packRequests.shift()({ error, version: 1, count: 1 }), guest: () => { loggedIn = false }, block: () => { playable = false }, replace: value => { current = value } }
+  return { original, values, requests, packRequests, navigations, calls, tracked, trackedIdentity, page, load, getLastSession, resolvePack: (error = '') => packRequests.shift()({ error, version: 1, count: 1 }), guest: () => { loggedIn = false }, block: () => { playable = false }, replace: value => { current = value } }
 }
 
 test('预览完整操作和复盘仅写独立预览空间，不写真实进度/任务/连续/队列/学习事件', () => {
@@ -120,6 +124,7 @@ test('预览完整操作和复盘仅写独立预览空间，不写真实进度/�
   assert.deepEqual([...h.values].filter(([key]) => !key.startsWith('think_preview_')), before)
   assert.deepEqual(h.calls, [])
   assert.deepEqual(h.tracked, [])
+  assert.deepEqual(h.trackedIdentity, [])
   assert.equal(h.packRequests.length, 0)
 })
 
@@ -161,6 +166,7 @@ test('第三关完整复盘后进入登录引导，携带第四关目标并保�
   h.values.set('real-user-session', JSON.stringify(record))
   const review = h.page('review')
   assert.equal(review.needsLogin.value, true)
+  assert.deepEqual(h.trackedIdentity, [['save_prompt', 'third_review', 'log-correlation']])
   review.goNext()
   assert.deepEqual(h.calls, ['login:async-swallow'])
   assert.deepEqual(h.getLastSession(), record)

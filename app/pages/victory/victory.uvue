@@ -123,7 +123,7 @@ onLoad((query : OnLoadOptions) => {
 })
 
 function replay() {
-  uni.redirectTo({ url: '/pages/play/play?' + (previewId.value.length > 0 ? 'previewId=' + previewId.value : 'id=' + caseId.value) })
+  uni.redirectTo({ url: '/pages/play/play?' + (previewId.value.length > 0 ? 'previewId=' + previewId.value : 'id=' + caseId.value + '&source=retry') })
 }
 
 function goReview() {

@@ -183,7 +183,7 @@ function openChapter(chapterId: string) {
   } as ConfirmDialogOptions
   openConfirmDialog(opt, (confirm: boolean) => {
     if (confirm) {
-      uni.navigateTo({ url: '/pages/play/play?id=' + challengeId })
+      uni.navigateTo({ url: '/pages/play/play?id=' + challengeId + '&source=challenge' })
     }
   })
 }
@@ -268,11 +268,11 @@ function openDaily() {
     }
     return
   }
-  uni.navigateTo({ url: '/pages/play/play?id=' + id })
+  uni.navigateTo({ url: '/pages/play/play?id=' + id + '&source=daily' })
 }
 
 function openPlay(id: string) {
-  uni.navigateTo({ url: '/pages/play/play?id=' + id })
+  uni.navigateTo({ url: '/pages/play/play?id=' + id + '&source=home_continue' })
 }
 
 function onPackTap() {

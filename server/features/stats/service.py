@@ -6,65 +6,61 @@
 
 import datetime
 import logging
-from collections import defaultdict
-from zoneinfo import ZoneInfo
+from typing import Any
+
+from fastapi import HTTPException
 
 import db
-from features.stats.models import LearningEventBody
+from features.stats import repo
+from features.stats.models import LearningEventBody, SessionEndFact
 
 logger = logging.getLogger("server")
 
 
 def record_learning_event(uid: str, body: LearningEventBody) -> None:
-    if body.test_mode:
+    if body.test_mode or body.preview:
         return
-    event_id = body.event_id or f"{body.session_id}:{body.kind}:{body.source}:{body.occurred_at.isoformat()}"
-    payload = body.model_dump(mode="json", by_alias=True)
-    db.ex(
-        "INSERT INTO learning_events(id,user_id,anonymous_id,kind,occurred_at,payload) VALUES(?,?,?,?,?,?) "
-        "ON CONFLICT(id) DO NOTHING",
-        ("client:" + event_id, uid, body.anonymous_id, body.kind, body.occurred_at.isoformat(), db.jdump(payload)),
-    )
+    with db.tx() as conn:
+        if repo.claim_identity(conn, body.anonymous_id, uid) != uid:
+            raise HTTPException(409, "该学习档案已归入其他账号")
+        repo.insert_event(conn, uid, body)
 
 
 def record_guest_learning_event(body: LearningEventBody) -> None:
-    if body.test_mode:
+    if body.test_mode or body.preview:
         return
-    event_id = body.event_id or f"{body.session_id}:{body.kind}:{body.source}:{body.occurred_at.isoformat()}"
-    payload = body.model_dump(mode="json", by_alias=True)
     with db.tx() as conn:
-        identity = conn.execute(
-            "SELECT user_id FROM learning_event_identities WHERE anonymous_id=?", (body.anonymous_id,)
-        ).fetchone()
-        owner = identity["user_id"] if identity else "guest:" + (body.anonymous_id or "")
-        conn.execute(
-            "INSERT INTO learning_events(id,user_id,anonymous_id,kind,occurred_at,payload) VALUES(?,?,?,?,?,?) "
-            "ON CONFLICT(id) DO NOTHING",
-            (
-                "client:" + event_id,
-                owner,
-                body.anonymous_id,
-                body.kind,
-                body.occurred_at.isoformat(),
-                db.jdump(payload),
-            ),
-        )
+        owner = repo.lock_identity(conn, body.anonymous_id, repo.guest_owner(body.anonymous_id))
+        repo.insert_event(conn, owner, body)
 
 
 def claim_guest_learning_events(uid: str, anonymous_id: str) -> None:
     with db.tx() as conn:
-        conn.execute(
-            "INSERT INTO learning_event_identities(anonymous_id,user_id) VALUES(?,?) "
-            "ON CONFLICT(anonymous_id) DO NOTHING",
-            (anonymous_id, uid),
-        )
-        owner = conn.execute(
-            "SELECT user_id FROM learning_event_identities WHERE anonymous_id=?", (anonymous_id,)
-        ).fetchone()["user_id"]
-        conn.execute(
-            "UPDATE learning_events SET user_id=? WHERE user_id=? AND anonymous_id=?",
-            (owner, "guest:" + anonymous_id, anonymous_id),
-        )
+        owner = repo.claim_identity(conn, anonymous_id, uid)
+        if owner != uid:
+            raise HTTPException(status_code=409, detail="该学习档案已归入其他账号")
+
+
+def record_session_fact(
+    conn: Any,
+    uid: str,
+    session_id: str,
+    case_id: str,
+    content_revision: int,
+    anonymous_id: str | None,
+    occurred_at: datetime.datetime,
+    solved: bool,
+) -> None:
+    """供进度域在同一结算事务内补全学习事实，不另建第二个结束事件。"""
+    body = SessionEndFact(
+        sessionId=session_id,
+        caseId=case_id,
+        contentRevision=content_revision,
+        anonymousId=anonymous_id,
+        occurredAt=occurred_at,
+        solved=solved,
+    )
+    repo.record_session_fact(conn, uid, body)
 
 
 def today_str(offset_days: int = 0) -> str:
@@ -162,73 +158,6 @@ def event_details(kind: str | None = None, limit: int = 100) -> list[dict]:
 
 
 def learning_metrics(as_of: str | None = None) -> dict:
-    today = as_of or today_str()
-    rows = db.q(
-        "SELECT user_id, kind, occurred_at, payload FROM learning_events "
-        "WHERE user_id NOT LIKE 'test:%' AND user_id NOT IN (SELECT id FROM users WHERE role='test')"
-    )
-    by_user: dict[str, list[dict]] = defaultdict(list)
-    for row in rows:
-        by_user[row["user_id"]].append(row)
-    started = finished = solved = d1_eligible = d1_retained = d7_eligible = d7_retained = 0
-    three_case_eligible = three_case_completed = 0
-    week_start = datetime.date.fromisoformat(today) - datetime.timedelta(
-        days=datetime.date.fromisoformat(today).weekday()
-    )
-    week_solved = set()
-    for events in by_user.values():
-        starts = [event for event in events if event["kind"] == "session_start"]
-        session_events = [event for event in events if event["kind"] == "session_end"]
-        verified_sessions = {
-            db.jload(event["payload"], {}).get("sessionId") for event in events if event["kind"] == "verification"
-        }
-        effective_end_events = [
-            event for event in session_events if db.jload(event["payload"], {}).get("sessionId") in verified_sessions
-        ]
-        if not starts:
-            continue
-        started += 1
-        finished += bool(session_events)
-        if any(db.jload(event["payload"], {}).get("solved") for event in session_events):
-            solved += 1
-            if any(_event_day(event["occurred_at"]) >= week_start.isoformat() for event in session_events):
-                week_solved.add(events[0]["user_id"])
-        completion_days = {_event_day(event["occurred_at"]) for event in effective_end_events}
-        first = min(_event_day(event["occurred_at"]) for event in starts)
-        d1 = (datetime.date.fromisoformat(first) + datetime.timedelta(days=1)).isoformat()
-        d7 = (datetime.date.fromisoformat(first) + datetime.timedelta(days=7)).isoformat()
-        if first <= (datetime.date.fromisoformat(today) - datetime.timedelta(days=1)).isoformat():
-            d1_eligible += 1
-            if d1 in completion_days:
-                d1_retained += 1
-        if first <= (datetime.date.fromisoformat(today) - datetime.timedelta(days=7)).isoformat():
-            d7_eligible += 1
-            if d7 in completion_days:
-                d7_retained += 1
-        first_day = datetime.date.fromisoformat(first)
-        if first_day <= datetime.date.fromisoformat(today) - datetime.timedelta(days=6):
-            three_case_eligible += 1
-            cases = {
-                db.jload(event["payload"], {}).get("caseId")
-                for event in effective_end_events
-                if 0 <= (datetime.date.fromisoformat(_event_day(event["occurred_at"])) - first_day).days < 7
-            }
-            if len(cases) >= 3:
-                three_case_completed += 1
-    return {
-        "asOf": today,
-        "funnel": {"startedUsers": started, "finishedUsers": finished, "solvedUsers": solved},
-        "d1": {"eligibleUsers": d1_eligible, "retainedUsers": d1_retained},
-        "d7": {"eligibleUsers": d7_eligible, "retainedUsers": d7_retained},
-        "threeCase7d": {"eligibleUsers": three_case_eligible, "completedUsers": three_case_completed},
-        "weeklySolvedUsers": len(week_solved),
-    }
+    from features.stats.metrics import calculate
 
-
-def _event_day(value: str) -> str:
-    return (
-        datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
-        .astimezone(ZoneInfo("Asia/Shanghai"))
-        .date()
-        .isoformat()
-    )
+    return calculate(repo.learning_rows(), as_of)
