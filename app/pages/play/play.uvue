@@ -40,11 +40,12 @@
     </view>
 
     <view v-else class="loading">
-      <text class="loading__text">正在调取现场……</text>
+      <text class="loading__text">{{ loadError.length > 0 ? loadError : '正在调取现场……' }}</text>
+      <text v-if="loadError.length > 0 && previewId.length === 0" class="loading__text" @click="loadPublishedCase">重新加载</text>
     </view>
 
     <!-- 内心小动物：悬浮弹窗 -->
-    <mascot :show="mascotShow" :who="mascotWho" :line="mascotLine"></mascot>
+    <mascot v-if="loaded" :show="mascotShow" :who="mascotWho" :line="mascotLine"></mascot>
 
     <!-- 阶段 FAB -->
     <view v-if="loaded && !finished && !drawerOpen" class="fab" @click="toggleDrawer">
@@ -53,10 +54,10 @@
     </view>
 
     <!-- 抽屉遮罩 -->
-    <view :class="drawerOpen ? 'mask mask--show' : 'mask'" @click="closeDrawer"></view>
+    <view v-if="loaded" :class="drawerOpen ? 'mask mask--show' : 'mask'" @click="closeDrawer"></view>
 
     <!-- 底部抽屉：三段式（假设板 / 验证动作 / 指认根因） -->
-    <view :class="drawerOpen ? 'drawer drawer--open' : 'drawer'">
+    <view v-if="loaded" :class="drawerOpen ? 'drawer drawer--open' : 'drawer'">
       <view class="drawer__handle"></view>
       <view class="seg">
         <view :class="drawerTab === 'board' ? 'seg__item seg__item--on' : 'seg__item'" @click="drawerTab = 'board'">
@@ -106,7 +107,7 @@
               :cost="a.cost"
               :danger="a.danger"
               :done="isTaken(a.id)"
-              :ev="evOf(a.id)"
+              :ev="isTaken(a.id) ? evOf(a.id) : null"
               @tap="executeAction(a)"
             ></action-item>
           </view>
@@ -124,7 +125,7 @@
               :cost="a.cost"
               :danger="a.danger"
               :done="isTaken(a.id)"
-              :ev="evOf(a.id)"
+              :ev="isTaken(a.id) ? evOf(a.id) : null"
               @tap="executeAction(a)"
             ></action-item>
           </view>
@@ -170,7 +171,7 @@ import drawerBoard from '../../components/drawer-board/drawer-board.uvue'
 import drawerIdentify from '../../components/drawer-identify/drawer-identify.uvue'
 import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { getCaseById, getCollectedLessons, CollectedLesson } from '../../data/cases'
-import { isCasePlayable } from '../../data/chapters'
+import { chapterUnlockHint, isCasePlayable } from '../../data/chapters'
 import { isDailyCase, markDailyDone } from '../../utils/daily'
 import { isLoggedIn } from '../../utils/auth'
 import { openGuestLoginDialog } from '../../utils/login-guide'
@@ -178,6 +179,7 @@ import { scheduleProgressUpload } from '../../utils/sync-progress'
 import { CaseAction, DiagnosisCase, Evidence, HypothesisOption, RootCauseOption } from '../../types/case'
 import { fetchDraftPreview, getPreviewCase, savePreviewSession } from '../../utils/draft-preview'
 import { trackLearningEvent } from '../../utils/learning-events'
+import { fetchCasepack } from '../../utils/sync'
 import { SessionEvent, MascotEventRec, SessionRecord, saveSession, bumpChecklistUse, bumpTask, recordSolvedLayer } from '../../utils/storage'
 import { computeGrade, shuffleCauses, MAX_WRONG_IDENTIFIES } from '../../utils/scoring'
 import {
@@ -218,6 +220,8 @@ class EvRec {
 const evByAct = ref<EvRec[]>([])
 const events = ref<SessionEvent[]>([])
 const previewId = ref('')
+const requestedCaseId = ref('')
+const loadError = ref('')
 let startedCase: DiagnosisCase | null = null
 let startedSessionId = ''
 const mascotEvents = ref<MascotEventRec[]>([])
@@ -313,18 +317,43 @@ onLoad((query : OnLoadOptions) => {
     if (token != null) {
       fetchDraftPreview(previewId.value, token as string, (error) => {
         if (error.length > 0) {
-          uni.showToast({ title: error, icon: 'none' })
+          loadError.value = error
           return
         }
-        initializeCase(getPreviewCase(previewId.value))
+        initializeCase(getPreviewCase(previewId.value)!)
       })
     } else {
-      initializeCase(getPreviewCase(previewId.value))
+      const restored = getPreviewCase(previewId.value)
+      if (restored == null) {
+        loadError.value = '预览已结束，请回到编辑器重新打开'
+        return
+      }
+      initializeCase(restored)
     }
     return
   }
-  const id = query['id']
-  const c = id != null ? getCaseById(id as string) : null
+  requestedCaseId.value = query['id'] as string
+  loadPublishedCase()
+})
+
+function loadPublishedCase() {
+  loadError.value = ''
+  const cached = getCaseById(requestedCaseId.value)
+  if (cached != null) {
+    openPublishedCase(cached)
+    return
+  }
+  // 社区冷深链尚无本地缓存，先取得发布目录，再判断案例与章节资格。
+  fetchCasepack((result) => {
+    if (result.error.length > 0) {
+      loadError.value = result.error
+      return
+    }
+    openPublishedCase(getCaseById(requestedCaseId.value))
+  })
+}
+
+function openPublishedCase(c: DiagnosisCase | null) {
   if (c == null) {
     uni.showToast({ title: '案例不存在', icon: 'none' })
     setTimeout(() => {
@@ -334,22 +363,17 @@ onLoad((query : OnLoadOptions) => {
   }
   // 章节锁最后防线：锁定章的非挑战关不可直达（跳级挑战关放行）；游客引导登录
   if (!isCasePlayable(c.id)) {
-    if (!isLoggedIn()) {
-      uni.navigateBack({})
-      // 等返回动画落定再弹登录引导，避免与页面出栈竞态
-      setTimeout(() => {
-        openGuestLoginDialog(c.id)
-      }, 300)
-      return
-    }
-    uni.showToast({ title: '通关上一章主线，或从章节页发起跳级挑战', icon: 'none' })
-    setTimeout(() => {
-      uni.navigateBack({})
-    }, 900)
+    uni.redirectTo({
+      url: '/pages/chapter/chapter?id=' + c.chapterId,
+      success: () => {
+        if (!isLoggedIn()) openGuestLoginDialog(c.id)
+        else uni.showToast({ title: chapterUnlockHint(c.chapterId), icon: 'none' })
+      },
+    })
     return
   }
   initializeCase(c)
-})
+}
 
 function initializeCase(source: DiagnosisCase) {
   const c = JSON.parse(JSON.stringify(source)) as DiagnosisCase
@@ -483,11 +507,7 @@ function isTaken(id: string): boolean {
 }
 
 function evOf(id: string): Evidence {
-  for (let i = 0; i < evByAct.value.length; i++) {
-    if (evByAct.value[i].id === id) return evByAct.value[i].ev
-  }
-  const fallback: Evidence = { type: 'text', title: '【未找到证据记录】', text: 'DEBUG: evByAct 未命中 id=' + id }
-  return fallback
+  return evByAct.value.find((item) => item.id === id)!.ev!
 }
 
 const pendingAction = ref<CaseAction | null>(null)
