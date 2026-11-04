@@ -708,6 +708,7 @@ A批适用A01至A16、A22、A24至A25，按该批实际交付边界验收；A15�
 - HBuilderX 内置 uni-cli 在显式本地 `APP_API_BASE`、`APP_H5_ORIGIN` 配置下完成 production build，并在真实隔离 MySQL API 上打开海报页与 `/pages/play/play?id=first-npe&source=poster`；MySQL 事件记录为 `trial_enter`、`session_start`、`share_source`，三者 source 均为 `poster`。真二维码由视觉检测解码，海报卡片经过截图修正。单独的 HBuilderX `publish web` CLI 入口曾生成未注入 `APP_API_BASE` 的产物；本次通过内置 uni-cli production build 验收，正式域名构建仍待地址确定。
 - T09B 管理端 UI 已在桌面和 393px 窄屏检查；社区发布冲突、重载和新修订流程通过。正式域名、真实短信、另一设备正式扫码、GitHub 远端 Actions/分支保护/密钥扫描、异地备份、真实用户 D7 仍待外部条件。
 - 全量真实用户三关到第四关与跨设备完整流程不在本轮最终截图中重新冒充已验收；历史 H5 证据保留在 `docs/validation/2026-11-04/`，需要正式地址与真实账号条件时再按矩阵复验。
+- 19:34 定点复核游客事件：新 H5 origin 上前三道试玩题实际触发的 `trial_enter`、`session_start` 均由真实 API 返回 204 并写入 MySQL；临时账号认领后六条事件全部归属账号。此前整合验收中的缺口未能复现，本次没有改业务代码。该轮只验证开局事件与归属认领，不代表重新完成对局、真实短信或真实用户留存观察；详见 `docs/validation/2026-11-04/h5-review.md`。
 
 ## 16 参考文件与技术依据
 
