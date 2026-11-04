@@ -20,4 +20,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.add_column(
+        "sms_codes",
+        sa.Column("code", sa.String(16), nullable=False, server_default=""),
+    )
     op.drop_column("sms_codes", "out_id")
