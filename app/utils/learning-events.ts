@@ -37,14 +37,29 @@ export function trackLearningEvent(kind: string, sessionId: string, caseId: stri
   events.push({ kind: kind, sessionId: sessionId, caseId: caseId, source: source, contentRevision: contentRevision, anonymousId: getLearningAnonymousId(), occurredAt: new Date().toISOString() })
   uni.setStorageSync(KEY_EVENTS, JSON.stringify(events))
   if (isLoggedIn()) {
-    uni.request({
-      url: API_BASE + '/api/me/learning-events',
-      method: 'POST',
-      header: { Authorization: 'Bearer ' + getToken() } as any,
-      data: events[events.length - 1] as any,
-      timeout: 8000,
-    })
+    sendLearningEvent(events[events.length - 1])
   }
+}
+
+export function flushLearningEvents(): void {
+  if (!isLoggedIn()) return
+  const events = learningEvents()
+  for (const event of events) sendLearningEvent(event)
+}
+
+function sendLearningEvent(event: LearningEventRecord): void {
+  uni.request({
+    url: API_BASE + '/api/me/learning-events',
+    method: 'POST',
+    header: { Authorization: 'Bearer ' + getToken() } as any,
+    data: event as any,
+    timeout: 8000,
+    success: (response) => {
+      if (response.statusCode !== 204) return
+      const events = learningEvents().filter((item) => item.occurredAt !== event.occurredAt)
+      uni.setStorageSync(KEY_EVENTS, JSON.stringify(events))
+    },
+  })
 }
 
 export function learningEvents(): LearningEventRecord[] {
