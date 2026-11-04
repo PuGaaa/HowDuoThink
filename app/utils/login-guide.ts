@@ -8,7 +8,7 @@ export function openGuestLoginDialog() {
   const freeCh = CHAPTERS.find((x) => x.id === getGuestFreeChapter())
   const opt = {
     title: '登录后继续闯关',
-    message: '游客可试玩「' + (freeCh != null ? freeCh.name : '第一章') + '」前 ' + getGuestFreeLevels() + ' 关，登录解锁全部章节，进度还能云同步。',
+    message: '游客可试玩「' + (freeCh != null ? freeCh.name : '第一章') + '」前 ' + getGuestFreeLevels() + ' 关，登录后可保存进度并继续解锁章节。',
     confirmText: '去登录',
     cancelText: '先逛逛',
     danger: false,

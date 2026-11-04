@@ -141,7 +141,7 @@
 import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { getCaseById, ALL_CASES } from '../../data/cases'
+import { getCaseById, MAINLINE_CASE_IDS } from '../../data/cases'
 import { ExpertStep, Lesson } from '../../types/case'
 import { SessionRecord, SessionEvent, MascotEventRec, getLastSession } from '../../utils/storage'
 import { gradeTitle, starsOf } from '../../utils/scoring'
@@ -228,12 +228,12 @@ onLoad(() => {
   const base = session.expertCost > 0 ? session.expertCost : 1
   youPct.value = Math.min(100, Math.round((session.playerCost / base) * 100))
 
-  // 下一关：ALL_CASES 顺序中的下一个已实现案例
+  // 下一关：稳定主线中的下一个案例，不跟随选做题注册顺序变化
   hasNext.value = false
-  for (let i = 0; i < ALL_CASES.length; i++) {
-    if (ALL_CASES[i].id === session.caseId && i + 1 < ALL_CASES.length) {
+  for (let i = 0; i < MAINLINE_CASE_IDS.length; i++) {
+    if (MAINLINE_CASE_IDS[i] === session.caseId && i + 1 < MAINLINE_CASE_IDS.length) {
       hasNext.value = true
-      nextId.value = ALL_CASES[i + 1].id
+      nextId.value = MAINLINE_CASE_IDS[i + 1]
       break
     }
   }
