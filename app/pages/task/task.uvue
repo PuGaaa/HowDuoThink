@@ -83,7 +83,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { DAILY_TASKS, WEEKLY_TASKS, GROWTH_TASKS } from '../../data/tasks'
 import { getTaskDaily, getTaskWeekly, getCaseProgress, getChecklistUse, getStreak } from '../../utils/storage'
 import { getEffectiveCases } from '../../data/cases'
-import { CHAPTERS, casesInChapter } from '../../data/chapters'
+import { CHAPTERS, chapterCompleted } from '../../data/chapters'
 
 class TaskVM {
   id: string = ''
@@ -153,8 +153,7 @@ function buildLists() {
   }
   let completedChapters = 0
   for (let i = 0; i < CHAPTERS.length; i++) {
-    const chapterCases = casesInChapter(CHAPTERS[i].id)
-    if (chapterCases.length > 0 && chapterCases.every((c) => getCaseProgress(c.id)?.solved === true)) completedChapters++
+    if (chapterCompleted(CHAPTERS[i].id)) completedChapters++
   }
   for (let i = 0; i < GROWTH_TASKS.length; i++) {
     const t = GROWTH_TASKS[i]

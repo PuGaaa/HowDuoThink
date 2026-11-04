@@ -52,15 +52,14 @@
 
       <!-- 扫码邀请卡 -->
       <view v-if="shareReady" class="qrcard">
-        <view class="qrcard__box">
-          <view v-for="(cell, i) in qrCells" :key="'q' + i" :class="cell ? 'qcell qcell--on' : 'qcell'"></view>
-        </view>
+        <image class="qrcard__qr" :src="qrDataUrl" mode="aspectFit"></image>
         <view class="qrcard__body">
           <text class="qrcard__title">扫码来挑战</text>
           <text class="qrcard__sub">把你的排错直觉，练成条件反射</text>
           <text class="qrcard__meta">{{ today }} · 侦探 No.0002</text>
         </view>
       </view>
+      <text v-else class="sharehint">H5 公开地址配置后，海报会显示可扫码的试玩入口</text>
 
       <view class="btnrow">
         <view class="primarybtn" @click="downloadPoster">
@@ -82,7 +81,8 @@ import { CHAPTERS, casesInChapter } from '../../data/chapters'
 import { getCaseProgress, getStreak, getChecklistUse, getTotals } from '../../utils/storage'
 import { rankOf } from '../../utils/scoring'
 import { getMascotUrl } from '../../utils/remote-assets'
-import { PUBLIC_WEB_ORIGIN } from '../../config'
+import { PUBLIC_H5_ORIGIN } from '../../config'
+import { createPosterShareUrl, createQrDataUrl } from '../../utils/qr'
 
 const frogUrl = getMascotUrl('frog')
 import navbar from '../../components/navbar/navbar.uvue'
@@ -92,9 +92,12 @@ const solvedCount = ref(0)
 const streakCount = ref(0)
 const lessonCount = ref(0)
 const partSolved = ref(0)
-const qrCells = ref<boolean[]>([])
+const qrDataUrl = ref('')
 const today = ref('')
-const shareReady = PUBLIC_WEB_ORIGIN.length > 0
+const shareUrl = PUBLIC_H5_ORIGIN.length > 0
+  ? createPosterShareUrl(PUBLIC_H5_ORIGIN)
+  : ''
+const shareReady = shareUrl.length > 0
 
 function refresh() {
   const cases = getEffectiveCases()
@@ -122,15 +125,7 @@ function refresh() {
   }
   partSolved.value = lit
 
-  if (shareReady) {
-    const cells: boolean[] = []
-    for (let i = 0; i < 25; i++) {
-      const x = i % 5
-      const y = Math.floor(i / 5)
-      cells.push((x + y * 3 + x * y) % 3 !== 0)
-    }
-    qrCells.value = cells
-  }
+  if (shareReady) qrDataUrl.value = createQrDataUrl(shareUrl)
 
   const d = new Date()
   const mm = d.getMonth() + 1 < 10 ? '0' + (d.getMonth() + 1) : String(d.getMonth() + 1)
@@ -182,7 +177,7 @@ function downloadPoster() {
     ctx.fillRect(KX + KW - 26 - (3 - i) * 20, KY + 16, 14, 14)
   }
   const img = document.createElement('img') as any
-  img.onload = () => {
+  const drawPoster = (qrImg: any) => {
     // 吉祥物 + 光圈
     ctx.beginPath()
     ctx.arc(KX + KW / 2, KY + 92, 52, 0, Math.PI * 2)
@@ -275,34 +270,24 @@ function downloadPoster() {
     if (shareReady) {
     // 扫码邀请卡
     ctx.beginPath()
-    if (ctx.roundRect != null) ctx.roundRect(20, 566, 350, 96, 20)
-    else ctx.rect(20, 566, 350, 96)
+    if (ctx.roundRect != null) ctx.roundRect(20, 556, 350, 120, 20)
+    else ctx.rect(20, 556, 350, 120)
     ctx.fillStyle = '#FFFFFF'
     ctx.fill()
     ctx.strokeStyle = '#F5E6DA'
     ctx.lineWidth = 2
     ctx.stroke()
-    ctx.beginPath()
-    if (ctx.roundRect != null) ctx.roundRect(34, 580, 68, 68, 10)
-    else ctx.rect(34, 580, 68, 68)
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fill()
-    ctx.fillStyle = '#4A4458'
-    for (let i = 0; i < 5; i++) {
-      for (let j = 0; j < 5; j++) {
-        if ((i + j * 3 + i * j) % 3 !== 0) ctx.fillRect(40 + i * 11, 586 + j * 11, 8, 8)
-      }
-    }
+    ctx.drawImage(qrImg, 28, 564, 98, 98)
     ctx.textAlign = 'left'
     ctx.fillStyle = '#4A4458'
     ctx.font = 'bold 13px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText('扫码来挑战', 116, 596)
+    ctx.fillText('扫码来挑战', 140, 592)
     ctx.fillStyle = '#7A7290'
     ctx.font = '10px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText('把你的排错直觉，练成条件反射', 116, 618)
+    ctx.fillText('把你的排错直觉，练成条件反射', 140, 615)
     ctx.fillStyle = '#AFA8BD'
     ctx.font = '9px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText(today.value + ' · 侦探 No.0002', 116, 638)
+    ctx.fillText(today.value + ' · 侦探 No.0002', 140, 640)
     }
     ctx.textAlign = 'center'
     ctx.fillStyle = '#AFA8BD'
@@ -317,6 +302,15 @@ function downloadPoster() {
     a.click()
     a.remove()
     uni.showToast({ title: '海报已开始下载', icon: 'none' })
+  }
+  img.onload = () => {
+    if (shareReady) {
+      const qrImg = document.createElement('img') as any
+      qrImg.onload = () => drawPoster(qrImg)
+      qrImg.src = qrDataUrl.value
+      return
+    }
+    drawPoster(null)
   }
   img.onerror = () => {
     uni.showToast({ title: '头像加载失败', icon: 'none' })
@@ -528,26 +522,11 @@ function downloadPoster() {
   box-shadow: 0 6rpx 0 0 #EFE5D6;
 }
 .qrcard__box {
-  width: 136rpx;
-  height: 136rpx;
-  border-radius: 20rpx;
-  border-width: 2rpx;
-  border-style: solid;
-  border-color: #F5E6DA;
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  padding: 10rpx;
+  width: 196rpx;
+  height: 196rpx;
+  margin-right: 24rpx;
 }
-.qcell {
-  width: 20rpx;
-  height: 20rpx;
-  margin: 2rpx;
-}
-.qcell--on {
-  background-color: #4A4458;
-  border-radius: 4rpx;
-}
+.qrcard__qr { width: 100%; height: 100%; }
 .qrcard__body {
   display: flex;
   flex-direction: column;
@@ -596,6 +575,12 @@ function downloadPoster() {
   color: #AFA8BD;
   text-align: center;
   margin-top: 12rpx;
+}
+.sharehint {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  text-align: center;
+  margin-top: 36rpx;
 }
 .foot {
   font-size: 19rpx;

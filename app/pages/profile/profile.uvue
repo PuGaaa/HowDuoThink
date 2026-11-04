@@ -204,23 +204,27 @@ function showReminderSheet() {
     success: (res) => {
       if (res.tapIndex === 4) {
         setReminder({ on: false, hh: 21, mm: 30 })
-      } else {
-        // #ifdef WEB
-        const permission = requestNotifyPermission()
-        if (permission === 'denied') {
-          setReminder({ on: false, hh: 21, mm: 30 })
-          uni.showToast({ title: '浏览器已拒绝通知权限，提醒未开启', icon: 'none' })
+        refresh()
+        uni.showToast({ title: '学习提醒已关闭', icon: 'none' })
+        return
+      }
+      const times: number[][] = [[20, 0], [21, 0], [21, 30], [22, 0]]
+      const t = times[res.tapIndex]
+      requestNotifyPermission().then((permission: string) => {
+        if (permission === 'granted') {
+          setReminder({ on: true, hh: t[0], mm: t[1] })
+          startReminderPolling()
           refresh()
+          uni.showToast({ title: '学习提醒已开启', icon: 'none' })
           return
         }
-        // #endif
-        const times: number[][] = [[20, 0], [21, 0], [21, 30], [22, 0]]
-        const t = times[res.tapIndex]
-        setReminder({ on: true, hh: t[0], mm: t[1] })
-        startReminderPolling()
-      }
-      refresh()
-      uni.showToast({ title: '学习提醒已更新', icon: 'none' })
+        setReminder({ on: false, hh: 21, mm: 30 })
+        refresh()
+        uni.showToast({
+          title: permission === 'denied' ? '浏览器已拒绝通知权限，提醒未开启' : '当前环境不支持浏览器通知',
+          icon: 'none',
+        })
+      })
     },
   })
 }

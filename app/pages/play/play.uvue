@@ -220,6 +220,7 @@ class EvRec {
 const evByAct = ref<EvRec[]>([])
 const events = ref<SessionEvent[]>([])
 const previewId = ref('')
+const eventSource = ref('play')
 const requestedCaseId = ref('')
 const loadError = ref('')
 let startedCase: DiagnosisCase | null = null
@@ -310,6 +311,8 @@ const fabLabel = computed((): string => {
 })
 
 onLoad((query : OnLoadOptions) => {
+  const source = query['source']
+  if (source != null) eventSource.value = source as string
   const preview = query['previewId']
   if (preview != null) {
     previewId.value = preview as string
@@ -410,7 +413,7 @@ function initializeCase(source: DiagnosisCase) {
     types.push(c.scene.symptoms[i].type)
   }
   appear(onSceneOpen(types))
-  if (previewId.value.length === 0) trackLearningEvent('session_start', startedSessionId, c.id, 'play', c.contentRevision ?? 1)
+  if (previewId.value.length === 0) trackLearningEvent('session_start', startedSessionId, c.id, eventSource.value, c.contentRevision ?? 1)
 }
 
 function toggleDrawer() {
@@ -579,7 +582,7 @@ function doExecute(a: CaseAction) {
 function pushEvent(kind: string, actionId: string, gain: string, cost: number, text: string, danger: boolean) {
   const ev: SessionEvent = { kind: kind, actionId: actionId, gain: gain, cost: cost, text: text, danger: danger }
   events.value.push(ev)
-  if (kind === 'action' && previewId.value.length === 0) trackLearningEvent('verification', startedSessionId, caseId.value, 'play', startedCase!.contentRevision ?? 1)
+  if (kind === 'action' && previewId.value.length === 0) trackLearningEvent('verification', startedSessionId, caseId.value, eventSource.value, startedCase!.contentRevision ?? 1)
 }
 
 function appear(m: MascotAppearance | null) {
@@ -668,7 +671,7 @@ function finishAndSave() {
     savePreviewSession(previewId.value, rec)
     return
   }
-  trackLearningEvent('session_end', rec.sessionId, rec.caseId, 'play', rec.contentRevision)
+  trackLearningEvent('session_end', rec.sessionId, rec.caseId, eventSource.value, rec.contentRevision)
   saveSession(rec)
   if (solved.value && recordSolvedLayer(currentCase.chapterId)) {
     bumpTask('layers2', 1)

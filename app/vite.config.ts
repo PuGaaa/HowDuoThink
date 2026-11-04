@@ -7,5 +7,6 @@ export default defineConfig(({ mode }) => ({
     'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : 'development'),
     'process.env.APP_API_BASE': JSON.stringify(process.env.APP_API_BASE || ''),
     'process.env.APP_PUBLIC_ORIGIN': JSON.stringify(process.env.APP_PUBLIC_ORIGIN || ''),
+    'process.env.APP_H5_ORIGIN': JSON.stringify(process.env.APP_H5_ORIGIN || ''),
   },
 }))

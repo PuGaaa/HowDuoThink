@@ -83,6 +83,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
+      - name: Install app dependencies
+        run: npm ci --prefix app
       - name: Install source-test compiler
         run: npm install --prefix "$RUNNER_TEMP/think-source-tests" --no-save --package-lock=false --ignore-scripts typescript@6.0.3
       - name: App and content regressions

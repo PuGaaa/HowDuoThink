@@ -8,3 +8,4 @@ const PROD_API_BASE = process.env.APP_API_BASE || ''
 if (process.env.NODE_ENV === 'production' && PROD_API_BASE.length === 0) throw new Error('生产构建必须配置 APP_API_BASE')
 export const API_BASE = process.env.NODE_ENV === 'development' ? DEV_API_BASE : PROD_API_BASE
 export const PUBLIC_WEB_ORIGIN = process.env.APP_PUBLIC_ORIGIN || ''
+export const PUBLIC_H5_ORIGIN = process.env.APP_H5_ORIGIN || ''

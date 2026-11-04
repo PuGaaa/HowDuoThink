@@ -34,16 +34,16 @@ export function reminderLabel(): string {
   return '每天 ' + hh + ':' + mm
 }
 
-/** H5：请求通知权限。返回 'granted' | 'denied' | 'unsupported' */
-export function requestNotifyPermission(): string {
+/** H5：等待浏览器通知权限结果。 */
+export function requestNotifyPermission(): Promise<string> {
   // #ifdef WEB
   const N = (window as any).Notification
-  if (!N) return 'unsupported'
-  if (N.permission === 'default') N.requestPermission()
-  return N.permission as string
+  if (!N) return Promise.resolve('unsupported')
+  if (N.permission === 'default') return N.requestPermission() as Promise<string>
+  return Promise.resolve(N.permission as string)
   // #endif
   // #ifndef WEB
-  return 'unsupported'
+  return Promise.resolve('unsupported')
   // #endif
 }
 
