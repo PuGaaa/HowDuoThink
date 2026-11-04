@@ -25,6 +25,7 @@ export interface SubmissionDetail extends Submission {
   material: Material | null
   materialVersion: number
   materialConfirmed: boolean
+  materialCurrent: boolean
   caseId: string | null
   linkedCaseId: string | null
   parentSubmissionId: string | null

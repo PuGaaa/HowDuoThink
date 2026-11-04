@@ -102,6 +102,7 @@ class SubmissionView(BaseModel):
     parentSubmissionId: str | None
     materialVersion: int
     materialConfirmed: bool
+    materialCurrent: bool
     material: DraftMaterial | None
     messages: list[SubmissionMessage]
 

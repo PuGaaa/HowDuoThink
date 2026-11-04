@@ -160,6 +160,8 @@ def test_ai_source_requires_current_author_consent_and_contains_only_sanitized_m
         ).status_code
         == 200
     )
+    view = author.get(f"/api/me/submissions/{sid}").json()
+    assert view["materialCurrent"] is False and view["materialConfirmed"] is False
     with pytest.raises(HTTPException) as exc:
         service.authorized_draft_source(sid)
     assert exc.value.status_code == 409
