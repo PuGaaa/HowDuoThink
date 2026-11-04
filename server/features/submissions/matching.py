@@ -46,6 +46,7 @@ def candidates(conn: Any, query: str, sid: str = "", editor: bool = False) -> li
                 "excerpt": text[:200],
                 "url": "/solutions/a-" + item["id"],
                 "_revision": item["payload"],
+                "_searchText": item["payload"],
             }
         )
     if editor:
@@ -61,8 +62,10 @@ def candidates(conn: Any, query: str, sid: str = "", editor: bool = False) -> li
                     "excerpt": str(payload.get("intro", ""))[:200],
                     "url": None,
                     "_revision": item["payload"],
+                    "_searchText": item["payload"],
                 }
             )
+        supplements = repo.supplement_texts(conn, [item["id"] for item in submissions])
         for item in submissions:
             rows.append(
                 {
@@ -72,7 +75,16 @@ def candidates(conn: Any, query: str, sid: str = "", editor: bool = False) -> li
                     "title": item["title"],
                     "excerpt": item["symptom"][:200],
                     "url": None,
-                    "_revision": item["symptom"] + item["resolution"],
+                    "_revision": item["symptom"]
+                    + item["resolution"]
+                    + str(item["source_revision"])
+                    + str(item["material_version"]),
+                    "_searchText": item["symptom"]
+                    + " "
+                    + item["resolution"]
+                    + " "
+                    + (item["material"] or "")
+                    + supplements[item["id"]],
                 }
             )
     for item in rows:
@@ -85,7 +97,7 @@ def candidates(conn: Any, query: str, sid: str = "", editor: bool = False) -> li
         )
     query_tokens = _tokens(query)
     for item in rows:
-        words = _tokens(item["title"] + " " + item["excerpt"])
+        words = _tokens(item["title"] + " " + item.pop("_searchText"))
         item["score"] = len(query_tokens & words)
     rows.sort(key=lambda item: (-item["score"], item["kind"], item["id"]))
     return rows[:10]
@@ -96,6 +108,8 @@ def for_submission(conn: Any, submission) -> list[dict]:
     source = (
         json.loads(review["material"])
         if review["material"]
-        else {"title": submission["title"], "symptom": submission["symptom"]}
+        else {"title": submission["title"], "symptom": submission["symptom"], "resolution": submission["resolution"]}
     )
-    return candidates(conn, source["title"] + " " + source["symptom"], submission["id"], editor=True)
+    return candidates(
+        conn, source["title"] + " " + source["symptom"] + " " + source["resolution"], submission["id"], editor=True
+    )
