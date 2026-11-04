@@ -81,6 +81,8 @@ def _view(conn, row, editor: bool = False) -> dict:
         "linkedCaseId": row["linked_case_id"],
         "parentSubmissionId": row["parent_submission_id"],
         "materialVersion": review["material_version"],
+        "materialCurrent": review["material_version"] > 0
+        and review["material_source_revision"] == review["source_revision"],
         "materialConfirmed": review["material_version"] > 0
         and review["confirmed_version"] == review["material_version"]
         and review["material_source_revision"] == review["source_revision"],

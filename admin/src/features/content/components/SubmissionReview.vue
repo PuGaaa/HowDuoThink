@@ -89,7 +89,7 @@ function toggleCandidate(key: string, selected: boolean) {
       <NButton v-if="material.lessons.length < 3" size="small" @click="material.lessons.push('')">添加经验</NButton>
       <label>公开标签（逗号分隔，最多6项）<NInput v-model:value="tags" /></label>
       <label>归属领域（必选）<NSelect v-model:value="material.domainHint" :options="domains" /></label>
-      <div class="actions"><NButton :loading="busy" :disabled="!material.domainHint" @click="saveMaterial">保存并请作者确认</NButton><NTag :type="detail.materialConfirmed ? 'success' : 'warning'">第 {{ detail.materialVersion }} 版 · {{ detail.materialConfirmed ? '作者已确认' : '等待作者确认' }}</NTag></div>
+      <div class="actions"><NButton :loading="busy" :disabled="!material.domainHint" @click="saveMaterial">保存并请作者确认</NButton><NTag :type="detail.materialConfirmed ? 'success' : 'warning'">第 {{ detail.materialVersion }} 版 · {{ !detail.materialCurrent ? '待编辑根据补件更新' : detail.materialConfirmed ? '作者已确认' : '等待作者确认' }}</NTag></div>
     </NCard>
     <NCard size="small" title="人工查重与差异裁定">
       <p class="muted">候选包含待审稿、草稿和公开案例。文字相似仅供查找，需核对机制、证据和训练目标，不能据分数直接拒稿。</p>
