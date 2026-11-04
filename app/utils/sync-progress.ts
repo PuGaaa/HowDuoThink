@@ -43,6 +43,7 @@ function markSynced() {
 function replaceServerProjection(d: any): void {
   const info = uni.getStorageInfoSync()
   const casePrefix = progressStorageKey('think_case_')
+  const solvedLayers = progressStorageGet('think_solved_layers_v1')
   for (let i = 0; i < info.keys.length; i++) {
     if (info.keys[i].indexOf(casePrefix) === 0) uni.removeStorageSync(info.keys[i])
   }
@@ -56,6 +57,15 @@ function replaceServerProjection(d: any): void {
     solvedLayers: [],
     unlockedChapterIds: d.unlockedChapterIds ?? [],
   })
+  progressStorageSet('think_solved_layers_v1', solvedLayers == null ? '[]' : solvedLayers)
+}
+
+function replayTask(metric: string, amount: number): void {
+  const raw = progressStorageGet('think_tasks_v1')
+  const tasks = raw == null || (raw as string).length === 0 ? { day: '', week: '', daily: {}, weekly: {} } : JSON.parse(raw as string)
+  tasks.daily[metric] = (tasks.daily[metric] ?? 0) + amount
+  tasks.weekly[metric] = (tasks.weekly[metric] ?? 0) + amount
+  progressStorageSet('think_tasks_v1', JSON.stringify(tasks))
 }
 
 function replayPendingOperations(operations: any[]): void {
@@ -70,6 +80,7 @@ function replayPendingOperations(operations: any[]): void {
       const raw = progressStorageGet('think_case_' + p.caseId)
       const current = raw == null || (raw as string).length === 0 ? { solved: false, bestGrade: '', bestCost: 0, plays: 0, fails: 0 } : JSON.parse(raw as string)
       const localSolved = current.solved
+      const hadFailure = (current.fails ?? 0) > 0
       current.solved = current.solved || p.solved
       current.plays = (current.plays ?? 0) + 1
       current.fails = (current.fails ?? 0) + (p.solved ? 0 : 1)
@@ -85,6 +96,10 @@ function replayPendingOperations(operations: any[]): void {
         current.scoringVersion = p.scoringVersion
       }
       progressStorageSet('think_case_' + p.caseId, JSON.stringify(current))
+      if (p.solved) {
+        replayTask('win', 1)
+        if (hadFailure) replayTask('retrain', 1)
+      }
       const mascots = JSON.parse((progressStorageGet('think_mascots_v1') as string) || '{}')
       for (let j = 0; j < p.mascotEvents.length; j++) mascots[p.mascotEvents[j].id] = (mascots[p.mascotEvents[j].id] ?? 0) + 1
       progressStorageSet('think_mascots_v1', JSON.stringify(mascots))
@@ -92,12 +107,22 @@ function replayPendingOperations(operations: any[]): void {
     }
     if (operation.kind === 'checklist_use') {
       progressStorageSet('think_checkuse_v1', String((Number(progressStorageGet('think_checkuse_v1')) || 0) + 1))
+      replayTask('checkuse', 1)
+      continue
+    }
+    if (operation.kind === 'task_increment') {
+      replayTask(operation.payload.metric, operation.payload.amount)
       continue
     }
     if (operation.kind === 'unlocked_chapters') {
       const ids = getUnlockedChapterIds()
       for (let j = 0; j < operation.payload.chapterIds.length; j++) if (ids.indexOf(operation.payload.chapterIds[j]) < 0) ids.push(operation.payload.chapterIds[j])
       progressStorageSet('think_unlocked_chapters_v1', JSON.stringify(ids))
+      continue
+    }
+    if (operation.kind === 'daily_done') {
+      progressStorageSet('think_daily_done_v1', operation.payload.day)
+      replayTask('dailycase', 1)
     }
   }
 }
