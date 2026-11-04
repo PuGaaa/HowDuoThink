@@ -83,5 +83,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 20 }
-      - run: node --test app/tests/*.test.mjs content/pipeline/*.test.mjs content/baselines/*.test.mjs
+      - name: Install source-test compiler
+        run: npm install --prefix "$RUNNER_TEMP/think-source-tests" --no-save --package-lock=false --ignore-scripts typescript@6.0.3
+      - name: App and content regressions
+        env:
+          THINK_REVIEW_TYPESCRIPT: ${{ runner.temp }}/think-source-tests/node_modules/typescript
+        run: node --test app/tests/*.test.mjs content/pipeline/*.test.mjs content/baselines/*.test.mjs
       - run: node content/pipeline/validate.mjs app/data/cases/first-npe.ts app/data/cases/caused-by.ts app/data/cases/log-correlation.ts app/data/cases/async-swallow.ts

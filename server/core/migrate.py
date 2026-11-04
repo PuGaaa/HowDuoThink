@@ -1,7 +1,6 @@
 """编程式 Alembic 的唯一入口：upgrade_head / current_version / head_version / stamp_head。
 
-一切读取都在调用时进行（core.db.DB_PATH、core.config 的 MYSQL_*），
-禁止 import 时缓存 URL——测试与多库场景靠 monkeypatch DB_PATH 切换。
+MySQL连接配置在调用时读取，禁止 import 时缓存 URL。
 """
 
 from pathlib import Path
@@ -13,7 +12,6 @@ from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 
 from core import config
-from core import db as coredb
 
 _BASE_DIR = Path(__file__).resolve().parent.parent  # server/
 
@@ -25,9 +23,7 @@ def _cfg() -> Config:
 
 def _database_url() -> str:
     """与 alembic/env.py 的 database_url() 保持一致；测试把守两处不漂移。"""
-    if config.DB_PROVIDER == "mysql":
-        return config.mysql_database_url()
-    return f"sqlite:///{coredb.DB_PATH.resolve()}"
+    return config.mysql_database_url()
 
 
 def upgrade_head() -> None:

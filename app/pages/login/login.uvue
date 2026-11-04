@@ -112,13 +112,7 @@ function sendCode() {
       errMsg.value = r.error
       return
     }
-    if (r.devEcho.length > 0) {
-      // dev 通道：验证码直接回显给联调
-      smsCode.value = r.devEcho
-      uni.showToast({ title: '验证码已自动填入（dev）', icon: 'none' })
-    } else {
-      uni.showToast({ title: '验证码已发送', icon: 'none' })
-    }
+    uni.showToast({ title: '验证码已发送', icon: 'none' })
     startCountdown()
   })
 }

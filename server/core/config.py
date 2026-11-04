@@ -23,8 +23,7 @@ DEV_MODE = os.environ.get("ENV", "").lower() == "dev"
 # 生产 HTTPS 部署时设 COOKIE_SECURE=1，会话 cookie 仅经 HTTPS 传输
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "") == "1"
 
-# 短信：所有环境使用同一 provider 实现，仅配置项随部署环境变化。
-SMS_PROVIDER = os.environ.get("SMS_PROVIDER", "dev")
+# 短信：所有环境统一使用阿里云 SDK，仅配置项随部署环境变化。
 ALIYUN_SMS_ACCESS_KEY = os.environ.get("ALIYUN_SMS_ACCESS_KEY", "")
 ALIYUN_SMS_SECRET = os.environ.get("ALIYUN_SMS_SECRET", "")
 ALIYUN_SMS_SIGN = os.environ.get("ALIYUN_SMS_SIGN", "")
@@ -35,8 +34,8 @@ DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.deepseek.com")
 AI_CHAT_MODEL = os.environ.get("AI_CHAT_MODEL", "deepseek-chat")
 
-# 数据库：sqlite（默认，零部署）/ mysql（生产多用户，配 MYSQL_* 五项）
-DB_PROVIDER = os.environ.get("DB_PROVIDER", "mysql")
+# 数据库：所有环境统一 MySQL 8，MYSQL_* 仅配置连接与容量。
+DB_PROVIDER = "mysql"
 MYSQL_HOST = os.environ.get("MYSQL_HOST", "127.0.0.1")
 MYSQL_PORT = int(os.environ.get("MYSQL_PORT", "3306"))
 MYSQL_USER = os.environ.get("MYSQL_USER", "hdt")

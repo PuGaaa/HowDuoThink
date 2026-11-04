@@ -92,9 +92,7 @@ def index_case(case_id: str, expected_revision: int | None = None) -> str:
     """索引单个已发布案例：嵌入前后都校验修订，返回 done/stale/unavailable。"""
     if not client.embed_available():
         return "unavailable"
-    rows = db.q(
-        "SELECT payload, content_revision FROM cases WHERE id=? AND status='published'", (case_id,)
-    )
+    rows = db.q("SELECT payload, content_revision FROM cases WHERE id=? AND status='published'", (case_id,))
     if not rows:
         return "stale"
     revision = int(rows[0]["content_revision"] or 1)
