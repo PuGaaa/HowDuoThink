@@ -145,10 +145,10 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
             (payload.id,),
         ).fetchone()
         sub_id = exists["submission_id"] if exists else None
-        author_name = publication["authorName"] if publication else "官方"
+        author_name = publication.author_name if publication else "官方"
         source_type = "community" if publication else "official"
         source_commit = (
-            f"submission:{sub_id}:material:{publication['materialVersion']}" if publication else None
+            f"submission:{sub_id}:material:{publication.material_version}" if publication else None
         )
         d["submissionId"] = sub_id
         d["authorName"] = author_name
