@@ -66,7 +66,9 @@ function harness() {
     wrapper(specifier => {
       if (!specifier.startsWith('.')) throw new Error(`测试未隔离的外部依赖：${specifier}`);
       const target = path.resolve(path.dirname(file), specifier);
-      return load(path.extname(target) ? target : `${target}.ts`);
+      if (path.extname(target)) return load(target);
+      if (fs.existsSync(`${target}.ts`)) return load(`${target}.ts`);
+      return load(path.join(target, 'index.ts'));
     }, module, module.exports);
     return module.exports;
   }
