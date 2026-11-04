@@ -64,7 +64,7 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
       </div>
       <div class="statbox">
         <div class="statbox__n">{{ pct(data?.progress.completionRate) }}</div>
-        <div class="statbox__k">完关率（有进度用户）</div>
+        <div class="statbox__k">题库完成度（有进度用户）</div>
       </div>
     </div>
 
@@ -131,10 +131,18 @@ const pct = (v: number | null | undefined) => (v == null ? '—' : (v * 100).toF
         <div><b>{{ learning.d1.retainedUsers }} / {{ learning.d1.eligibleUsers }}</b><span>D1 留存 / 成熟样本</span></div>
         <div><b>{{ learning.d7.retainedUsers }} / {{ learning.d7.eligibleUsers }}</b><span>D7 留存 / 成熟样本</span></div>
         <div><b>{{ learning.threeCase7d.completedUsers }} / {{ learning.threeCase7d.eligibleUsers }}</b><span>七日三题 / 成熟样本</span></div>
+        <div><b>{{ learning.firstSession.solvedUsers }} / {{ learning.firstSession.startedUsers }}</b><span>首局成功 / 首局开局</span></div>
+        <div><b>{{ learning.firstSession.failedUsers }} / {{ learning.firstSession.unfinishedUsers }}</b><span>首局失败 / 未结束</span></div>
+        <div><b>{{ learning.d7Solved.retainedUsers }} / {{ learning.d7Solved.eligibleUsers }}</b><span>D7 成功破案 / 同批成熟样本</span></div>
+        <div><b>{{ learning.saveConversion7d.convertedUsers }} / {{ learning.saveConversion7d.eligibleUsers }}</b><span>七日登录保存 / 成熟提示样本</span></div>
+        <div><b>{{ learning.continue7d.continuedUsers }} / {{ learning.continue7d.eligibleUsers }}</b><span>保存后七日继续 / 成熟账号样本</span></div>
       </div>
+      <p class="hint">首访 {{ learning.window.firstDay ?? '暂无' }} 至 {{ learning.window.lastDay }}；七日窗口为第 0 至第 6 个自然日。</p>
+      <p class="hint">观察未满：D1 {{ learning.immatureUsers.d1 }}，D7 {{ learning.immatureUsers.d7 }}，试玩三题 {{ learning.immatureUsers.threeCase7d }}，登录保存 {{ learning.immatureUsers.saveConversion7d }}，保存后继续 {{ learning.immatureUsers.continue7d }}。</p>
+      <p class="hint" v-for="entry in learning.sources" :key="entry.source">{{ entry.source }}：{{ entry.startedUsers }} 位开局主体</p>
     </NCard>
 
-    <p class="hint">活跃 = 登录或上传进度；完关率 = 有进度用户的 solved 总数 ÷（有进度用户数 × 已上线案例数），App 端进度结构对齐后可细分到章节。</p>
+    <p class="hint">活跃 = 登录或上传进度；题库完成度 = 有进度用户的 solved 总数 ÷（有进度用户数 × 已上线案例数）。有效训练须执行至少一次验证并结束；失败局计训练，成功破案单列。游客认领后按账号合并，首次开局和首次保存提示取最早时间。</p>
   </div>
 </template>
 

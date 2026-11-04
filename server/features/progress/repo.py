@@ -1,6 +1,5 @@
 """进度数据访问：所有结算使用同一连接，先锁用户行再读取投影与账本。"""
 
-import hashlib
 import json
 from dataclasses import dataclass
 from typing import Any
@@ -10,6 +9,7 @@ from pydantic import TypeAdapter
 import db
 from features.progress.legacy import unlocked_chapters
 from features.progress.models import ImportOperation, ProgressBlob, ProgressOperation, ProgressState, SessionOperation
+from features.stats.service import SessionEndFact, record_session_fact
 
 OPERATIONS = TypeAdapter(list[ProgressOperation])
 
@@ -116,24 +116,11 @@ def add_operation(conn: Any, uid: str, operation: ProgressOperation) -> bool:
 def add_session_event(conn: Any, uid: str, operation: SessionOperation) -> None:
     if operation.payload.test_mode:
         return
-    event_id = operation.payload.event_id
-    event_key = (
-        "client:" + event_id
-        if event_id
-        else "session_end:" + hashlib.sha256((uid + ":" + operation.payload.session_id).encode()).hexdigest()
-    )
-    conn.execute(
-        "INSERT INTO learning_events(id,user_id,anonymous_id,kind,occurred_at,payload) VALUES(?,?,?,?,?,?) "
-        "ON CONFLICT(id) DO NOTHING",
-        (
-            event_key,
-            uid,
-            operation.payload.anonymous_id,
-            "session_end",
-            operation.occurred_at.isoformat(),
-            operation.payload.model_dump_json(by_alias=True),
-        ),
-    )
+    p = operation.payload
+    record_session_fact(conn, uid, SessionEndFact(
+        sessionId=p.session_id, caseId=p.case_id, contentRevision=p.content_revision,
+        anonymousId=p.anonymous_id, occurredAt=operation.occurred_at, solved=p.solved,
+    ))
 
 
 def save(conn: Any, uid: str, state: ProgressState, revision: int) -> str:

@@ -18,7 +18,7 @@ const descriptions = {
   published: '内容已发布，仍可补充事实或报告需要纠正的地方。',
   rejected: '本次未采用。你仍可补充证据或说明，编辑会看到新的反馈。',
 }
-const playUrl = computed(() => config.public.appH5Origin.replace(/\/$/, '') + props.submission.playPath)
+const playUrl = computed(() => config.public.appH5Origin.replace(/\/$/, '') + props.submission.playPath + '&source=community')
 watch(() => [props.submission.materialVersion, props.submission.materialConfirmed, props.submission.materialCurrent], () => { agreed.value = false })
 
 async function addSupplement() {

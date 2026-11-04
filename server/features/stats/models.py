@@ -13,6 +13,17 @@ class LearningEventBody(BaseModel):
     anonymous_id: str = Field(min_length=1, max_length=191, alias="anonymousId")
     occurred_at: AwareDatetime = Field(default_factory=lambda: datetime.now().astimezone(), alias="occurredAt")
     test_mode: bool = Field(default=False, alias="testMode")
+    preview: bool = False
+    solved: bool | None = None
+
+
+class SessionEndFact(BaseModel):
+    session_id: str = Field(alias="sessionId")
+    case_id: str = Field(alias="caseId")
+    content_revision: int = Field(alias="contentRevision")
+    anonymous_id: str | None = Field(default=None, alias="anonymousId")
+    occurred_at: AwareDatetime = Field(alias="occurredAt")
+    solved: bool
 
 
 class LearningEventClaimBody(BaseModel):

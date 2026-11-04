@@ -141,7 +141,7 @@ function openCase(node: NodeVM) {
     uni.showToast({ title: chapterUnlockHint(ch.value.id), icon: 'none' })
     return
   }
-  uni.navigateTo({ url: '/pages/play/play?id=' + node.id })
+  uni.navigateTo({ url: '/pages/play/play?id=' + node.id + '&source=chapter' })
 }
 </script>
 

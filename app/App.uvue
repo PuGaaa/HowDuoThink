@@ -1,10 +1,11 @@
 <script setup lang="uts">
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
+import { flushLearningEvents } from './utils/learning-events'
 
 onLaunch(() => {
   console.log('App Launch')
 })
-onShow(() => {})
+onShow(() => { flushLearningEvents() })
 onHide(() => {})
 </script>
 
