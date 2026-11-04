@@ -15,6 +15,7 @@ from tests.conftest import make_client
 
 @pytest.fixture
 def people():
+    original_cases = {row["id"] for row in db.q("SELECT id FROM cases")}
     clients = []
     for role in ["user", "editor", "user"]:
         uid = "sub-" + uuid4().hex
@@ -26,8 +27,17 @@ def people():
         client.headers["Authorization"] = "Bearer " + security.sign_session(uid)
         clients.append((uid, client))
     yield clients
-    for _, client in clients:
+    for uid, client in clients:
         client.close()
+        for row in db.q("SELECT id FROM submissions WHERE user_id=?", (uid,)):
+            sid = row["id"]
+            db.ex("DELETE FROM submission_messages WHERE submission_id=?", (sid,))
+            db.ex("DELETE FROM submission_reviews WHERE submission_id=?", (sid,))
+        db.ex("DELETE FROM submission_requests WHERE user_id=?", (uid,))
+        db.ex("DELETE FROM submissions WHERE user_id=?", (uid,))
+        db.ex("DELETE FROM users WHERE id=?", (uid,))
+    for cid in {row["id"] for row in db.q("SELECT id FROM cases")} - original_cases:
+        db.ex("DELETE FROM cases WHERE id=?", (cid,))
 
 
 def body(**changes):
@@ -321,3 +331,42 @@ def test_submission_and_request_alias_rollback_together(people, monkeypatch):
         service.create_submission(people[0][0], SubmissionCreate.model_validate(body()))
     assert db.q("SELECT id FROM submissions WHERE user_id=?", (people[0][0],)) == []
     assert db.q("SELECT request_id FROM submission_requests WHERE user_id=?", (people[0][0],)) == []
+
+
+def test_candidate_search_includes_mechanism_and_evidence_beyond_intro(people):
+    cid = "mechanism-" + uuid4().hex[:12]
+    add_case(cid)
+    db.ex(
+        "UPDATE cases SET payload=? WHERE id=?",
+        (
+            db.jdump(
+                {
+                    "intro": "一个概括性现象，未直接写出根因术语",
+                    "expertChain": [{"thought": "SESSION_LEAK_2026 通过持有者证据验证释放路径"}],
+                }
+            ),
+            cid,
+        ),
+    )
+    results = service.similar("SESSION_LEAK_2026")
+    assert results[0]["id"] == cid
+    assert "_searchText" not in results[0] and "_revision" not in results[0]
+
+
+def test_candidate_supplement_invalidates_previous_review(people):
+    sid = submit(people[0][1])
+    other_sid = submit(people[2][1], title="相同现象的另一份事故原稿")
+    authorize(people, sid)
+    before = {item["id"]: item["key"] for item in service.editor_candidates(sid)}
+    assert other_sid in before
+    assert (
+        people[2][1]
+        .post(f"/api/me/submissions/{other_sid}/supplements", json={"text": "新增证据说明两个事故可能来自同一次发布"})
+        .status_code
+        == 200
+    )
+    after = {item["id"]: item["key"] for item in service.editor_candidates(sid)}
+    assert before[other_sid] != after[other_sid]
+    with pytest.raises(HTTPException) as exc:
+        service.require_publication_review(sid)
+    assert exc.value.status_code == 409

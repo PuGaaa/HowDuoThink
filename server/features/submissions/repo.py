@@ -162,7 +162,7 @@ def private_candidates(conn: Any, sid: str) -> tuple[list, list]:
         (sid,),
     ).fetchall()
     submissions = conn.execute(
-        "SELECT id,title,symptom,resolution,status FROM submissions WHERE id<>? AND status IN ('pending','needs_more','accepted') ORDER BY created_at DESC LIMIT 200",
+        "SELECT s.id,s.title,s.symptom,s.resolution,s.status,r.source_revision,r.material_version,r.material FROM submissions s JOIN submission_reviews r ON r.submission_id=s.id WHERE s.id<>? AND s.status IN ('pending','needs_more','accepted') ORDER BY s.created_at DESC LIMIT 200",
         (sid,),
     ).fetchall()
     return cases, submissions
@@ -201,3 +201,17 @@ def contributors(conn: Any, cid: str) -> list:
         "AND r.confirmed_version=r.material_version AND r.material_source_revision=r.source_revision)) ORDER BY role DESC,s.created_at,s.id",
         (cid,),
     ).fetchall()
+
+
+def supplement_texts(conn: Any, submission_ids: list[str]) -> dict[str, str]:
+    grouped = {sid: "" for sid in submission_ids}
+    if not submission_ids:
+        return grouped
+    placeholders = ",".join("?" for _ in submission_ids)
+    rows = conn.execute(
+        f"SELECT submission_id,body FROM submission_messages WHERE kind='supplement' AND submission_id IN ({placeholders}) ORDER BY id",
+        tuple(submission_ids),
+    ).fetchall()
+    for row in rows:
+        grouped[row["submission_id"]] += " " + row["body"]
+    return grouped
