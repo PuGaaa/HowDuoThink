@@ -10,7 +10,7 @@ from fastapi import HTTPException
 import db
 from core import security
 from features.submissions import service
-from tests.conftest import make_client
+from tests.conftest import load_seed, make_client
 
 
 @pytest.fixture
@@ -207,6 +207,22 @@ def test_human_difference_review_is_required_for_manual_draft(people):
     assert db.jload(case["payload"], {})["part"] == "engineer"
     assert case["source_type"] == "community"
     assert service.authorized_draft_source(sid) == material
+
+
+def test_publish_path_requires_review_and_records_community_source(people):
+    sid = submit(people[0][1])
+    payload = load_seed()
+    payload["id"] = "publish-guard-" + uuid4().hex[:10]
+    draft = people[1][1].post("/api/admin/cases", json={"id": payload["id"], "payload": payload, "submissionId": sid})
+    assert draft.status_code == 200
+    assert people[1][1].post("/api/cases", json=payload).status_code == 409
+
+    authorize(people, sid)
+    published = people[1][1].post("/api/cases", json=payload)
+    assert published.status_code == 200, published.text
+    row = db.q("SELECT submission_id,source_type,source_commit FROM cases WHERE id=?", (payload["id"],))[0]
+    assert row["submission_id"] == sid and row["source_type"] == "community"
+    assert row["source_commit"].startswith("submission:" + sid + ":material:")
 
 
 def test_new_candidate_requires_recheck_before_publish(people):

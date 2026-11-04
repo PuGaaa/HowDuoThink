@@ -25,6 +25,7 @@ __all__ = [
     "require_publication_review",
     "save_material",
     "save_review",
+    "validate_publication",
 ]
 
 
@@ -183,3 +184,28 @@ def contributors_for_case(cid: str) -> list[dict]:
             {"authorId": row["user_id"], "author": row["author"], "role": row["role"]}
             for row in repo.contributors(conn, cid)
         ]
+
+
+def validate_publication(conn, sid: str) -> dict:
+    """在调用方事务内锁定并校验可发布投稿，返回发布所需的公开署名信息。"""
+    from features.submissions.review import _authorized, _reviewed_candidates
+
+    source = repo.get(conn, sid, lock=True)
+    if source is None:
+        raise HTTPException(404, "投稿不存在")
+    if source["status"] == "archived" or source["linked_case_id"] or source["parent_submission_id"]:
+        raise HTTPException(409, "归档稿或补证稿不能直接发布为独立案例")
+    _authorized(conn, sid)
+    _reviewed_candidates(conn, sid)
+    author_row = conn.execute(
+        "SELECT name,login FROM users WHERE id=?", (source["user_id"],)
+    ).fetchone()
+    review = repo.review(conn, sid)
+    return {
+        "authorName": (
+            author_row["name"] or ("@" + author_row["login"])
+            if author_row and (author_row["name"] or author_row["login"])
+            else "官方"
+        ),
+        "materialVersion": review["material_version"],
+    }

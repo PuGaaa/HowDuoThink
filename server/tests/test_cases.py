@@ -42,7 +42,7 @@ def test_publish_roundtrip_and_idempotent():
         assert r1.status_code == 200, r1.text
         v1 = r1.json()["version"]
         # 幂等重发：正文不变，不新增修订或 cursor
-        r2 = client.post("/api/cases", json=payload)
+        r2 = client.post("/api/cases", json={**payload, "baseRevision": 1})
         assert r2.status_code == 200
         assert r2.json()["version"] == v1
         assert r2.json()["unchanged"] is True

@@ -69,7 +69,13 @@ def update_case_meta(cid: str, body: CaseMetaBody) -> dict:
     changed = bool(body.part) or body.chapter_id is not None or body.order is not None or body.type_tags is not None
     if changed:
         with db.tx() as conn:
-            version_row = conn.execute("SELECT value FROM meta WHERE meta_key='casepack_version'").fetchone()
+            conn.execute(
+                "INSERT INTO meta(meta_key, value) VALUES('casepack_version', '0') "
+                "ON CONFLICT(meta_key) DO NOTHING"
+            )
+            version_row = conn.execute(
+                "SELECT value FROM meta WHERE meta_key='casepack_version' /* FOR UPDATE */"
+            ).fetchone()
             version = (int(version_row["value"]) if version_row else 0) + 1
             conn.execute(
                 "INSERT INTO meta(meta_key, value) VALUES('casepack_version', ?) ON CONFLICT(meta_key) DO UPDATE SET value=excluded.value",
@@ -119,33 +125,36 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
     errors = gate.check_case(payload)
     if errors:
         raise HTTPException(422, {"message": "未过发布门禁", "errors": errors})
-    # 来源与署名：关联投稿 → 投稿者昵称；官方题 → "官方"
-    sub_id = None
-    author_name = "官方"
-    crow = db.q("SELECT submission_id, author_id FROM cases WHERE id=?", (payload.id,))
-    if crow and crow[0]["submission_id"]:
-        sub_id = crow[0]["submission_id"]
-        srow = db.q(
-            "SELECT u.name, u.login FROM submissions s LEFT JOIN users u ON u.id=s.user_id WHERE s.id=?",
-            (sub_id,),
-        )
-        if srow and (srow[0]["name"] or srow[0]["login"]):
-            author_name = srow[0]["name"] or ("@" + srow[0]["login"])
     d = payload.model_dump(by_alias=True)
     requested_base = d.pop("baseRevision", None)
     requested_revision = d.pop("contentRevision", None)
-    source_type = d.pop("sourceType", None) or "official"
-    source_commit = d.pop("sourceCommit", None)
-    d["submissionId"] = sub_id
-    d["authorName"] = author_name
+    d.pop("sourceType", None)
+    d.pop("sourceCommit", None)
     with db.tx() as conn:
+        case_snapshot = conn.execute(
+            "SELECT id, submission_id FROM cases WHERE id=?", (payload.id,)
+        ).fetchone()
+        sub_id = case_snapshot["submission_id"] if case_snapshot else None
+        publication = None
+        if sub_id:
+            from features.submissions.service import validate_publication
+
+            publication = validate_publication(conn, sub_id)
         exists = conn.execute(
-            "SELECT id, status, content_revision, payload, source_type, source_commit FROM cases WHERE id=?",
+            "SELECT id, status, submission_id, content_revision, payload, source_type, source_commit FROM cases WHERE id=? /* FOR UPDATE */",
             (payload.id,),
         ).fetchone()
+        sub_id = exists["submission_id"] if exists else None
+        author_name = publication["authorName"] if publication else "官方"
+        source_type = "community" if publication else "official"
+        source_commit = (
+            f"submission:{sub_id}:material:{publication['materialVersion']}" if publication else None
+        )
+        d["submissionId"] = sub_id
+        d["authorName"] = author_name
         if exists and exists["status"] == "published":
             current_revision = int(exists["content_revision"] or 1)
-            if requested_base is not None and requested_base != current_revision:
+            if requested_base is None or requested_base != current_revision:
                 raise HTTPException(409, "案例修订已变化，请重新载入后发布")
             current_payload = _content_payload(db.jload(exists["payload"], {}))
             if current_payload == _content_payload(d):
@@ -167,7 +176,13 @@ def publish_case(uid: str, payload: CasePayload) -> dict:
             next_revision = requested_revision or 1
             if next_revision < 1:
                 raise HTTPException(409, "contentRevision 必须从 1 开始")
-        version_row = conn.execute("SELECT value FROM meta WHERE meta_key='casepack_version'").fetchone()
+        conn.execute(
+            "INSERT INTO meta(meta_key, value) VALUES('casepack_version', '0') "
+            "ON CONFLICT(meta_key) DO NOTHING"
+        )
+        version_row = conn.execute(
+            "SELECT value FROM meta WHERE meta_key='casepack_version' /* FOR UPDATE */"
+        ).fetchone()
         version = (int(version_row["value"]) if version_row else 0) + 1
         conn.execute(
             "INSERT INTO meta(meta_key, value) VALUES('casepack_version', ?) ON CONFLICT(meta_key) DO UPDATE SET value=excluded.value",
