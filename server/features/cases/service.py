@@ -211,8 +211,13 @@ def _upsert_article(conn, payload: CasePayload, author: str) -> str:
 
 
 def published_after(since: int) -> tuple[int, list[dict]]:
-    """App 同步：version > since 的已发布案例 + 当前版本号（sync feature 经此取数）。"""
-    rows = db.q(
-        "SELECT id, version, payload FROM cases WHERE status='published' AND version>? ORDER BY version", (since,)
-    )
-    return db.current_version(), [db.jload(r["payload"], {}) for r in rows]
+    """App 同步：固定本次响应的发布上界，再读取该上界内的增量。"""
+    with db.tx() as conn:
+        head_row = conn.execute("SELECT value FROM meta WHERE meta_key='casepack_version'").fetchone()
+        head = int(head_row["value"]) if head_row else 0
+        rows = conn.execute(
+            "SELECT id, version, payload FROM cases "
+            "WHERE status='published' AND version>? AND version<=? ORDER BY version",
+            (since, head),
+        ).fetchall()
+    return head, [db.jload(r["payload"], {}) for r in rows]
