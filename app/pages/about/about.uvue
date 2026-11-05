@@ -19,13 +19,9 @@
 
       <view class="card">
         <text class="card__title">相关站点</text>
-        <view class="linkrow" @click="openWeb">
+        <view class="linkrow">
           <text class="linkrow__label">Web 社区站（投稿与解决逻辑）</text>
           <text class="linkrow__v">localhost:3000</text>
-        </view>
-        <view class="linkrow" @click="goHandbook">
-          <text class="linkrow__label">诊断手册（本机）</text>
-          <text class="linkrow__v">查看</text>
         </view>
       </view>
 

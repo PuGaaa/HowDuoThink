@@ -2,7 +2,8 @@ import { defineConfig, loadEnv } from 'vite'
 import uni from '@dcloudio/vite-plugin-uni'
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
+  // HBuilderX 编译时进程 cwd 在其插件目录，项目根以 UNI_INPUT_DIR 为准（与 uni 自身一致）
+  const env = loadEnv(mode, process.env.UNI_INPUT_DIR || process.cwd(), '')
 
   return {
     plugins: [uni()],

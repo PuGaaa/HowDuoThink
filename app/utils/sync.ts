@@ -1,6 +1,9 @@
 /** Web 社区同步：拉取 casepack（已发布关卡包），本地校验后落 storage。
  *  增量：带本地版本号 since 只拉 delta，按 id 并入已存整包；
- *  所有入口经 getEffectiveCases 按内容修订合并；发布游标只决定增量范围。 */
+ *  所有入口经 getEffectiveCases 按内容修订合并；发布游标只决定增量范围。
+ *  存储：按案例拆 key（think_casepack_v2/<id>），避免 iOS 上单 key 大值
+ *  在主线程做整包 JSON 递归转换导致 watchdog（0x8BADF00D）杀进程；
+ *  进程内缓存保证同一会话只读 storage 一轮。 */
 import { API_BASE } from '../config'
 import { DiagnosisCase } from '../types/case'
 import { preserveLegacyChapterUnlocks } from '../data/chapters'
@@ -11,44 +14,81 @@ export interface SyncResult {
   error: string
 }
 
+/** 旧版整包 key：仅用于迁移与清理，不再写入。 */
 export const CASEPACK_KEY = 'think_casepack_v1'
+const V2_PREFIX = 'think_casepack_v2/'
 const KEY_VERSION = 'think_pack_version'
-const KEY_PACK = CASEPACK_KEY
+
+let remoteCache: DiagnosisCase[] | null = null
 
 export function getPackVersion(): number {
   const v = uni.getStorageSync(KEY_VERSION)
   return Number(v) || 0
 }
 
-/** 远端已同步的案例（casepack payload 与 DiagnosisCase 同构） */
+function v2Keys(): string[] {
+  const info = uni.getStorageInfoSync()
+  const keys: string[] = info?.keys ?? []
+  return keys.filter(k => k.startsWith(V2_PREFIX))
+}
+
+/** 远端已同步的案例（casepack payload 与 DiagnosisCase 同构）。 */
 export function getRemoteCases(): DiagnosisCase[] {
+  if (remoteCache != null) return remoteCache
+  const keys = v2Keys()
+  if (keys.length > 0) {
+    const out: DiagnosisCase[] = []
+    for (const key of keys) {
+      try {
+        const raw = uni.getStorageSync(key)
+        if (raw == null) continue
+        const parsed = JSON.parse(raw as string) as DiagnosisCase
+        if (parsed != null && parsed.id) out.push(parsed)
+      } catch (e) {
+        // 单案例损坏只丢弃该条，不影响整包
+      }
+    }
+    remoteCache = out
+    return remoteCache
+  }
+  return migrateLegacyPack()
+}
+
+/** v1 整包 → v2 拆分 key；迁移后删除整包。 */
+function migrateLegacyPack(): DiagnosisCase[] {
   const raw = uni.getStorageSync(CASEPACK_KEY)
-  if (raw == null) {
-    return []
+  if (raw == null || (raw as string).length === 0) {
+    remoteCache = []
+    return remoteCache
   }
-  const str = raw as string
-  if (str.length === 0) {
-    return []
-  }
+  let arr: DiagnosisCase[] = []
   try {
-    const arr = JSON.parse(str) as DiagnosisCase[]
-    return Array.isArray(arr) ? arr : []
+    const parsed = JSON.parse(raw as string)
+    arr = Array.isArray(parsed) ? parsed : []
   } catch (e) {
-    return []
+    arr = []
   }
+  for (const item of arr) {
+    if (item == null || !item.id) continue
+    uni.setStorageSync(V2_PREFIX + item.id, JSON.stringify(item))
+  }
+  uni.removeStorageSync(CASEPACK_KEY)
+  remoteCache = arr.filter(item => item != null && item.id)
+  return remoteCache
 }
 
 export function getPackCount(): number {
-  const raw = uni.getStorageSync(KEY_PACK)
-  if (raw == null) return 0
-  const str = raw as string
-  if (str.length === 0) return 0
-  try {
-    const arr = JSON.parse(str) as any[]
-    return arr.length
-  } catch (e) {
-    return 0
+  return getRemoteCases().length
+}
+
+function persistPack(cases: DiagnosisCase[]) {
+  // delta 语义：响应不含某案例不代表远端已删，只写不删；清理仅针对旧版整包 key
+  for (const c of cases) {
+    if (c == null || !c.id) continue
+    uni.setStorageSync(V2_PREFIX + c.id, JSON.stringify(c))
   }
+  uni.removeStorageSync(CASEPACK_KEY)
+  remoteCache = cases.filter(c => c != null && c.id)
 }
 
 export function fetchCasepack(cb: (r: SyncResult) => void) {
@@ -84,8 +124,8 @@ export function fetchCasepack(cb: (r: SyncResult) => void) {
           const previous = mergedMap.get(c.id)
           if (previous == null || (c.contentRevision ?? 1) > (previous.contentRevision ?? 1)) mergedMap.set(c.id, c)
         }
-        const merged = [...mergedMap.values()]
-        uni.setStorageSync(KEY_PACK, JSON.stringify(merged))
+        const merged = [...mergedMap.values()] as DiagnosisCase[]
+        persistPack(merged)
         uni.setStorageSync(KEY_VERSION, String(data.version))
         cb({ version: data.version, count: merged.length, error: '' })
       } catch (e) {
