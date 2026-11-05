@@ -298,4 +298,3 @@ test('同版本远端较高成本不能覆盖本地有效0成本', () => {
   h.respond(h.take('/api/me/progress', 'GET'), h.projection({ cases: { 'first-npe': score(4) } }));
   assert.equal(h.storage.getCaseProgress('first-npe').bestCost, 0);
 });
-

@@ -463,4 +463,3 @@
 停止点：【停止规则】提交与发送前终止/分支复现吻合，send异常、Broker后丢和消费提交失败均排除。以上均来自已执行动作；修复建议不冒充已完成的证据。
 
 技术机制依据：[官方资料1](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)、[官方资料2](https://www.rabbitmq.com/docs/confirms)。
-

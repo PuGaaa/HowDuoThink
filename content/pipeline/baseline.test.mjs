@@ -28,4 +28,3 @@ test('正文变化不能复用旧的 ID+正文哈希基线', () => {
   const changed = { ...current, title: `${current.title}（修订）` }
   assert.notEqual(hashContent(changed), current.contentHash)
 })
-
