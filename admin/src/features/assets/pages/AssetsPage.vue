@@ -2,7 +2,7 @@
 import { h, computed, onMounted, ref } from "vue";
 import { useMessage } from "naive-ui";
 import { NButton, NCard, NDataTable, NPopconfirm, NSelect, NTag, NUpload } from "naive-ui";
-import type { DataTableColumns, UploadCustomRequestOptions } from "naive-ui";
+import type { DataTableColumns, UploadFileInfo } from "naive-ui";
 import {
   bindSlot,
   deleteAsset,
@@ -14,12 +14,14 @@ import {
   type AssetItem,
   type SlotItem,
 } from "@/api/assets";
+import { createUploadQueue, uploadBatch } from "../upload-batch";
 
 const message = useMessage();
 
 const items = ref<AssetItem[]>([]);
 const loading = ref(false);
-const uploading = ref(false);
+// 进行中的上传文件数：>0 时按钮转圈并显示剩余计数，全部结算后归零
+const uploading = ref(0);
 const uploadCategory = ref<string>("misc");
 const slots = ref<SlotItem[]>([]);
 // 每个槽位当前在下拉里选中的素材 id（0 = 未选择）
@@ -87,18 +89,42 @@ async function saveSlot(s: SlotItem) {
 
 onMounted(load);
 
-// NUpload 自定义上传：单文件走 /api/assets multipart；成功后刷新列表
-function customRequest({ file }: UploadCustomRequestOptions) {
-  const f = file.file as File;
-  if (!f) return;
-  uploading.value = true;
-  uploadAsset(f, uploadCategory.value)
-    .then((item) => {
-      message.success(`已上传：${item.filename}`);
-      load();
-    })
-    .catch((e: any) => message.error(e?.message || "上传失败"))
-    .finally(() => (uploading.value = false));
+// 多选上传：NUpload 只负责选文件（default-upload=false），编排交给 uploadBatch。
+// @change 对累积列表逐文件触发：用 id 集合去重，createUploadQueue 把同一轮
+// 连发的事件合并成一次 runBatch，汇总提示才是一条完整的「成功 x 个，失败 y 个」。
+const pickedUids = new Set<string>();
+const uploadQueue = createUploadQueue(runBatch);
+
+function onUploadChange({ fileList }: { fileList: UploadFileInfo[] }) {
+  const fresh = fileList.filter((f) => !pickedUids.has(f.id));
+  fresh.forEach((f) => pickedUids.add(f.id));
+  const files = fresh.map((f) => f.file).filter((f): f is File => !!f);
+  if (files.length === 0) return;
+  uploadQueue.add(files);
+}
+
+async function runBatch(files: File[]) {
+  uploading.value += files.length;
+  try {
+    const result = await uploadBatch(
+      files,
+      uploadCategory.value,
+      uploadAsset,
+      (name, ok, error) => {
+        uploading.value = Math.max(0, uploading.value - 1);
+        if (ok) message.success(`已上传：${name}`);
+        else message.error(`${name}：${error || "上传失败"}`);
+      },
+    );
+    if (result.failed.length === 0 && result.succeeded.length > 0) {
+      message.success(`全部完成，共 ${result.succeeded.length} 个`);
+    } else if (result.failed.length > 0) {
+      message.warning(`批量上传结束：成功 ${result.succeeded.length} 个，失败 ${result.failed.length} 个`);
+    }
+    load();
+  } catch (e: any) {
+    message.error(e?.message || "批量上传失败");
+  }
 }
 
 async function copyUrl(item: AssetItem) {
@@ -203,12 +229,16 @@ const columns: DataTableColumns<AssetItem> = [
         style="width: 120px"
       />
       <NUpload
-        :custom-request="customRequest"
+        multiple
+        :default-upload="false"
         :show-file-list="false"
         accept=".png,.jpg,.jpeg,.webp,.gif,.svg"
         style="width: auto"
+        @change="onUploadChange"
       >
-        <NButton type="primary" size="small" :loading="uploading">上传素材</NButton>
+        <NButton type="primary" size="small" :loading="uploading > 0">
+          上传素材{{ uploading > 0 ? `（${uploading}）` : "" }}
+        </NButton>
       </NUpload>
     </div>
 
