@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import pymysql
+import pytest
 
 # 环境与隔离库必须在 import main 之前就位
 os.environ["JWT_SECRET"] = "test-secret-for-pytest-only-32bytes!!"  # HS256 建议至少 32 字节
@@ -65,6 +66,18 @@ def make_client() -> TestClient:
 def login_admin(client: TestClient) -> None:
     r = client.post("/api/auth/login", json={"login": "admin", "password": "test-admin-pw"})
     assert r.status_code == 200, r.text
+
+
+@pytest.fixture(autouse=True)
+def _reset_login_throttle():
+    """用例间清空登录防爆破计数器：故意输错密码的用例（如 401 测试）会给
+    pw:<login> 攒失败数，进程级 _LOGIN_FAILURES 不清就会让同 key 的后续
+    用例整片撞 429（CI 上 settings/stats/submissions/users 的顺序耦合失败根源）。"""
+    from features.auth import service as auth_service
+
+    auth_service._LOGIN_FAILURES.clear()
+    yield
+    auth_service._LOGIN_FAILURES.clear()
 
 
 def load_seed(case_id: str = "cache-drift") -> dict:

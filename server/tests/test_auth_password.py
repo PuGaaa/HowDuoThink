@@ -62,5 +62,8 @@ def test_change_password_requires_old():
         assert r.status_code == 400
         r = client.post("/api/me/password", json={"oldPassword": _OLD, "newPassword": _NEW})
         assert r.status_code == 200
+        # 改回，避免污染同会话后续用例（login_admin 依赖 ADMIN_PASSWORD 对应密码）
+        r2 = client.post("/api/me/password", json={"oldPassword": _NEW, "newPassword": _OLD})
+        assert r2.status_code == 200
         r = client.get("/api/me")
         assert r.json()["hasPassword"] is True
