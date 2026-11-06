@@ -128,7 +128,14 @@ function finish(r: LoginResult) {
   uni.showToast({ title: '登录成功', icon: 'none' })
   const u = getStoredUser()
   const loginToken = getToken()
-  if (u != null) prepareProgressIdentity(u.id)
+  if (u != null) {
+    // 防御：游客进度脏数据异常不得阻断登录链（解析层已兜底，此处兜最后）
+    try {
+      prepareProgressIdentity(u.id)
+    } catch (e) {
+      errMsg.value = '登录成功，但本地进度合并异常，已跳过合并'
+    }
+  }
   trackIdentityLearningEvent('login_success', 'login')
   claimLearningEvents()
   flushLearningEvents()

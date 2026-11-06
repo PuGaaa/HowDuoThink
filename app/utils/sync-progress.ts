@@ -26,7 +26,10 @@ export function prepareProgressIdentity(uid: string): void {
       const archiveId = 'archive-' + String(Date.now()) + '-' + String(Math.random())
       operations.push({ opId: 'bootstrap-' + archiveId, kind: 'bootstrap', occurredAt: new Date().toISOString(), payload: { archiveId: archiveId, bundle: bundle } })
     }
-    operations.push(...guestOperations)
+    // uts 原生端数组展开 push 存在兼容性风险，改为等价循环
+    for (let i = 0; i < guestOperations.length; i++) {
+      operations.push(guestOperations[i])
+    }
     progressStorageSet('think_progress_ops_v1', JSON.stringify(operations))
     return
   }

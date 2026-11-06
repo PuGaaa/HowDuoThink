@@ -125,15 +125,22 @@ export function progressStorageSet(key: string, value: any): void {
 }
 
 function enqueueOperation(kind: string, payload: any, occurredAt?: string): void {
-  const raw = progressStorageGet(KEY_OPS)
-  const ops: ProgressOperation[] = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as ProgressOperation[]
+  const ops = pendingProgressOperations()
   ops.push({ opId: String(Date.now()) + '-' + String(Math.random()), kind: kind, occurredAt: occurredAt ?? new Date().toISOString(), payload: payload })
   progressStorageSet(KEY_OPS, JSON.stringify(ops))
 }
 
 export function pendingProgressOperations(): ProgressOperation[] {
   const raw = progressStorageGet(KEY_OPS)
-  return raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as ProgressOperation[]
+  if (raw == null) return []
+  const s = raw as string
+  if (s.length === 0) return []
+  try {
+    return JSON.parse(s) as ProgressOperation[]
+  } catch (e) {
+    // 脏数据兜底：操作队列解析失败按空队列处理，不允许卡死身份合并/登录链
+    return []
+  }
 }
 
 export function confirmProgressOperations(ids: string[]): void {
@@ -185,6 +192,18 @@ export interface ProgressBundle {
 }
 
 /** 导出本地全量进度（登录态上传用） */
+function safeSolvedLayers(): string[] {
+  const raw = progressStorageGet(KEY_SOLVED_LAYERS)
+  if (raw == null || typeof raw != 'string') return []
+  if ((raw as string).length === 0) return []
+  try {
+    return JSON.parse(raw as string) as string[]
+  } catch (e) {
+    // 脏数据兜底：游客进度导出不因解析失败抛异常卡死身份合并
+    return []
+  }
+}
+
 export function exportProgressBundle(): ProgressBundle {
   const cases: { [id: string]: any } = {}
   const info = uni.getStorageInfoSync()
@@ -194,7 +213,7 @@ export function exportProgressBundle(): ProgressBundle {
     const legacyGuest = progressIdentity() === 'guest' && k.indexOf(KEY_CASE) === 0
     if (k.indexOf(prefix) !== 0 && !legacyGuest) continue
     const raw = uni.getStorageSync(k)
-    if (raw == null || (raw as string).length === 0) continue
+    if (raw == null || typeof raw != 'string' || (raw as string).length === 0) continue
     try {
       cases[legacyGuest ? k.replace(KEY_CASE, '') : k.replace(prefix, '')] = JSON.parse(raw as string)
     } catch (e) {}
@@ -206,7 +225,7 @@ export function exportProgressBundle(): ProgressBundle {
     tasks: loadTasks(),
     dailyDone: progressStorageGet('think_daily_done_v1') as string ?? '',
     checkuse: getChecklistUse(),
-    solvedLayers: progressStorageGet(KEY_SOLVED_LAYERS) == null ? [] : JSON.parse(progressStorageGet(KEY_SOLVED_LAYERS) as string) as string[],
+    solvedLayers: safeSolvedLayers(),
     unlockedChapterIds: getUnlockedChapterIds(),
   }
   return b
@@ -551,7 +570,21 @@ let unlockedCache: string[] | null = null
 export function getUnlockedChapterIds(): string[] {
   if (unlockedCache != null) return unlockedCache
   const raw = progressStorageGet(KEY_UNLOCKED_CHAPTERS)
-  unlockedCache = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as string[]
+  if (raw == null) {
+    unlockedCache = []
+    return unlockedCache
+  }
+  const s = raw as string
+  if (s.length === 0) {
+    unlockedCache = []
+    return unlockedCache
+  }
+  try {
+    unlockedCache = JSON.parse(s) as string[]
+  } catch (e) {
+    // 脏数据兜底：解析失败按未解锁处理，不允许身份合并/登录链卡死
+    unlockedCache = []
+  }
   return unlockedCache
 }
 
