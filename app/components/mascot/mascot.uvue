@@ -1,5 +1,5 @@
 <template>
-  <view :class="visible ? 'mascot' : 'mascot mascot--hidden'">
+  <view :class="visible ? 'mascot' : 'mascot mascot--hidden'" @click="$emit('dismiss')">
     <view class="mascot__badge">
       <image v-if="imgUrl.length > 0" class="mascot__avatar" :src="imgUrl" mode="aspectFit"></image>
       <text v-else class="mascot__emoji">{{ emoji }}</text>
@@ -11,6 +11,8 @@
 <script setup lang="uts">
 import { computed } from 'vue'
 import { getMascotUrl } from '../../utils/remote-assets'
+
+defineEmits(['dismiss'])
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -64,7 +66,8 @@ const visible = computed((): boolean => {
   /* 动画暂移除：蒸汽模式 @keyframes/transition 为 HBuilderX 5.33 新特性，
      iOS 真机在 mascot 显示→隐藏切换时 UNIAPP_DOM 线程 SIGSEGV（见 unpackage/logs），
      待引擎修复后再恢复弹出动效 */
-  z-index: 90;
+  /* 高于抽屉(97)/遮罩(96)：选错反馈从抽屉上方弹出（低于 confirm-dialog 998） */
+  z-index: 98;
   border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #E8D49A;
 }
 .mascot--hidden {

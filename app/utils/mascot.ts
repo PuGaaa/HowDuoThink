@@ -9,6 +9,7 @@ export interface MascotAppearance {
   id: string // frog | snail | otter | rabbit | dino
   emoji: string
   line: string
+  sticky: boolean // true = 重要反馈（选错/出局）：不自动消失，玩家点击才收
 }
 
 const FROG_LINES: string[] = [
@@ -27,12 +28,6 @@ const OTTER_LINES: string[] = [
   '纳尼？！证据它自己说话了！',
   '纳尼？！这条线索值回票价！',
   '纳尼？！快记下来，这就是突破口！',
-]
-
-const RABBIT_LINES: string[] = [
-  '（摇头）证据还不够，你只是想结束它。',
-  '（用耳朵捂住提交按钮）再咬合一下证据链？',
-  '（长耳朵垂下来）过早锁定，是排错里最贵的错误。',
 ]
 
 const DINO_LINES: string[] = [
@@ -57,7 +52,7 @@ function pick(lines: string[]): string {
 export function onSceneOpen(symptomTypes: string[]): MascotAppearance | null {
   for (let i = 0; i < symptomTypes.length; i++) {
     if (symptomTypes[i] === 'error') {
-      const a: MascotAppearance = { id: 'frog', emoji: '🐸', line: pick(FROG_LINES) }
+      const a: MascotAppearance = { id: 'frog', emoji: '🐸', line: pick(FROG_LINES), sticky: false }
       return a
     }
   }
@@ -80,32 +75,37 @@ export function onActionResolved(
   const nextCooldown = otterCooldown > 0 ? otterCooldown - 1 : 0
 
   if (gain === 'high' && nextCooldown === 0) {
-    const a: MascotAppearance = { id: 'otter', emoji: '🦦', line: pick(OTTER_LINES) }
+    const a: MascotAppearance = { id: 'otter', emoji: '🦦', line: pick(OTTER_LINES), sticky: false }
     return { appearance: a, lowStreak: 0, otterCooldown: 2 }
   }
   if (nextLowStreak >= 2) {
-    const a: MascotAppearance = { id: 'snail', emoji: '🐌', line: pick(SNAIL_LINES) }
+    const a: MascotAppearance = { id: 'snail', emoji: '🐌', line: pick(SNAIL_LINES), sticky: false }
     return { appearance: a, lowStreak: 0, otterCooldown: nextCooldown }
   }
   return { appearance: null, lowStreak: nextLowStreak, otterCooldown: nextCooldown }
 }
 
-/** 错误指认根因：垂耳兔出场 */
+/** 错误指认根因：垂耳兔出场（固定引导文案，sticky 弹窗点击才收） */
 export function onWrongIdentify(): MascotAppearance {
-  const a: MascotAppearance = { id: 'rabbit', emoji: '🐰', line: pick(RABBIT_LINES) }
+  const a: MascotAppearance = {
+    id: 'rabbit',
+    emoji: '🐰',
+    line: '证据链指向了别处——回假设板重新推演，或再看看证据。',
+    sticky: true,
+  }
   return a
 }
 
 /** 挫败时刻①：两次错误指认出局。三角龙只暖不刺 */
 export function onEliminated(): MascotAppearance {
-  const a: MascotAppearance = { id: 'dino', emoji: '🦖', line: pick(DINO_LINES) }
+  const a: MascotAppearance = { id: 'dino', emoji: '🦖', line: pick(DINO_LINES), sticky: true }
   return a
 }
 
 /** 挫败时刻②：花费远超专家基准（每关最多提示一次，由调用方去重） */
 export function onOverspend(playerCost: number, expertCost: number): MascotAppearance | null {
   if (playerCost > expertCost * 2.5) {
-    const a: MascotAppearance = { id: 'dino', emoji: '🦖', line: pick(DINO_LINES) }
+    const a: MascotAppearance = { id: 'dino', emoji: '🦖', line: pick(DINO_LINES), sticky: false }
     return a
   }
   return null

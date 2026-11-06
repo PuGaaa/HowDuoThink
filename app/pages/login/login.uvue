@@ -59,6 +59,7 @@
         </view>
       </view>
 
+      <text class="forgot" @click="onForgot">忘记密码？</text>
       <text class="hint">Web 社区站注册的账号可直接登录 · 数据互通</text>
     </view>
     </scroll-view>
@@ -99,6 +100,12 @@ function startCountdown() {
       timer = 0
     }
   }, 1000)
+}
+
+/** 忘记密码：找回路径 = 短信验证码登录同一账号 → 到「我的→设置密码」设置新密码 */
+function onForgot() {
+  if (tab.value !== 'sms') tab.value = 'sms'
+  uni.showToast({ title: '用手机验证码登录同一账号，即可在「我的→设置密码」设置新密码', icon: 'none' })
 }
 
 function sendCode() {
@@ -324,6 +331,12 @@ function doPwLogin() {
   font-size: 28rpx;
   color: #FFFFFF;
   font-weight: bold;
+}
+.forgot {
+  font-size: 22rpx;
+  color: #FF8A5C;
+  text-align: center;
+  margin-top: 16rpx;
 }
 .hint {
   font-size: 20rpx;

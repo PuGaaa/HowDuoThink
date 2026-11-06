@@ -40,18 +40,14 @@ test('auth.ts 提供 changePassword 与 fetchProfile，AppUser 带 hasPassword',
   assert.match(auth, /export function fetchProfile/, '缺少 fetchProfile（GET /api/me 刷新登录资料）')
 })
 
-test('个人中心登录态展示账号区入口并正确分发', () => {
+test('个人中心登录态展示设置/修改密码入口并正确分发', () => {
   const profile = read('app/pages/profile/profile.uvue')
   const template = profile.match(/<template>([\s\S]*?)<\/template>/)[1]
   // 账号区只在登录态出现
   assert.match(template, /v-if="user != null"[^>]*@click="goPassword"|@click="goPassword"[^>]*v-if="user != null"/, '设置/修改密码入口应限登录态')
-  assert.match(template, /goForgot/, '缺少忘记密码入口')
   const script = profile.match(/<script[\s\S]*?<\/script>/)[0]
   assert.match(script, /function goPassword\(\)/, '缺少 goPassword 分发')
   assert.match(script, /pages\/password\/password/, 'goPassword 应跳密码页')
-  assert.match(script, /function goForgot\(\)/, '缺少 goForgot 分发')
-  assert.match(script, /pages\/login\/login/, '忘记密码应跳登录页（短信验证码登录即找回）')
-  assert.match(script, /短信/, '跳登录前应提示用短信验证码登录')
   // 入口文案由 hasPassword 驱动
   assert.match(script, /hasPassword/, '入口文案应依赖 hasPassword 字段')
 })

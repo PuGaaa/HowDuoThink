@@ -59,14 +59,17 @@
         <text class="row__value">{{ row.value }}</text>
         <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
       </view>
+      <!-- 提醒自定义时间：系统时间选择器（快捷时间在「学习提醒」行） -->
+      <picker mode="time" @change="onCustomReminderTime">
+        <view class="row">
+          <text class="row__label">提醒时间（自定义）</text>
+          <text class="row__value">点击选择</text>
+          <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
+        </view>
+      </picker>
       <!-- 账号：密码入口（登录态） -->
       <view v-if="user != null" class="row" @click="goPassword">
         <text class="row__label">{{ passwordLabel }}</text>
-        <text class="row__value"></text>
-        <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
-      </view>
-      <view v-if="user != null" class="row" @click="goForgot">
-        <text class="row__label">忘记密码</text>
         <text class="row__value"></text>
         <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
       </view>
@@ -94,7 +97,7 @@ import { openConfirmDialog, ConfirmDialogOptions } from '../../utils/confirm-dia
 import { getAvatar as resolveAvatar, getDisplayName } from '../../utils/auth'
 import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
 import { getReminder, setReminder, reminderLabel, startReminderPolling, requestNotifyPermission } from '../../utils/reminder'
-import { manualSync, lastSyncLabel, pullServerProgress } from '../../utils/sync-progress'
+import { pullServerProgress } from '../../utils/sync-progress'
 import { APP_VERSION } from '../../utils/version'
 
 class RowVM {
@@ -162,12 +165,9 @@ function refresh() {
   r3.label = '分享海报'
   r3.value = '生成侦探档案'
   const r4 = new RowVM()
-  r4.label = '检查单云同步'
-  r4.value = user.value != null ? (lastSyncLabel().length > 0 ? lastSyncLabel() : '点击同步') : '登录后可用'
-  const r5 = new RowVM()
-  r5.label = '关于 好多星'
-  r5.value = APP_VERSION
-  rows.value = [r1, r2, r3, r4, r5]
+  r4.label = '关于 好多星'
+  r4.value = APP_VERSION
+  rows.value = [r1, r2, r3, r4]
 }
 
 // onShow 首次显示也会触发：从子页返回时数据保持最新；提醒轮询随页面常驻
@@ -216,12 +216,29 @@ function goPassword() {
   uni.navigateTo({ url: '/pages/password/password' })
 }
 
-/** 忘记密码：产品内找回路径 = 短信验证码登录同一账号 → 再在密码页设置新密码 */
-function goForgot() {
-  uni.showToast({ title: '用手机验证码登录同一账号，回来即可设置新密码', icon: 'none' })
-  setTimeout(() => {
-    uni.navigateTo({ url: '/pages/login/login' })
-  }, 800)
+/** 开启提醒的共享逻辑：权限申请 → 偏好落库 → 轮询 → 刷新提示（快捷时间与自定义时间共用） */
+function applyReminder(hh: number, mm: number) {
+  requestNotifyPermission().then((permission: string) => {
+    if (permission === 'granted') {
+      setReminder({ on: true, hh: hh, mm: mm })
+      startReminderPolling()
+      refresh()
+      uni.showToast({ title: '学习提醒已开启', icon: 'none' })
+      return
+    }
+    setReminder({ on: false, hh: 21, mm: 30 })
+    refresh()
+    uni.showToast({
+      title: permission === 'denied' ? '浏览器已拒绝通知权限，提醒未开启' : '当前环境不支持浏览器通知',
+      icon: 'none',
+    })
+  })
+}
+
+function onCustomReminderTime(e: PickerChangeEvent) {
+  const parts = e.value.split(':')
+  if (parts.length !== 2) return
+  applyReminder(parseInt(parts[0]), parseInt(parts[1]))
 }
 
 function showReminderSheet() {
@@ -237,21 +254,7 @@ function showReminderSheet() {
       }
       const times: number[][] = [[20, 0], [21, 0], [21, 30], [22, 0]]
       const t = times[res.tapIndex]
-      requestNotifyPermission().then((permission: string) => {
-        if (permission === 'granted') {
-          setReminder({ on: true, hh: t[0], mm: t[1] })
-          startReminderPolling()
-          refresh()
-          uni.showToast({ title: '学习提醒已开启', icon: 'none' })
-          return
-        }
-        setReminder({ on: false, hh: 21, mm: 30 })
-        refresh()
-        uni.showToast({
-          title: permission === 'denied' ? '浏览器已拒绝通知权限，提醒未开启' : '当前环境不支持浏览器通知',
-          icon: 'none',
-        })
-      })
+      applyReminder(t[0], t[1])
     },
   })
 }
@@ -288,13 +291,6 @@ function onRow(label: string, value: string) {
   }
   if (label === '学习提醒') {
     showReminderSheet()
-    return
-  }
-  if (label === '检查单云同步') {
-    manualSync((r) => {
-      if (r.error.length > 0) uni.showToast({ title: r.error, icon: 'none' })
-      refresh()
-    })
     return
   }
   uni.showToast({ title: value + ' · 即将上线', icon: 'none' })

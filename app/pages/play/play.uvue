@@ -45,8 +45,8 @@
     </view>
     </scroll-view>
 
-    <!-- 内心小动物：悬浮弹窗 -->
-    <mascot v-if="loaded" :show="mascotShow" :who="mascotWho" :line="mascotLine"></mascot>
+    <!-- 内心小动物：悬浮弹窗（选错/出局为 sticky，点击才收） -->
+    <mascot v-if="loaded" :show="mascotShow" :who="mascotWho" :line="mascotLine" @dismiss="dismissMascot"></mascot>
 
     <!-- 阶段 FAB -->
     <view v-if="loaded && !finished && !drawerOpen" class="fab" @click="toggleDrawer">
@@ -154,12 +154,6 @@
               <view v-if="collected.length == 0" class="checklist__empty">
                 <text class="checklist__empty-text">还没有收集的检查单——破案后会在这里积累</text>
               </view>
-            </view>
-          </view>
-          <view v-if="wrongCount > 0" class="reguide">
-            <text class="reguide__text">垂耳兔：你的证据链指向了别处。回假设板重新推演，或者再看一遍证据。</text>
-            <view class="reguide__btn" @click="drawerTab = 'board'">
-              <text class="reguide__btn-text">回假设板</text>
             </view>
           </view>
           <view v-for="(c, i) in causes" :key="c.id" class="cause" @click="pickCause(i)">
@@ -636,10 +630,21 @@ function appear(m: MascotAppearance | null) {
   mascotEvents.value.push(rec)
   if (hideTimer > 0) {
     clearTimeout(hideTimer)
+    hideTimer = 0
   }
+  // sticky 弹窗（选错/出局）不自动消失，等玩家点击收起
+  if (m.sticky) return
   hideTimer = setTimeout(() => {
     mascotShow.value = false
   }, 2800)
+}
+
+function dismissMascot() {
+  if (hideTimer > 0) {
+    clearTimeout(hideTimer)
+    hideTimer = 0
+  }
+  mascotShow.value = false
 }
 
 function findCause(id: string): RootCauseOption | null {
@@ -678,6 +683,7 @@ function confirmIdentify() {
     if (wrongCount.value >= maxWrong) {
       finished.value = true
       appear(onEliminated())
+      drawerOpen.value = false
       finishAndSave()
     } else if (!frustratedShown.value) {
       const o = onOverspend(playerCost.value, expertCost.value)
@@ -1165,37 +1171,6 @@ function goReview() {
 .checklist__empty-text {
   font-size: 21rpx;
   color: #B08F4A;
-}
-.reguide {
-  display: flex;
-  flex-direction: column;
-  background-color: #FFF6DE;
-  border-radius: 18rpx;
-  border-width: 1rpx;
-  border-style: solid;
-  border-color: #F2D98C;
-  padding: 20rpx;
-  margin-bottom: 20rpx;
-}
-.reguide__text {
-  font-size: 22rpx;
-  color: #8A6D1F;
-  line-height: 34rpx;
-}
-.reguide__btn {
-  align-self: flex-start;
-  background-color: #FFFFFF;
-  border-radius: 26rpx;
-  border-width: 2rpx;
-  border-style: solid;
-  border-color: #FF8A5C;
-  padding: 10rpx 24rpx;
-  margin-top: 14rpx;
-}
-.reguide__btn-text {
-  font-size: 21rpx;
-  font-weight: bold;
-  color: #FF8A5C;
 }
 
 /* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
