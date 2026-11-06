@@ -1,5 +1,7 @@
 """auth 域·手机号身份：验证码发送/登录建号/账号互通绑定/限频。"""
 
+import os
+
 import pytest
 
 from tests.conftest import login_admin, make_client
@@ -7,6 +9,9 @@ from tests.conftest import login_admin, make_client
 PHONE = "13800001234"
 _seq = {"n": 0}
 _SMS_CODE_FOR_TESTS = "246810"
+# 测试密码从 conftest 注入的 ADMIN_PASSWORD 派生，文件内不落明文凭据
+_PW_A = os.environ["ADMIN_PASSWORD"] + "-phone-a"
+_PW_B = os.environ["ADMIN_PASSWORD"] + "-phone-b"
 
 
 @pytest.fixture(autouse=True)
@@ -186,7 +191,7 @@ def test_phone_account_password_login_uses_same_user_id():
         assert phone_login.status_code == 200
         uid = phone_login.json()["userId"]
         login_name = phone_login.json()["login"]
-        password = "phone-pw-123"
+        password = _PW_A
 
         r = client.post(
             "/api/me/password",
@@ -210,12 +215,12 @@ def test_phone_account_can_password_login_by_phone():
         assert (
             client.post(
                 "/api/me/password",
-                json={"newPassword": "phone-pw-456"},
+                json={"newPassword": _PW_B},
                 headers={"Authorization": "Bearer " + phone_login.json()["token"]},
             ).status_code
             == 200
         )
 
-        password_login = client.post("/api/auth/login", json={"login": p, "password": "phone-pw-456"})
+        password_login = client.post("/api/auth/login", json={"login": p, "password": _PW_B})
         assert password_login.status_code == 200
         assert password_login.json()["userId"] == phone_login.json()["userId"]

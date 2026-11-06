@@ -1,8 +1,13 @@
 """auth 域：健康检查、账密鉴权、哈希升级、dev 旁路关闭。"""
 
+import os
+
 import pytest
 
 from tests.conftest import login_admin, make_client
+
+# 套件约定的管理员测试密码由 conftest 注入，文件内不落明文凭据
+_ADMIN_PW = os.environ["ADMIN_PASSWORD"]
 
 
 def test_health():
@@ -58,10 +63,13 @@ def _remove_admins():
     db.ex("DELETE FROM users WHERE role='admin'")
 
 
-def _restore_pw_admin(password="test-admin-pw"):
-    """种子类测试会动 pw-admin——恢复成套件约定的 test-admin-pw，避免污染后续用例。"""
+def _restore_pw_admin(password=None):
+    """种子类测试会动 pw-admin——恢复成套件约定密码，避免污染后续用例。"""
     import db
     from core import security
+
+    if password is None:
+        password = _ADMIN_PW
 
     db.ex(
         "INSERT INTO users(id, login, name, avatar, role, password_hash) "

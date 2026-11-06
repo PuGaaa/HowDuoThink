@@ -1,7 +1,12 @@
 """settings 机制层：优先级链（DB > env > 内置默认）、缓存失效、写校验、client scope、读库降级。"""
 
+import os
+
 import db
 from core import settings
+
+# 测试密码从 conftest 注入的 ADMIN_PASSWORD 派生，文件内不落明文凭据
+_PW = os.environ["ADMIN_PASSWORD"] + "-settings"
 
 
 def _clear(*keys: str) -> None:
@@ -80,7 +85,7 @@ def _mkuser(role: str = "user") -> str:
     login = f"setuser-{uuid.uuid4().hex[:6]}"
     db.ex(
         "INSERT INTO users(id, login, name, role, password_hash) VALUES(?,?,?,?,?)",
-        ("pw-" + login, login, login, role, security.hash_password("pw-123456")),
+        ("pw-" + login, login, login, role, security.hash_password(_PW)),
     )
     return login
 
@@ -106,7 +111,7 @@ def test_admin_settings_requires_admin():
     with make_client() as client:
         assert client.get("/api/admin/settings").status_code in (401, 403)  # 匿名
         login = _mkuser("user")
-        r = client.post("/api/auth/login", json={"login": login, "password": "pw-123456"})
+        r = client.post("/api/auth/login", json={"login": login, "password": _PW})
         assert r.status_code == 200
         assert client.get("/api/admin/settings").status_code == 403
         assert client.put("/api/admin/settings", json={"values": {"ai.rate_limit": 7}}).status_code == 403

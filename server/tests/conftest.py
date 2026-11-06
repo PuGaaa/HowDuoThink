@@ -23,11 +23,11 @@ _MYSQL = dict(
     password=os.environ["MYSQL_PASSWORD"],
     charset="utf8mb4",
 )
-_TEST_DB = "hdt_test_%d" % os.getpid()
+_TEST_DB = "hdt_test"
 _admin = pymysql.connect(**_MYSQL)
 with _admin.cursor() as cur:
-    cur.execute("DROP DATABASE IF EXISTS " + _TEST_DB)
-    cur.execute("CREATE DATABASE " + _TEST_DB + " CHARACTER SET utf8mb4")
+    cur.execute("DROP DATABASE IF EXISTS hdt_test")
+    cur.execute("CREATE DATABASE hdt_test CHARACTER SET utf8mb4")
 _admin.commit()
 _admin.close()
 os.environ["MYSQL_DATABASE"] = _TEST_DB
@@ -36,7 +36,7 @@ os.environ["MYSQL_DATABASE"] = _TEST_DB
 def _drop_test_db() -> None:
     admin = pymysql.connect(**_MYSQL)
     with admin.cursor() as cur:
-        cur.execute("DROP DATABASE IF EXISTS " + _TEST_DB)
+        cur.execute("DROP DATABASE IF EXISTS hdt_test")
     admin.commit()
     admin.close()
 

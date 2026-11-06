@@ -2,12 +2,16 @@
 遵循 conftest：临时库 + 无 dev 绕行；LangChain 调用在 service 层被 monkeypatch（不触网）。"""
 
 import json
+import os
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 import main
 from core import security
+
+# 测试密码从 conftest 注入的 ADMIN_PASSWORD 派生，文件内不落明文凭据
+_PW = os.environ["ADMIN_PASSWORD"] + "-ai"
 
 
 def make_user(client, login: str, role: str = "user") -> None:
@@ -17,12 +21,12 @@ def make_user(client, login: str, role: str = "user") -> None:
     db.ex(
         "INSERT INTO users(id, login, name, role, password_hash) VALUES(?,?,?,?,?) "
         "ON CONFLICT(id) DO UPDATE SET role=excluded.role, password_hash=excluded.password_hash",
-        (f"pw-{login}", login, login, role, security.hash_password("test-pw-123")),
+        (f"pw-{login}", login, login, role, security.hash_password(_PW)),
     )
 
 
 def login(c, login_name: str) -> None:
-    r = c.post("/api/auth/login", json={"login": login_name, "password": "test-pw-123"})
+    r = c.post("/api/auth/login", json={"login": login_name, "password": _PW})
     assert r.status_code == 200, r.text
 
 

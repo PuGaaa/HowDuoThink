@@ -28,7 +28,7 @@ def _bearer(client, uid: str):
     client.headers.update({"Authorization": "Bearer " + security.sign_session(uid)})
 
 
-def test_me_has_password_false_for_sms_user(): 
+def test_me_has_password_false_for_sms_user():
     """无密码账号：资料里 hasPassword=False（App 据此显示「设置密码」）。"""
     with make_client() as client:
         _insert_sms_user("pw-less-1")

@@ -339,9 +339,10 @@ def test_mysql_upgrade_freezes_existing_data_and_replays(monkeypatch):
     from core import config, migrate
     from core import db as coredb
 
-    database = "integrity_upgrade_" + uuid4().hex
+    # 一次性实例内的独立库：名称固定字面量（不拼接），测试结束即删
+    database = "integrity_upgrade_isolated"
     admin = coredb.connect()
-    admin.execute("CREATE DATABASE " + database)
+    admin.execute("CREATE DATABASE integrity_upgrade_isolated")
     try:
         monkeypatch.setattr(config, "MYSQL_DATABASE", database)
         command.upgrade(migrate._cfg(), "0004_learning_events")
@@ -368,7 +369,7 @@ def test_mysql_upgrade_freezes_existing_data_and_replays(monkeypatch):
             == original["cases"]
         )
     finally:
-        admin.execute("DROP DATABASE " + database)
+        admin.execute("DROP DATABASE integrity_upgrade_isolated")
         admin.commit()
         admin.close()
 

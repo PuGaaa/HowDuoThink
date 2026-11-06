@@ -111,7 +111,14 @@ def get_profile(uid: str) -> dict:
     if not rows:
         raise HTTPException(401, "用户不存在")
     r = rows[0]
-    return {"id": r["id"], "login": r["login"], "name": r["name"], "avatar": r["avatar"], "role": r["role"], "hasPassword": bool(r["password_hash"])}
+    return {
+        "id": r["id"],
+        "login": r["login"],
+        "name": r["name"],
+        "avatar": r["avatar"],
+        "role": r["role"],
+        "hasPassword": bool(r["password_hash"]),
+    }
 
 
 def update_profile(uid: str, name: str, avatar_url: str | None) -> dict:
