@@ -105,6 +105,14 @@
       }
     },
     {
+      "path": "pages/forgot/forgot",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "找回密码",
+        "disableScroll": true
+      }
+    },
+    {
       "path": "pages/submit/submit",
       "style": {
         "disableScroll": true

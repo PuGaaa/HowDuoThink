@@ -246,6 +246,55 @@ export function sendSmsCode(phone: string, cb: (r: SmsResult) => void) {
   })
 }
 
+export interface ResetVerifyResult {
+  error: string
+  resetToken: string
+}
+
+/** 忘记密码第一步：短信验证已注册手机号，换取短时重置票据（无需登录）。 */
+export function verifyResetCode(phone: string, code: string, cb: (r: ResetVerifyResult) => void) {
+  uni.request({
+    url: API_BASE + '/api/auth/password/reset/verify',
+    method: 'POST',
+    data: { phone: phone, code: code } as any,
+    timeout: 8000,
+    success: (res) => {
+      if (res.statusCode !== 200) {
+        const detail = (res.data as any)?.detail
+        cb({ error: typeof detail === 'string' ? detail : '验证失败', resetToken: '' })
+        return
+      }
+      const token = (res.data as any)?.resetToken
+      if (typeof token !== 'string' || (token as string).length === 0) {
+        cb({ error: '验证响应异常（缺少重置凭证）', resetToken: '' })
+        return
+      }
+      cb({ error: '', resetToken: token as string })
+    },
+    fail: () => cb({ error: '无法连接社区服务', resetToken: '' }),
+  })
+}
+
+/** 忘记密码第二步：凭重置票据免旧密码设新密码。 */
+export function resetPassword(resetToken: string, newPassword: string, cb: (r: LoginResult) => void) {
+  uni.request({
+    url: API_BASE + '/api/auth/password/reset',
+    method: 'POST',
+    header: { 'Content-Type': 'application/json' } as any,
+    data: { resetToken: resetToken, newPassword: newPassword } as any,
+    timeout: 8000,
+    success: (res) => {
+      if (res.statusCode !== 200) {
+        const detail = (res.data as any)?.detail
+        cb({ error: typeof detail === 'string' ? detail : '重置失败' })
+        return
+      }
+      cb({ error: '' })
+    },
+    fail: () => cb({ error: '无法连接社区服务' }),
+  })
+}
+
 /** 手机验证码登录：新手机号自动建号（与 Web 注册互通）。 */
 export function smsLogin(phone: string, code: string, cb: (r: LoginResult) => void) {
   uni.request({

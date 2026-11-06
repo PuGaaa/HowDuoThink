@@ -24,7 +24,7 @@ test('忘记密码入口从个人中心迁移到登录页', () => {
   assert.match(loginTpl, /忘记密码/, '登录页应有忘记密码入口')
   const loginScript = login.match(/<script[\s\S]*?<\/script>/)[0]
   assert.match(loginScript, /function onForgot\(\)/, '登录页缺少 onForgot')
-  assert.match(loginScript, /tab\.value = 'sms'/, '忘记密码应切到短信验证码登录（找回路径）')
+  assert.match(loginScript, /pages\/forgot\/forgot/, '忘记密码应跳转独立找回页（短信验证 → 设新密码）')
 })
 
 test('学习提醒单行：点时间直接选（系统时间选择器）+ 开关直接开关，无快捷选项菜单', () => {

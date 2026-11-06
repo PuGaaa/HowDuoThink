@@ -145,6 +145,29 @@ def change_password(uid: str, old_password: str, new_password: str) -> None:
     db.ex("UPDATE users SET password_hash=? WHERE id=?", (security.hash_password(new_password), uid))
 
 
+def verify_password_reset_code(phone: str, code: str) -> str:
+    """忘记密码第一步：手机号必须已注册（找回不是注册）→ 验码并消费 → 签发短时重置票据。"""
+    rows = db.q("SELECT id FROM users WHERE phone=?", (phone,))
+    if not rows:
+        raise HTTPException(404, "该手机号尚未注册")
+    uid = rows[0]["id"]
+    ensure_active(uid)
+    out_id = _verify_code(phone, code)
+    with db.tx() as conn:
+        _consume_code(conn, phone, out_id)
+    return security.sign_password_reset(uid)
+
+
+def reset_password_with_token(token: str, new_password: str) -> None:
+    """忘记密码第二步：票据有效即免旧密码设新密码（票据 10 分钟过期；验证码已在上一步消费）。"""
+    uid = security.verify_password_reset(token)
+    if uid is None:
+        raise HTTPException(401, "重置凭证无效或已过期，请重新验证手机号")
+    if not db.q("SELECT id FROM users WHERE id=?", (uid,)):
+        raise HTTPException(404, "用户不存在")
+    db.ex("UPDATE users SET password_hash=? WHERE id=?", (security.hash_password(new_password), uid))
+
+
 # ---------- 手机号身份 ----------
 
 _NICK_ADJ = ["机警的", "敏锐的", "沉稳的", "好奇的", "冷静的", "执着的", "灵巧的"]

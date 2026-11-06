@@ -224,3 +224,65 @@ def test_phone_account_can_password_login_by_phone():
         password_login = client.post("/api/auth/login", json={"login": p, "password": _PW_B})
         assert password_login.status_code == 200
         assert password_login.json()["userId"] == phone_login.json()["userId"]
+
+
+# ---------- 忘记密码：短信验证手机号 → 重置票据 → 免旧密码设新密码 ----------
+
+_PW_RESET = os.environ["ADMIN_PASSWORD"] + "-reset"
+
+
+def _insert_phone_user(phone: str) -> str:
+    """已注册的手机号账号（直插避免同号二次发码撞 60s 限频）；返回 login 名。"""
+    import db
+
+    login_name = "u" + phone[-4:]
+    db.ex(
+        "INSERT INTO users(id, login, name, avatar, role, phone) VALUES(?,?,?,?,?,?)",
+        ("ph-" + phone, login_name, login_name, "", "user", phone),
+    )
+    return login_name
+
+
+def test_password_reset_requires_registered_phone():
+    """未注册手机号不能走找回（找回不是注册）。"""
+    with make_client() as client:
+        p = _phone()
+        _send(client, p)
+        r = client.post("/api/auth/password/reset/verify", json={"phone": p, "code": _read_code(client, p)})
+        assert r.status_code == 404
+        # 必须是业务 404（路由缺失的 "Not Found" 不算实现）
+        assert "注册" in r.json()["detail"]
+
+
+def test_password_reset_wrong_code_401():
+    with make_client() as client:
+        p = _phone()
+        _insert_phone_user(p)
+        _send(client, p)
+        r = client.post("/api/auth/password/reset/verify", json={"phone": p, "code": "000000"})
+        assert r.status_code == 401
+
+
+def test_password_reset_flow_sets_new_password_without_old():
+    """验码通过 → 重置票据 → 不需旧密码直接设新密码 → 新密码可登录；票据不能冒充会话。"""
+    with make_client() as client:
+        p = _phone()
+        login_name = _insert_phone_user(p)
+        _send(client, p)
+        r = client.post("/api/auth/password/reset/verify", json={"phone": p, "code": _read_code(client, p)})
+        assert r.status_code == 200, r.text
+        token = r.json()["resetToken"]
+        assert token
+        # 重置票据不是会话凭证
+        assert client.get("/api/me", headers={"Authorization": "Bearer " + token}).status_code == 401
+        r = client.post("/api/auth/password/reset", json={"resetToken": token, "newPassword": _PW_RESET})
+        assert r.status_code == 200, r.text
+    with make_client() as fresh:
+        r = fresh.post("/api/auth/login", json={"login": login_name, "password": _PW_RESET})
+        assert r.status_code == 200
+
+
+def test_password_reset_bad_token_401():
+    with make_client() as client:
+        r = client.post("/api/auth/password/reset", json={"resetToken": "not-a-token", "newPassword": _PW_RESET})
+        assert r.status_code == 401

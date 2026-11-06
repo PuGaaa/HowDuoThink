@@ -46,3 +46,24 @@ class PhoneLoginBody(BaseModel):
 class BindPhoneBody(BaseModel):
     phone: str = Field(pattern=r"^1[3-9]\d{9}$")
     code: str = Field(min_length=6, max_length=6)
+
+
+class PasswordResetVerifyBody(BaseModel):
+    """忘记密码第一步：短信验证手机号。"""
+
+    phone: str = Field(pattern=r"^1[3-9]\d{9}$")
+    code: str = Field(min_length=6, max_length=6)
+
+
+class PasswordResetBody(BaseModel):
+    """忘记密码第二步：凭重置票据免旧密码设新密码。"""
+
+    reset_token: str = Field(min_length=1, max_length=1024, alias="resetToken")
+    new_password: str = Field(min_length=6, max_length=128, alias="newPassword")
+
+    @field_validator("new_password")
+    @classmethod
+    def _bcrypt_72_bytes(cls, v: str) -> str:
+        if len(v.encode()) > 72:
+            raise ValueError("密码过长（最多 72 字节；中文约 24 个字）")
+        return v

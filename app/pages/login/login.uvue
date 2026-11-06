@@ -102,10 +102,9 @@ function startCountdown() {
   }, 1000)
 }
 
-/** 忘记密码：找回路径 = 短信验证码登录同一账号 → 到「我的→设置密码」设置新密码 */
+/** 忘记密码：独立找回页——短信验证手机号 → 免旧密码设新密码 */
 function onForgot() {
-  if (tab.value !== 'sms') tab.value = 'sms'
-  uni.showToast({ title: '用手机验证码登录同一账号，即可在「我的→设置密码」设置新密码', icon: 'none' })
+  uni.navigateTo({ url: '/pages/forgot/forgot' })
 }
 
 function sendCode() {

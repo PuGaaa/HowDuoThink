@@ -110,3 +110,16 @@ def phone_login(body: models.PhoneLoginBody):
 def bind_phone(body: models.BindPhoneBody, uid: str = Depends(current_user)):
     """绑定手机号到当前账号：绑定后可用验证码登录同一账号。"""
     return service.bind_phone(uid, body.phone, body.code)
+
+
+@router.post("/api/auth/password/reset/verify")
+def password_reset_verify(body: models.PasswordResetVerifyBody):
+    """忘记密码第一步：短信验证已注册手机号，换取短时重置票据（无需登录）。"""
+    return {"resetToken": service.verify_password_reset_code(body.phone, body.code)}
+
+
+@router.post("/api/auth/password/reset")
+def password_reset(body: models.PasswordResetBody):
+    """忘记密码第二步：凭重置票据免旧密码设新密码。"""
+    service.reset_password_with_token(body.reset_token, body.new_password)
+    return {"ok": True}

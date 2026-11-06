@@ -48,6 +48,26 @@ def sign_preview(preview_id: str, expires_at: int) -> str:
     return jwt.encode({"pid": preview_id, "purpose": "case_preview", "exp": expires_at}, JWT_SECRET, algorithm="HS256")
 
 
+def sign_password_reset(user_id: str, minutes: int = 10) -> str:
+    """忘记密码重置票据：短时有效。载荷故意不带 uid 字段——verify_session 取不到 uid 即拒绝，
+    票据无法冒充登录会话。"""
+    return jwt.encode(
+        {"rid": user_id, "purpose": "password_reset", "exp": int(time.time()) + minutes * 60},
+        JWT_SECRET,
+        algorithm="HS256",
+    )
+
+
+def verify_password_reset(token: str) -> str | None:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        if payload.get("purpose") != "password_reset":
+            return None
+        return payload["rid"]
+    except Exception:
+        return None
+
+
 def verify_preview(token: str) -> str | None:
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
