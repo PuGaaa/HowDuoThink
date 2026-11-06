@@ -87,3 +87,37 @@ test('指认抽屉移除 reguide 纯文字块，反馈只走弹窗', () => {
   assert.ok(!playSource.includes('reguide'), 'reguide 文字块与样式应整体移除')
   assert.ok(!playSource.includes('你的证据链指向了别处'), '引导文案移交 mascot 引擎')
 })
+
+test('验证动作与指认根因列表恢复 scroll-view 滚动（假设板同款写法）', () => {
+  // 假设板（drawer-board）的 scroll-view 在同一抽屉内已被真机验证可滚动且 tap 正常
+  assert.match(
+    playSource,
+    /<scroll-view class="drawer__scroll" direction="vertical">/,
+    '验证动作列表区应恢复 scroll-view（v4 曾误删导致内容裁剪）'
+  )
+  assert.match(
+    playSource,
+    /<scroll-view class="dscroll" direction="vertical">/,
+    '指认根因列表区应恢复 scroll-view'
+  )
+})
+
+test('抽屉打开时动物弹窗抬升，不遮挡底部确认按钮', () => {
+  assert.match(mascotComp, /mascot--raised/, '应有抬升态样式类')
+  const style = mascotComp.match(/<style>([\s\S]*?)<\/style>/)[1]
+  const raised = style.match(/\.mascot--raised\s*\{([^}]*)\}/)
+  assert.ok(raised, '缺少 .mascot--raised 样式')
+  const bottom = raised[1].match(/bottom\s*:\s*(\d+)rpx/)
+  assert.ok(
+    bottom && Number(bottom[1]) >= 300,
+    `抬升后 bottom 应 ≥ 300rpx（确认按钮顶缘约 266rpx），当前为 ${bottom ? bottom[1] + 'rpx' : '缺失'}`
+  )
+  assert.match(playSource, /:raised="drawerOpen"/, 'play 页应传入 drawerOpen 控制抬升')
+})
+
+test('抽屉关闭时弹窗保持原位（bottom 140rpx 不变）', () => {
+  const style = mascotComp.match(/<style>([\s\S]*?)<\/style>/)[1]
+  const base = style.match(/\.mascot\s*\{([^}]*)\}/)
+  assert.ok(base, '缺少 .mascot 样式')
+  assert.match(base[1], /bottom\s*:\s*140rpx/, '默认位置应保持 140rpx（开场震惊娃观感不变）')
+})

@@ -54,19 +54,21 @@
 
       <!-- 通用 -->
       <text class="sec">通用</text>
+      <!-- 学习提醒：点时间直接选（系统时间选择器），开关直接开/关 -->
+      <view class="row">
+        <picker class="row__pick" mode="time" :value="reminderTime" @change="onReminderTime">
+          <view class="row__pickinner">
+            <text class="row__label">学习提醒</text>
+            <text class="row__value">{{ reminderValue }}</text>
+          </view>
+        </picker>
+        <switch :checked="reminderOn" color="#FF8A5C" @change="onReminderToggle"></switch>
+      </view>
       <view v-for="(row, i) in rows" :key="'r' + i" class="row" @click="onRow(row.label, row.value)">
         <text class="row__label">{{ row.label }}</text>
         <text class="row__value">{{ row.value }}</text>
         <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
       </view>
-      <!-- 提醒自定义时间：系统时间选择器（快捷时间在「学习提醒」行） -->
-      <picker mode="time" @change="onCustomReminderTime">
-        <view class="row">
-          <text class="row__label">提醒时间（自定义）</text>
-          <text class="row__value">点击选择</text>
-          <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
-        </view>
-      </picker>
       <!-- 账号：密码入口（登录态） -->
       <view v-if="user != null" class="row" @click="goPassword">
         <text class="row__label">{{ passwordLabel }}</text>
@@ -119,6 +121,10 @@ const avatarSrc = ref('')
 const dailyTitle = ref('')
 const dailyIsDone = ref(false)
 const passwordLabel = ref('设置 / 修改密码')
+// 学习提醒：开关状态 / picker 初值（HH:mm）/ 行内展示文案
+const reminderOn = ref(false)
+const reminderTime = ref('21:30')
+const reminderValue = ref('关闭')
 
 function refresh() {
   const cases = getEffectiveCases()
@@ -155,19 +161,21 @@ function refresh() {
   const span = seg[1] - seg[0]
   profilePct.value = span > 0 ? Math.min(100, Math.round(((totals.solved - seg[0]) * 100) / span)) : 100
 
+  const rp = getReminder()
+  reminderOn.value = rp.on
+  reminderTime.value = pad2(rp.hh) + ':' + pad2(rp.mm)
+  reminderValue.value = reminderLabel()
+
   const r1 = new RowVM()
-  r1.label = '学习提醒'
-  r1.value = reminderLabel()
+  r1.label = '每日一题'
+  r1.value = dailyIsDone.value ? '✓ 已完成' : dailyTitle.value
   const r2 = new RowVM()
-  r2.label = '每日一题'
-  r2.value = dailyIsDone.value ? '✓ 已完成' : dailyTitle.value
+  r2.label = '分享海报'
+  r2.value = '生成侦探档案'
   const r3 = new RowVM()
-  r3.label = '分享海报'
-  r3.value = '生成侦探档案'
-  const r4 = new RowVM()
-  r4.label = '关于 好多星'
-  r4.value = APP_VERSION
-  rows.value = [r1, r2, r3, r4]
+  r3.label = '关于 好多星'
+  r3.value = APP_VERSION
+  rows.value = [r1, r2, r3]
 }
 
 // onShow 首次显示也会触发：从子页返回时数据保持最新；提醒轮询随页面常驻
@@ -216,7 +224,11 @@ function goPassword() {
   uni.navigateTo({ url: '/pages/password/password' })
 }
 
-/** 开启提醒的共享逻辑：权限申请 → 偏好落库 → 轮询 → 刷新提示（快捷时间与自定义时间共用） */
+function pad2(n: number): string {
+  return n < 10 ? '0' + n : String(n)
+}
+
+/** 开启提醒的共享逻辑：权限申请 → 偏好落库 → 轮询 → 刷新提示（时间选择与开关共用） */
 function applyReminder(hh: number, mm: number) {
   requestNotifyPermission().then((permission: string) => {
     if (permission === 'granted') {
@@ -226,7 +238,8 @@ function applyReminder(hh: number, mm: number) {
       uni.showToast({ title: '学习提醒已开启', icon: 'none' })
       return
     }
-    setReminder({ on: false, hh: 21, mm: 30 })
+    // 权限未授予：保留所选时间，仅置为关闭，下次开启不用重选
+    setReminder({ on: false, hh: hh, mm: mm })
     refresh()
     uni.showToast({
       title: permission === 'denied' ? '浏览器已拒绝通知权限，提醒未开启' : '当前环境不支持浏览器通知',
@@ -235,28 +248,23 @@ function applyReminder(hh: number, mm: number) {
   })
 }
 
-function onCustomReminderTime(e: PickerChangeEvent) {
-  const parts = e.value.split(':')
+/** 点时间 → 系统时间选择器选定即开启 */
+function onReminderTime(e: UniPickerChangeEvent) {
+  const parts = (e.detail.value as string).split(':')
   if (parts.length !== 2) return
   applyReminder(parseInt(parts[0]), parseInt(parts[1]))
 }
 
-function showReminderSheet() {
-  const items = ['每天 20:00', '每天 21:00', '每天 21:30', '每天 22:00', '关闭提醒']
-  uni.showActionSheet({
-    itemList: items,
-    success: (res) => {
-      if (res.tapIndex === 4) {
-        setReminder({ on: false, hh: 21, mm: 30 })
-        refresh()
-        uni.showToast({ title: '学习提醒已关闭', icon: 'none' })
-        return
-      }
-      const times: number[][] = [[20, 0], [21, 0], [21, 30], [22, 0]]
-      const t = times[res.tapIndex]
-      applyReminder(t[0], t[1])
-    },
-  })
+/** 开关：开 → 按当前时间开启；关 → 保留时间仅关闭 */
+function onReminderToggle(e: UniSwitchChangeEvent) {
+  const rp = getReminder()
+  if (e.detail.value) {
+    applyReminder(rp.hh, rp.mm)
+    return
+  }
+  setReminder({ on: false, hh: rp.hh, mm: rp.mm })
+  refresh()
+  uni.showToast({ title: '学习提醒已关闭', icon: 'none' })
 }
 
 function onLogout() {
@@ -287,10 +295,6 @@ function onRow(label: string, value: string) {
   }
   if (label === '每日一题') {
     uni.navigateTo({ url: '/pages/play/play?id=' + dailyCase().id + '&source=daily' })
-    return
-  }
-  if (label === '学习提醒') {
-    showReminderSheet()
     return
   }
   uni.showToast({ title: value + ' · 即将上线', icon: 'none' })
@@ -524,6 +528,15 @@ function onRow(label: string, value: string) {
   font-weight: 500;
   color: #4A4458;
   flex: 1;
+}
+/* 学习提醒行：picker 占满开关左侧区域，内部沿用 label/value 横排 */
+.row__pick {
+  flex: 1;
+}
+.row__pickinner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }
 .row__value {
   font-size: 20rpx;

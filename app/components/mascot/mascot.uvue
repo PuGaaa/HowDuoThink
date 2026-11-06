@@ -1,5 +1,5 @@
 <template>
-  <view :class="visible ? 'mascot' : 'mascot mascot--hidden'" @click="$emit('dismiss')">
+  <view :class="cls" @click="$emit('dismiss')">
     <view class="mascot__badge">
       <image v-if="imgUrl.length > 0" class="mascot__avatar" :src="imgUrl" mode="aspectFit"></image>
       <text v-else class="mascot__emoji">{{ emoji }}</text>
@@ -18,6 +18,8 @@ const props = defineProps({
   show: { type: Boolean, default: false },
   who: { type: String, default: 'frog' },
   line: { type: String, default: '' },
+  /** 抽屉打开时抬升，避免压住抽屉底部确认按钮 */
+  raised: { type: Boolean, default: false },
 })
 
 // 资源未派发时的 emoji 降级（吉祥物图走后端派发，包内不再带图）
@@ -40,6 +42,12 @@ const emoji = computed((): string => {
 
 const visible = computed((): boolean => {
   return props.show && props.who.length > 0
+})
+
+const cls = computed((): string => {
+  let c = visible.value ? 'mascot' : 'mascot mascot--hidden'
+  if (props.raised) c = c + ' mascot--raised'
+  return c
 })
 </script>
 
@@ -73,6 +81,10 @@ const visible = computed((): boolean => {
 .mascot--hidden {
   opacity: 0;
   pointer-events: none;
+}
+.mascot--raised {
+  /* 抽屉打开时抬升：越过抽屉底部确认按钮顶缘（约 266rpx），压在列表区上方 */
+  bottom: 300rpx;
 }
 .mascot__badge {
   width: 72rpx;

@@ -27,9 +27,13 @@ test('忘记密码入口从个人中心迁移到登录页', () => {
   assert.match(loginScript, /tab\.value = 'sms'/, '忘记密码应切到短信验证码登录（找回路径）')
 })
 
-test('学习提醒支持自定义时间（系统时间选择器）', () => {
-  assert.match(profileTpl, /<picker[^>]*mode="time"/, '应有 mode=time 的 picker 作为自定义时间入口')
-  assert.match(profile, /onCustomReminderTime/, 'picker change 应接 onCustomReminderTime')
-  // 快捷选项与自定义共用同一套开启逻辑，避免权限/轮询/刷新三处复制
+test('学习提醒单行：点时间直接选（系统时间选择器）+ 开关直接开关，无快捷选项菜单', () => {
+  assert.match(profileTpl, /<picker[^>]*mode="time"/, '学习提醒应用 mode=time 的 picker 让用户直接设置时间')
+  assert.match(profileTpl, /<switch/, '学习提醒应有开关直接开/关')
+  assert.ok(!profileTpl.includes('提醒时间（自定义）'), '不应再有单独的自定义时间行（学习提醒即提醒时间）')
+  assert.match(profile, /onReminderTime/, 'picker change 应接 onReminderTime')
+  assert.match(profile, /onReminderToggle/, 'switch change 应接 onReminderToggle')
+  assert.ok(!/showReminderSheet/.test(profile), '不应再有快捷选项 ActionSheet')
+  // 开启逻辑单份实现（时间选择与开关共用）
   assert.match(profile, /function applyReminder\(/, '应抽出 applyReminder 共享开启逻辑')
 })
