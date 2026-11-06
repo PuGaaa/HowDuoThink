@@ -2,13 +2,14 @@
   <view class="page">
     <safe-top></safe-top>
     <navbar></navbar>
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
     <view v-if="loaded" class="content">
       <text v-if="previewId.length > 0" class="preview-note">草稿预览 · 本局不保存学习进度</text>
       <text v-else-if="legacySnapshot" class="preview-note">历史对局未记录题目快照，以下讲解来自当前版本。</text>
       <text class="pagetitle">复盘室</text>
       <!-- 仪式卡 -->
       <view :class="grade === 'F' ? 'verdict verdict--f' : 'verdict'">
-        <text class="verdict__grade">{{ grade }}</text>
+        <text :class="grade === 'F' ? 'verdict__grade verdict__grade--f' : 'verdict__grade'">{{ grade }}</text>
         <text class="verdict__title">{{ gradeText }}</text>
         <view class="verdict__stars">
           <image v-for="(st, i) in starImages" :key="'st' + i" class="verdict__star" :src="st" mode="aspectFit"></image>
@@ -135,11 +136,11 @@
         <text class="lessons__title">案例贡献</text>
         <text v-for="person in contributors" :key="person.authorId + '-' + person.role" class="lessons__layer">{{ person.role === 'source' ? '案例来源' : '补充证据' }} · {{ person.author }}</text>
       </view>
+      <view v-if="!loaded" class="loading">
+        <text class="loading__text">正在生成复盘……</text>
+      </view>
     </view>
-
-    <view v-else class="loading">
-      <text class="loading__text">正在生成复盘……</text>
-    </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -382,20 +383,22 @@ function replay() {
   margin-bottom: 18rpx;
 }
 .page {
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
-  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  padding: 24rpx 32rpx 60rpx;
 }
 .content {
+  padding-top: 112rpx;
+  padding-bottom: 60rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
   display: flex;
   flex-direction: column;
-  padding-top: 88rpx;
 }
 .pagetitle {
   font-size: 44rpx;
@@ -423,7 +426,7 @@ function replay() {
   border-radius: 30rpx;
   padding: 40rpx 28rpx 30rpx;
   margin-bottom: 22rpx;
-  box-shadow: 0 10rpx 0 0 #37323F;;
+  border-bottom-width: 10rpx; border-bottom-style: solid; border-bottom-color: #37323F;;
 }
 .verdict--f {
   background-color: #6B5E5E;
@@ -434,7 +437,8 @@ function replay() {
   color: #FFC94D;
   line-height: 110rpx;
 }
-.verdict--f .verdict__grade {
+/* uvue 不支持后代选择器：F 态由模板条件类表达 */
+.verdict__grade--f {
   color: #E8A0A0;
 }
 .verdict__title {
@@ -514,7 +518,7 @@ function replay() {
   border-radius: 18rpx;
   padding: 18rpx 24rpx;
   margin-bottom: 20rpx;
-  box-shadow: 0 6rpx 0 0 #C8E8DA;;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #C8E8DA;;
 }
 .gain__icon {
   width: 32rpx;
@@ -545,7 +549,7 @@ function replay() {
   border-radius: 46rpx;
   padding: 24rpx;
   margin-right: 16rpx;
-  box-shadow: 0 8rpx 0 0 #E06B38;;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #E06B38;;
 }
 .nextbtn__text {
   font-size: 28rpx;
@@ -579,7 +583,7 @@ function replay() {
   border-radius: 24rpx;
   padding: 28rpx;
   margin-bottom: 22rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;;
 }
 .replay__title {
   font-size: 29rpx;
@@ -679,8 +683,8 @@ function replay() {
   line-height: 34rpx;
 }
 .hrow__text--excluded {
+  /* text-decoration 在 iOS/Android 端不支持：排除态用置灰表达 */
   color: #C3CBD5;
-  text-decoration: line-through;
 }
 .hrow__text--hit {
   color: #E86F3F;
@@ -719,7 +723,7 @@ function replay() {
   border-radius: 24rpx;
   padding: 28rpx;
   margin-bottom: 22rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;;
 }
 .chain__title {
   font-size: 29rpx;
@@ -838,7 +842,7 @@ function replay() {
 .stepnav__btn--main {
   flex: 1.4;
   background-color: #FF8A5C;
-  box-shadow: 0 8rpx 0 0 #E06B38;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #E06B38;
 }
 .stepnav__btn--ghost {
   flex: 1;
@@ -854,7 +858,7 @@ function replay() {
 .stepnav__btn--done {
   flex: 1.4;
   background-color: #5FC9A5;
-  box-shadow: 0 8rpx 0 0 #3FA885;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #3FA885;
 }
 .stepnav__main-text {
   font-size: 27rpx;
@@ -911,7 +915,7 @@ function replay() {
   background-color: #FF8A5C;
   border-radius: 46rpx;
   padding: 22rpx;
-  box-shadow: 0 8rpx 0 0 #E06B38;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #E06B38;
 }
 .reveal__btn-text {
   font-size: 27rpx;
@@ -931,7 +935,7 @@ function replay() {
   background-color: #5FC9A5;
   border-radius: 46rpx;
   padding: 18rpx;
-  box-shadow: 0 6rpx 0 0 #3FA885;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #3FA885;
 }
 .reveal__chip-img {
   width: 26rpx;
@@ -952,7 +956,7 @@ function replay() {
   border-radius: 24rpx;
   padding: 28rpx;
   margin-bottom: 40rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;;
 }
 .lessons__title {
   font-size: 29rpx;
@@ -987,5 +991,10 @@ function replay() {
   color: #AFA8BD;
   margin-top: 10rpx;
   line-height: 34rpx;
+}
+
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
 }
 </style>

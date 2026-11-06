@@ -1,7 +1,8 @@
 <template>
   <view class="page">
     <safe-top></safe-top>
-    <view class="content">
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
+      <view class="content">
       <!-- 头部：档案 + streak -->
       <view class="header">
         <view class="header__avatar-wrap">
@@ -12,56 +13,59 @@
           <text class="header__sub">{{ rankNext }}</text>
         </view>
         <view class="header__streak">
-          <image class="header__flame" src="/static/icons/flame-lemon.png" mode="aspectFit"></image>
+          <image class="header__flame" src="/static/icons/v4/flame-orange.png" mode="aspectFit"></image>
           <text class="header__streak-num">{{ streakCount }} 天</text>
         </view>
       </view>
-      <view v-if="packSynced" class="packchip" @click="onPackTap">
-        <image class="packchip__icon" src="/static/icons/cloud-sky.png" mode="aspectFit"></image>
-        <text class="packchip__text">社区关卡已同步 · {{ packCount }} 关可玩</text>
+
+      <!-- 继续闯关：hero 背景每次进入随机抽一张，吉祥物烤在背景图里，左侧文案由前端渲染 -->
+      <view v-if="continueCase" class="hero" @click="openPlay(continueCaseId)">
+        <image class="hero__bg" :src="heroBg" mode="aspectFill"></image>
+        <view class="hero__copy">
+          <text class="hero__tag">继续闯关</text>
+          <text class="hero__title" max-lines="1">{{ continueTitle }}</text>
+          <text class="hero__meta">{{ continueMeta }}</text>
+          <view class="hero__cta">
+            <text class="hero__cta-text">继续挑战</text>
+            <image class="hero__cta-arrow" src="/static/icons/v4/arrow-right-white.png" mode="aspectFit"></image>
+          </view>
+        </view>
+      </view>
+      <view v-else class="idlecard" @click="onContinueIdleTap">
+        <text class="idlecard__title">{{ guestWall ? '试玩关卡已通关' : '全部破案！' }}</text>
+        <text class="idlecard__meta">{{ guestWall ? '登录解锁全部章节，进度云同步' : '新的章节正在路上，敬请期待' }}</text>
       </view>
 
-      <!-- 今日一题横幅 -->
-      <view :class="dailyDoneToday ? 'dailycard dailycard--done' : 'dailycard'" @click="openDaily">
-        <view class="dailycard__left">
-          <text class="dailycard__tag">{{ dailyDoneToday ? '今日一题 · 已完成 ✓' : '今日一题 · ' + todayKey() }}</text>
-          <text class="dailycard__title">{{ dailyTitle }}</text>
+      <!-- 今日一题：完成后整卡隐藏（任务页仍有入口） -->
+      <view v-if="!dailyDoneToday" class="dailycard" @click="openDaily">
+        <view class="dailycard__badge">
+          <image class="dailycard__badge-img" src="/static/icons/v4/lightbulb-orange.png" mode="aspectFit"></image>
         </view>
-        <image class="dailycard__arrow" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
-      </view>
-
-      <!-- 继续闯关 -->
-      <view v-if="continueCase" class="continue" @click="openPlay(continueCaseId)">
-        <text class="continue__tag">继续闯关 · {{ continueChapterLabel }}</text>
-        <text class="continue__title">{{ continueTitle }}</text>
-        <text class="continue__meta">{{ continueMeta }}</text>
-        <view class="continue__circle">
-          <image class="continue__arrow" src="/static/icons/arrowr-white.png" mode="aspectFit"></image>
+        <view class="dailycard__body">
+          <text class="dailycard__tag">今日一题</text>
+          <text class="dailycard__title" max-lines="1">{{ dailyTitle }}</text>
         </view>
-        <text class="continue__hint">最近的故障现场，就差一步收网</text>
-      </view>
-      <view v-else class="continue continue--done" @click="onContinueIdleTap">
-        <text class="continue__title">{{ guestWall ? '试玩关卡已通关' : '全部破案！' }}</text>
-        <text class="continue__meta">{{ guestWall ? '登录解锁全部章节，进度云同步' : '新的章节正在路上，敬请期待' }}</text>
+        <image class="dailycard__mascot" src="/static/illustrations/daily-otter-peek.png" mode="aspectFit"></image>
+        <image class="dailycard__arrow" src="/static/icons/v4/arrow-right-orange.png" mode="aspectFit"></image>
       </view>
 
       <!-- 章节地图：篇-章两级 -->
       <view class="secrow">
-        <text class="secrow__title">章节地图</text>
-        <text class="secrow__sub">按层闯关，拼出全栈地图</text>
+        <view class="secrow__left">
+          <text class="secrow__title">章节地图</text>
+          <image class="secrow__spark" src="/static/icons/v4/magic-sparkles.png" mode="aspectFit"></image>
+        </view>
+        <text class="secrow__count">{{ parts.length }} 篇</text>
       </view>
       <view v-for="(part, pi) in parts" :key="part.id" class="part">
         <view class="part__head" @click="togglePart(part.id)">
-          <view class="part__left">
-            <view class="part__titlerow">
-              <text class="part__name">{{ part.name }}</text>
-              <text class="part__chcount">{{ partChCount(part.id) }} 章</text>
-            </view>
-            <text class="part__desc">{{ part.desc }}</text>
+          <text class="part__name">{{ part.name }}</text>
+          <image class="part__flag" src="/static/icons/v4/bookmark-orange.png" mode="aspectFit"></image>
+          <view class="part__pill">
+            <text class="part__pill-text">{{ partChDone(part.id) }}/{{ partChCount(part.id) }} 章</text>
           </view>
-          <view :class="openParts[part.id] ? 'part__chev part__chev--open' : 'part__chev'">
-            <image class="part__chev-img" :src="openParts[part.id] ? '/static/icons/arrowr-white.png' : '/static/icons/arrowr-coral.png'" :style="openParts[part.id] ? 'transform: rotate(-90deg)' : 'transform: rotate(90deg)'" mode="aspectFit"></image>
-          </view>
+          <view class="part__spacer"></view>
+          <image class="part__chev" :src="openParts[part.id] ? '/static/icons/v4/circle-chevron-up-orange.png' : '/static/icons/v4/circle-chevron-down-pale.png'" mode="aspectFit"></image>
         </view>
         <view v-if="openParts[part.id]" class="part__body">
           <chapter-cube
@@ -69,7 +73,6 @@
             :key="ch.id"
             :chapter-no="ch.no"
             :name="ch.name"
-            :pact="ch.pact"
             :solved="partProgress(ch.id).solved"
             :total="partProgress(ch.id).total"
             :accent="part.id"
@@ -79,15 +82,16 @@
         </view>
       </view>
       <text class="footer">全部 {{ totalLevels }} 关 · 每关一朵层契约拼图</text>
-    </view>
+      </view>
+    </scroll-view>
   </view>
 </template>
 
 <script setup lang="uts">
 import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref, computed } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
-import { CHAPTERS, PARTS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId, chapterUnlockHint } from '../../data/chapters'
+import { onShow, onLoad } from '@dcloudio/uni-app'
+import { CHAPTERS, PARTS, casesInChapter, isChapterUnlocked, isCasePlayable, chapterChallengeCaseId, chapterUnlockHint, chapterCompleted } from '../../data/chapters'
 import chapterCube from '../../components/chapter-cube/chapter-cube.uvue'
 import { openConfirmDialog, ConfirmDialogOptions } from '../../utils/confirm-dialog'
 import { getEffectiveCases, getCaseById } from '../../data/cases'
@@ -97,16 +101,28 @@ import { getTotals } from '../../utils/storage'
 import { rankOf, starsLabel } from '../../utils/scoring'
 import { getAvatar, isLoggedIn } from '../../utils/auth'
 import { openGuestLoginDialog } from '../../utils/login-guide'
-import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
+import { dailyCase, dailyDone } from '../../utils/daily'
 import { fetchCasepack, getPackCount } from '../../utils/sync'
 import { fetchAppConfig } from '../../utils/app-config'
 import { fetchAppResources } from '../../utils/remote-assets'
+
+/** 继续闯关卡背景：素材包 4 张 9:4 hero，冷启动随机抽一张。
+ *  只在 onLoad 换图：onShow 每次换图会触发大图重解码，切 tab 回首页顿一下。 */
+const HERO_BGS: string[] = [
+  '/static/hero/continue-01-bunny-900x400.png',
+  '/static/hero/continue-02-snail-900x400.png',
+  '/static/hero/continue-03-otter-900x400.png',
+  '/static/hero/continue-04-triceratops-900x400.png',
+]
+const heroBg = ref(HERO_BGS[0])
+function rollHero() {
+  heroBg.value = HERO_BGS[Math.floor(Math.random() * HERO_BGS.length)]
+}
 
 const rankName = ref('')
 const continueCaseId = ref('')
 const continueTitle = ref('')
 const continueMeta = ref('')
-const continueChapterLabel = ref('')
 const hasContinue = ref(false)
 /** 游客已通关全部免费关：继续闯关位变成登录引导 */
 const guestWall = ref(false)
@@ -124,7 +140,6 @@ class ChapterVM {
   id: string = ''
   no: string = ''
   name: string = ''
-  pact: string = ''
 }
 function togglePart(id: string) {
   openParts.value[id] = !openParts.value[id]
@@ -138,13 +153,20 @@ function chaptersOfPart(partId: string): ChapterVM[] {
     vm.id = ch.id
     vm.no = ch.no
     vm.name = ch.name
-    vm.pact = ch.pact
     out.push(vm)
   }
   return out
 }
 function partChCount(partId: string): number {
   return chaptersOfPart(partId).length
+}
+function partChDone(partId: string): number {
+  const list = chaptersOfPart(partId)
+  let done = 0
+  for (let i = 0; i < list.length; i++) {
+    if (chapterCompleted(list[i].id)) done++
+  }
+  return done
 }
 
 function partProgress(chapterId: string) {
@@ -191,13 +213,19 @@ const headerAvatar = ref('')
 const dailyTitle = ref('')
 const dailyDoneToday = ref(false)
 const packCount = ref(0)
-const packSynced = ref(false)
 const totalLevels = ref(getEffectiveCases().length)
+
+/** 默认头像：未登录且远程头像预设未就绪时兜底，首次进入也有头像 */
+const DEFAULT_AVATAR = '/static/illustrations/triceratops-alone.png'
+function refreshAvatar() {
+  const av = getAvatar()
+  headerAvatar.value = av.length > 0 ? av : DEFAULT_AVATAR
+}
 
 // 数据装配（onShow 触发，首次显示也会执行）：破案/同步后回到首页保持最新
 function refreshHome() {
   const cases = getEffectiveCases()
-  headerAvatar.value = getAvatar()
+  refreshAvatar()
   const dc = dailyCase()
   dailyTitle.value = dc.title
   dailyDoneToday.value = dailyDone()
@@ -207,17 +235,21 @@ function refreshHome() {
   )
   const rk = rankOf(totals.solved)
   rankName.value = rk.name
-  rankNext.value = rk.remain > 0 ? '再破案 ' + rk.remain + ' 关晋升「' + rk.nextName + '」' : '已是最高称号'
+  rankNext.value = rk.remain > 0 ? '再闯 ' + rk.remain + ' 关，晋升' + rk.nextName : '已是最高称号'
   streakCount.value = getStreak().count
   packCount.value = getPackCount()
   // 关卡总数：本地注册表与已同步关卡包取大者（包内含社区关）
   totalLevels.value = packCount.value > cases.length ? packCount.value : cases.length
   fetchAppConfig((_ok) => {})  // 运行时配置（游客门禁等）：失败退内置默认，不阻塞首页
-  fetchAppResources((_ok) => {})  // 吉祥物/头像资源预取：失败保留旧缓存，未拉到时 UI 走 emoji/空占位
+  // 吉祥物/头像资源预取：拉到预设后若头像仍是兜底图，立即回填真实预设
+  fetchAppResources((_ok) => {
+    if (headerAvatar.value === DEFAULT_AVATAR) {
+      refreshAvatar()
+    }
+  })
   fetchCasepack((r) => {
     if (r.error.length === 0 && r.count > 0) {
       packCount.value = getPackCount()
-      packSynced.value = true
       totalLevels.value = packCount.value > getEffectiveCases().length ? packCount.value : getEffectiveCases().length
     }
   })
@@ -232,8 +264,6 @@ function refreshHome() {
       continueFound = true
       continueCaseId.value = c.id
       continueTitle.value = c.title
-      const ch = CHAPTERS.find((x) => x.id === c.chapterId)
-      continueChapterLabel.value = ch ? ch.no + ' ' + ch.name : ''
       const sl = starsLabel(p != null && p.bestGrade.length > 0 ? p.bestGrade : '')
       const best = p != null && p.bestGrade.length > 0 ? '最佳 ' + p.bestCost + '⚡︎' : '未挑战'
       continueMeta.value = sl + ' 标准 · ' + best
@@ -250,6 +280,9 @@ function onContinueIdleTap() {
     openGuestLoginDialog()
   }
 }
+onLoad(() => {
+  rollHero()
+})
 onShow(() => {
   refreshHome()
   // 登录态：后端为唯一事实源，回首页即拉取覆盖本地，再刷新显示
@@ -274,28 +307,30 @@ function openDaily() {
 function openPlay(id: string) {
   uni.navigateTo({ url: '/pages/play/play?id=' + id + '&source=home_continue' })
 }
-
-function onPackTap() {
-  uni.showToast({ title: '社区关卡已在各章节中可玩', icon: 'none' })
-}
 </script>
 
 <style>
 .page {
   display: flex;
   flex-direction: column;
-  background-color: #FFF9F4;
-  min-height: 100vh;
+  background-color: #FFF8F4;
   width: 100%;
+  height: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  padding: 24rpx 32rpx 200rpx;
-  padding-top: 88rpx;
+}
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
 }
 .content {
   display: flex;
   flex-direction: column;
+  padding-top: 88rpx;
+  padding-bottom: 200rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
 }
 .header {
   display: flex;
@@ -307,15 +342,16 @@ function onPackTap() {
 .header__avatar-wrap {
   width: 96rpx;
   height: 96rpx;
-  border-radius: 48rpx;
-  background-color: #E9F7F1;
-  border-width: 2rpx;
+  border-radius: 28rpx;
+  background-color: #FFFFFF;
+  border-width: 1.5rpx;
   border-style: solid;
-  border-color: #5FC9A5;
+  border-color: #F0E1D6;
 }
 .header__avatar {
   width: 96rpx;
   height: 96rpx;
+  border-radius: 28rpx;
 }
 .header__who {
   display: flex;
@@ -324,147 +360,183 @@ function onPackTap() {
   margin-left: 20rpx;
 }
 .header__rank {
-  font-size: 30rpx;
+  font-size: 32rpx;
   font-weight: bold;
-  color: #4A4458;
+  color: #303343;
 }
 .header__sub {
   font-size: 20rpx;
-  color: #AFA8BD;
+  color: #A09DAD;
   margin-top: 6rpx;
 }
 .header__streak {
   display: flex;
   flex-direction: row;
   align-items: center;
-  background-color: #FFF6DE;
-  border-radius: 34rpx;
-  padding: 12rpx 22rpx;
-  box-shadow: 0 5rpx 0 0 #EBD48A;;
+  background-color: #FFF0EA;
+  border-radius: 999rpx;
+  padding: 12rpx 24rpx;
 }
 .header__flame {
-  width: 30rpx;
-  height: 30rpx;
+  width: 28rpx;
+  height: 28rpx;
   margin-right: 8rpx;
 }
 .header__streak-num {
   font-size: 24rpx;
   font-weight: bold;
-  color: #8A6D1F;
-}
-.packchip {
-  background-color: #EAF4FC;
-  border-radius: 18rpx;
-  border-width: 1.5rpx;
-  border-style: solid;
-  border-color: #BFE0F5;
-  padding: 16rpx 22rpx;
-  margin-bottom: 22rpx;
-}
-.packchip__icon {
-  width: 34rpx;
-  height: 34rpx;
-  margin-right: 10rpx;
-}
-.packchip__text {
-  font-size: 22rpx;
-  color: #4A7FB5;
-  font-weight: bold;
-}
-.continue {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  background-color: #FFF1E7;
-  border-radius: 24rpx;
-  border-width: 2rpx;
-  border-style: solid;
-  border-color: #FFD3BC;
-  padding: 28rpx;
-  margin-bottom: 28rpx;
-  box-shadow: 0 8rpx 0 0 #F3CFA9;;
-}
-.continue--done {
-  background-color: #E9F7F1;
-  border-color: #BFE3CD;
-}
-.continue__tag {
-  font-size: 20rpx;
-  font-weight: bold;
-  color: #FF8A5C;
-}
-.continue__title {
-  font-size: 36rpx;
-  font-weight: bold;
-  color: #4A4458;
-  margin-top: 12rpx;
-}
-.continue__meta {
-  font-size: 22rpx;
-  color: #7A7290;
-  margin-top: 10rpx;
+  color: #C25E38;
 }
 
-/* 今日一题横幅 */
-.dailycard {
+/* 继续闯关 hero 卡：9:4 背景图 + 左侧文案（素材图左侧留白） */
+.hero {
+  position: relative;
   display: flex;
   flex-direction: row;
   align-items: center;
-  background-color: #EAF4FC;
+  width: 100%;
+  height: 310rpx;
+  border-radius: 42rpx;
+  overflow: hidden;
+  background-color: #FFF0EA;
+  margin-bottom: 24rpx;
+}
+.hero__bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 42rpx;
+}
+.hero__copy {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 62%;
+  padding-left: 36rpx;
+}
+.hero__tag {
+  font-size: 22rpx;
+  font-weight: bold;
+  color: #FF7047;
+}
+.hero__title {
+  margin-top: 10rpx;
+  font-size: 34rpx;
+  font-weight: bold;
+  color: #303343;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.hero__meta {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #858397;
+}
+.hero__cta {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  /* iOS 对 90deg 角度形式兼容不稳：用 to right 关键字形式 + 纯色兜底（渐变失效时仍有橙底） */
+  background-color: #FF7047;
+  background-image: linear-gradient(to right, #FF8A5C, #FF5A3D);
+  border-radius: 999rpx;
+  padding: 14rpx 34rpx;
+  margin-top: 22rpx;
+}
+.hero__cta-text {
+  font-size: 26rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.hero__cta-arrow {
+  width: 28rpx;
+  height: 28rpx;
+  margin-left: 10rpx;
+}
+
+/* 继续闯关空态 */
+.idlecard {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
   border-radius: 24rpx;
-  border-width: 2rpx;
-  border-style: solid;
-  border-color: #BFE0F5;
-  padding: 24rpx 28rpx;
-  margin-bottom: 22rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 6rpx 16rpx 0 #F6E4D8;
 }
-.dailycard--done {
-  background-color: #E9F7F1;
-  border-color: #BEE3D3;
+.idlecard__title {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #303343;
 }
-.dailycard__left {
+.idlecard__meta {
+  font-size: 20rpx;
+  color: #858397;
+  margin-top: 8rpx;
+}
+
+/* 今日一题 */
+.dailycard {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 6rpx 16rpx 0 #F6E4D8;
+}
+.dailycard__badge {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 32rpx;
+  background-color: #FFF2DC;
+  margin-right: 16rpx;
+}
+.dailycard__badge-img {
+  width: 34rpx;
+  height: 34rpx;
+  margin: 15rpx;
+}
+.dailycard__body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  /* 让出右侧水獭插画区（水獭绝对定位占 padding 缘 60~180rpx），标题不压图 */
+  margin-right: 140rpx;
 }
 .dailycard__tag {
-  font-size: 19rpx;
+  font-size: 26rpx;
   font-weight: bold;
-  color: #6FB8E8;
-}
-.dailycard--done .dailycard__tag {
-  color: #5FC9A5;
+  color: #303343;
 }
 .dailycard__title {
-  font-size: 27rpx;
-  font-weight: bold;
-  color: #4A4458;
-  margin-top: 8rpx;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #858397;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.dailycard__mascot {
+  position: absolute;
+  right: 60rpx;
+  bottom: 0;
+  width: 120rpx;
+  height: 84rpx;
 }
 .dailycard__arrow {
-  width: 26rpx;
-  height: 26rpx;
+  width: 32rpx;
+  height: 32rpx;
+  margin-left: 8rpx;
 }
 
-.continue__circle {
-  position: absolute;
-  right: 40rpx;
-  top: 88rpx;
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 36rpx;
-  background-color: #FF8A5C;
-}
-.continue__arrow {
-  width: 40rpx;
-  height: 40rpx;
-  margin: 16rpx;
-}
-.continue__hint {
-  font-size: 20rpx;
-  color: #AFA8BD;
-  margin-top: 14rpx;
-}
 .secrow {
   display: flex;
   flex-direction: row;
@@ -472,179 +544,73 @@ function onPackTap() {
   justify-content: space-between;
   margin-bottom: 20rpx;
 }
-.secrow__title {
-  font-size: 28rpx;
-  font-weight: bold;
-  color: #4A4458;
+.secrow__left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
 }
-.secrow__sub {
-  font-size: 20rpx;
-  color: #AFA8BD;
+.secrow__title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #303343;
+}
+.secrow__spark {
+  width: 30rpx;
+  height: 30rpx;
+  margin-left: 10rpx;
+}
+.secrow__count {
+  font-size: 24rpx;
+  color: #858397;
 }
 
-/* 篇-章两级导航 */
-/* 篇 = 白色大立方体容器（头盖 + 章体一体） */
+/* 篇 = 白卡容器（头 + 章网格一体） */
 .part {
-  margin-bottom: 24rpx;
   background-color: #FFFFFF;
-  border-radius: 24rpx;
-  box-shadow: 0 8rpx 0 0 #EFE5D6;
-  overflow: hidden;
+  border-radius: 28rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 6rpx 16rpx 0 #F6E4D8;
 }
 .part__head {
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-  padding: 26rpx 28rpx;
-}
-.part__titlerow {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
-.part__chcount {
-  font-size: 20rpx;
-  font-weight: bold;
-  color: #AFA8BD;
-  background-color: #FBF3EB;
-  border-radius: 18rpx;
-  padding: 4rpx 16rpx;
-  margin-left: 14rpx;
-}
-.part__head--open {
-  border-bottom-width: 2rpx;
-  border-bottom-style: dashed;
-  border-bottom-color: #F5E6DA;
-}
-.part__left {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
 }
 .part__name {
-  font-size: 30rpx;
+  font-size: 32rpx;
   font-weight: bold;
-  color: #4A4458;
+  color: #303343;
 }
-.part__desc {
-  font-size: 20rpx;
-  color: #AFA8BD;
-  margin-top: 6rpx;
+.part__flag {
+  width: 28rpx;
+  height: 28rpx;
+  margin-left: 10rpx;
+}
+.part__pill {
+  background-color: #FFF0EA;
+  border-radius: 999rpx;
+  padding: 6rpx 18rpx;
+  margin-left: 14rpx;
+}
+.part__pill-text {
+  font-size: 22rpx;
+  font-weight: bold;
+  color: #FF7047;
+}
+.part__spacer {
+  flex: 1;
 }
 .part__chev {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 28rpx;
-  background-color: #FFF1E7;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  transition-property: transform;
-  transition-duration: 200ms;
-}
-.part__chev--open {
-  background-color: #FF8A5C;
-}
-.part__chev-img {
-  width: 30rpx;
-  height: 30rpx;
+  width: 36rpx;
+  height: 36rpx;
 }
 .part__body {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   justify-content: space-between;
-  padding: 20rpx 24rpx 26rpx;
-}
-/* 章 = 各篇专属色的小立方体（2 列网格） */
-
-.grid {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: space-between;
-}
-
-.chapter--live {
-  background-color: #FFF1E7;
-  border-style: solid;
-  border-color: #FFD3BC;
-}
-.chapter__no {
-  background-color: #FBF3EB;
-  border-radius: 22rpx;
-  padding: 8rpx 20rpx;
-  align-self: flex-start;
-}
-.chapter__no--live {
-  background-color: #FF8A5C;
-}
-.chapter__no-text {
-  font-size: 18rpx;
-  color: #AFA8BD;
-  font-weight: bold;
-}
-.chapter__no-text--live {
-  color: #FFFFFF;
-}
-.chapter__star {
-  position: absolute;
-  right: 24rpx;
-  top: 26rpx;
-  width: 40rpx;
-  height: 40rpx;
-}
-.chapter__lock {
-  position: absolute;
-  right: 24rpx;
-  top: 26rpx;
-  width: 40rpx;
-  height: 40rpx;
-}
-.chapter__name {
-  font-size: 30rpx;
-  font-weight: bold;
-  color: #4A4458;
-  margin-top: 22rpx;
-}
-.chapter__name--locked {
-  color: #7A7290;
-}
-.chapter__pact {
-  font-size: 20rpx;
-  color: #AFA8BD;
-  margin-top: 10rpx;
-  lines: 1;
-  text-overflow: ellipsis;
-}
-.chapter__track {
-  height: 14rpx;
-  border-radius: 7rpx;
-  background-color: #FBF3EB;
-  margin-top: 24rpx;
-}
-.chapter__track--live {
-  background-color: #FFFFFF;
-}
-.chapter__fill {
-  height: 14rpx;
-  border-radius: 7rpx;
-  background-color: #AFA8BD;
-}
-.chapter__fill--live {
-  background-color: #FF8A5C;
-}
-.chapter__count {
-  font-size: 22rpx;
-  font-weight: bold;
-  color: #AFA8BD;
-  align-self: flex-end;
-  margin-top: -30rpx;
-}
-.chapter__count--live {
-  color: #FF8A5C;
+  padding-top: 24rpx;
 }
 .footer {
   font-size: 20rpx;

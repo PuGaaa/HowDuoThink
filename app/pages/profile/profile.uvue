@@ -1,6 +1,7 @@
 <template>
   <view class="page">
     <safe-top></safe-top>
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
     <view class="content">
 
       <!-- 档案卡（横排 + 账号身份行）：个人信息为主，称号为次 -->
@@ -44,27 +45,11 @@
         </view>
       </view>
 
-      <!-- 手册 + 海报入口 -->
+      <!-- 手册入口 -->
       <view class="entryrow" @click="goHandbook">
         <image class="entryrow__icon" src="/static/icons/book-coral.png" mode="aspectFit"></image>
         <text class="entryrow__label">我的手册</text>
         <text class="entryrow__v">{{ lessonCount }} 条检查单</text>
-      </view>
-      <view class="entryrow" @click="goPoster">
-        <image class="entryrow__icon" src="/static/icons/pen-coral.png" mode="aspectFit"></image>
-        <text class="entryrow__label">侦探档案海报</text>
-        <text class="entryrow__v">生成分享</text>
-      </view>
-
-      <view class="entryrow" @click="goSubmit">
-        <image class="entryrow__icon" src="/static/icons/star-lemon.png" mode="aspectFit"></image>
-        <text class="entryrow__label">投稿出题</text>
-        <text class="entryrow__v">把你的坑变成关卡</text>
-      </view>
-      <view class="entryrow" @click="goMySubmissions">
-        <image class="entryrow__icon" src="/static/icons/pen-coral.png" mode="aspectFit"></image>
-        <text class="entryrow__label">我的投稿</text>
-        <text class="entryrow__v">查看状态</text>
       </view>
 
       <!-- 通用 -->
@@ -72,6 +57,17 @@
       <view v-for="(row, i) in rows" :key="'r' + i" class="row" @click="onRow(row.label, row.value)">
         <text class="row__label">{{ row.label }}</text>
         <text class="row__value">{{ row.value }}</text>
+        <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
+      </view>
+      <!-- 账号：密码入口（登录态） -->
+      <view v-if="user != null" class="row" @click="goPassword">
+        <text class="row__label">{{ passwordLabel }}</text>
+        <text class="row__value"></text>
+        <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
+      </view>
+      <view v-if="user != null" class="row" @click="goForgot">
+        <text class="row__label">忘记密码</text>
+        <text class="row__value"></text>
         <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
       </view>
       <!-- 账号操作：白色危险按钮 / 珊瑚主按钮，与设置行区分 -->
@@ -82,6 +78,7 @@
         <text class="authbtn__text authbtn__text--main">去登录</text>
       </view>
     </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -92,12 +89,13 @@ import { onShow } from '@dcloudio/uni-app'
 import { getEffectiveCases } from '../../data/cases'
 import { getCaseProgress, getStreak, useDay, getTotals } from '../../utils/storage'
 import { rankOf } from '../../utils/scoring'
-import { getStoredUser, logout, AppUser } from '../../utils/auth'
+import { getStoredUser, logout, fetchProfile, AppUser } from '../../utils/auth'
 import { openConfirmDialog, ConfirmDialogOptions } from '../../utils/confirm-dialog'
 import { getAvatar as resolveAvatar, getDisplayName } from '../../utils/auth'
 import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
 import { getReminder, setReminder, reminderLabel, startReminderPolling, requestNotifyPermission } from '../../utils/reminder'
 import { manualSync, lastSyncLabel, pullServerProgress } from '../../utils/sync-progress'
+import { APP_VERSION } from '../../utils/version'
 
 class RowVM {
   label: string = ''
@@ -117,11 +115,21 @@ const displayName = ref('')
 const avatarSrc = ref('')
 const dailyTitle = ref('')
 const dailyIsDone = ref(false)
+const passwordLabel = ref('设置 / 修改密码')
 
 function refresh() {
   const cases = getEffectiveCases()
   user.value = getStoredUser()
   displayName.value = getDisplayName()
+  // 密码入口文案：登录响应不带 hasPassword，fetchProfile 刷新后才准确
+  const pu = user.value
+  if (pu != null && pu.hasPassword == true) {
+    passwordLabel.value = '修改密码'
+  } else if (pu != null && pu.hasPassword == false) {
+    passwordLabel.value = '设置密码'
+  } else {
+    passwordLabel.value = '设置 / 修改密码'
+  }
   avatarSrc.value = resolveAvatar()
   const dc = dailyCase()
   dailyTitle.value = dc.title
@@ -151,12 +159,15 @@ function refresh() {
   r2.label = '每日一题'
   r2.value = dailyIsDone.value ? '✓ 已完成' : dailyTitle.value
   const r3 = new RowVM()
-  r3.label = '检查单云同步'
-  r3.value = user.value != null ? (lastSyncLabel().length > 0 ? lastSyncLabel() : '点击同步') : '登录后可用'
+  r3.label = '分享海报'
+  r3.value = '生成侦探档案'
   const r4 = new RowVM()
-  r4.label = '关于 好多星'
-  r4.value = 'v0.1'
-  rows.value = [r1, r2, r3, r4]
+  r4.label = '检查单云同步'
+  r4.value = user.value != null ? (lastSyncLabel().length > 0 ? lastSyncLabel() : '点击同步') : '登录后可用'
+  const r5 = new RowVM()
+  r5.label = '关于 好多星'
+  r5.value = APP_VERSION
+  rows.value = [r1, r2, r3, r4, r5]
 }
 
 // onShow 首次显示也会触发：从子页返回时数据保持最新；提醒轮询随页面常驻
@@ -165,6 +176,10 @@ onShow(() => {
   startReminderPolling()
   // 登录态：后端为唯一事实源，回到档案页即拉取覆盖本地，再刷新显示
   pullServerProgress((r) => {
+    if (r.error.length === 0) refresh()
+  })
+  // 刷新登录资料（含 hasPassword）→ 密码入口文案准确切换
+  fetchProfile((r) => {
     if (r.error.length === 0) refresh()
   })
 })
@@ -195,6 +210,18 @@ function goEdit() {
 
 function goAbout() {
   uni.navigateTo({ url: '/pages/about/about' })
+}
+
+function goPassword() {
+  uni.navigateTo({ url: '/pages/password/password' })
+}
+
+/** 忘记密码：产品内找回路径 = 短信验证码登录同一账号 → 再在密码页设置新密码 */
+function goForgot() {
+  uni.showToast({ title: '用手机验证码登录同一账号，回来即可设置新密码', icon: 'none' })
+  setTimeout(() => {
+    uni.navigateTo({ url: '/pages/login/login' })
+  }, 800)
 }
 
 function showReminderSheet() {
@@ -251,6 +278,10 @@ function onRow(label: string, value: string) {
     goAbout()
     return
   }
+  if (label === '分享海报') {
+    goPoster()
+    return
+  }
   if (label === '每日一题') {
     uni.navigateTo({ url: '/pages/play/play?id=' + dailyCase().id + '&source=daily' })
     return
@@ -272,18 +303,20 @@ function onRow(label: string, value: string) {
 
 <style>
 .page {
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
-  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  padding: 24rpx 32rpx 200rpx;
-  padding-top: 88rpx;
 }
 .content {
+  padding-top: 112rpx;
+  padding-bottom: 200rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
   display: flex;
   flex-direction: column;
 }
@@ -294,7 +327,7 @@ function onRow(label: string, value: string) {
   border-radius: 30rpx;
   padding: 36rpx 32rpx 24rpx;
   margin-bottom: 24rpx;
-  box-shadow: 0 10rpx 0 0 #37323F;;
+  border-bottom-width: 10rpx; border-bottom-style: solid; border-bottom-color: #37323F;;
 }
 .profile__toprow {
   display: flex;
@@ -411,7 +444,7 @@ function onRow(label: string, value: string) {
 }
 .authbtn--login {
   background-color: #FF8A5C;
-  box-shadow: 0 8rpx 0 0 #E06B38;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #E06B38;
 }
 .authbtn__text--main {
   font-size: 27rpx;
@@ -430,7 +463,7 @@ function onRow(label: string, value: string) {
   border-style: solid;
   border-color: #F5E6DA;
   padding: 26rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;;
 }
 .statcard__v {
   font-size: 36rpx;
@@ -488,7 +521,7 @@ function onRow(label: string, value: string) {
   border-color: #F5E6DA;
   padding: 26rpx;
   margin-bottom: 16rpx;
-  box-shadow: 0 5rpx 0 0 #EFE5D6;;
+  border-bottom-width: 5rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;;
 }
 .row__label {
   font-size: 25rpx;
@@ -504,5 +537,10 @@ function onRow(label: string, value: string) {
 .row__chevron {
   width: 24rpx;
   height: 24rpx;
+}
+
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
 }
 </style>

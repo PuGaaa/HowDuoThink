@@ -102,7 +102,7 @@ page {
   border-style: solid;
   border-color: #F3CFA9;
   padding: 36rpx 32rpx 32rpx;
-  box-shadow: 0 10rpx 0 0 #E8DCCB;
+  border-bottom-width: 10rpx; border-bottom-style: solid; border-bottom-color: #E8DCCB;
 }
 .ctitle {
   font-size: 32rpx;
@@ -135,12 +135,12 @@ page {
 }
 .cbtn--main {
   background-color: #FF8A5C;
-  box-shadow: 0 8rpx 0 0 #E06B38;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #E06B38;
   margin-left: 16rpx;
 }
 .cbtn--danger {
   background-color: #E86A6A;
-  box-shadow: 0 8rpx 0 0 #C24E4E;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #C24E4E;
   margin-left: 16rpx;
 }
 .cbtn--ghost {

@@ -38,27 +38,27 @@ const iconPath = computed((): string => {
   border-radius: 18rpx;
   padding: 20rpx;
   margin-top: 18rpx;
-  box-shadow: 0 5rpx 0 0 #EFE5D6;
+  border-bottom-width: 5rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;
 }
 .evbg--error {
   background-color: #FDEDED;
-  box-shadow: 0 5rpx 0 0 #F0CFCF;
+  border-bottom-width: 5rpx; border-bottom-style: solid; border-bottom-color: #F0CFCF;
 }
 .evbg--log {
   background-color: #FFF6DE;
-  box-shadow: 0 5rpx 0 0 #EBD48A;
+  border-bottom-width: 5rpx; border-bottom-style: solid; border-bottom-color: #EBD48A;
 }
 .evbg--code {
   background-color: #E9F7F1;
-  box-shadow: 0 5rpx 0 0 #C8E8DA;
+  border-bottom-width: 5rpx; border-bottom-style: solid; border-bottom-color: #C8E8DA;
 }
 .evbg--text {
   background-color: #EAF4FC;
-  box-shadow: 0 5rpx 0 0 #CDE1F0;
+  border-bottom-width: 5rpx; border-bottom-style: solid; border-bottom-color: #CDE1F0;
 }
 .evbg--time {
   background-color: #F3F0F8;
-  box-shadow: 0 5rpx 0 0 #DDD8E8;
+  border-bottom-width: 5rpx; border-bottom-style: solid; border-bottom-color: #DDD8E8;
 }
 .evcard {
   display: flex;

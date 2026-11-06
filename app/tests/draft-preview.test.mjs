@@ -38,6 +38,7 @@ function harness() {
   const storage = {
     saveSession, getLastSession,
     bumpChecklistUse: () => calls.push('checklist'), bumpTask: metric => calls.push('task:' + metric),
+    getTaskDaily: () => 0,
     recordSolvedLayer: id => { calls.push('layer:' + id); const added = !layers.has(id); layers.add(id); return added },
   }
   const mocks = {
@@ -86,7 +87,7 @@ function harness() {
     const wrapper = new vm.Script(`(function(require,module,exports){${code}\n})`, { filename: file }).runInContext(context)
     wrapper(specifier => {
       if (specifier === 'vue') return { ref, computed: fn => ({ get value() { return fn() } }) }
-      if (specifier === '@dcloudio/uni-app') return { onLoad: callback => hooks.set(file, callback) }
+      if (specifier === '@dcloudio/uni-app') return { onLoad: callback => hooks.set(file, callback), onUnload: () => {} }
       let target = resolve(dirname(file), specifier)
       if (!extname(target)) target = target.endsWith('/cases') ? resolve(target, 'index.ts') : target + '.ts'
       return load(target)

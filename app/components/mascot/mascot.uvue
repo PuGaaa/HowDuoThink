@@ -61,18 +61,11 @@ const visible = computed((): boolean => {
   border-color: #F2D98C;
   padding: 16rpx 22rpx;
   opacity: 1;
-  transition-property: opacity;
-  transition-duration: 180ms;
-  animation-name: mascot-pop;
-  animation-duration: 380ms;
-  animation-timing-function: ease-out;
+  /* 动画暂移除：蒸汽模式 @keyframes/transition 为 HBuilderX 5.33 新特性，
+     iOS 真机在 mascot 显示→隐藏切换时 UNIAPP_DOM 线程 SIGSEGV（见 unpackage/logs），
+     待引擎修复后再恢复弹出动效 */
   z-index: 90;
-  box-shadow: 0 8rpx 0 0 #E8D49A;
-}
-@keyframes mascot-pop {
-  0% { transform: translateY(24rpx) scale(0.92); opacity: 0; }
-  60% { transform: translateY(-4rpx) scale(1.02); opacity: 1; }
-  100% { transform: translateY(0) scale(1); opacity: 1; }
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #E8D49A;
 }
 .mascot--hidden {
   opacity: 0;
@@ -81,11 +74,11 @@ const visible = computed((): boolean => {
 .mascot__badge {
   width: 72rpx;
   height: 72rpx;
-  border-radius: 36rpx;
-  background-color: #FFFFFF;
-  border-width: 1rpx;
-  border-style: solid;
-  border-color: #F2D98C;
+  /* border-radius: 36rpx; */
+  /* background-color: #FFFFFF; */
+  /* border-width: 1rpx; */
+  /* border-style: solid; */
+  /* border-color: #F2D98C; */
   margin-right: 18rpx;
 }
 .mascot__avatar {

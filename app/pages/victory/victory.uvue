@@ -1,63 +1,87 @@
 <template>
   <view class="page">
-    <text v-if="previewId.length > 0" class="preview-note">草稿预览 · 本局不保存学习进度</text>
-    <!-- 装饰粒子（仅破案时撒花） -->
-    <view v-if="solved" class="confetti">
-      <view v-for="(d, i) in dots" :key="'d' + i" class="dot" :class="'dot-' + (i % 6)" :style="d"></view>
-    </view>
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
+      <text v-if="previewId.length > 0" class="preview-note">草稿预览 · 本局不保存学习进度</text>
+      <!-- 装饰粒子（仅破案时撒花） -->
+      <view v-if="solved" class="confetti">
+        <view v-for="(d, i) in dots" :key="'d' + i" class="dot" :class="'dot-' + (i % 6)" :style="d"></view>
+      </view>
 
-    <!-- 五兽行：破案全员庆祝 / 失败垂耳兔+三角龙安慰 -->
-    <view class="mascots">
-      <view v-for="(m, i) in mascots" :key="'m' + i" class="mwrap" :class="'mwrap-' + i">
-        <view class="mwrap__circle" :style="{ backgroundColor: m.bg }">
-          <image class="mwrap__img" :src="m.src" mode="aspectFit"></image>
+      <!-- 五兽行：破案全员庆祝 / 失败垂耳兔+三角龙安慰 -->
+      <view class="mascots">
+        <view v-for="(m, i) in mascots" :key="'m' + i" class="mwrap" :class="'mwrap-' + i">
+          <view class="mwrap__circle" :style="{ backgroundColor: m.bg }">
+            <image class="mwrap__img" :src="m.src" mode="aspectFit"></image>
+          </view>
+          <text class="mwrap__name">{{ m.name }}</text>
         </view>
-        <text class="mwrap__name">{{ m.name }}</text>
       </view>
-    </view>
 
-    <!-- 主标题 -->
-    <text :class="solved ? 'victory-title' : 'victory-title victory-title--fail'">{{ solved ? '破案成功！' : '本案未破' }}</text>
-    <text class="victory-sub">{{ solved ? '思维兽们为你欢呼' : '三角龙：证据不够结实的案子，复盘会还你一次公道' }}</text>
+      <!-- 主标题 -->
+      <text :class="solved ? 'victory-title' : 'victory-title victory-title--fail'">{{ solved ? '破案成功！' : '本案未破' }}</text>
+      <text class="victory-sub">{{ solved ? '思维兽们为你欢呼' : '三角龙：证据不够结实的案子，复盘会还你一次公道' }}</text>
 
-    <!-- 评级 + 数据 -->
-    <view class="stats">
-      <view class="stat">
-        <text :class="grade === 'F' ? 'stat__v stat__v--fail' : 'stat__v stat__v--gold'">{{ grade }}</text>
-        <text class="stat__k">评级</text>
+      <!-- 评级 + 数据 -->
+      <view class="stats">
+        <view class="stat stat--d1">
+          <text :class="grade === 'F' ? 'stat__v stat__v--fail' : 'stat__v stat__v--gold'">{{ grade }}</text>
+          <text class="stat__k">评级</text>
+        </view>
+        <view class="stat stat--d2">
+          <text class="stat__v">{{ cost }}⚡</text>
+          <text class="stat__k">你的成本</text>
+        </view>
+        <view class="stat stat--d3">
+          <text class="stat__v stat__v--mint">{{ expert }}⚡</text>
+          <text class="stat__k">专家</text>
+        </view>
+        <view v-if="solved" class="stat stat--d4">
+          <text class="stat__v stat__v--mint">{{ lessons }}</text>
+          <text class="stat__k">本题检查单</text>
+        </view>
       </view>
-      <view class="stat">
-        <text class="stat__v">{{ cost }}⚡</text>
-        <text class="stat__k">你的成本</text>
-      </view>
-      <view class="stat">
-        <text class="stat__v stat__v--mint">{{ expert }}⚡</text>
-        <text class="stat__k">专家</text>
-      </view>
-      <view v-if="solved" class="stat">
-        <text class="stat__v stat__v--mint">{{ lessons }}</text>
-        <text class="stat__k">本题检查单</text>
-      </view>
-    </view>
 
-    <!-- 进入复盘 / 再战一局 -->
-    <view class="btnpad">
-      <view class="primarybtn" @click="goReview">
-        <text class="primarybtn__text">{{ solved ? '进入复盘' : '查看复盘' }}</text>
+      <!-- 进入复盘 / 再战一局 -->
+      <view class="btnpad">
+        <view class="primarybtn" @click="goReview">
+          <text class="primarybtn__text">{{ solved ? '进入复盘' : '查看复盘' }}</text>
+        </view>
+        <view v-if="!solved" class="ghostbtn" @click="replay">
+          <text class="ghostbtn__text">再战一局</text>
+        </view>
       </view>
-      <view v-if="!solved" class="ghostbtn" @click="replay">
-        <text class="ghostbtn__text">再战一局</text>
+
+      <!-- 今日任务战报：破案后内嵌展示（卡片弹入 + 进度条生长 + 徽章弹出；App 无 @keyframes，JS 步进三端一致） -->
+      <view v-if="taskReportVisible" class="taskrep" :style="'transform: scale(' + taskReportScale + ');opacity:' + taskReportOpacity">
+        <text class="taskrep__title">今日任务</text>
+        <text class="taskrep__sub">{{ repSub }}</text>
+        <view v-for="(t, i) in repList" :key="'tr' + i" class="reprow">
+          <view class="reprow__iconbox">
+            <image class="reprow__icon" :src="t.iconImg" mode="aspectFit"></image>
+          </view>
+          <view class="reprow__body">
+            <text class="reprow__title">{{ t.title }}</text>
+            <view class="reprow__track">
+              <view :class="t.done ? 'reprow__fill reprow__fill--done' : 'reprow__fill'" :style="'width:' + t.pct + '%'"></view>
+            </view>
+          </view>
+          <view v-if="t.done" class="reprow__badge" :style="'transform: scale(' + badgeScale + ')'">
+            <image class="reprow__badge-img" src="/static/icons/check-white.png" mode="aspectFit"></image>
+          </view>
+          <text v-else class="reprow__count">{{ t.cur }}/{{ t.goal }}</text>
+        </view>
       </view>
-    </view>
+    </scroll-view>
   </view>
 </template>
 
 <script setup lang="uts">
 import { ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onUnload } from '@dcloudio/uni-app'
 import { getMascotUrl } from '../../utils/remote-assets'
-import { getLastSession } from '../../utils/storage'
+import { getLastSession, getTaskDaily } from '../../utils/storage'
 import { getPreviewSession } from '../../utils/draft-preview'
+import { DAILY_TASKS } from '../../data/tasks'
 
 const solved = ref(true)
 const grade = ref('S')
@@ -116,11 +140,140 @@ onLoad((query : OnLoadOptions) => {
     lessons.value = session.caseSnapshot?.lessons.length ?? 0
     mascots.value = mascotData
     genDots()
+    startTaskReport()
   } else {
     // 垂耳兔（错误指认引导）+ 三角龙（出局安慰）
     mascots.value = [mascotData[3], mascotData[4]]
   }
 })
+
+onUnload(() => clearReportAnim())
+
+// —— 今日任务战报（内嵌在按钮区下方）：破案后展示每日任务进度（预览局不写进度，不展示） ——
+class TaskRepVM {
+  iconImg: string = ''
+  title: string = ''
+  cur: number = 0
+  goal: number = 0
+  pct: number = 0
+  targetPct: number = 0
+  done: boolean = false
+}
+
+const taskReportVisible = ref(false)
+const taskReportScale = ref(0.85)
+const taskReportOpacity = ref(0)
+const badgeScale = ref(0)
+const repSub = ref('')
+const repList = ref<TaskRepVM[]>([])
+
+function buildTaskReport(): boolean {
+  if (previewId.value.length > 0) return false
+  const rows: TaskRepVM[] = []
+  let allDone = true
+  for (let i = 0; i < DAILY_TASKS.length; i++) {
+    const t = DAILY_TASKS[i]
+    const raw = getTaskDaily(t.metric)
+    const cur = raw > t.goal ? t.goal : raw
+    const done = raw >= t.goal
+    if (!done) allDone = false
+    const vm = new TaskRepVM()
+    vm.iconImg = '/static/icons/' + t.icon + '.png'
+    vm.title = t.title
+    vm.cur = cur
+    vm.goal = t.goal
+    vm.targetPct = t.goal > 0 ? Math.min(100, Math.round((cur * 100) / t.goal)) : 0
+    vm.done = done
+    rows.push(vm)
+  }
+  // 重玩局且当日任务早已全完成：不再展示（进度无新变化，展示是噪音）
+  if (allDone && getTaskDaily('win') > 1) return false
+  if (allDone) {
+    repSub.value = '今日任务全部完成！'
+  } else if (rows[0].done) {
+    repSub.value = '破案 +1 · 任务进度更新'
+  } else {
+    repSub.value = '破案 +1，还差一点收齐'
+  }
+  repList.value = rows
+  return true
+}
+
+// 三段动画共用一条定时器链：卡片弹入 → 进度条生长 → 完成徽章弹出
+let repTimer: number = -1
+
+function clearReportAnim() {
+  if (repTimer != -1) {
+    clearTimeout(repTimer)
+    repTimer = -1
+  }
+}
+
+function startTaskReport() {
+  if (!buildTaskReport()) return
+  clearReportAnim()
+  taskReportVisible.value = true
+  taskReportScale.value = 0.85
+  taskReportOpacity.value = 0
+  badgeScale.value = 0
+  const rows = repList.value
+  for (let i = 0; i < rows.length; i++) rows[i].pct = 0
+  const POP_STEPS = 10
+  let step = 0
+  const popTick = () => {
+    step++
+    const t = step / POP_STEPS
+    const c1 = 1.70158
+    const c3 = c1 + 1
+    const k = 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2) // easeOutBack 回弹
+    taskReportScale.value = 0.85 + 0.15 * k
+    taskReportOpacity.value = Math.min(1, step / 3)
+    if (step < POP_STEPS) {
+      repTimer = setTimeout(popTick, 30)
+    } else {
+      repTimer = -1
+      startReportBars()
+    }
+  }
+  repTimer = setTimeout(popTick, 900)
+}
+
+function startReportBars() {
+  const BAR_STEPS = 16
+  let step = 0
+  const barTick = () => {
+    step++
+    const k = 1 - (1 - step / BAR_STEPS) * (1 - step / BAR_STEPS) // easeOut
+    const rows = repList.value
+    for (let i = 0; i < rows.length; i++) {
+      rows[i].pct = Math.round(rows[i].targetPct * k)
+    }
+    if (step < BAR_STEPS) {
+      repTimer = setTimeout(barTick, 40)
+    } else {
+      repTimer = -1
+      startReportBadges()
+    }
+  }
+  repTimer = setTimeout(barTick, 80)
+}
+
+function startReportBadges() {
+  const B_STEPS = 8
+  let step = 0
+  const badgeTick = () => {
+    step++
+    const t = step / B_STEPS
+    // 0 → 1.15 → 1 的过冲缩放
+    badgeScale.value = t < 0.7 ? (t / 0.7) * 1.15 : 1.15 - ((t - 0.7) / 0.3) * 0.15
+    if (step < B_STEPS) {
+      repTimer = setTimeout(badgeTick, 30)
+    } else {
+      repTimer = -1
+    }
+  }
+  repTimer = setTimeout(badgeTick, 60)
+}
 
 function replay() {
   uni.redirectTo({ url: '/pages/play/play?' + (previewId.value.length > 0 ? 'previewId=' + previewId.value : 'id=' + caseId.value + '&source=retry') })
@@ -143,10 +296,14 @@ function goReview() {
   align-items: center;
   background-color: #FFF9F4;
   width: 100%;
-  min-height: 100vh;
-  padding: 60rpx 32rpx 60rpx;
+  height: 100%;
   position: relative;
   overflow: hidden;
+}
+.pagesv {
+  flex: 1;
+  width: 100%;
+  padding: 60rpx 32rpx 60rpx;
 }
 
 /* 装饰粒子 */
@@ -158,19 +315,11 @@ function goReview() {
   bottom: 0;
   pointer-events: none;
 }
+/* App 端隐藏彩纸（无动画的静态实心圆很突兀）；Web 端见文末动画块 */
 .dot {
   position: absolute;
   border-radius: 50%;
-  opacity: 0;
-  animation: dotIn 0.5s ease-out forwards, float 3s ease-in-out 0.5s infinite;
-}
-@keyframes dotIn {
-  from { opacity: 0; transform: scale(0); }
-  to { opacity: 0.6; transform: scale(1); }
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+  display: none;
 }
 
 /* 五兽庆祝 */
@@ -185,17 +334,6 @@ function goReview() {
   flex-direction: column;
   align-items: center;
   margin: 0 12rpx;
-  opacity: 0;
-  animation: mascotIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-.mwrap-0 { animation-delay: 0.3s; }
-.mwrap-1 { animation-delay: 0.45s; }
-.mwrap-2 { animation-delay: 0.6s; }
-.mwrap-3 { animation-delay: 0.75s; }
-.mwrap-4 { animation-delay: 0.9s; }
-@keyframes mascotIn {
-  from { opacity: 0; transform: translateY(60rpx) scale(0.3); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .mwrap__circle {
   width: 120rpx;
@@ -204,7 +342,7 @@ function goReview() {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6rpx 0 0 rgba(0, 0, 0, 0.08);
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: rgba(0, 0, 0, 0.08);
 }
 .mwrap__img {
   width: 96rpx;
@@ -224,8 +362,6 @@ function goReview() {
   color: #FFC94D;
   margin-top: 40rpx;
   text-align: center;
-  opacity: 0;
-  animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 1.2s forwards;
   text-shadow: 0 4rpx 0 rgba(0, 0, 0, 0.06);
 }
 .victory-title--fail {
@@ -236,16 +372,6 @@ function goReview() {
   font-size: 24rpx;
   color: #AFA8BD;
   margin-top: 12rpx;
-  opacity: 0;
-  animation: fadeUp 0.4s ease-out 1.5s forwards;
-}
-@keyframes popIn {
-  from { opacity: 0; transform: scale(0) rotate(-5deg); }
-  to { opacity: 1; transform: scale(1) rotate(0deg); }
-}
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20rpx); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 /* 数据行 */
@@ -262,14 +388,8 @@ function goReview() {
   border-radius: 24rpx;
   padding: 26rpx 36rpx;
   margin: 0 12rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;
-  opacity: 0;
-  animation: fadeUp 0.4s ease-out forwards;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;
 }
-.stat:nth-child(1) { animation-delay: 1.7s; }
-.stat:nth-child(2) { animation-delay: 1.85s; }
-.stat:nth-child(3) { animation-delay: 2s; }
-.stat:nth-child(4) { animation-delay: 2.15s; }
 .stat__v {
   font-size: 36rpx;
   font-weight: bold;
@@ -296,9 +416,67 @@ function goReview() {
   padding-bottom: 8rpx;
   margin-top: 48rpx;
   width: 100%;
+}
+
+/* 入场动画仅在 Web 生效：App 蒸汽模式（HBuilderX 5.33+）不支持 @keyframes/CSS animation，
+   base opacity:0 会让 iOS 整页空白（同 mascot.uvue 的既有结论）。App 端静态全可见。 */
+/* #ifdef WEB */
+.dot {
+  display: flex;
+  opacity: 0;
+  animation: dotIn 0.5s ease-out forwards, float 3s ease-in-out 0.5s infinite;
+}
+@keyframes dotIn {
+  from { opacity: 0; transform: scale(0); }
+  to { opacity: 0.6; transform: scale(1); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.mwrap {
+  opacity: 0;
+  animation: mascotIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.mwrap-0 { animation-delay: 0.3s; }
+.mwrap-1 { animation-delay: 0.45s; }
+.mwrap-2 { animation-delay: 0.6s; }
+.mwrap-3 { animation-delay: 0.75s; }
+.mwrap-4 { animation-delay: 0.9s; }
+@keyframes mascotIn {
+  from { opacity: 0; transform: translateY(60rpx) scale(0.3); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.victory-title {
+  opacity: 0;
+  animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 1.2s forwards;
+}
+.victory-sub {
+  opacity: 0;
+  animation: fadeUp 0.4s ease-out 1.5s forwards;
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0) rotate(-5deg); }
+  to { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.stat {
+  opacity: 0;
+  animation: fadeUp 0.4s ease-out forwards;
+}
+/* uvue 不支持 nth-child：逐块显式延迟类 */
+.stat--d1 { animation-delay: 1.7s; }
+.stat--d2 { animation-delay: 1.85s; }
+.stat--d3 { animation-delay: 2s; }
+.stat--d4 { animation-delay: 2.15s; }
+.btnpad {
   opacity: 0;
   animation: fadeUp 0.4s ease-out 2.5s forwards;
 }
+/* #endif */
 .primarybtn {
   display: flex;
   flex-direction: row;
@@ -307,7 +485,7 @@ function goReview() {
   background-color: #FF8A5C;
   border-radius: 46rpx;
   padding: 26rpx;
-  box-shadow: 0 8rpx 0 0 #E06B38;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #E06B38;
 }
 .primarybtn__text {
   font-size: 28rpx;
@@ -331,5 +509,101 @@ function goReview() {
   font-size: 28rpx;
   color: #FF8A5C;
   font-weight: bold;
+}
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
+  width: 100%;
+}
+
+/* —— 今日任务战报（内嵌在按钮区下方，样式与任务页卡片同语言） —— */
+.taskrep {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 28rpx;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;
+  padding: 28rpx 26rpx 24rpx;
+  margin-top: 28rpx;
+}
+.taskrep__title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #4A4458;
+}
+.taskrep__sub {
+  font-size: 20rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+  margin-top: 6rpx;
+}
+.reprow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 18rpx;
+}
+.reprow__iconbox {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 20rpx;
+  background-color: #FFF7EF;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F8EADA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16rpx;
+}
+.reprow__icon {
+  width: 48rpx;
+  height: 48rpx;
+}
+.reprow__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin-right: 14rpx;
+}
+.reprow__title {
+  font-size: 23rpx;
+  font-weight: bold;
+  color: #4A4458;
+  line-height: 32rpx;
+}
+.reprow__track {
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: #F6EDE3;
+  margin-top: 10rpx;
+  overflow: hidden;
+}
+.reprow__fill {
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: #FF8A5C;
+}
+.reprow__fill--done {
+  background-color: #5FC9A5;
+}
+.reprow__badge {
+  width: 46rpx;
+  height: 46rpx;
+  border-radius: 23rpx;
+  background-color: #5FC9A5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom-width: 3rpx; border-bottom-style: solid; border-bottom-color: #3FA885;
+}
+.reprow__badge-img {
+  width: 24rpx;
+  height: 24rpx;
+}
+.reprow__count {
+  font-size: 22rpx;
+  font-weight: bold;
+  color: #AFA8BD;
 }
 </style>

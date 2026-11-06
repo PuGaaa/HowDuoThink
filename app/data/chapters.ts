@@ -2,7 +2,7 @@
 import { CASE_CATALOG, getEffectiveCases, MAINLINE_CASE_IDS, TRIAL_CASE_IDS } from './cases'
 import { COURSE_CASE_IDS, LEGACY_CASE_CATALOG } from './course'
 import { DiagnosisCase } from '../types/case'
-import { getCaseProgress, getUnlockedChapterIds, rememberUnlockedChapterIds, progressStorageGet, progressStorageSet } from '../utils/storage'
+import { getCaseProgress, getUnlockedChapterIds, rememberUnlockedChapterIds, progressIdentity, progressStorageGet, progressStorageSet } from '../utils/storage'
 import { getRemoteCases } from '../utils/sync'
 import { isLoggedIn } from '../utils/auth'
 
@@ -47,10 +47,22 @@ export const CHAPTERS: ChapterDef[] = [
 
 export { MAINLINE_CASE_IDS, TRIAL_CASE_IDS }
 
-/** 章内先展示冻结主线，再展示选做；所有入口采用同一有效题目修订。 */
+/** 章内先展示冻结主线，再展示选做；所有入口采用同一有效题目修订。
+ *  进程内缓存：按 getEffectiveCases 引用校验（换包自动重建）；isCasePlayable/列表渲染每帧多次调用。
+ *  缓存数组按引用返回，调用方只读。 */
+const chapterCasesCache = new Map<string, DiagnosisCase[]>()
+let chapterCasesSource: DiagnosisCase[] | null = null
+
 export function casesInChapter(chapterId: string): DiagnosisCase[] {
-  const merged = getEffectiveCases().filter((c) => c.chapterId === chapterId)
-  return merged.sort((a, b) => {
+  const source = getEffectiveCases()
+  if (chapterCasesSource !== source) {
+    chapterCasesCache.clear()
+    chapterCasesSource = source
+  }
+  const hit = chapterCasesCache.get(chapterId)
+  if (hit != null) return hit
+  const merged = source.filter((c) => c.chapterId === chapterId)
+  const out = merged.sort((a, b) => {
     const aMainline = MAINLINE_CASE_IDS.indexOf(a.id)
     const bMainline = MAINLINE_CASE_IDS.indexOf(b.id)
     if (aMainline >= 0 || bMainline >= 0) {
@@ -63,6 +75,8 @@ export function casesInChapter(chapterId: string): DiagnosisCase[] {
     if (aCommunity !== bCommunity) return aCommunity ? 1 : -1
     return a.order - b.order
   })
+  chapterCasesCache.set(chapterId, out)
+  return out
 }
 
 /** 篇内全部章 */
@@ -72,9 +86,18 @@ export function chaptersInPart(partId: string): ChapterDef[] {
 
 const KEY_LEGACY_CAPTURED = 'think_course_20261104_captured'
 
+// 一次性标记按身份域记忆：KEY_LEGACY_CAPTURED 是按身份隔离的，
+// 游客捕获后登录还要为新身份再捕获一次（prepareProgressIdentity 在覆盖进度前调用）
+let legacyCapturedUid: string = ''
+
 /** 在切换身份或覆盖旧 casepack 前调用；仅按迁移时可证明的旧规则保留资格。 */
 export function preserveLegacyChapterUnlocks(): void {
-  if (progressStorageGet(KEY_LEGACY_CAPTURED) === '1') return
+  const uid = progressIdentity()
+  if (legacyCapturedUid === uid) return
+  if (progressStorageGet(KEY_LEGACY_CAPTURED) === '1') {
+    legacyCapturedUid = uid
+    return
+  }
   const oldCases = LEGACY_CASE_CATALOG.slice()
   for (const item of getRemoteCases()) {
     if (!oldCases.some((c) => c.id === item.id)) oldCases.push({ id: item.id, chapterId: item.chapterId, order: item.order })
@@ -92,6 +115,7 @@ export function preserveLegacyChapterUnlocks(): void {
   }
   progressStorageSet(KEY_LEGACY_CAPTURED, '1')
   rememberUnlockedChapterIds(unlocked)
+  legacyCapturedUid = uid
 }
 
 /** 章内已破案数（本地 + 远端 casepack） */

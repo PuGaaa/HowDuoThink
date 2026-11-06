@@ -15,11 +15,19 @@ export interface AppUser {
   name: string
   avatar: string
   role: string
+  // 是否已设密码：登录响应不带此字段，fetchProfile（GET /api/me）刷新后才有值
+  hasPassword?: boolean
 }
 
+// token 缓存：isChapterUnlocked/isCasePlayable 在每日题循环里逐案调 isLoggedIn，
+// 每次原生读在真机上被放大上千次；写入/登出时同步失效（本文件是 token 唯一读写处）
+let tokenCache: string | null = null
+
 export function getToken(): string {
+  if (tokenCache != null) return tokenCache
   const v = uni.getStorageSync(KEY_TOKEN)
-  return v == null ? '' : v as string
+  tokenCache = v == null ? '' : v as string
+  return tokenCache
 }
 
 export function getStoredUser(): AppUser | null {
@@ -144,6 +152,7 @@ export function login(loginName: string, password: string, cb: (r: LoginResult) 
         return
       }
       uni.setStorageSync(KEY_TOKEN, token)
+      tokenCache = token
       uni.setStorageSync(KEY_USER, JSON.stringify({ id: d.userId, login: d.login, name: d.name, avatar: d.avatar ?? '', role: d.role } as AppUser))
       cb({ error: '' })
     },
@@ -153,8 +162,59 @@ export function login(loginName: string, password: string, cb: (r: LoginResult) 
   })
 }
 
+/** 拉取登录资料（GET /api/me）：刷新本地 user（含 hasPassword）。 */
+export function fetchProfile(cb: (r: LoginResult) => void) {
+  uni.request({
+    url: API_BASE + '/api/me',
+    method: 'GET',
+    header: { Authorization: 'Bearer ' + getToken() } as any,
+    timeout: 8000,
+    success: (res) => {
+      if (res.statusCode !== 200) {
+        cb({ error: '获取资料失败' })
+        return
+      }
+      const d = res.data as any
+      const u = getStoredUser()
+      if (u != null) {
+        const nu: AppUser = { id: d.id ?? u.id, login: d.login ?? u.login, name: d.name ?? u.name, avatar: d.avatar ?? u.avatar, role: d.role ?? u.role, hasPassword: d.hasPassword == true }
+        uni.setStorageSync(KEY_USER, JSON.stringify(nu))
+      }
+      cb({ error: '' })
+    },
+    fail: () => cb({ error: '无法连接社区服务' }),
+  })
+}
+
+/** 设置/修改密码：无密码账号 oldPassword 传空即直接设置（服务端自动区分）。 */
+export function changePassword(oldPassword: string, newPassword: string, cb: (r: LoginResult) => void) {
+  uni.request({
+    url: API_BASE + '/api/me/password',
+    method: 'POST',
+    header: { Authorization: 'Bearer ' + getToken(), 'Content-Type': 'application/json' } as any,
+    data: { oldPassword: oldPassword, newPassword: newPassword } as any,
+    timeout: 8000,
+    success: (res) => {
+      if (res.statusCode !== 200) {
+        const detail = (res.data as any)?.detail
+        cb({ error: typeof detail === 'string' ? detail : '保存失败' })
+        return
+      }
+      // 已设密码：本地资料同步置 true，入口文案即时切「修改密码」
+      const u = getStoredUser()
+      if (u != null) {
+        const nu: AppUser = { id: u.id, login: u.login, name: u.name, avatar: u.avatar, role: u.role, hasPassword: true }
+        uni.setStorageSync(KEY_USER, JSON.stringify(nu))
+      }
+      cb({ error: '' })
+    },
+    fail: () => cb({ error: '无法连接社区服务' }),
+  })
+}
+
 export function logout() {
   setProgressIdentity('guest')
+  tokenCache = ''
   uni.removeStorageSync(KEY_TOKEN)
   uni.removeStorageSync(KEY_USER)
   uni.removeStorageSync('think_learning_anonymous_id_v1')
@@ -206,6 +266,7 @@ export function smsLogin(phone: string, code: string, cb: (r: LoginResult) => vo
         return
       }
       uni.setStorageSync(KEY_TOKEN, token)
+      tokenCache = token
       const realName = typeof d.name === 'string' && (d.name as string).length > 0 ? d.name as string : d.login
       uni.setStorageSync(KEY_USER, JSON.stringify({ id: d.userId, login: d.login, name: realName, avatar: d.avatar ?? '', role: d.role } as AppUser))
       cb({ error: '' })

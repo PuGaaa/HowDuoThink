@@ -2,6 +2,7 @@
   <view class="page">
     <safe-top></safe-top>
     <navbar></navbar>
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
     <view v-if="loaded" class="content">
       <text v-if="previewId.length > 0" class="preview-note">草稿预览 · 本局不保存学习进度</text>
       <text class="pagetitle">诊断现场</text>
@@ -37,12 +38,12 @@
           <text class="primarybtn__text">看复盘</text>
         </view>
       </view>
+      <view v-if="!loaded" class="loading">
+        <text class="loading__text">{{ loadError.length > 0 ? loadError : '正在调取现场……' }}</text>
+        <text v-if="loadError.length > 0 && previewId.length === 0" class="loading__text" @click="loadPublishedCase">重新加载</text>
+      </view>
     </view>
-
-    <view v-else class="loading">
-      <text class="loading__text">{{ loadError.length > 0 ? loadError : '正在调取现场……' }}</text>
-      <text v-if="loadError.length > 0 && previewId.length === 0" class="loading__text" @click="loadPublishedCase">重新加载</text>
-    </view>
+    </scroll-view>
 
     <!-- 内心小动物：悬浮弹窗 -->
     <mascot v-if="loaded" :show="mascotShow" :who="mascotWho" :line="mascotLine"></mascot>
@@ -71,9 +72,11 @@
         </view>
       </view>
 
-      <!-- 假设板 tab：勾选你的怀疑（全程可编辑） -->
+      <!-- 假设板 tab：勾选你的怀疑（全程可编辑）
+           三 tab 用 v-show 常驻：v-if 分支卸载在 iOS 蒸汽模式 fixed 容器内触发
+           UNIAPP_DOM 线程渲染指令 SIGSEGV（切 tab 即卡死），故不卸载只切换显示 -->
       <drawer-board
-        v-if="drawerTab === 'board'"
+        v-show="drawerTab === 'board'"
         :hyps="hyps"
         :selected="selected"
         :free-notes="freeNotes"
@@ -84,9 +87,9 @@
         @start="submitHypotheses"
       ></drawer-board>
 
-      <!-- 验证动作 tab：按假设分节，其余隐藏 -->
-      <view v-else-if="drawerTab === 'actions'" class="drawer__body">
-        <scroll-view class="drawer__scroll" scroll-y>
+      <!-- 验证动作 tab：按假设分节，其余隐藏（v-show 常驻 + 去 scroll-view，同指认根因） -->
+      <view v-show="drawerTab === 'actions'" class="drawer__body">
+        <view class="drawer__scroll">
           <view v-if="verifySections.length == 0" class="emptyhint">
             <text class="emptyhint__text">先勾选你的怀疑，这里才会出现对应的验证手段</text>
             <view class="emptyhint__btn" @click="drawerTab = 'board'">
@@ -130,22 +133,45 @@
             ></action-item>
           </view>
           <text class="drawer__note">换怀疑？回假设板勾选，验证线会跟着变</text>
-        </scroll-view>
+        </view>
       </view>
 
-      <!-- 指认根因 tab -->
-      <drawer-identify
-        v-else
-        :causes="causes"
-        :picked="identifyPick"
-        :collected="collected"
-        :checklist-open="checklistOpen"
-        :wrong-count="wrongCount"
-        @pick="identifyPick = $event"
-        @toggle-check="toggleChecklist"
-        @submit="confirmIdentify"
-        @go-board="drawerTab = 'board'"
-      ></drawer-identify>
+      <!-- 指认根因 tab（模板内联于页面 + v-show 常驻；scroll-view 换普通 view：
+           抽屉内 scroll-view 的 tap 命中在 iOS 蒸汽模式原生渲染下失效（点击无反馈），
+           chapter 页无 scroll-view 一切正常） -->
+      <view v-show="drawerTab === 'identify'" class="dbody">
+        <view class="dscroll">
+          <view class="checklist">
+            <view class="checklist__head" @click="toggleChecklist">
+              <text class="checklist__title">指认前核对：我的检查单（{{ collected.length }}）</text>
+              <text class="checklist__chev">{{ checklistOpen ? '⌃' : '⌄' }}</text>
+            </view>
+            <view v-if="checklistOpen">
+              <view v-for="(cl, i) in collected" :key="'cl' + i" class="checklist__item">
+                <text class="checklist__item-text">✓ {{ cl.text }}</text>
+                <text class="checklist__item-src">{{ cl.src }}</text>
+              </view>
+              <view v-if="collected.length == 0" class="checklist__empty">
+                <text class="checklist__empty-text">还没有收集的检查单——破案后会在这里积累</text>
+              </view>
+            </view>
+          </view>
+          <view v-if="wrongCount > 0" class="reguide">
+            <text class="reguide__text">垂耳兔：你的证据链指向了别处。回假设板重新推演，或者再看一遍证据。</text>
+            <view class="reguide__btn" @click="drawerTab = 'board'">
+              <text class="reguide__btn-text">回假设板</text>
+            </view>
+          </view>
+          <view v-for="(c, i) in causes" :key="c.id" class="cause" @click="pickCause(i)">
+            <view :class="pickIndex === i ? 'cause__dot cause__dot--on' : 'cause__dot'"></view>
+            <text class="cause__text">{{ c.text }}</text>
+          </view>
+          <text class="dnote">垂耳兔提醒：咬合的证据链比答案本身值钱</text>
+        </view>
+        <view class="primarybtn" @click="confirmIdentify">
+          <text class="primarybtn__text">就是它！</text>
+        </view>
+      </view>
     </view>
     <confirm-dialog
       :show="confirmShow"
@@ -168,7 +194,6 @@ import mascot from '../../components/mascot/mascot.uvue'
 import evidenceCard from '../../components/evidence-card/evidence-card.uvue'
 import actionItem from '../../components/action-item/action-item.uvue'
 import drawerBoard from '../../components/drawer-board/drawer-board.uvue'
-import drawerIdentify from '../../components/drawer-identify/drawer-identify.uvue'
 import confirmDialog from '../../components/confirm-dialog/confirm-dialog.uvue'
 import { getCaseById, getCollectedLessons, CollectedLesson } from '../../data/cases'
 import { chapterUnlockHint, isCasePlayable, TRIAL_CASE_IDS } from '../../data/chapters'
@@ -242,6 +267,8 @@ const checklistOpen = ref(false)
 const checklistTouched = ref(false)
 const collected = ref<CollectedLesson[]>([])
 const identifyPick = ref('')
+/** 圆点选中态用 v-for index 比较（ref === v-for 项属性的三元在 iOS 蒸汽模式下不触发重渲染） */
+const pickIndex = ref(-1)
 const wrongCount = ref(0)
 const maxWrong: number = MAX_WRONG_IDENTIFIES
 const finished = ref(false)
@@ -395,6 +422,8 @@ function initializeCase(source: DiagnosisCase) {
   expertCost.value = c.expertCost
   restartActionId.value = c.restartActionId
   collected.value = getCollectedLessons(c.id)
+  identifyPick.value = ''
+  pickIndex.value = -1
   loaded.value = true
 
   const hs: HStateRec[] = []
@@ -423,6 +452,14 @@ function initializeCase(source: DiagnosisCase) {
 
 function toggleDrawer() {
   drawerOpen.value = !drawerOpen.value
+}
+
+/** 指认根因选项点击（页面内处理：绕开 iOS 蒸汽模式带参组件 $emit 的崩溃路径） */
+function pickCause(i: number) {
+  const c = causes.value[i]
+  if (c == null) return
+  pickIndex.value = i
+  identifyPick.value = c.id
 }
 
 function closeDrawer() {
@@ -702,20 +739,22 @@ function goReview() {
   margin-bottom: 18rpx;
 }
 .page {
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
-  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  padding: 24rpx 32rpx 220rpx;
 }
 .content {
+  padding-top: 112rpx;
+  padding-bottom: 220rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
   display: flex;
   flex-direction: column;
-  padding-top: 88rpx;
 }
 .pagetitle {
   font-size: 44rpx;
@@ -743,7 +782,7 @@ function goReview() {
   border-radius: 20rpx;
   padding: 20rpx 28rpx;
   margin-bottom: 22rpx;
-  box-shadow: 0 8rpx 0 0 #35303F;;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #35303F;;
 }
 .costbar__left {
   display: flex;
@@ -774,7 +813,7 @@ function goReview() {
   border-radius: 24rpx;
   padding: 28rpx;
   margin-bottom: 22rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;;
 }
 .scene__tag {
   background-color: #FFF1E7;
@@ -827,7 +866,7 @@ function goReview() {
   background-color: #FFFFFF;
   border-radius: 24rpx;
   padding: 28rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;;
 }
 .donebar__text {
   font-size: 28rpx;
@@ -853,7 +892,7 @@ function goReview() {
   border-radius: 46rpx;
   padding: 26rpx;
   z-index: 98;
-  box-shadow: 0 8rpx 0 0 #E06B38;;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #E06B38;;
 }
 .fab__text {
   font-size: 28rpx;
@@ -890,7 +929,7 @@ function goReview() {
   margin-left: auto;
   margin-right: auto;
   max-width: 480px;
-  height: 90vh;
+  height: 90%;
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
@@ -901,7 +940,7 @@ function goReview() {
   transition-duration: 260ms;
   transition-timing-function: ease-out;
   z-index: 97;
-  box-shadow: 0 -6rpx 0 0 #EFE5D6;;
+  border-top-width: 6rpx; border-top-style: solid; border-top-color: #EFE5D6;;
 }
 .drawer--open {
   transform: translateY(0);
@@ -1026,5 +1065,141 @@ function goReview() {
   font-size: 28rpx;
   color: #FFFFFF;
   font-weight: bold;
+}
+
+/* 指认根因（自 drawer-identify 组件内联迁入，样式随迁） */
+.dbody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.dscroll {
+  flex: 1;
+}
+.dnote {
+  font-size: 20rpx;
+  color: #AFA8BD;
+  margin-top: 14rpx;
+  text-align: center;
+}
+.cause {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F5E6DA;
+  border-radius: 16rpx;
+  padding: 18rpx;
+  margin-bottom: 14rpx;
+  background-color: #FFFFFF;
+  border-bottom-width: 5rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;
+}
+.cause__dot {
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 15rpx;
+  border-width: 2.5rpx;
+  border-style: solid;
+  border-color: #D5DEE9;
+  margin-right: 16rpx;
+  margin-top: 4rpx;
+}
+.cause__dot--on {
+  border-color: #FF8A5C;
+  background-color: #FF8A5C;
+}
+.cause__text {
+  font-size: 25rpx;
+  color: #4A4458;
+  line-height: 38rpx;
+  flex: 1;
+}
+.checklist {
+  background-color: #FFF6DE;
+  border-radius: 16rpx;
+  border-width: 1rpx;
+  border-style: solid;
+  border-color: #F2D98C;
+  padding: 16rpx 18rpx;
+  margin-bottom: 16rpx;
+}
+.checklist__head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.checklist__title {
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #8A6D1F;
+  flex: 1;
+}
+.checklist__chev {
+  font-size: 22rpx;
+  color: #B08F4A;
+}
+.checklist__item {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 12rpx;
+  padding: 12rpx 16rpx;
+  margin-top: 10rpx;
+}
+.checklist__item-text {
+  font-size: 22rpx;
+  color: #4A4458;
+  line-height: 34rpx;
+}
+.checklist__item-src {
+  font-size: 19rpx;
+  color: #B08F4A;
+  margin-top: 4rpx;
+}
+.checklist__empty {
+  padding: 6rpx 0;
+}
+.checklist__empty-text {
+  font-size: 21rpx;
+  color: #B08F4A;
+}
+.reguide {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF6DE;
+  border-radius: 18rpx;
+  border-width: 1rpx;
+  border-style: solid;
+  border-color: #F2D98C;
+  padding: 20rpx;
+  margin-bottom: 20rpx;
+}
+.reguide__text {
+  font-size: 22rpx;
+  color: #8A6D1F;
+  line-height: 34rpx;
+}
+.reguide__btn {
+  align-self: flex-start;
+  background-color: #FFFFFF;
+  border-radius: 26rpx;
+  border-width: 2rpx;
+  border-style: solid;
+  border-color: #FF8A5C;
+  padding: 10rpx 24rpx;
+  margin-top: 14rpx;
+}
+.reguide__btn-text {
+  font-size: 21rpx;
+  font-weight: bold;
+  color: #FF8A5C;
+}
+
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
 }
 </style>

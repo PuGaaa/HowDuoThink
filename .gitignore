@@ -37,3 +37,4 @@ server/local_models/
 
 # 会话工作区（计划/台账临时区）
 .zcode/
+.mimosa/

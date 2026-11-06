@@ -107,11 +107,11 @@ def dev_upsert_user(login: str) -> str:
 
 
 def get_profile(uid: str) -> dict:
-    rows = db.q("SELECT id, login, name, avatar, role FROM users WHERE id=?", (uid,))
+    rows = db.q("SELECT id, login, name, avatar, role, password_hash FROM users WHERE id=?", (uid,))
     if not rows:
         raise HTTPException(401, "用户不存在")
     r = rows[0]
-    return {"id": r["id"], "login": r["login"], "name": r["name"], "avatar": r["avatar"], "role": r["role"]}
+    return {"id": r["id"], "login": r["login"], "name": r["name"], "avatar": r["avatar"], "role": r["role"], "hasPassword": bool(r["password_hash"])}
 
 
 def update_profile(uid: str, name: str, avatar_url: str | None) -> dict:

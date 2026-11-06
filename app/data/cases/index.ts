@@ -292,15 +292,31 @@ for (let i = 0; i < ALL_CASES.length; i++) {
   }
 }
 
-/** 所有玩法入口共享同一有效集合；同 ID 只采用更高内容修订，游标不参与比较。 */
+/** 所有玩法入口共享同一有效集合；同 ID 只采用更高内容修订，游标不参与比较。
+ *  进程内缓存：切 tab / 列表渲染每帧多次调用；以远端包内容指纹为失效依据
+ *  （sync.ts 覆盖包换新数组、增量合并原位改写，长度+修订号和两种路径都能感知）。 */
+let effectiveCache: DiagnosisCase[] | null = null
+let effectiveStamp = ''
+
+function effectiveStampOf(remote: DiagnosisCase[]): string {
+  let sum = 0
+  for (let i = 0; i < remote.length; i++) sum += (remote[i].contentRevision ?? 1)
+  return remote.length + ':' + sum
+}
+
 export function getEffectiveCases(): DiagnosisCase[] {
+  const remote = getRemoteCases()
+  const stamp = effectiveStampOf(remote)
+  if (effectiveCache != null && stamp === effectiveStamp) return effectiveCache
   const byId = new Map<string, DiagnosisCase>()
   for (const item of ALL_CASES) byId.set(item.id, item)
-  for (const item of getRemoteCases()) {
+  for (const item of remote) {
     const local = byId.get(item.id)
     if (local == null || (item.contentRevision ?? 1) > (local.contentRevision ?? 1)) byId.set(item.id, item)
   }
-  return [...byId.values()]
+  effectiveCache = [...byId.values()]
+  effectiveStamp = stamp
+  return effectiveCache
 }
 
 export function getCaseById(id: string): DiagnosisCase | null {

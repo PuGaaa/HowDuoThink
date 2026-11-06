@@ -2,145 +2,74 @@
   <view class="page">
     <safe-top></safe-top>
     <navbar></navbar>
-    <view class="content">
-      <!-- 标题区（Figma：品牌行 / 大标题 / 英文小字） -->
-      <text class="head__brand">好多星</text>
-      <text class="head__title">侦 探 档 案</text>
-      <text class="head__sub">AGENT-ERA DEBUGGER · DIAGNOSIS RECORD</text>
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
+      <view class="content">
+        <!-- 传播海报卡（与导出 PNG 同构）：手账拼贴 · 吸引下载向 -->
+        <view class="postcard" id="postcard">
+          <view class="postcard__photo">
+            <view class="postcard__tape postcard__tape--a"></view>
+            <view class="postcard__tape postcard__tape--b"></view>
+            <image class="postcard__hero" src="/static/post/stickers.png" mode="widthFix"></image>
+          </view>
+          <!-- 标题行：终端贴纸在左侧做装饰（微旋转手账质感），组合居中 -->
+          <view class="postcard__titlerow">
+            <image class="postcard__titlebadge" src="/static/post/terminal.png" mode="aspectFit"></image>
+            <text class="postcard__title">这届 Bug 有点难抓</text>
+          </view>
+          <text class="postcard__sub">你的排错直觉该练练了</text>
+          <view v-if="shareReady" class="postcard__qrrow">
+            <view class="postcard__qrtext">
+              <text class="postcard__cta">扫码来试试</text>
+              <text class="postcard__brand">好多星 · 多想，多星。</text>
+            </view>
+            <view class="postcard__qrwrap">
+              <view class="postcard__qrframe">
+                <image class="postcard__qr" :src="qrDataUrl" mode="aspectFit"></image>
+              </view>
+            </view>
+            <!-- 恐龙挂行容器正偏移定位（relative + top≥0），整只落在行边界内，原生端不会被裁剪 -->
+            <image class="postcard__dino" src="/static/post/triceratops.png" mode="aspectFit"></image>
+            <!-- 粉色和纸胶带斜贴码图左上角（正偏移在便签内，不越界裁剪；码图自带超宽静区不伤码） -->
+            <view class="postcard__qrtape"></view>
+            <!-- 星星压便签内左下角（正偏移不越界） -->
+            <image class="postcard__spark" src="/static/icons/v4/magic-sparkles.png" mode="aspectFit"></image>
+          </view>
+        </view>
 
-      <!-- 深色档案主卡（海报同款视觉） -->
-      <view class="postcard">
-        <view class="deco">
-          <view class="deco__b deco__b--a"></view>
-          <view class="deco__b deco__b--e"></view>
-          <view class="deco__b deco__b--m"></view>
-        </view>
-        <view class="postcard__halo">
-          <image class="postcard__avatar" :src="frogUrl" mode="aspectFit"></image>
-        </view>
-        <text class="postcard__rank">{{ rankName }}</text>
-        <view class="postcard__divider"></view>
-        <view class="postcard__stats">
-          <view class="pstat">
-            <text class="pstat__v">{{ solvedCount }}</text>
-            <text class="pstat__k">破案</text>
-          </view>
-          <view class="pstat">
-            <text class="pstat__v">{{ streakCount }}</text>
-            <text class="pstat__k">连续天数</text>
-          </view>
-          <view class="pstat">
-            <text class="pstat__v">{{ lessonCount }}</text>
-            <text class="pstat__k">检查单</text>
-          </view>
-        </view>
-        <text class="postcard__slogan">多想，多星。</text>
-      </view>
-
-      <!-- 层契约拼图条：每章一块，点亮 = 已破案 -->
-      <view class="puzzle">
-        <view class="puzzle__head">
-          <text class="puzzle__title">层契约拼图</text>
-          <text class="puzzle__count">{{ partSolved }} / {{ CHAPTERS.length }} 章</text>
-        </view>
-        <view class="puzzle__row">
-          <view v-for="(ch, i) in CHAPTERS" :key="ch.id" :class="i < partSolved ? 'pblock pblock--lit' : 'pblock'">
-            <text :class="i < partSolved ? 'pblock__text pblock__text--lit' : 'pblock__text'">章{{ i + 1 }}</text>
+        <view class="btnrow">
+          <view class="primarybtn" @click="downloadPoster">
+            <text class="primarybtn__text">保存海报 PNG</text>
           </view>
         </view>
       </view>
-
-      <!-- 扫码邀请卡 -->
-      <view v-if="shareReady" class="qrcard">
-        <image class="qrcard__qr" :src="qrDataUrl" mode="aspectFit"></image>
-        <view class="qrcard__body">
-          <text class="qrcard__title">扫码来挑战</text>
-          <text class="qrcard__sub">把你的排错直觉，练成条件反射</text>
-          <text class="qrcard__meta">{{ today }} · 侦探 No.0002</text>
-        </view>
-      </view>
-      <text v-else class="sharehint">H5 公开地址配置后，海报会显示可扫码的试玩入口</text>
-
-      <view class="btnrow">
-        <view class="primarybtn" @click="downloadPoster">
-          <text class="primarybtn__text">保存海报 PNG</text>
-        </view>
-      </view>
-      <text class="hint">H5 端下载 PNG 图片；App 端将支持保存到相册</text>
-      <text class="foot">—— 本档案由 好多星 生成 ——</text>
-    </view>
+    </scroll-view>
   </view>
 </template>
 
 <script setup lang="uts">
 import safeTop from '../../components/safe-top/safe-top.uvue'
+import navbar from '../../components/navbar/navbar.uvue'
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getEffectiveCases } from '../../data/cases'
-import { CHAPTERS, casesInChapter } from '../../data/chapters'
-import { getCaseProgress, getStreak, getChecklistUse, getTotals } from '../../utils/storage'
-import { rankOf } from '../../utils/scoring'
-import { getMascotUrl } from '../../utils/remote-assets'
 import { PUBLIC_H5_ORIGIN } from '../../config'
 import { createPosterShareUrl, createQrDataUrl } from '../../utils/qr'
 
-const frogUrl = getMascotUrl('frog')
-import navbar from '../../components/navbar/navbar.uvue'
-
-const rankName = ref('')
-const solvedCount = ref(0)
-const streakCount = ref(0)
-const lessonCount = ref(0)
-const partSolved = ref(0)
 const qrDataUrl = ref('')
-const today = ref('')
 const shareUrl = PUBLIC_H5_ORIGIN.length > 0
   ? createPosterShareUrl(PUBLIC_H5_ORIGIN)
   : ''
 const shareReady = shareUrl.length > 0
 
-function refresh() {
-  const cases = getEffectiveCases()
-  const totals = getTotals(
-    cases.map((c) => c.id),
-    cases.map((c) => c.lessons.length)
-  )
-  solvedCount.value = totals.solved
-  lessonCount.value = totals.lessons
-  streakCount.value = getStreak().count
-  const rk = rankOf(totals.solved)
-  rankName.value = rk.name
-
-  // 层契约拼图：已破案 ≥1 关的章数
-  let lit = 0
-  for (let i = 0; i < CHAPTERS.length; i++) {
-    const list = casesInChapter(CHAPTERS[i].id)
-    for (let j = 0; j < list.length; j++) {
-      const p = getCaseProgress(list[j].id)
-      if (p != null && p.solved) {
-        lit++
-        break
-      }
-    }
-  }
-  partSolved.value = lit
-
+// onShow 首次显示也会触发：二维码随分享地址保持最新
+onShow(() => {
   if (shareReady) qrDataUrl.value = createQrDataUrl(shareUrl)
-
-  const d = new Date()
-  const mm = d.getMonth() + 1 < 10 ? '0' + (d.getMonth() + 1) : String(d.getMonth() + 1)
-  const dd = d.getDate() < 10 ? '0' + d.getDate() : String(d.getDate())
-  today.value = d.getFullYear() + '.' + mm + '.' + dd
-}
-
-// onShow 首次显示也会触发：海报数据随任务积累保持最新
-onShow(() => refresh())
+})
 
 function downloadPoster() {
   // #ifdef WEB
-  // Canvas 按 Figma 画板坐标（390×720）2x 手绘 → PNG 下载
+  // Canvas 逻辑尺寸 390×560，2x 导出 780×1120 —— 与页面海报卡（手账拼贴）同构
   const BW = 390
-  const BH = 720
+  const BH = 560
   const c = document.createElement('canvas') as any
   c.width = BW * 2
   c.height = BH * 2
@@ -150,418 +79,361 @@ function downloadPoster() {
     return
   }
   ctx.scale(2, 2)
-  // 奶油页底
-  ctx.fillStyle = '#FFF9F4'
+  // 奶油卡底
+  ctx.fillStyle = '#FFF8F0'
   ctx.fillRect(0, 0, BW, BH)
   ctx.textAlign = 'center'
-  // 标题区
-  ctx.fillStyle = '#FF8A5C'
-  ctx.font = 'bold 13px -apple-system, PingFang SC, sans-serif'
-  ctx.fillText('好多星', BW / 2, 40)
-  ctx.fillStyle = '#4A4458'
-  ctx.font = 'bold 26px -apple-system, PingFang SC, sans-serif'
-  ctx.fillText('侦 探 档 案', BW / 2, 76)
-  ctx.fillStyle = '#AFA8BD'
-  ctx.font = '8px -apple-system, PingFang SC, sans-serif'
-  ctx.fillText('AGENT-ERA DEBUGGER · DIAGNOSIS RECORD', BW / 2, 101)
-  // 深色主卡
-  const KX = 20, KY = 120, KW = 350, KH = 330
-  ctx.beginPath()
-  if (ctx.roundRect != null) ctx.roundRect(KX, KY, KW, KH, 24)
-  else ctx.rect(KX, KY, KW, KH)
-  ctx.fillStyle = '#4A4458'
-  ctx.fill()
-  const colors = ['#FF8A5C', '#5FC9A5', '#6FB8E8']
-  for (let i = 0; i < 3; i++) {
-    ctx.fillStyle = colors[i]
-    ctx.fillRect(KX + KW - 26 - (3 - i) * 20, KY + 16, 14, 14)
+  const rr = (x: number, y: number, w: number, h: number, r: number) => {
+    ctx.beginPath()
+    if (ctx.roundRect != null) ctx.roundRect(x, y, w, h, r)
+    else ctx.rect(x, y, w, h)
   }
-  const img = document.createElement('img') as any
-  const drawPoster = (qrImg: any) => {
-    // 吉祥物 + 光圈
-    ctx.beginPath()
-    ctx.arc(KX + KW / 2, KY + 92, 52, 0, Math.PI * 2)
+  const drawPoster = (heroImg: any, qrImg: any, dinoImg: any, termImg: any, sparkImg: any) => {
+    // 贴纸图 = 微旋转白框照片（阴影 + 白边 + 圆角）
     ctx.save()
-    ctx.clip()
-    const g = ctx.createLinearGradient(0, KY + 40, 0, KY + 144) as any
-    g.addColorStop(0, '#5E5770')
-    g.addColorStop(1, '#413B4D')
-    ctx.fillStyle = g
-    ctx.fillRect(KX + KW / 2 - 52, KY + 40, 104, 104)
-    ctx.drawImage(img, KX + KW / 2 - 34, KY + 58, 68, 68)
-    ctx.restore()
-    // 称号 + 分隔虚线
-    ctx.fillStyle = '#FFC94D'
-    ctx.font = 'bold 26px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText(rankName.value, BW / 2, KY + 178)
-    ctx.strokeStyle = '#5E5770'
-    ctx.setLineDash([4, 4])
-    ctx.beginPath()
-    ctx.moveTo(KX + 90, KY + 202)
-    ctx.lineTo(KX + KW - 90, KY + 202)
-    ctx.stroke()
-    ctx.setLineDash([])
-    // 三列数据胶囊
-    const stats: any[][] = [
-      [String(solvedCount.value), '破案'],
-      [String(streakCount.value), '连续天数'],
-      [String(lessonCount.value), '检查单'],
-    ]
-    for (let i = 0; i < 3; i++) {
-      const cw = 98
-      const x = KX + 18 + i * (cw + 9)
-      ctx.beginPath()
-      if (ctx.roundRect != null) ctx.roundRect(x, KY + 220, cw, 64, 16)
-      else ctx.rect(x, KY + 220, cw, 64)
-      ctx.fillStyle = '#413B4D'
-      ctx.fill()
-      ctx.fillStyle = '#FFFFFF'
-      ctx.font = 'bold 22px -apple-system, PingFang SC, sans-serif'
-      ctx.fillText(stats[i][0], x + cw / 2, KY + 251)
-      ctx.fillStyle = '#C9C2DA'
-      ctx.font = '10px -apple-system, PingFang SC, sans-serif'
-      ctx.fillText(stats[i][1], x + cw / 2, KY + 272)
-    }
-    ctx.fillStyle = '#9BD49B'
-    ctx.font = 'bold 11px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText('看症状 · 立假设 · 算成本 · 定根因', BW / 2, KY + 307)
-    // 层契约拼图条
-    ctx.textAlign = 'left'
-    ctx.fillStyle = '#4A4458'
-    ctx.font = 'bold 12px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText('层契约拼图', 20, 483)
-    ctx.textAlign = 'right'
-    ctx.fillStyle = '#FF8A5C'
-    ctx.fillText(partSolved.value + ' / ' + CHAPTERS.length + ' 章', 370, 483)
-    ctx.textAlign = 'center'
-    // 实体积木语言：点亮 = 章节色实心块 + 硬边投影 + 白字；未点亮 = 虚线空块
-    const acc = ['#FF8A5C', '#FF8A5C', '#5FC9A5', '#6FB8E8', '#FFC94D', '#FFB5C8']
-    const deep = ['#E06B38', '#E06B38', '#3FA885', '#4F93C4', '#D9A32E', '#E08AA6']
-    for (let i = 0; i < 6; i++) {
-      const x = 20 + i * 59
-      if (i < partSolved.value) {
-        ctx.beginPath()
-        if (ctx.roundRect != null) ctx.roundRect(x + 1, 498, 51, 48, 12)
-        else ctx.rect(x + 1, 498, 51, 48)
-        ctx.fillStyle = deep[i]
-        ctx.fill()
-        ctx.beginPath()
-        if (ctx.roundRect != null) ctx.roundRect(x, 494, 51, 48, 12)
-        else ctx.rect(x, 494, 51, 48)
-        ctx.fillStyle = acc[i]
-        ctx.fill()
-        ctx.fillStyle = '#FFFFFF'
-      } else {
-        ctx.beginPath()
-        if (ctx.roundRect != null) ctx.roundRect(x, 494, 51, 48, 12)
-        else ctx.rect(x, 494, 51, 48)
-        ctx.fillStyle = '#FFFFFF'
-        ctx.fill()
-        ctx.strokeStyle = '#E3E6EB'
-        ctx.lineWidth = 1.5
-        ctx.setLineDash([4, 4])
-        ctx.stroke()
-        ctx.setLineDash([])
-        ctx.fillStyle = '#AFA8BD'
-      }
-      ctx.font = 'bold 11px -apple-system, PingFang SC, sans-serif'
-      ctx.fillText('章' + (i + 1), x + 25.5, 522)
-    }
-    if (shareReady) {
-    // 扫码邀请卡
-    ctx.beginPath()
-    if (ctx.roundRect != null) ctx.roundRect(20, 556, 350, 120, 20)
-    else ctx.rect(20, 556, 350, 120)
+    ctx.translate(BW / 2, 165)
+    ctx.rotate(-1.2 * Math.PI / 180)
+    ctx.shadowColor = 'rgba(74, 68, 88, 0.18)'
+    ctx.shadowBlur = 18
+    ctx.shadowOffsetY = 8
+    rr(-163.5, -125.5, 327, 251, 12)
     ctx.fillStyle = '#FFFFFF'
     ctx.fill()
-    ctx.strokeStyle = '#F5E6DA'
-    ctx.lineWidth = 2
-    ctx.stroke()
-    ctx.drawImage(qrImg, 28, 564, 98, 98)
-    ctx.textAlign = 'left'
-    ctx.fillStyle = '#4A4458'
-    ctx.font = 'bold 13px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText('扫码来挑战', 140, 592)
-    ctx.fillStyle = '#7A7290'
-    ctx.font = '10px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText('把你的排错直觉，练成条件反射', 140, 615)
-    ctx.fillStyle = '#AFA8BD'
-    ctx.font = '9px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText(today.value + ' · 侦探 No.0002', 140, 640)
+    ctx.shadowColor = 'transparent'
+    ctx.shadowBlur = 0
+    ctx.shadowOffsetY = 0
+    if (heroImg != null) {
+      // 图 303×227 居中内嵌（白边 12）
+      ctx.drawImage(heroImg, -151.5, -113.5, 303, 227)
+    } else {
+      ctx.fillStyle = '#FFF3E9'
+      rr(-151.5, -113.5, 303, 227, 8)
+      ctx.fill()
     }
+    ctx.restore()
+    // 和纸胶带：斜贴照片框上缘两角
+    const tapes: any[][] = [[86, 46, -42, 'rgba(247, 226, 178, 0.92)'], [304, 47, 38, 'rgba(205, 233, 214, 0.92)']]
+    for (let i = 0; i < tapes.length; i++) {
+      ctx.save()
+      ctx.translate(tapes[i][0] as number, tapes[i][1] as number)
+      ctx.rotate((tapes[i][2] as number) * Math.PI / 180)
+      ctx.fillStyle = tapes[i][3] as string
+      rr(-29, -11, 58, 22, 3)
+      ctx.fill()
+      ctx.restore()
+    }
+    // 标题行：终端放大镜贴纸在左做装饰（微旋转），组合按文字实测宽度居中 —— 与页面标题行同构
+    ctx.fillStyle = '#303343'
+    ctx.font = 'bold 24px -apple-system, PingFang SC, sans-serif'
+    const titleText = '这届 Bug 有点难抓'
+    const titleW = ctx.measureText(titleText).width
+    const termW = 44
+    const termH = 33
+    const titleGap = 10
+    const titleLeft = (BW - termW - titleGap - titleW) / 2
+    if (termImg != null) {
+      ctx.save()
+      ctx.translate(titleLeft + termW / 2, 341)
+      ctx.rotate(8 * Math.PI / 180)
+      ctx.drawImage(termImg, -22, -17, termW, termH)
+      ctx.restore()
+    }
+    ctx.textAlign = 'left'
+    ctx.fillText(titleText, titleLeft + termW + titleGap, 350)
     ctx.textAlign = 'center'
-    ctx.fillStyle = '#AFA8BD'
-    ctx.font = '9px -apple-system, PingFang SC, sans-serif'
-    ctx.fillText('—— 本档案由 好多星 生成 ——', BW / 2, 696)
+    // 副题
+    ctx.fillStyle = '#858397'
+    ctx.font = '13px -apple-system, PingFang SC, sans-serif'
+    ctx.fillText('你的排错直觉该练练了', BW / 2, 382)
+    // 白色便签：与照片框同倾角（-1.2°）微旋转，码图直接贴纸面，按内容推导宽度并居中 —— 与页面扫码区同构
+    if (qrImg != null) {
+      ctx.font = '11px -apple-system, PingFang SC, sans-serif'
+      const brandW = ctx.measureText('好多星 · 多想，多星。').width
+      const panelW = brandW + 14 + 116 + 15 + 8 + 40
+      const panelX = (BW - panelW) / 2
+      const textX = panelX + 20
+      const qrX = textX + brandW + 14
+      ctx.save()
+      ctx.translate(BW / 2, 454)
+      ctx.rotate(-1.2 * Math.PI / 180)
+      // 便签底色/投影暂由页面设计迭代决定（当前页面为无底透明），此处仅作旋转坐标系
+      // 码图直接贴便签（数据源自带静区），恐龙右缘伸出码图右缘 15px —— 与页面卡同构
+      ctx.drawImage(qrImg, qrX - BW / 2, -42, 116, 116)
+      // 粉色和纸胶带（页面当前定在便签左缘 top75rpx）—— 与页面同构
+      ctx.save()
+      ctx.translate(panelX - BW / 2 + 19, -40)
+      ctx.rotate(-30 * Math.PI / 180)
+      ctx.fillStyle = 'rgba(248, 205, 214, 0.9)'
+      rr(-18.5, -7, 37, 14, 3)
+      ctx.fill()
+      ctx.restore()
+      if (dinoImg != null) {
+        ctx.save()
+        ctx.translate(qrX + 101 - BW / 2, -54)
+        ctx.rotate(4 * Math.PI / 180)
+        ctx.drawImage(dinoImg, -30, -30, 60, 60)
+        ctx.restore()
+      }
+      ctx.textAlign = 'left'
+      ctx.fillStyle = '#303343'
+      ctx.font = 'bold 16px -apple-system, PingFang SC, sans-serif'
+      ctx.fillText('扫码来试试', textX - BW / 2, 4)
+      ctx.fillStyle = '#AFA8BD'
+      ctx.font = '11px -apple-system, PingFang SC, sans-serif'
+      ctx.fillText('好多星 · 多想，多星。', textX - BW / 2, 30)
+      ctx.textAlign = 'center'
+      // 星星压便签内左下角
+      if (sparkImg != null) {
+        ctx.drawImage(sparkImg, panelX + 3 - BW / 2, 51, 32, 32)
+      }
+      ctx.restore()
+    } else {
+      ctx.fillStyle = '#AFA8BD'
+      ctx.font = '11px -apple-system, PingFang SC, sans-serif'
+      ctx.fillText('H5 公开地址配置后，海报会显示可扫码的试玩入口', BW / 2, 470)
+    }
     // 触发下载
     const url = c.toDataURL('image/png')
     const a = document.createElement('a') as any
     a.href = url
-    a.download = 'detective-card-' + Date.now() + '.png'
+    a.download = 'share-poster-' + Date.now() + '.png'
     document.body.appendChild(a)
     a.click()
     a.remove()
     uni.showToast({ title: '海报已开始下载', icon: 'none' })
   }
-  img.onload = () => {
-    if (shareReady) {
-      const qrImg = document.createElement('img') as any
-      qrImg.onload = () => drawPoster(qrImg)
-      qrImg.src = qrDataUrl.value
-      return
-    }
-    drawPoster(null)
+  const load = (src: string) => {
+    return new Promise((res: (v: any) => void) => {
+      const im = document.createElement('img') as any
+      im.onload = () => res(im)
+      im.onerror = () => res(null)
+      im.src = src
+    })
   }
-  img.onerror = () => {
-    uni.showToast({ title: '头像加载失败', icon: 'none' })
-  }
-  img.src = getMascotUrl('frog')
+  Promise.all([
+    load('/static/post/stickers.png'),
+    shareReady ? load(qrDataUrl.value) : Promise.resolve(null),
+    load('/static/post/triceratops.png'),
+    load('/static/post/terminal.png'),
+    load('/static/icons/v4/magic-sparkles.png'),
+  ]).then((imgs) => {
+    drawPoster(imgs[0], imgs[1], imgs[2], imgs[3], imgs[4])
+  })
   // #endif
   // #ifndef WEB
-  uni.showToast({ title: 'App 端海报保存即将上线', icon: 'none' })
+  // App 端：直接对页面海报卡元素截图后存系统相册 —— 所见即所得，不维护第二套绘制代码。
+  // 首次保存会触发相册写入权限弹窗；拒绝后再次保存走系统设置引导。
+  const card = uni.getElementById('postcard')
+  if (card == null) {
+    uni.showToast({ title: '海报生成失败，请重试', icon: 'none' })
+    return
+  }
+  card.takeSnapshot({
+    format: 'png',
+    success: (res) => {
+      uni.saveImageToPhotosAlbum({
+        filePath: res.tempFilePath,
+        success: () => {
+          uni.showToast({ title: '海报已保存到相册', icon: 'success' })
+        },
+        fail: () => {
+          uni.showToast({ title: '保存失败，请允许访问相册后重试', icon: 'none' })
+        },
+      })
+    },
+    fail: () => {
+      uni.showToast({ title: '海报生成失败，请重试', icon: 'none' })
+    },
+  })
   // #endif
 }
 </script>
 
 <style>
 .page {
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
-  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  padding: 24rpx 32rpx 60rpx;
+}
+.pagesv {
+  flex: 1;
 }
 .content {
   display: flex;
   flex-direction: column;
-  padding-top: 88rpx;
+  /* 顶部留白盖过悬浮返回胶囊（约 96rpx），海报卡不顶到返回按钮 */
+  padding-top: 120rpx;
+  padding-bottom: 60rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
 }
-.head__brand {
+/* 手账拼贴海报：整卡奶油底，贴纸图 = 微旋转白框照片 + 胶带/恐龙/终端/星星点缀 */
+.postcard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #ffffff;
+  border-radius: 28rpx;
+  padding: 40rpx 0 52rpx;
+  box-shadow: 0 8rpx 24rpx 0 #F0DFD2;
+}
+.postcard__photo {
+  position: relative;
+  width: 654rpx;
+  padding: 24rpx;
+  background-color: #FFFFFF;
+  border-radius: 20rpx;
+  transform: rotate(-1.2deg);
+  box-shadow: 0 12rpx 32rpx 0 rgba(74, 68, 88, 0.16);
+}
+/* 和纸胶带：斜贴照片框上缘两角 */
+.postcard__tape {
+  position: absolute;
+  width: 116rpx;
+  height: 44rpx;
+  border-radius: 6rpx;
+}
+.postcard__tape--a {
+  top: -18rpx;
+  left: 44rpx;
+  background-color: rgba(247, 226, 178, 0.92);
+  transform: rotate(-42deg);
+  z-index: 22;
+}
+.postcard__tape--b {
+  top: -16rpx;
+  right: 44rpx;
+  background-color: rgba(205, 233, 214, 0.92);
+  transform: rotate(38deg);
+  z-index: 22;
+}
+.postcard__hero {
+  width: 100%;
+  border-radius: 12rpx;
+}
+/* 标题行：终端放大镜贴纸在左做装饰；对称内边距容纳 8° 旋转角点外扩，内容居中位置不变 */
+.postcard__titlerow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8rpx;
+  margin-top: 36rpx;
+}
+.postcard__titlebadge {
+  width: 68rpx;
+  height: 51rpx;
+  margin-right: 14rpx;
+  transform: rotate(8deg);
+}
+.postcard__title {
+  font-size: 38rpx;
+  font-weight: bold;
+  color: #303343;
+}
+.postcard__sub {
   font-size: 24rpx;
-  font-weight: bold;
-  color: #FF8A5C;
-  text-align: center;
-}
-.head__title {
-  font-size: 50rpx;
-  font-weight: bold;
-  color: #4A4458;
-  text-align: center;
+  color: #858397;
   margin-top: 12rpx;
 }
-.head__sub {
-  font-size: 17rpx;
-  color: #AFA8BD;
-  text-align: center;
-  margin-top: 10rpx;
-  letter-spacing: 2rpx;
-}
-.postcard {
+.postcard__qrrow {
+  position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  background-color: #4A4458;
-  border-radius: 48rpx;
-  border-width: 2rpx;
-  border-style: solid;
-  border-color: #35303F;
-  padding: 32rpx 30rpx 40rpx;
-  margin-top: 40rpx;
-  box-shadow: 0 8rpx 0 0 #35303F;
+  /* 白色便签：与照片框同倾角（-1.2°）+ 同语言软投影，扫码行像贴在手账上的第二张拍立得；
+     上内边距给趴框的三角龙留出整只空间（恐龙 top≥0，任何端都不越界裁剪）；
+     左右对称内边距把恐龙伸出码图右缘的部分包进行边界框：内容绝对位置不变，任何端不裁剪 */
+  /* background-color: #FFFFFF; */
+  border-radius: 20rpx;
+  transform: rotate(-1.2deg);
+  /* box-shadow: 0 8rpx 20rpx 0 rgba(74, 68, 88, 0.10); */
+  padding-top: 85rpx;
+  padding-bottom: 28rpx;
+  padding-left: 38rpx;
+  padding-right: 38rpx;
+  /* margin-top: 44rpx; */
 }
-.deco {
+.postcard__qrwrap {
+  position: relative;
+}
+.postcard__qr {
+  width: 148rpx;
+  height: 148rpx;
+}
+/* 三角龙趴在二维码白框右上角（右缘伸出框外 30rpx，调定位置不变）：
+   right 8rpx = 行右内边距 38rpx − 伸出 30rpx，视觉位置不变且整只落在行边界内不被裁剪 */
+.postcard__dino {
   position: absolute;
-  top: 32rpx;
-  right: 44rpx;
-  display: flex;
-  flex-direction: row;
+  top: 0rpx;
+  right: 8rpx;
+  width: 120rpx;
+  height: 120rpx;
+  transform: rotate(4deg);
 }
-.deco__b {
-  width: 28rpx;
-  height: 28rpx;
-  border-radius: 8rpx;
-  margin-left: 12rpx;
-}
-.deco__b--a { background-color: #FF8A5C; }
-.deco__b--e { background-color: #5FC9A5; }
-.deco__b--m { background-color: #6FB8E8; }
-.postcard__halo {
-  width: 208rpx;
-  height: 208rpx;
-  border-radius: 104rpx;
-  background-color: #413B4D;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 40rpx;
-}
-.postcard__avatar {
-  width: 136rpx;
-  height: 136rpx;
-  border-radius: 68rpx;
-}
-.postcard__rank {
-  font-size: 52rpx;
-  font-weight: bold;
-  color: #FFC94D;
-  margin-top: 24rpx;
-}
-.postcard__divider {
-  width: 336rpx;
-  border-top-width: 2rpx;
-  border-top-style: dashed;
-  border-top-color: #5E5770;
-  margin-top: 20rpx;
-}
-.postcard__stats {
-  display: flex;
-  flex-direction: row;
-  width: 100%;
-  margin-top: 36rpx;
-}
-.pstat {
+.postcard__qrtext {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  flex: 1;
-  background-color: #413B4D;
-  border-radius: 32rpx;
-  padding: 22rpx 0 18rpx;
-  margin: 0 9rpx;
+  margin-right: 26rpx;
 }
-.pstat__v {
-  font-size: 42rpx;
+.postcard__cta {
+  font-size: 30rpx;
   font-weight: bold;
-  color: #FFFFFF;
+  color: #303343;
 }
-.pstat__k {
-  font-size: 19rpx;
-  color: #C9C2DA;
-  margin-top: 8rpx;
-}
-.postcard__slogan {
-  font-size: 23rpx;
-  font-weight: bold;
-  color: #9BD49B;
-  margin-top: 34rpx;
-}
-.puzzle {
-  display: flex;
-  flex-direction: column;
-  margin-top: 40rpx;
-}
-.puzzle__head {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-.puzzle__title {
-  font-size: 25rpx;
-  font-weight: bold;
-  color: #4A4458;
-}
-.puzzle__count {
-  font-size: 25rpx;
-  font-weight: bold;
-  color: #FF8A5C;
-}
-.puzzle__row {
-  display: flex;
-  flex-direction: row;
-  /* 硬边阴影缓冲：pblock 贴行底，uni-view 默认 overflow:hidden 会裁阴影 */
-  padding-bottom: 8rpx;
-  margin-top: 18rpx;
-}
-.pblock {
-  flex: 1;
-  height: 96rpx;
-  border-radius: 24rpx;
-  background-color: #FFFFFF;
-  border-width: 2rpx;
-  border-style: dashed;
-  border-color: #E3E6EB;
-  margin-right: 14rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.pblock--lit {
-  border-style: solid;
-  border-color: rgba(0, 0, 0, 0);
-}
-.pblock--lit:nth-child(1) { box-shadow: 0 8rpx 0 0 #E06B38; background-color: #FF8A5C; }
-.pblock--lit:nth-child(2) { box-shadow: 0 8rpx 0 0 #E06B38; background-color: #FF8A5C; }
-.pblock--lit:nth-child(3) { box-shadow: 0 8rpx 0 0 #3FA885; background-color: #5FC9A5; }
-.pblock--lit:nth-child(4) { box-shadow: 0 8rpx 0 0 #4F93C4; background-color: #6FB8E8; }
-.pblock--lit:nth-child(5) { box-shadow: 0 8rpx 0 0 #D9A32E; background-color: #FFC94D; }
-.pblock--lit:nth-child(6) { box-shadow: 0 8rpx 0 0 #E08AA6; background-color: #FFB5C8; }
-.pblock__text {
-  font-size: 21rpx;
-  font-weight: bold;
+.postcard__brand {
+  font-size: 22rpx;
   color: #AFA8BD;
-}
-.pblock__text--lit {
-  color: #FFFFFF;
-}
-.qrcard {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  background-color: #FFFFFF;
-  border-radius: 40rpx;
-  border-width: 2rpx;
-  border-style: solid;
-  border-color: #F5E6DA;
-  padding: 28rpx;
-  margin-top: 36rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;
-}
-.qrcard__qr {
-  width: 196rpx;
-  height: 196rpx;
-  margin-right: 24rpx;
-}
-.qrcard__body {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-.qrcard__title {
-  font-size: 27rpx;
-  font-weight: bold;
-  color: #4A4458;
-}
-.qrcard__sub {
-  font-size: 21rpx;
-  color: #7A7290;
   margin-top: 10rpx;
 }
-.qrcard__meta {
-  font-size: 19rpx;
+/* 粉色和纸胶带：斜贴码图左上角，把二维码"钉"在便签上（与照片的黄/绿胶带成三色拼贴）。
+   从行右侧锚定（right 140 = 码图 148 − 压角 8），只盖码图自带静区，不随文字宽度漂移 */
+.postcard__qrtape {
+  position: absolute;
+  top: 75rpx;
+  left: 0rpx;
+  width: 72rpx;
+  height: 26rpx;
+  border-radius: 6rpx;
+  background-color: rgba(248, 205, 214, 0.9);
+  transform: rotate(-30deg);
+}
+/* 星星点缀：压在券面块内左下角（正偏移，不越界不裁剪） */
+.postcard__spark {
+  position: absolute;
+  left: 6rpx;
+  bottom: 6rpx;
+  width: 32rpx;
+  height: 32rpx;
+}
+.sharehint {
+  font-size: 22rpx;
   color: #AFA8BD;
-  margin-top: 14rpx;
+  margin-top: 32rpx;
+  text-align: center;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 .btnrow {
-  display: flex;
-  flex-direction: column;
-  /* uni-view 运行时默认 overflow:hidden，给贴底按钮的硬边阴影留缓冲 */
-  padding-bottom: 8rpx;
   margin-top: 36rpx;
-  margin-bottom: 8rpx;
 }
 .primarybtn {
   display: flex;
   flex-direction: row;
+  align-items: center;
   justify-content: center;
-  background-color: #FF8A5C;
+  background-color: #FF7047;
+  background-image: linear-gradient(to right, #FF8A5C, #FF5A3D);
   border-radius: 46rpx;
-  padding: 24rpx;
-  box-shadow: 0 8rpx 0 0 #E06B38;
+  padding: 26rpx;
+  border-bottom-width: 8rpx;
+  border-bottom-style: solid;
+  border-bottom-color: #E06B38;
 }
 .primarybtn__text {
   font-size: 28rpx;
@@ -572,18 +444,6 @@ function downloadPoster() {
   font-size: 20rpx;
   color: #AFA8BD;
   text-align: center;
-  margin-top: 12rpx;
-}
-.sharehint {
-  font-size: 20rpx;
-  color: #AFA8BD;
-  text-align: center;
-  margin-top: 36rpx;
-}
-.foot {
-  font-size: 19rpx;
-  color: #AFA8BD;
-  text-align: center;
-  margin-top: 30rpx;
+  margin-top: 18rpx;
 }
 </style>

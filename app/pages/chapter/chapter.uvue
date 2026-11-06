@@ -2,6 +2,7 @@
   <view class="page">
     <safe-top></safe-top>
     <navbar></navbar>
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
     <view class="content">
       <!-- 章头（Figma：胶囊章号与章名同行 + 层契约 + 进度行） -->
       <view class="hero">
@@ -11,7 +12,7 @@
           </view>
           <text class="hero__name">{{ ch.name }}</text>
         </view>
-        <text class="hero__pact">层契约：{{ ch.pact }}</text>
+        <text class="hero__pact" max-lines="1">层契约：{{ ch.pact }}</text>
         <text class="hero__meta">主线进度 {{ solvedInChapter }}/{{ totalInChapter }} · 检查单 {{ lessonCount }} 条</text>
       </view>
 
@@ -25,10 +26,13 @@
             <image v-else class="node__bolt" src="/static/icons/lock-ink3.png" mode="aspectFit"></image>
           </view>
           <view class="node__body">
-            <text :class="node.playable ? 'node__title' : 'node__title node__title--locked'">{{ node.title }}</text>
-            <text class="node__meta">{{ node.meta }}</text>
+            <text :class="node.playable ? 'node__title' : 'node__title node__title--locked'" max-lines="2">{{ node.title }}</text>
           </view>
           <text v-if="node.failed" class="node__fail">未破</text>
+          <view v-else-if="node.playable && !node.challenged" class="node__go">
+            <text class="node__go-text">去挑战</text>
+            <image class="node__go-arrow" src="/static/icons/v4/arrow-right-white.png" mode="aspectFit"></image>
+          </view>
           <text v-else-if="node.playable" class="node__stars">{{ node.stars }}</text>
           <view v-else class="node__offchip">
             <text class="node__offchip-text">{{ node.challenge ? '跳级挑战' : '未解锁' }}</text>
@@ -38,6 +42,7 @@
       </view>
       <text class="footer">通关本章，解锁「{{ ch.name }}」层契约拼图</text>
     </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -56,11 +61,12 @@ import navbar from '../../components/navbar/navbar.uvue'
 class NodeVM {
   id: string = ''
   title: string = ''
-  meta: string = ''
   stars: string = ''
   live: boolean = false
   playable: boolean = false
   challenge: boolean = false
+  /** 是否已挑战过（有最佳成绩）：右侧显示星级而非"去挑战"胶囊 */
+  challenged: boolean = false
   /** 玩过未破（失败留痕：地图"未破"标 + 重练引导） */
   failed: boolean = false
   fails: number = 0
@@ -100,18 +106,11 @@ onLoad((query : OnLoadOptions) => {
     vm.challenge = !chapterOpen && isLoggedIn() && c.id === challengeId
     const p = getCaseProgress(c.id)
     const best = p != null && p.bestGrade.length > 0 ? p.bestGrade : ''
-    const difficulty = ['', '★ 入门', '★★ 标准', '★★★ 挑战'][c.difficulty]
     vm.stars = starsLabel(best)
+    vm.challenged = best.length > 0
     if (p != null && !p.solved && p.fails > 0) {
       vm.failed = true
       vm.fails = p.fails
-    }
-    if (vm.challenge) {
-      vm.meta = '跳级挑战 · 赢了立即解锁本章 · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
-    } else if (vm.failed) {
-      vm.meta = difficulty + ' · 失败 ' + vm.fails + ' 次 · 点此重练'
-    } else {
-      vm.meta = difficulty + ' · ' + (best.length > 0 ? '最佳 ' + p!.bestCost + '⚡︎' : '未挑战')
     }
     if (mainline && p != null && p.solved) solved++
     list.push(vm)
@@ -147,20 +146,22 @@ function openCase(node: NodeVM) {
 
 <style>
 .page {
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
-  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  padding: 32rpx;
 }
 .content {
+  padding-top: 120rpx;
+  padding-bottom: 32rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
   display: flex;
   flex-direction: column;
-  padding-top: 88rpx;
 }
 .hero {
   display: flex;
@@ -172,7 +173,7 @@ function openCase(node: NodeVM) {
   border-color: #F3CFA9;
   padding: 24rpx 28rpx;
   margin-bottom: 28rpx;
-  box-shadow: 0 8rpx 0 0 #F3CFA9;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #F3CFA9;
 }
 .hero__titlerow {
   display: flex;
@@ -197,29 +198,32 @@ function openCase(node: NodeVM) {
   flex: 1;
 }
 .hero__pact {
-  font-size: 22rpx;
-  color: #7A7290;
-  margin-top: 12rpx;
-  line-height: 34rpx;
+  font-size: 20rpx;
+  color: #8A8499;
+  margin-top: 10rpx;
+  line-height: 30rpx;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .hero__meta {
-  font-size: 21rpx;
+  font-size: 20rpx;
   font-weight: bold;
   color: #FF8A5C;
-  margin-top: 14rpx;
+  margin-top: 12rpx;
 }
 .conn {
   width: 4rpx;
-  height: 26rpx;
-  margin-left: 108rpx;
+  height: 20rpx;
+  margin-left: 88rpx;
   border-left-width: 3rpx;
   border-left-style: dashed;
   border-left-color: #FFB5C8;
 }
 .section-title {
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: bold;
-  color: #7A7290;
+  color: #8A8499;
   margin-top: 16rpx;
   margin-bottom: 18rpx;
 }
@@ -230,9 +234,7 @@ function openCase(node: NodeVM) {
 .nodewrap {
   padding-bottom: 6rpx;
 }
-.nodewrap .conn {
-  height: 20rpx;
-}
+/* uvue 不支持后代选择器：conn 仅在 nodewrap 内使用，高度并入基类 */
 .node {
   display: flex;
   flex-direction: row;
@@ -242,51 +244,72 @@ function openCase(node: NodeVM) {
   border-width: 2rpx;
   border-style: dashed;
   border-color: #F5E6DA;
-  padding: 22rpx;
-  box-shadow: 0 5rpx 0 0 #EFE5D6;;
+  padding: 20rpx;
+  border-bottom-width: 5rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;;
 }
 .node--live {
   border-style: solid;
   border-color: #FF8A5C;
-  box-shadow: 0 6rpx 0 0 #F3CFA9;;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #F3CFA9;;
 }
 .node__icon {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 28rpx;
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 22rpx;
   background-color: #FBF3EB;
-  margin-right: 22rpx;
+  margin-right: 18rpx;
 }
 .node__icon--live {
   background-color: #FF8A5C;
 }
 .node__bolt {
-  width: 44rpx;
-  height: 44rpx;
-  margin: 22rpx;
+  width: 34rpx;
+  height: 34rpx;
+  margin: 17rpx;
 }
+/* 清单版：标题单行占满，状态由右侧徽章表达 */
 .node__body {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   flex: 1;
 }
 .node__title {
-  font-size: 30rpx;
+  flex: 1;
+  font-size: 27rpx;
   font-weight: bold;
   color: #4A4458;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 .node__title--locked {
   color: #7A7290;
 }
-.node__meta {
-  font-size: 22rpx;
-  color: #AFA8BD;
-  margin-top: 8rpx;
-}
 .node__stars {
-  font-size: 30rpx;
+  font-size: 24rpx;
   color: #FFC94D;
   font-weight: bold;
+}
+/* 未挑战 = 迷你实心 CTA（与首页 hero 卡同款渐变），与已挑战的金色星级区分 */
+.node__go {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  /* iOS 对 90deg 角度形式兼容不稳：用 to right 关键字形式 + 纯色兜底（渐变失效时仍有橙底） */
+  background-color: #FF7047;
+  background-image: linear-gradient(to right, #FF8A5C, #FF5A3D);
+  border-radius: 999rpx;
+  padding: 10rpx 22rpx;
+}
+.node__go-text {
+  font-size: 20rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+}
+.node__go-arrow {
+  width: 22rpx;
+  height: 22rpx;
+  margin-left: 6rpx;
 }
 .node__fail {
   font-size: 18rpx;
@@ -315,5 +338,10 @@ function openCase(node: NodeVM) {
   color: #AFA8BD;
   text-align: center;
   margin-top: 26rpx;
+}
+
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
 }
 </style>

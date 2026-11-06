@@ -2,6 +2,7 @@
   <view class="page">
     <safe-top></safe-top>
     <navbar></navbar>
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
     <view class="content">
       <text class="pagetitle">登录</text>
 
@@ -60,6 +61,7 @@
 
       <text class="hint">Web 社区站注册的账号可直接登录 · 数据互通</text>
     </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -137,6 +139,7 @@ function finish(r: LoginResult) {
       return
     }
     trackIdentityLearningEvent('progress_saved', 'login')
+    // 登录后必须强制全量拉取：身份刚合并，节流会跳过关键的首拉
     pullServerProgress((pulled) => {
       if (pulled.error.length > 0) {
         errMsg.value = '登录成功，但账号进度拉取失败：' + pulled.error
@@ -150,7 +153,7 @@ function finish(r: LoginResult) {
           uni.navigateBack({})
         }
       }, 600)
-    })
+    }, true)
   })
 }
 
@@ -181,20 +184,22 @@ function doPwLogin() {
 
 <style>
 .page {
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
-  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  padding: 24rpx 32rpx 60rpx;
 }
 .content {
+  padding-top: 112rpx;
+  padding-bottom: 60rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
   display: flex;
   flex-direction: column;
-  padding-top: 88rpx;
 }
 .pagetitle {
   font-size: 44rpx;
@@ -235,7 +240,7 @@ function doPwLogin() {
   background-color: #FFFFFF;
   border-radius: 24rpx;
   padding: 30rpx 28rpx 26rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;
 }
 .field {
   display: flex;
@@ -306,7 +311,7 @@ function doPwLogin() {
   background-color: #FF8A5C;
   border-radius: 46rpx;
   padding: 24rpx;
-  box-shadow: 0 8rpx 0 0 #E06B38;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #E06B38;
 }
 .primarybtn__text {
   font-size: 28rpx;
@@ -319,5 +324,10 @@ function doPwLogin() {
   margin-top: 18rpx;
   text-align: center;
   line-height: 32rpx;
+}
+
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
 }
 </style>

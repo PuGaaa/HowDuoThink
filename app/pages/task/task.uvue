@@ -1,6 +1,7 @@
 <template>
   <view class="page">
     <safe-top></safe-top>
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
     <view class="content">
       <!-- 今日进度环 -->
       <view class="ringcard">
@@ -20,59 +21,87 @@
       </view>
 
       <!-- 每日任务 -->
-      <text class="sec">每日任务</text>
-      <view v-for="(t, i) in dailyList" :key="t.id" :class="t.done ? 'task task--done' : 'task'">
-        <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
+      <view class="secrow">
+        <view class="secrow__dot secrow__dot--coral"></view>
+        <text class="secrow__label">每日任务</text>
+        <text class="secrow__count">{{ doneDaily }}/{{ totalDaily }}</text>
+      </view>
+      <view v-for="(t, i) in dailyList" :key="t.id" :class="taskClass(t)" @click="goTask(t)" @touchstart="pressTask(t.id)" @touchend="releaseTask" @touchcancel="releaseTask">
+        <view :class="t.done ? 'task__iconbox task__iconbox--done' : 'task__iconbox'">
+          <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
+        </view>
         <view class="task__body">
-          <text class="task__title">{{ t.title }}</text>
-          <view class="task__track">
+          <text :class="t.done ? 'task__title task__title--done' : 'task__title'">{{ t.title }}</text>
+          <view :class="t.done ? 'task__track task__track--done' : 'task__track'">
             <view :class="t.done ? 'task__fill task__fill--done' : 'task__fill'" :style="'width:' + t.pct + '%'"></view>
           </view>
         </view>
         <view v-if="t.done" class="task__badge">
           <image class="task__badge-img" src="/static/icons/check-white.png" mode="aspectFit"></image>
         </view>
-        <text v-else class="task__prog">{{ t.cur }}/{{ t.goal }}</text>
+        <view v-else class="task__right">
+          <text class="task__count">{{ t.cur }}/{{ t.goal }}</text>
+          <view class="task__go">
+            <text class="task__go-text">去完成 ›</text>
+          </view>
+        </view>
       </view>
 
       <!-- 每周任务 -->
-      <text class="sec">每周任务</text>
-      <view v-for="(t, i) in weeklyList" :key="'w' + i" :class="t.done ? 'task task--done' : 'task'">
-        <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
+      <view class="secrow">
+        <view class="secrow__dot secrow__dot--sky"></view>
+        <text class="secrow__label">每周任务</text>
+        <text class="secrow__count">{{ weeklyDone }}/{{ weeklyTotal }}</text>
+      </view>
+      <view v-for="(t, i) in weeklyList" :key="'w' + i" :class="taskClass(t)" @click="goTask(t)" @touchstart="pressTask(t.id)" @touchend="releaseTask" @touchcancel="releaseTask">
+        <view :class="t.done ? 'task__iconbox task__iconbox--done' : 'task__iconbox'">
+          <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
+        </view>
         <view class="task__body">
-          <text class="task__title">{{ t.title }}</text>
-          <view class="task__track">
+          <text :class="t.done ? 'task__title task__title--done' : 'task__title'">{{ t.title }}</text>
+          <view :class="t.done ? 'task__track task__track--done' : 'task__track'">
             <view :class="t.done ? 'task__fill task__fill--done' : 'task__fill'" :style="'width:' + t.pct + '%'"></view>
           </view>
         </view>
         <view v-if="t.done" class="task__badge">
           <image class="task__badge-img" src="/static/icons/check-white.png" mode="aspectFit"></image>
         </view>
-        <text v-else class="task__prog">{{ t.cur }}/{{ t.goal }}</text>
+        <view v-else class="task__right">
+          <text class="task__count">{{ t.cur }}/{{ t.goal }}</text>
+          <view class="task__go">
+            <text class="task__go-text">去完成 ›</text>
+          </view>
+        </view>
       </view>
 
       <!-- 成长任务 -->
-      <text class="sec">成长任务</text>
-      <view v-for="(t, i) in growthList" :key="'g' + i" :class="t.done ? 'task task--done' : 'task'">
-        <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
+      <view class="secrow">
+        <view class="secrow__dot secrow__dot--lemon"></view>
+        <text class="secrow__label">成长任务</text>
+        <text class="secrow__count">{{ growthDone }}/{{ growthTotal }}</text>
+      </view>
+      <view v-for="(t, i) in growthList" :key="'g' + i" :class="taskClass(t)" @click="goTask(t)" @touchstart="pressTask(t.id)" @touchend="releaseTask" @touchcancel="releaseTask">
+        <view :class="t.done ? 'task__iconbox task__iconbox--done' : 'task__iconbox'">
+          <image class="task__icon" :src="t.iconImg" mode="aspectFit"></image>
+        </view>
         <view class="task__body">
-          <text class="task__title">{{ t.title }}</text>
-          <view class="task__track">
+          <text :class="t.done ? 'task__title task__title--done' : 'task__title'">{{ t.title }}</text>
+          <view :class="t.done ? 'task__track task__track--done' : 'task__track'">
             <view :class="t.done ? 'task__fill task__fill--done' : 'task__fill'" :style="'width:' + t.pct + '%'"></view>
           </view>
         </view>
         <view v-if="t.done" class="task__badge">
           <image class="task__badge-img" src="/static/icons/check-white.png" mode="aspectFit"></image>
         </view>
-        <text v-else class="task__prog">{{ t.cur }}/{{ t.goal }}</text>
-      </view>
-
-      <!-- 分享海报 -->
-      <view class="postbtn" @click="goPoster">
-        <image class="postbtn__icon" src="/static/icons/clipboard-coral.png" mode="aspectFit"></image>
-        <text class="postbtn__text">生成我的侦探档案海报</text>
+        <view v-else class="task__right">
+          <text class="task__count">{{ t.cur }}/{{ t.goal }}</text>
+          <view class="task__go">
+            <text class="task__go-text">去完成 ›</text>
+          </view>
+        </view>
       </view>
     </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -81,7 +110,7 @@ import safeTop from '../../components/safe-top/safe-top.uvue'
 import { ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { DAILY_TASKS, WEEKLY_TASKS, GROWTH_TASKS } from '../../data/tasks'
-import { getTaskDaily, getTaskWeekly, getCaseProgress, getChecklistUse, getStreak } from '../../utils/storage'
+import { getTaskDaily, getTaskWeekly, getCaseProgress, getStreak } from '../../utils/storage'
 import { getEffectiveCases } from '../../data/cases'
 import { CHAPTERS, chapterCompleted } from '../../data/chapters'
 
@@ -94,22 +123,30 @@ class TaskVM {
   cur: number = 0
   pct: number = 0
   done: boolean = false
+  to: string = ''
+  toTab: boolean = false
 }
 
 const streakCount = ref(getStreak().count)
 const doneDaily = ref(0)
 const totalDaily = ref(DAILY_TASKS.length)
+const weeklyDone = ref(0)
+const weeklyTotal = ref(WEEKLY_TASKS.length)
+const growthDone = ref(0)
+const growthTotal = ref(GROWTH_TASKS.length)
 const ringPct = ref(0)
 const dailyList = ref<TaskVM[]>([])
 const weeklyList = ref<TaskVM[]>([])
 const growthList = ref<TaskVM[]>([])
+const pressedId = ref('')
 
 function buildLists() {
   const dl: TaskVM[] = []
   let done = 0
   for (let i = 0; i < DAILY_TASKS.length; i++) {
     const t = DAILY_TASKS[i]
-    const cur = t.metric === 'checkuse' ? getChecklistUse() : getTaskDaily(t.metric)
+    // 每日任务一律读每日计数：checkuse 此前误读终身累计，跨天不重置
+    const cur = getTaskDaily(t.metric)
     const d = cur >= t.goal
     if (d) done++
     var v = new TaskVM()
@@ -120,6 +157,8 @@ function buildLists() {
     v.cur = cur > t.goal ? t.goal : cur
     v.pct = t.goal > 0 ? Math.min(100, Math.round((v.cur * 100) / t.goal)) : 0
     v.done = d
+    v.to = t.to
+    v.toTab = t.toTab
     dl.push(v)
   }
   dailyList.value = dl
@@ -127,6 +166,7 @@ function buildLists() {
   ringPct.value = Math.round((done * 100) / DAILY_TASKS.length)
 
   const wl: TaskVM[] = []
+  let wdone = 0
   for (let i = 0; i < WEEKLY_TASKS.length; i++) {
     const t = WEEKLY_TASKS[i]
     const cur = getTaskWeekly(t.metric)
@@ -139,12 +179,17 @@ function buildLists() {
     w2.cur = c2
     w2.pct = t.goal > 0 ? Math.min(100, Math.round((c2 * 100) / t.goal)) : 0
     w2.done = cur >= t.goal
+    if (w2.done) wdone++
+    w2.to = t.to
+    w2.toTab = t.toTab
     wl.push(w2)
   }
   weeklyList.value = wl
+  weeklyDone.value = wdone
 
   // 成长任务：由 data/tasks.ts 的 GROWTH_TASKS 驱动；allcases 的目标随案例注册表动态取
   const gl: TaskVM[] = []
+  let gdone = 0
   const cases = getEffectiveCases()
   let solved = 0
   for (let i = 0; i < cases.length; i++) {
@@ -168,34 +213,59 @@ function buildLists() {
     g.cur = cur
     g.pct = goal > 0 ? Math.min(100, Math.round((cur * 100) / goal)) : 0
     g.done = current >= goal
+    if (g.done) gdone++
+    g.to = t.to
+    g.toTab = t.toTab
     gl.push(g)
   }
   growthList.value = gl
+  growthDone.value = gdone
 }
-
 
 // onShow 首次显示也会触发：破案/核对检查单后回到任务页进度即时更新
 onShow(() => buildLists())
 
-function goPoster() {
-  uni.navigateTo({ url: '/pages/post/post' })
+// —— 任务卡跳转：进度来源页 = 完成入口 ——
+function goTask(t: TaskVM) {
+  if (t.to.length === 0) return
+  if (t.toTab) {
+    uni.switchTab({ url: t.to })
+  } else {
+    uni.navigateTo({ url: t.to })
+  }
+}
+
+function pressTask(id: string) {
+  pressedId.value = id
+}
+
+function releaseTask() {
+  pressedId.value = ''
+}
+
+function taskClass(t: TaskVM): string {
+  let cls = t.done ? 'task task--done' : 'task'
+  if (pressedId.value === t.id) cls += ' task--press'
+  return cls
 }
 </script>
 
 <style>
 .page {
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
-  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  padding: 24rpx 32rpx 200rpx;
-  padding-top: 88rpx;
 }
 .content {
+  padding-top: 112rpx;
+  padding-bottom: 200rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
   display: flex;
   flex-direction: column;
 }
@@ -262,95 +332,161 @@ function goPoster() {
   border-radius: 37rpx;
   background-color: #4A4458;
 }
-.sec {
+
+/* 分区头：彩色圆点 + 标题 + 完成计数 */
+.secrow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 14rpx;
+  margin-bottom: 18rpx;
+}
+.secrow__dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 7rpx;
+  margin-right: 12rpx;
+}
+.secrow__dot--coral {
+  background-color: #FF8A5C;
+}
+.secrow__dot--sky {
+  background-color: #6FB8E8;
+}
+.secrow__dot--lemon {
+  background-color: #FFC94D;
+}
+.secrow__label {
+  flex: 1;
   font-size: 30rpx;
   font-weight: bold;
   color: #4A4458;
-  margin-bottom: 18rpx;
 }
+.secrow__count {
+  font-size: 21rpx;
+  font-weight: bold;
+  color: #AFA8BD;
+}
+
+/* 任务卡：硬底边卡片（同 rankcard/verdict 的既有语言）+ 图标徽章盒 */
 .task {
   display: flex;
   flex-direction: row;
   align-items: center;
   background-color: #FFFFFF;
-  border-radius: 20rpx;
+  border-radius: 26rpx;
   border-width: 1.5rpx;
   border-style: solid;
   border-color: #F5E6DA;
-  padding: 22rpx;
-  margin-bottom: 16rpx;
+  border-bottom-width: 7rpx;
+  border-bottom-color: #F0E2D2;
+  padding: 24rpx 24rpx 20rpx;
+  margin-bottom: 18rpx;
+  /* 按压反馈：transform 过渡在 App 端可用（同 play.uvue 抽屉既有用法） */
+  transition-property: transform;
+  transition-duration: 90ms;
+  transition-timing-function: ease-out;
 }
 .task--done {
   background-color: #F0FAF5;
-  border-color: #C8EADC;
+  border-color: #D9F0E5;
+  border-bottom-color: #BFE5D4;
+}
+.task--press {
+  transform: scale(0.98);
+}
+.task__iconbox {
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: 24rpx;
+  background-color: #FFF7EF;
+  border-width: 1.5rpx;
+  border-style: solid;
+  border-color: #F8EADA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 20rpx;
+}
+.task__iconbox--done {
+  background-color: #E4F5EC;
+  border-color: #D2EDE0;
 }
 .task__icon {
-  width: 72rpx;
-  height: 72rpx;
-  margin-right: 18rpx;
+  width: 56rpx;
+  height: 56rpx;
 }
 .task__body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  margin-right: 16rpx;
 }
 .task__title {
-  font-size: 25rpx;
+  font-size: 26rpx;
+  font-weight: bold;
   color: #4A4458;
+  line-height: 36rpx;
+}
+.task__title--done {
+  color: #86A296;
 }
 .task__track {
-  height: 10rpx;
-  border-radius: 5rpx;
-  background-color: #FBF3EB;
-  margin-top: 10rpx;
+  height: 14rpx;
+  border-radius: 7rpx;
+  background-color: #F6EDE3;
+  margin-top: 14rpx;
+  overflow: hidden;
+}
+.task__track--done {
+  background-color: #DFF3EA;
 }
 .task__fill {
-  height: 10rpx;
-  border-radius: 5rpx;
+  height: 14rpx;
+  border-radius: 7rpx;
   background-color: #FF8A5C;
 }
 .task__fill--done {
   background-color: #5FC9A5;
 }
 .task__badge {
-  width: 46rpx;
-  height: 46rpx;
-  border-radius: 23rpx;
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 26rpx;
   background-color: #5FC9A5;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3rpx 0 0 #3FA885;
+  border-bottom-width: 4rpx; border-bottom-style: solid; border-bottom-color: #3FA885;
 }
 .task__badge-img {
-  width: 26rpx;
-  height: 26rpx;
+  width: 28rpx;
+  height: 28rpx;
 }
-.task__prog {
-  font-size: 21rpx;
+.task__right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.task__count {
+  font-size: 24rpx;
   font-weight: bold;
   color: #AFA8BD;
 }
-.postbtn {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  background-color: #FFFFFF;
-  border-width: 2rpx;
-  border-style: solid;
-  border-color: #FF8A5C;
-  border-radius: 46rpx;
-  padding: 22rpx;
-  margin-top: 20rpx;
+.task__go {
+  background-color: #FFF1E7;
+  border-radius: 24rpx;
+  padding: 8rpx 18rpx;
+  margin-top: 10rpx;
 }
-.postbtn__icon {
-  width: 30rpx;
-  height: 30rpx;
-  margin-right: 10rpx;
-}
-.postbtn__text {
-  font-size: 27rpx;
+.task__go-text {
+  font-size: 20rpx;
   font-weight: bold;
   color: #FF8A5C;
+}
+
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
 }
 </style>

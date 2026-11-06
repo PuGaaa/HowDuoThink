@@ -9,7 +9,8 @@
 		"vapor": true,
 		"vapor-render-target": "bytecode",
 		"flex-direction": "column",
-		"styleIsolationVersion": "2"
+		"styleIsolationVersion": "2",
+		"vapor-default-script-lang": "ts"
 	},
 	"web": {
 		"title": "好多星 HowDuoThink",
@@ -20,6 +21,19 @@
 		"devServer": {
 			"port": 5173,
 			"https": false
+		}
+	},
+	"app-ios": {
+		"distribute": {
+			"icons": {
+				"appstore": "/Users/bucida/Desktop/moooooz/think/design/app logo.png"
+			},
+			"privacyDescription": {
+				"NSPhotoLibraryAddUsageDescription": "需要您的同意，才能保存传播海报到相册"
+			},
+			"splashScreens": {
+				"storyboard": "/Users/bucida/Desktop/moooooz/think/design/CustomStoryboard/splash-storyboard.zip"
+			}
 		}
 	}
 }

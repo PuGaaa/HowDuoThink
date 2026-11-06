@@ -23,6 +23,7 @@ function harness() {
       getCaseProgress: id => progress.get(id) || null,
       getUnlockedChapterIds: () => [...unlocked],
       rememberUnlockedChapterIds: ids => ids.forEach(id => unlocked.add(id)),
+      progressIdentity: () => 'tester',
       progressStorageGet: key => values.get(key),
       progressStorageSet: (key, value) => values.set(key, value),
     },

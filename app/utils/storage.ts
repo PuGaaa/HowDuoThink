@@ -80,12 +80,21 @@ const KEY_CASE = 'think_case_'
 const KEY_OPS = 'think_progress_ops_v1'
 const KEY_PROGRESS_UID = 'think_progress_uid'
 
+// 热路径缓存：每次 get/set 都要拼身份前缀，原生读一次 uid 在列表页会放大上千次
+let progressUidCache: string = ''
+
 export function progressIdentity(): string {
+  if (progressUidCache.length > 0) return progressUidCache
   const value = uni.getStorageSync(KEY_PROGRESS_UID)
-  return value == null || (value as string).length === 0 ? 'guest' : value as string
+  progressUidCache = value == null || (value as string).length === 0 ? 'guest' : value as string
+  return progressUidCache
 }
 
 export function setProgressIdentity(uid: string): void {
+  // 身份切换（登录/登出/合并游客进度）：前缀变了，所有身份域缓存整体失效，防止串号
+  invalidateCaseProgressCache()
+  unlockedCache = null
+  progressUidCache = uid
   uni.setStorageSync(KEY_PROGRESS_UID, uid)
 }
 
@@ -99,8 +108,20 @@ export function progressStorageGet(key: string): any {
   return scoped
 }
 
+// —— 案例进度解析缓存：首页/任务/章节页对全部案例逐个 getCaseProgress，
+// 每次都是 1~2 次原生 storage 读 + JSON.parse；写入一律走 progressStorageSet（写穿失效），
+// 绕过 helper 的批量删除（clearProgressLocal / 服务端投影替换）后需调 invalidateCaseProgressCache。
+// 缓存对象按引用返回，调用方只读（现有调用点均无修改）。 ——
+const caseProgressCache = new Map<string, any>()
+
+export function invalidateCaseProgressCache(): void {
+  caseProgressCache.clear()
+}
+
 export function progressStorageSet(key: string, value: any): void {
   uni.setStorageSync(progressStorageKey(key), value)
+  if (key.indexOf(KEY_CASE) === 0) caseProgressCache.delete(key.substring(KEY_CASE.length))
+  if (key === KEY_UNLOCKED_CHAPTERS) unlockedCache = null
 }
 
 function enqueueOperation(kind: string, payload: any, occurredAt?: string): void {
@@ -131,6 +152,8 @@ export function clearProgressLocal(): void {
       uni.removeStorageSync(key)
     }
   }
+  invalidateCaseProgressCache()
+  unlockedCache = null
 }
 
 function emptyMascotStats(): MascotStats {
@@ -191,8 +214,13 @@ export function exportProgressBundle(): ProgressBundle {
 
 /** 导入后端全量进度（登录态拉取用，覆盖本地——后端为唯一事实源） */
 export function importProgressBundle(b: ProgressBundle) {
+  // 内容未变的 key 跳过写入：同步成功路径每次全量下发，
+  // 逐条比对省掉整包原生写突发（首页 onShow 的另一处卡顿源）
   for (const id in b.cases) {
-    progressStorageSet(KEY_CASE + id, JSON.stringify(b.cases[id]))
+    const key = KEY_CASE + id
+    const value = JSON.stringify(b.cases[id])
+    if (uni.getStorageSync(progressStorageKey(key)) === value) continue
+    progressStorageSet(key, value)
   }
   if (b.streak != null) progressStorageSet('think_streak_v1', JSON.stringify(b.streak))
   if (b.mascots != null) progressStorageSet('think_mascots_v1', JSON.stringify(b.mascots))
@@ -204,19 +232,23 @@ export function importProgressBundle(b: ProgressBundle) {
 }
 
 export function getCaseProgress(caseId: string): CaseProgress | null {
+  if (caseProgressCache.has(caseId)) {
+    return caseProgressCache.get(caseId) as CaseProgress | null
+  }
   const raw = progressStorageGet(KEY_CASE + caseId)
-  if (raw == null) {
-    return null
+  let parsed: CaseProgress | null = null
+  if (raw != null) {
+    const str = raw as string
+    if (str.length > 0) {
+      try {
+        parsed = JSON.parse(str) as CaseProgress
+      } catch (e) {
+        parsed = null
+      }
+    }
   }
-  const str = raw as string
-  if (str.length === 0) {
-    return null
-  }
-  try {
-    return JSON.parse(str) as CaseProgress
-  } catch (e) {
-    return null
-  }
+  caseProgressCache.set(caseId, parsed)
+  return parsed
 }
 
 export function saveSession(record: SessionRecord): void {
@@ -513,9 +545,14 @@ export function recordSolvedLayer(layer: string): boolean {
   return true
 }
 
+// 解锁章缓存：isChapterUnlocked 在每日题循环里逐案触发，写穿失效（remember/import 走 progressStorageSet）
+let unlockedCache: string[] | null = null
+
 export function getUnlockedChapterIds(): string[] {
+  if (unlockedCache != null) return unlockedCache
   const raw = progressStorageGet(KEY_UNLOCKED_CHAPTERS)
-  return raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as string[]
+  unlockedCache = raw == null || (raw as string).length === 0 ? [] : JSON.parse(raw as string) as string[]
+  return unlockedCache
 }
 
 export function rememberUnlockedChapterIds(ids: string[]): void {

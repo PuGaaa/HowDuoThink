@@ -2,6 +2,7 @@
   <view class="page">
     <safe-top></safe-top>
     <navbar></navbar>
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
     <view class="content">
       <text class="pagetitle">编辑资料</text>
 
@@ -11,10 +12,10 @@
           <view
             v-for="(it, i) in presets"
             :key="'a' + i"
-            :class="selIdx === i ? 'avgrid__item avgrid__item--on' : 'avgrid__item'"
+            class="avgrid__item"
             @click="selIdx = i"
           >
-            <image class="avgrid__img" :src="it.path" mode="aspectFill"></image>
+            <image :class="selIdx === i ? 'avgrid__img avgrid__img--on' : 'avgrid__img'" :src="it.path" mode="aspectFill"></image>
             <view v-if="selIdx === i" class="avgrid__check">
               <image class="avgrid__check-img" src="/static/icons/check-white.png" mode="aspectFit"></image>
             </view>
@@ -32,6 +33,7 @@
         </view>
       </view>
     </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -112,20 +114,22 @@ function save() {
 
 <style>
 .page {
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
-  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  padding: 24rpx 32rpx 60rpx;
 }
 .content {
+  padding-top: 112rpx;
+  padding-bottom: 60rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
   display: flex;
   flex-direction: column;
-  padding-top: 88rpx;
 }
 .pagetitle {
   font-size: 44rpx;
@@ -139,7 +143,7 @@ function save() {
   background-color: #FFFFFF;
   border-radius: 24rpx;
   padding: 30rpx 28rpx 26rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;
 }
 .formcard__label {
   font-size: 23rpx;
@@ -150,35 +154,36 @@ function save() {
 .formcard__label--gap {
   margin-top: 26rpx;
 }
+/* 网格宽 630rpx（750-64-56）：4 列 × 144rpx + space-between 3 × 18rpx 正好铺满 */
 .avgrid {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
+  justify-content: space-between;
 }
+/* item 是无圆角方形透明盒：原生端圆角容器会裁切子元素（选中勾曾只剩月牙） */
 .avgrid__item {
-  width: 150rpx;
-  height: 150rpx;
-  border-radius: 75rpx;
-  margin-right: 24rpx;
+  width: 144rpx;
+  height: 144rpx;
   margin-bottom: 18rpx;
+  position: relative;
+}
+.avgrid__img {
+  width: 136rpx;
+  height: 136rpx;
+  border-radius: 72rpx;
+  background-color: #FBF3EB;
   border-width: 4rpx;
   border-style: solid;
   border-color: rgba(0, 0, 0, 0);
-  position: relative;
 }
-.avgrid__item--on {
+.avgrid__img--on {
   border-color: #FF8A5C;
-}
-.avgrid__img {
-  width: 142rpx;
-  height: 142rpx;
-  border-radius: 71rpx;
-  background-color: #FBF3EB;
 }
 .avgrid__check {
   position: absolute;
-  right: 4rpx;
-  bottom: 4rpx;
+  right: 2rpx;
+  bottom: 2rpx;
   width: 44rpx;
   height: 44rpx;
   border-radius: 22rpx;
@@ -186,6 +191,7 @@ function save() {
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2;
 }
 .avgrid__check-img {
   width: 24rpx;
@@ -219,11 +225,16 @@ function save() {
   background-color: #FF8A5C;
   border-radius: 46rpx;
   padding: 24rpx;
-  box-shadow: 0 8rpx 0 0 #E06B38;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #E06B38;
 }
 .primarybtn__text {
   font-size: 28rpx;
   color: #FFFFFF;
   font-weight: bold;
+}
+
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
 }
 </style>

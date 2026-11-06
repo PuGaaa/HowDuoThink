@@ -12,28 +12,27 @@ export interface TaskDef {
   metric: string
   /** 图标资产名（app/static/icons/{name}.png） */
   icon: string
+  /** 点击任务卡的去向页面（任务页 = 地图 + 手册两个完成入口） */
+  to: string
+  /** 去向是否为 tabBar 页（决定 switchTab / navigateTo） */
+  toTab: boolean
 }
 
 export const DAILY_TASKS: TaskDef[] = [
-  { id: 'd-win', type: 'daily', title: '今日首胜：破案 1 关', goal: 1, metric: 'win', icon: 'trophy-lemon' },
-  { id: 'd-check', type: 'daily', title: '复习检查单 1 次', goal: 1, metric: 'checkuse', icon: 'scroll-coral' },
-  { id: 'd-hypo', type: 'daily', title: '立假设 ≥2 个', goal: 2, metric: 'hypo', icon: 'bulb-sky' },
-  { id: 'd-daily', type: 'daily', title: '完成今日一题', goal: 1, metric: 'dailycase', icon: 'target-coral' },
-  { id: 'd-retrain', type: 'daily', title: '错案重练：破掉 1 个曾失败的案子', goal: 1, metric: 'retrain', icon: 'flame-lemon' },
+  { id: 'd-win', type: 'daily', title: '破案 1 关（今日一题也计入）', goal: 1, metric: 'win', icon: 'trophy-lemon', to: '/pages/index/index', toTab: true },
+  { id: 'd-check', type: 'daily', title: '复习检查单 1 次', goal: 1, metric: 'checkuse', icon: 'scroll-coral', to: '/pages/handbook/handbook', toTab: false },
 ]
 
 export const WEEKLY_TASKS: TaskDef[] = [
-  { id: 'w-case3', type: 'weekly', title: '本周破案 3 关', goal: 3, metric: 'casewin7', icon: 'target-coral' },
-  { id: 'w-layer2', type: 'weekly', title: '集齐 2 个不同层的检查单', goal: 2, metric: 'layers2', icon: 'puzzle-sky' },
+  { id: 'w-case3', type: 'weekly', title: '本周破案 3 关', goal: 3, metric: 'casewin7', icon: 'target-coral', to: '/pages/index/index', toTab: true },
+  { id: 'w-layer2', type: 'weekly', title: '集齐 2 个不同层的检查单', goal: 2, metric: 'layers2', icon: 'puzzle-sky', to: '/pages/index/index', toTab: true },
 ]
 
-/** 成长任务：进度来自永久统计（rankOf/getTotals），不走 progress 存储 */
+/** 成长任务：进度来自永久统计（rankOf/getTotals），不走 progress 存储。
+ *  只留两根进度轴的终点（破案数 / 章节数），中段刻度不再单独立卡。 */
 export const GROWTH_TASKS: TaskDef[] = [
-  { id: 'g-first', type: 'growth', title: '完成首关：建立排错习惯', goal: 1, metric: 'solved', icon: 'target-coral' },
-  { id: 'g-three', type: 'growth', title: '破案 3 关：晋升「主治工程师」', goal: 3, metric: 'solved', icon: 'medal-coral' },
-  { id: 'g-chapter', type: 'growth', title: '完成一章主线：收下第一份层契约', goal: 1, metric: 'chapters', icon: 'map-sky' },
-  { id: 'g-rank', type: 'growth', title: '破案 6 关：晋升「首席诊断官」', goal: 6, metric: 'solved', icon: 'medal-coral' },
-  { id: 'g-all', type: 'growth', title: '全部章节主线通关', goal: 16, metric: 'chapters', icon: 'map-sky' },
+  { id: 'g-rank', type: 'growth', title: '破案 6 关：晋升「首席诊断官」', goal: 6, metric: 'solved', icon: 'medal-coral', to: '/pages/index/index', toTab: true },
+  { id: 'g-all', type: 'growth', title: '全部章节主线通关', goal: 16, metric: 'chapters', icon: 'map-sky', to: '/pages/index/index', toTab: true },
 ]
 
 export function taskById(id: string): TaskDef | null {

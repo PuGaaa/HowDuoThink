@@ -2,76 +2,61 @@
   <view class="page">
     <safe-top></safe-top>
     <navbar></navbar>
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
     <view class="content">
       <view class="herocard">
-        <image class="herocard__avatar" :src="frogUrl" mode="aspectFit"></image>
+        <image class="herocard__logo" src="/static/logo/app-logo.png" mode="aspectFit"></image>
         <text class="herocard__name">好多星</text>
         <text class="herocard__en">HowDuoThink</text>
         <text class="herocard__sub">多想，多星。</text>
-        <text class="herocard__slogan">How to think.</text>
-        <text class="herocard__ver">v0.1</text>
-      </view>
-
-      <view class="card">
-        <text class="card__title">这是什么</text>
-        <text class="card__text">好多星把真实故障做成一桩桩案件：走进现场，提出假设、花 ⚡︎ 预算验证、指认根因，复盘对照专家推理链——多想一步，星就多一颗。</text>
+        <text class="herocard__ver">{{ appVersion }}</text>
       </view>
 
       <view class="card">
         <text class="card__title">相关站点</text>
         <view class="linkrow">
           <text class="linkrow__label">Web 社区站（投稿与解决逻辑）</text>
-          <text class="linkrow__v">localhost:3000</text>
+          <text class="linkrow__v">hdt.moooooz.com</text>
         </view>
       </view>
 
       <view class="card">
-        <text class="card__title">技术栈致谢</text>
-        <text class="card__text">uni-app X（蒸汽模式）· FastAPI · SQLite · Nuxt 3 · Vue · 吉祥物与图标均为项目自有资产</text>
+        <text class="card__title">数据与隐私</text>
+        <text class="card__text">闯关进度实时保存在本机；登录后检查单云同步到社区站账号。仅在保存传播海报时申请相册写入权限，不收集与学习无关的数据。</text>
       </view>
 
-      <text class="foot">—— 本机进度实时保存，闯关愉快 ——</text>
+      <text class="foot">—— 多想一步，星就多一颗 ——</text>
     </view>
+    </scroll-view>
   </view>
 </template>
 
 <script setup lang="uts">
 import safeTop from '../../components/safe-top/safe-top.uvue'
 import navbar from '../../components/navbar/navbar.uvue'
-import { getMascotUrl } from '../../utils/remote-assets'
+import { APP_VERSION } from '../../utils/version'
 
-const frogUrl = getMascotUrl('frog')
-
-function openWeb() {
-  // #ifdef WEB
-  window.open('http://localhost:3000', '_blank')
-  // #endif
-  // #ifndef WEB
-  uni.showToast({ title: '请在浏览器访问社区站', icon: 'none' })
-  // #endif
-}
-
-function goHandbook() {
-  uni.navigateBack({})
-}
+const appVersion = APP_VERSION
 </script>
 
 <style>
 .page {
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #FFF9F4;
-  min-height: 100vh;
   width: 100%;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  padding: 24rpx 32rpx 60rpx;
 }
 .content {
+  padding-top: 112rpx;
+  padding-bottom: 60rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
   display: flex;
   flex-direction: column;
-  padding-top: 88rpx;
 }
 .herocard {
   display: flex;
@@ -80,12 +65,12 @@ function goHandbook() {
   background-color: #4A4458;
   border-radius: 30rpx;
   padding: 40rpx 30rpx 34rpx;
-  box-shadow: 0 8rpx 0 0 #35303F;
+  border-bottom-width: 8rpx; border-bottom-style: solid; border-bottom-color: #35303F;
 }
-.herocard__avatar {
-  width: 140rpx;
-  height: 140rpx;
-  border-radius: 70rpx;
+.herocard__logo {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 36rpx;
   background-color: #FBF3EB;
 }
 .herocard__name {
@@ -104,16 +89,16 @@ function goHandbook() {
   color: #C9C2DA;
   margin-top: 10rpx;
 }
+.herocard__ver {
+  font-size: 20rpx;
+  color: #C9C2DA;
+  margin-top: 12rpx;
+}
 .herocard__slogan {
   font-size: 22rpx;
   font-weight: bold;
   color: #9BD49B;
   margin-top: 14rpx;
-}
-.herocard__ver {
-  font-size: 20rpx;
-  color: #C9C2DA;
-  margin-top: 12rpx;
 }
 .card {
   display: flex;
@@ -122,7 +107,7 @@ function goHandbook() {
   border-radius: 24rpx;
   padding: 28rpx;
   margin-top: 24rpx;
-  box-shadow: 0 6rpx 0 0 #EFE5D6;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;
 }
 .card__title {
   font-size: 25rpx;
@@ -155,5 +140,10 @@ function goHandbook() {
   color: #AFA8BD;
   text-align: center;
   margin-top: 26rpx;
+}
+
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
 }
 </style>

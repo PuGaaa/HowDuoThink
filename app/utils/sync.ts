@@ -82,12 +82,21 @@ export function getPackCount(): number {
 }
 
 function persistPack(cases: DiagnosisCase[]) {
-  // delta 语义：响应不含某案例不代表远端已删，只写不删；清理仅针对旧版整包 key
+  // delta 语义：响应不含某案例不代表远端已删，只写不删；清理仅针对旧版整包 key。
+  // 逐键比对、只写有变化的：回首页每次都拉 casepack，常态是空 delta——
+  // 若整包重写 150 个 key，iOS 主线程要做 150 次大 JSON 转换（见文件头注释），
+  // 液态 tab 变形动画会被冻住几百毫秒。
+  let dirty = false
   for (const c of cases) {
     if (c == null || !c.id) continue
-    uni.setStorageSync(V2_PREFIX + c.id, JSON.stringify(c))
+    const raw = JSON.stringify(c)
+    if (uni.getStorageSync(V2_PREFIX + c.id) === raw) continue
+    uni.setStorageSync(V2_PREFIX + c.id, raw)
+    dirty = true
   }
   uni.removeStorageSync(CASEPACK_KEY)
+  // 内容未变：保持 remoteCache 引用稳定（下游 effectiveCache/章缓存的指纹继续命中）
+  if (!dirty && remoteCache != null) return
   remoteCache = cases.filter(c => c != null && c.id)
 }
 
@@ -106,6 +115,11 @@ export function fetchCasepack(cb: (r: SyncResult) => void) {
         }
         if (data.version < getPackVersion()) {
           cb({ version: getPackVersion(), count: getPackCount(), error: '' })
+          return
+        }
+        if (data.cases.length === 0) {
+          // 空 delta：远端无新内容，本地包原样保留——不进合并/落库，主线程零负担
+          cb({ version: data.version, count: getPackCount(), error: '' })
           return
         }
         // 最小字段校验（App 端防丢字段第二道门）

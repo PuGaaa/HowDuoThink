@@ -1,5 +1,6 @@
 <template>
   <view class="page">
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
     <view class="content">
       <view class="head">
         <text class="head__title">投稿出题</text>
@@ -80,6 +81,7 @@
         <text class="foot">提交后编辑会查重与核实证据。脱敏版本需你确认；采纳表示制作中，正式发布后才有可玩和文章入口。</text>
       </template>
     </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -208,8 +210,8 @@ function toast(t: string) {
 
 <style>
 .page {
+  height: 100%;
   background-color: #FAF6F0;
-  min-height: 100vh;
 }
 .content {
   padding: 24rpx 28rpx 60rpx 28rpx;
@@ -223,7 +225,7 @@ function toast(t: string) {
   color: #332C4E;
 }
 .head__sub {
-  display: block;
+ 
   font-size: 22rpx;
   color: #8F87A3;
   margin-top: 8rpx;
@@ -354,10 +356,15 @@ function toast(t: string) {
   font-weight: bold;
 }
 .foot {
-  display: block;
+ 
   font-size: 20rpx;
   color: #AFA8BD;
   margin-top: 20rpx;
   text-align: center;
+}
+
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
 }
 </style>

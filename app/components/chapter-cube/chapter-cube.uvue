@@ -2,16 +2,22 @@
   <view :class="locked ? 'cubecube cubecube--locked' : 'cubecube cubecube--' + accent" @click="$emit('tap')">
     <view class="cubecube__head">
       <view class="cubecube__no">
-        <text class="cubecube__no-text">{{ chapterNo }}</text>
+        <text :class="locked ? 'cubecube__no-text cubecube__no-text--locked' : 'cubecube__no-text cubecube__no-text--' + accent">{{ chapterNo }}</text>
       </view>
-      <image v-if="locked" class="cubecube__lock" src="/static/icons/lock-ink3.png" mode="aspectFit"></image>
+      <view class="cubecube__deco">
+        <image v-if="!locked" class="cubecube__spark" :src="sparkSrc" mode="aspectFit"></image>
+        <image v-if="!locked" class="cubecube__mag" :src="magSrc" mode="aspectFit"></image>
+        <image v-else class="cubecube__lock" src="/static/icons/v4/lock-muted-diy.png" mode="aspectFit"></image>
+      </view>
     </view>
-    <text class="cubecube__name">{{ name }}</text>
-    <text class="cubecube__pact">{{ locked ? '通关上一章全部关卡解锁，或直接挑战本章首关' : pact }}</text>
-    <view v-if="!locked" class="cubecube__track">
-      <view class="cubecube__fill" :style="'width:' + fillPct + '%'"></view>
+    <text class="cubecube__name" max-lines="1">{{ name }}</text>
+    <view v-if="!locked" class="cubecube__foot">
+      <view class="cubecube__track">
+        <view :class="'cubecube__fill cubecube__fill--' + accent" :style="'width:' + fillPct + '%'"></view>
+      </view>
+      <text class="cubecube__count">{{ solved }}/{{ total }}</text>
     </view>
-    <text v-if="!locked" class="cubecube__count">{{ solved }}/{{ total }}</text>
+    <image v-else class="cubecube__orbit" src="/static/icons/v4/orbit-muted.png" mode="aspectFit"></image>
   </view>
 </template>
 
@@ -23,12 +29,11 @@ const props = defineProps({
   id: { type: String, default: '' },
   chapterNo: { type: String, default: '' },
   name: { type: String, default: '' },
-  pact: { type: String, default: '' },
   solved: { type: Number, default: 0 },
   total: { type: Number, default: 0 },
-  /** 篇 id：决定积木色系 apprentice/engineer/master */
+  /** 篇 id：决定积木色系 apprentice/engineer/master，图标与进度条随篇色 */
   accent: { type: String, default: 'apprentice' },
-  /** 锁定态：置灰 + 锁图标，文案换成解锁提示 */
+  /** 锁定态：置灰 + 锁图标 + 虚线轨道装饰 */
   locked: { type: Boolean, default: false },
 })
 
@@ -36,35 +41,55 @@ const fillPct = computed((): number => {
   if (props.total <= 0) return 0
   return Math.round((props.solved * 100) / props.total)
 })
+
+/** 激活块装饰图标随篇色：apprentice 橙 / engineer 绿 / master 蓝 */
+const magSrc = computed((): string => {
+  if (props.accent === 'engineer') return '/static/icons/v4/magnifier-green-diy.png'
+  if (props.accent === 'master') return '/static/icons/v4/magnifier-blue-diy.png'
+  return '/static/icons/v4/magnifier-orange-diy.png'
+})
+const sparkSrc = computed((): string => {
+  if (props.accent === 'engineer') return '/static/icons/v4/sparkles-green-diy.png'
+  if (props.accent === 'master') return '/static/icons/v4/sparkles-blue-diy.png'
+  return '/static/icons/v4/magic-sparkles.png'
+})
 </script>
 
 <style>
-/* 章积木组件：多邻国式实体积木。色系按篇加重（底色饱和 + 厚硬边） */
+/* 章积木组件：激活态 = 篇色浅底 + 随篇色的图标/进度条；锁定态 = 浅灰 + 锁 + 角落虚线轨道。
+   定高保证同行/跨篇方块尺寸一致。 */
 .cubecube {
+  position: relative;
   display: flex;
   flex-direction: column;
-  /* 一行两块：part__body 是 space-between + wrap，用百分比自适应；
-     固定 344rpx 双块加上外层页面留白会超宽，导致被挤成竖排 */
+  /* 一行两块：part__body 是 space-between + wrap，用百分比自适应 */
   width: 46%;
-  border-radius: 22rpx;
+  height: 190rpx;
+  border-radius: 24rpx;
+  border-width: 2rpx;
+  border-style: solid;
   padding: 24rpx;
   margin-bottom: 20rpx;
 }
 .cubecube--apprentice {
-  background-color: #FFE3D1;
-  box-shadow: 0 8rpx 0 0 #F0A97E;
+  background-color: #FFF3E9;
+  border-color: #FFD9BC;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #F5C79C;
 }
 .cubecube--engineer {
-  background-color: #CDEEDF;
-  box-shadow: 0 8rpx 0 0 #7FCBAD;
+  background-color: #EFF9F3;
+  border-color: #BFE8D2;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #ABDFC5;
 }
 .cubecube--master {
-  background-color: #D4E9FB;
-  box-shadow: 0 8rpx 0 0 #85B8E0;
+  background-color: #EDF5FD;
+  border-color: #C6DEF4;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #B9D7F0;
 }
 .cubecube--locked {
-  background-color: #EDE9E4;
-  box-shadow: 0 8rpx 0 0 #CFC8C0;
+  background-color: #F4F0EC;
+  border-color: #EFE9E4;
+  border-bottom-width: 6rpx; border-bottom-style: solid; border-bottom-color: #E0D7CE;
 }
 .cubecube__head {
   display: flex;
@@ -72,50 +97,92 @@ const fillPct = computed((): number => {
   justify-content: space-between;
   align-items: center;
 }
-.cubecube__lock {
-  width: 34rpx;
-  height: 34rpx;
-}
 .cubecube__no {
   background-color: #FFFFFF;
-  border-radius: 16rpx;
+  border-radius: 999rpx;
   padding: 6rpx 16rpx;
   align-self: flex-start;
 }
 .cubecube__no-text {
-  font-size: 18rpx;
+  font-size: 20rpx;
   font-weight: bold;
-  color: #7A7290;
+}
+.cubecube__no-text--apprentice {
+  color: #FF7047;
+}
+.cubecube__no-text--engineer {
+  color: #2FA97C;
+}
+.cubecube__no-text--master {
+  color: #4A90D9;
+}
+.cubecube__no-text--locked {
+  color: #A29EAC;
+}
+.cubecube__deco {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+.cubecube__spark {
+  width: 26rpx;
+  height: 26rpx;
+  margin-right: 8rpx;
+}
+.cubecube__mag {
+  width: 40rpx;
+  height: 40rpx;
+}
+.cubecube__lock {
+  width: 36rpx;
+  height: 36rpx;
 }
 .cubecube__name {
-  font-size: 29rpx;
+  font-size: 32rpx;
   font-weight: bold;
-  color: #4A4458;
-  margin-top: 14rpx;
-}
-.cubecube__pact {
-  font-size: 20rpx;
-  color: #6B6480;
-  margin-top: 8rpx;
-  lines: 2;
+  color: #303343;
+  margin-top: 16rpx;
   text-overflow: ellipsis;
+  overflow: hidden;
+}
+.cubecube__foot {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: auto;
 }
 .cubecube__track {
-  height: 14rpx;
-  border-radius: 7rpx;
-  background-color: rgba(255, 255, 255, 0.9);
-  margin-top: 18rpx;
+  flex: 1;
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: rgba(255, 255, 255, 0.85);
 }
-.cubecube__fill {
-  height: 14rpx;
-  border-radius: 7rpx;
-  background-color: #E86F3F;
+.cubecube__fill--apprentice {
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: #FF7047;
+}
+.cubecube__fill--engineer {
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: #2FA97C;
+}
+.cubecube__fill--master {
+  height: 12rpx;
+  border-radius: 6rpx;
+  background-color: #4A90D9;
 }
 .cubecube__count {
-  font-size: 21rpx;
+  font-size: 22rpx;
   font-weight: bold;
-  color: #4A4458;
-  align-self: flex-end;
-  margin-top: -26rpx;
+  color: #303343;
+  margin-left: 12rpx;
+}
+.cubecube__orbit {
+  position: absolute;
+  right: 14rpx;
+  bottom: 10rpx;
+  width: 64rpx;
+  height: 40rpx;
 }
 </style>

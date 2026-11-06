@@ -5,11 +5,13 @@
 import { API_BASE } from '../config'
 import { preserveLegacyChapterUnlocks } from '../data/chapters'
 import { getToken, isLoggedIn } from './auth'
-import { clearProgressLocal, confirmProgressOperations, exportProgressBundle, getUnlockedChapterIds, importProgressBundle, pendingProgressOperations, progressIdentity, progressStorageGet, progressStorageKey, progressStorageSet, setProgressIdentity, setProgressListener } from './storage'
+import { clearProgressLocal, confirmProgressOperations, exportProgressBundle, getCaseProgress, getUnlockedChapterIds, importProgressBundle, invalidateCaseProgressCache, pendingProgressOperations, progressIdentity, progressStorageGet, progressStorageKey, progressStorageSet, setProgressIdentity, setProgressListener } from './storage'
 
 const KEY_LAST_SYNC = 'think_last_sync'
 
 export function prepareProgressIdentity(uid: string): void {
+  // 身份合并后强制下一次同步全量应用：指纹跨身份残留会让 bootstrap 重放被跳过
+  lastProjectionFp = ''
   const previous = progressIdentity()
   if (previous === 'guest') {
     preserveLegacyChapterUnlocks()
@@ -43,13 +45,21 @@ function markSynced() {
   progressStorageSet(KEY_LAST_SYNC, '今天 ' + hh + ':' + mm)
 }
 
-function replaceServerProjection(d: any): void {
-  const info = uni.getStorageInfoSync()
-  const casePrefix = progressStorageKey('think_case_')
-  const solvedLayers = progressStorageGet('think_solved_layers_v1')
-  for (let i = 0; i < info.keys.length; i++) {
-    if (info.keys[i].indexOf(casePrefix) === 0) uni.removeStorageSync(info.keys[i])
+// 投影指纹（含身份域）：服务端投影未变化时跳过整套覆盖写入——
+// 覆盖路径含 getStorageInfoSync 全量枚举（iOS 真机慢）与逐键校验写，是高频回首页的最后一处重活。
+// 跳过是安全的：本地状态 = 上次投影 + 未确认操作重放 + 写穿透的实时写，投影未变则无需任何写。
+let lastProjectionFp = ''
+
+function applyServerProjection(d: any): void {
+  const fp = progressIdentity() + ':' + JSON.stringify(d)
+  if (fp === lastProjectionFp) {
+    markSynced()
+    return
   }
+  lastProjectionFp = fp
+  const solvedLayers = progressStorageGet('think_solved_layers_v1')
+  // 案例进度缓存随投影整体重建：先清缓存再覆盖写入
+  invalidateCaseProgressCache()
   importProgressBundle({
     cases: d.cases ?? {},
     streak: d.streak ?? {},
@@ -60,7 +70,20 @@ function replaceServerProjection(d: any): void {
     solvedLayers: [],
     unlockedChapterIds: d.unlockedChapterIds ?? [],
   })
+  // 投影替换语义：服务端已不存在的本地案例清掉（只删缺席项，不再全删重写）
+  const serverCases = (d.cases ?? {}) as { [id: string]: any }
+  const casePrefix = progressStorageKey('think_case_')
+  const serverKeys = new Set<string>()
+  for (const id in serverCases) serverKeys.add(casePrefix + id)
+  const info = uni.getStorageInfoSync()
+  for (let i = 0; i < info.keys.length; i++) {
+    const k = info.keys[i]
+    if (k.indexOf(casePrefix) === 0 && !serverKeys.has(k)) uni.removeStorageSync(k)
+  }
   progressStorageSet('think_solved_layers_v1', solvedLayers == null ? '[]' : solvedLayers)
+  // 覆盖抹掉了本地未确认操作的效果：重放一遍（fp 未变时本地本就含这些效果，不能重放以免二次计数）
+  replayPendingOperations(pendingProgressOperations())
+  markSynced()
 }
 
 function replayTask(metric: string, amount: number): void {
@@ -150,9 +173,7 @@ export function pushProgress(cb?: (r: { error: string }) => void) {
       if (res.statusCode === 200) {
         const d = res.data as any
         confirmProgressOperations(d.confirmedOperationIds as string[])
-        replaceServerProjection(d)
-        replayPendingOperations(pendingProgressOperations())
-        markSynced()
+        applyServerProjection(d)
       }
       if (cb != null) cb({ error: res.statusCode === 200 ? '' : '上传失败' })
     },
@@ -165,12 +186,23 @@ export function pushProgress(cb?: (r: { error: string }) => void) {
 /** 全量拉取（登录态）：后端与本地做并集合并——
  *  关卡：服务端有本地无 → 补入；双方都有 → solved 并集、星级/成本取优、plays/fails 取大；
  *  streak/mascots/tasks/checkuse：逐字段取大；dailyDone：本地为空才采用服务端。
- *  并集语义保证任何时序下不丢数据（离线破的关、后端的旧进度都安全）。 */
-export function pullServerProgress(cb?: (r: { error: string }) => void) {
+ *  并集语义保证任何时序下不丢数据（离线破的关、后端的旧进度都安全）。
+ *  自动拉取 20s 节流（回首页/我的页高频触发，全量包解析在真机上有成本）；
+ *  手动同步与登录后的强制拉取传 force = true 不受限。 */
+let lastAutoPullAt = 0
+const AUTO_PULL_MIN_GAP = 20000
+
+export function pullServerProgress(cb?: (r: { error: string }) => void, force?: boolean) {
   if (!isLoggedIn()) {
     if (cb != null) cb({ error: '' })
     return
   }
+  const now = Date.now()
+  if (force != true && now - lastAutoPullAt < AUTO_PULL_MIN_GAP) {
+    if (cb != null) cb({ error: '' })
+    return
+  }
+  lastAutoPullAt = now
   const requestUid = progressIdentity()
   const requestToken = getToken()
   uni.request({
@@ -189,27 +221,43 @@ export function pullServerProgress(cb?: (r: { error: string }) => void) {
       let merged = 0
       for (const id in remoteCases) {
         const rp = remoteCases[id]
-        const raw = progressStorageGet('think_case_' + id)
-        if (raw == null || (raw as string).length === 0) {
-          progressStorageSet('think_case_' + id, JSON.stringify(rp))
+        const lp = getCaseProgress(id)
+        if (lp == null) {
+          // 本地无进度：直接采用服务端投影
+          progressStorageSet('think_case_' + id, JSON.stringify({
+            solved: rp.solved ?? false,
+            bestGrade: rp.bestGrade ?? '',
+            bestCost: rp.bestCost ?? 0,
+            plays: rp.plays ?? 0,
+            fails: rp.fails ?? 0,
+            contentRevision: rp.contentRevision ?? 1,
+            scoringVersion: rp.scoringVersion ?? 1,
+          }))
           merged++
           continue
         }
-        try {
-          const lp = JSON.parse(raw as string)
-          const before = JSON.stringify(lp)
-          const localSolved = lp.solved
-          if (!lp.solved && rp.solved) lp.solved = true
-          if (rp.bestGrade === 'S' || (lp.bestGrade !== 'S' && rp.bestGrade !== '' && (lp.bestGrade === '' || rp.bestGrade < lp.bestGrade))) lp.bestGrade = rp.bestGrade
-          if (rp.bestGrade === 'S' && lp.bestGrade !== 'S') lp.bestGrade = 'S'
-          if (rp.solved && (!localSolved || rp.bestCost < lp.bestCost)) lp.bestCost = rp.bestCost
-          lp.plays = Math.max(lp.plays ?? 0, rp.plays ?? 0)
-          lp.fails = Math.max(lp.fails ?? 0, rp.fails ?? 0)
-          if (JSON.stringify(lp) !== before) {
-            progressStorageSet('think_case_' + id, JSON.stringify(lp))
-            merged++
-          }
-        } catch (e) {}
+        // 字段级并集（与逐字段快照比对等价），只有真的变化才落库：回首页的拉取高频，别做整包读写
+        const localSolved = lp.solved
+        const ns = lp.solved || rp.solved
+        let ng = lp.bestGrade
+        if (rp.bestGrade === 'S' || (lp.bestGrade !== 'S' && rp.bestGrade !== '' && (lp.bestGrade === '' || rp.bestGrade < lp.bestGrade))) ng = rp.bestGrade
+        if (rp.bestGrade === 'S' && lp.bestGrade !== 'S') ng = 'S'
+        let nc = lp.bestCost
+        if (rp.solved && (!localSolved || rp.bestCost < lp.bestCost)) nc = rp.bestCost
+        const np = Math.max(lp.plays ?? 0, rp.plays ?? 0)
+        const nf = Math.max(lp.fails ?? 0, rp.fails ?? 0)
+        if (ns !== lp.solved || ng !== lp.bestGrade || nc !== lp.bestCost || np !== (lp.plays ?? 0) || nf !== (lp.fails ?? 0)) {
+          progressStorageSet('think_case_' + id, JSON.stringify({
+            solved: ns,
+            bestGrade: ng,
+            bestCost: nc,
+            plays: np,
+            fails: nf,
+            contentRevision: lp.contentRevision ?? 1,
+            scoringVersion: lp.scoringVersion ?? 1,
+          }))
+          merged++
+        }
       }
       const ls = progressStorageGet('think_streak_v1')
       let lsj: any = {}
@@ -255,10 +303,7 @@ export function pullServerProgress(cb?: (r: { error: string }) => void) {
       const mergedUnlocked = localUnlocked.slice()
       for (let i = 0; i < remoteUnlocked.length; i++) if (mergedUnlocked.indexOf(remoteUnlocked[i]) < 0) mergedUnlocked.push(remoteUnlocked[i])
       if (mergedUnlocked.length !== localUnlocked.length) progressStorageSet('think_unlocked_chapters_v1', JSON.stringify(mergedUnlocked))
-      const pending = pendingProgressOperations()
-      replaceServerProjection(d)
-      replayPendingOperations(pending)
-      markSynced()
+      applyServerProjection(d)
       if (cb != null) cb({ error: '' })
     },
     fail: () => {
@@ -298,7 +343,7 @@ export function manualSync(cb: (r: { error: string }) => void) {
       const label = lastSyncLabel()
       cb({ error: '' })
       uni.showToast({ title: label.length > 0 ? '已同步 · ' + label : '已同步', icon: 'none' })
-    })
+    }, true)
   })
 }
 

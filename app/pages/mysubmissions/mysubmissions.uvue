@@ -1,5 +1,6 @@
 <template>
   <view class="page">
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
     <view class="content">
       <text class="title">我的投稿</text>
       <text class="muted">采纳表示制作中；正式发布后才会展示可玩和文章入口。原稿与补件都会保留。</text>
@@ -8,14 +9,14 @@
         <view class="button" @click="goAction"><text>{{ loggedIn ? '去投稿' : '去登录' }}</text></view>
       </view>
       <view v-for="it in items" :key="it.id" class="card">
-        <view class="row"><text class="card__title">{{ it.title }}</text><text class="status">{{ statusLabel(it.displayStatus) }}</text></view>
+        <view class="row"><text class="card__title">{{ it.title }}</text><text class="status status--gap">{{ statusLabel(it.displayStatus) }}</text></view>
         <text v-if="it.reviewNote != null" class="note">编辑反馈：{{ it.reviewNote }}</text>
         <text class="muted">{{ it.createdAt }}</text>
         <view v-if="it.displayStatus === 'published'" class="row">
           <view class="button" @click="play(it)"><text>去玩正式关卡</text></view>
-          <view v-if="PUBLIC_WEB_ORIGIN.length > 0" class="button button--light" @click="article(it)"><text>复制文章链接</text></view><text v-else class="muted">文章入口待配置公开地址</text>
+          <view v-if="PUBLIC_WEB_ORIGIN.length > 0" class="button button--light button--gap" @click="article(it)"><text>复制文章链接</text></view><text v-else class="muted muted--gap">文章入口待配置公开地址</text>
         </view>
-        <view class="button button--light" @click="expand(it)"><text>{{ expandedId === it.id ? '收起详情' : '原稿、反馈与补件' }}</text></view>
+        <view class="button button--light button--gap" @click="expand(it)"><text>{{ expandedId === it.id ? '收起详情' : '原稿、反馈与补件' }}</text></view>
         <view v-if="expandedId === it.id" class="details">
           <text class="label">原稿（仅自己与编辑可见）</text><text class="body">{{ it.symptom }}</text>
           <text v-if="it.keyError != null" class="body">关键报错：{{ it.keyError }}</text><text class="body">解决过程：{{ it.resolution }}</text>
@@ -36,6 +37,7 @@
         </view>
       </view>
     </view>
+    </scroll-view>
   </view>
 </template>
 
@@ -113,19 +115,27 @@ onShow(() => { supplement.value = ''; refresh() })
 </script>
 
 <style>
-.page { background-color: #FAF6F0; min-height: 100vh; }
+.page { height: 100%; display: flex; flex-direction: column; background-color: #FAF6F0; }
 .content { padding: 28rpx; }
-.title { display: block; font-size: 40rpx; font-weight: bold; color: #332C4E; margin-bottom: 12rpx; }
-.muted { display: block; font-size: 23rpx; color: #8F87A3; margin-top: 10rpx; line-height: 1.6; }
+.title { font-size: 40rpx; font-weight: bold; color: #332C4E; margin-bottom: 12rpx; }
+.muted { font-size: 23rpx; color: #8F87A3; margin-top: 10rpx; line-height: 1.6; }
 .card { margin-top: 24rpx; padding: 24rpx; background-color: white; border-radius: 20rpx; }
-.row { display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 14rpx; }
+.row { display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; }
 .card__title { flex: 1; font-size: 29rpx; font-weight: bold; color: #332C4E; }
 .status { font-size: 23rpx; color: #7154A0; background-color: #F0EAF8; padding: 6rpx 14rpx; border-radius: 18rpx; }
-.note,.body { display: block; margin-top: 14rpx; font-size: 25rpx; color: #514963; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.status--gap { margin-left: 14rpx; }
+.button--gap { margin-left: 14rpx; }
+.muted--gap { margin-left: 14rpx; }
+.note,.body { margin-top: 14rpx; font-size: 25rpx; color: #514963; line-height: 1.65; white-space: pre-wrap; }
 .button { margin-top: 18rpx; padding: 18rpx 22rpx; border-radius: 12rpx; background-color: #FF7A50; color: white; font-size: 25rpx; text-align: center; }
 .button--light { background-color: #F0EAF8; color: #7154A0; }
 .details { margin-top: 18rpx; border-top: 1rpx solid #EFEAF4; padding-top: 12rpx; }
-.label { display: block; font-size: 26rpx; font-weight: bold; color: #332C4E; margin-top: 22rpx; }
+.label { font-size: 26rpx; font-weight: bold; color: #332C4E; margin-top: 22rpx; }
 .message,.material { padding: 18rpx; margin-top: 16rpx; background-color: #FAF6F0; border-radius: 12rpx; }
 .input { box-sizing: border-box; width: 100%; margin-top: 18rpx; padding: 16rpx; height: 190rpx; font-size: 25rpx; background-color: #FAF6F0; border-radius: 12rpx; }
+
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
+}
 </style>

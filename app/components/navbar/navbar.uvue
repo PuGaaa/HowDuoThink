@@ -46,11 +46,10 @@ function back() {
   height: 36rpx;
 }
 /* #ifdef APP-IOS */
-/* 硬边阴影画在等形外层：玻璃容器的 box-shadow 是否生效未定，外层透明 wrap 保住项目签名 */
+/* 返回键无阴影：玻璃容器等形外层仅承担布局 */
 .navbar__shadowwrap {
   width: 80rpx;
   border-radius: 40rpx;
-  box-shadow: 0 6rpx 0 0 #E8DCCB;
 }
 .navbar__glass {
   width: 80rpx;
@@ -67,10 +66,6 @@ function back() {
 }
 /* #endif */
 /* #ifndef APP-IOS */
-/* 硬边阴影缓冲：胶囊阴影画在盒外，uni-view 默认 overflow:hidden 会裁 */
-.navbar__shadowpad {
-  padding-bottom: 6rpx;
-}
 .navbar__capsule {
   width: 80rpx;
   height: 80rpx;
@@ -84,7 +79,6 @@ function back() {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(20rpx);
-  box-shadow: 0 6rpx 0 0 #E8DCCB;
 }
 /* #endif */
 </style>

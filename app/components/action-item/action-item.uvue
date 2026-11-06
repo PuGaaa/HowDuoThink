@@ -52,7 +52,7 @@ defineEmits(['tap'])
   border-color: #F5E6DA;
   padding: 22rpx;
   margin-bottom: 14rpx;
-  box-shadow: 0 5rpx 0 0 #EFE5D6;
+  border-bottom-width: 5rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;
 }
 .act--done {
   opacity: 0.55;

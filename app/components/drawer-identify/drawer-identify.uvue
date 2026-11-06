@@ -1,6 +1,6 @@
 <template>
   <view class="dbody">
-    <scroll-view class="dscroll" scroll-y>
+    <scroll-view class="dscroll" direction="vertical">
       <view class="checklist">
         <view class="checklist__head" @click="$emit('toggle-check')">
           <text class="checklist__title">指认前核对：我的检查单（{{ collected.length }}）</text>
@@ -77,7 +77,7 @@ defineEmits(['pick', 'toggle-check', 'submit', 'go-board'])
   padding: 18rpx;
   margin-bottom: 14rpx;
   background-color: #FFFFFF;
-  box-shadow: 0 5rpx 0 0 #EFE5D6;
+  border-bottom-width: 5rpx; border-bottom-style: solid; border-bottom-color: #EFE5D6;
 }
 .cause__dot {
   width: 30rpx;

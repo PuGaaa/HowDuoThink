@@ -4,14 +4,16 @@
       "path": "pages/index/index",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "好多星"
+        "navigationBarTitleText": "好多星",
+        "disableScroll": true
       }
     },
     {
       "path": "pages/about/about",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "关于"
+        "navigationBarTitleText": "关于",
+        "disableScroll": true
       }
     },
     {
@@ -26,70 +28,93 @@
       "path": "pages/chapter/chapter",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "章节详情"
+        "navigationBarTitleText": "章节详情",
+        "disableScroll": true
       }
     },
     {
       "path": "pages/task/task",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "任务"
+        "navigationBarTitleText": "任务",
+        "disableScroll": true
       }
     },
     {
       "path": "pages/play/play",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "诊断现场"
+        "navigationBarTitleText": "诊断现场",
+        "disableScroll": true
       }
     },
     {
       "path": "pages/review/review",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "复盘室"
+        "navigationBarTitleText": "复盘室",
+        "disableScroll": true
       }
     },
     {
       "path": "pages/handbook/handbook",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "诊断手册"
+        "navigationBarTitleText": "诊断手册",
+        "disableScroll": true
       }
     },
     {
       "path": "pages/profile/profile",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "我的"
+        "navigationBarTitleText": "我的",
+        "disableScroll": true
       }
     },
     {
       "path": "pages/post/post",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "侦探档案"
+        "navigationBarTitleText": "侦探档案",
+        "disableScroll": true
       }
     },
     {
       "path": "pages/login/login",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "登录"
+        "navigationBarTitleText": "登录",
+        "disableScroll": true
       }
     },
     {
       "path": "pages/profile-edit/profile-edit",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarTitleText": "编辑资料"
+        "navigationBarTitleText": "编辑资料",
+        "disableScroll": true
       }
     },
     {
-      "path": "pages/submit/submit"
+      "path": "pages/password/password",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "账号密码",
+        "disableScroll": true
+      }
     },
     {
-      "path": "pages/mysubmissions/mysubmissions"
+      "path": "pages/submit/submit",
+      "style": {
+        "disableScroll": true
+      }
+    },
+    {
+      "path": "pages/mysubmissions/mysubmissions",
+      "style": {
+        "disableScroll": true
+      }
     },
     {
       "path": "pages/dialog/confirm",
@@ -103,7 +128,10 @@
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "好多星",
     "navigationBarBackgroundColor": "#FFF9F4",
-    "backgroundColor": "#FFF9F4"
+    "backgroundColor": "#FFF9F4",
+    "app-plus": {
+      "scrollIndicator": "none"
+    }
   },
   "tabBar": {
     "color": "#AFA8BD",
