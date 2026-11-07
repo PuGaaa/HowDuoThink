@@ -15,7 +15,8 @@ const reminderIdentifier = "howduo_daily_reminder"
  */
 export function scheduleDailyReminder(hour: Number, minute: Number, title: String, body: String) {
   let center = UNUserNotificationCenter.current()
-  center.requestAuthorization(options = UNAuthorizationOptions.alert.union(UNAuthorizationOptions.sound), completionHandler = (granted: Bool, error: Error?):void => {
+  // 闭包参数不标注类型：由原生 API 签名推断（标注 Error 会被编译为运行时包装 UTSError，类型不匹配）
+  center.requestAuthorization(options = UNAuthorizationOptions.alert.union(UNAuthorizationOptions.sound), completionHandler = (granted, error) => {
     if (granted == false) return
     let content = UNMutableNotificationContent()
     content.title = title
@@ -26,7 +27,7 @@ export function scheduleDailyReminder(hour: Number, minute: Number, title: Strin
     let trigger = UNCalendarNotificationTrigger(dateMatching = comps, repeats = true)
     let request = UNNotificationRequest(identifier = reminderIdentifier, content = content, trigger = trigger)
     center.removePendingNotificationRequests(withIdentifiers = [reminderIdentifier])
-    center.add(request, withCompletionHandler = (addError: Error?):void => {})
+    center.add(request, withCompletionHandler = null)
   })
 }
 
