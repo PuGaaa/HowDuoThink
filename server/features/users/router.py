@@ -1,4 +1,4 @@
-"""users 路由：管理端用户管理（admin 专属）。"""
+"""users 路由：管理端用户管理（admin 专属）+ 用户自助注销账号。"""
 
 from fastapi import APIRouter, Depends, Query
 
@@ -29,3 +29,9 @@ def admin_update_role(target: str, body: models.RoleUpdate, uid: str = Depends(c
 def admin_update_status(target: str, body: models.StatusUpdate, uid: str = Depends(current_user)):
     require_admin(uid)
     return service.set_status(target, body.status, uid)
+
+
+@router.post("/api/me/delete")
+def delete_me(uid: str = Depends(current_user)):
+    """用户自助注销账号（匿名化，uid 保留）；语义见 service.delete_account。"""
+    return service.delete_account(uid)

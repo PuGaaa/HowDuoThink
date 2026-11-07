@@ -2,7 +2,7 @@
  *  通道与 Web 的 cookie 互不影响；API_BASE 见 config.ts。 */
 import { API_BASE } from '../config'
 import { getAvatarPresets } from './remote-assets'
-import { setProgressIdentity } from './storage'
+import { clearProgressLocal, setProgressIdentity } from './storage'
 
 const KEY_TOKEN = 'think_token'
 const KEY_USER = 'think_user'
@@ -219,6 +219,41 @@ export function logout() {
   uni.removeStorageSync(KEY_USER)
   uni.removeStorageSync('think_learning_anonymous_id_v1')
   uni.removeStorageSync('think_last_sync')
+}
+
+/** 注销账号（POST /api/me/delete）：服务端匿名化该账号（语义见 server/features/users/service.py）。 */
+export function deleteAccount(cb: (r: LoginResult) => void) {
+  uni.request({
+    url: API_BASE + '/api/me/delete',
+    method: 'POST',
+    header: { Authorization: 'Bearer ' + getToken() } as any,
+    timeout: 8000,
+    success: (res) => {
+      if (res.statusCode !== 200) {
+        const detail = (res.data as any)?.detail
+        cb({ error: typeof detail === 'string' ? detail : '注销失败，请稍后再试' })
+        return
+      }
+      cb({ error: '' })
+    },
+    fail: () => cb({ error: '无法连接社区服务' }),
+  })
+}
+
+/** 注销成功后的本地清理：登出全套 + 本机学习进度/学习事件队列/本地昵称头像一并清除。
+ *  服务端只匿名化不回滚，本地残留的进度域键也必须清掉（弹窗文案承诺本机进度清除）。 */
+export function deleteAccountLocal() {
+  // 旧匿名身份的学习事件队列与归属键：键随匿名 id 派生，logout 清掉 id 后不可达，先摘除
+  const anonId = uni.getStorageSync('think_learning_anonymous_id_v1')
+  if (anonId != null && typeof anonId == 'string' && (anonId as string).length > 0) {
+    uni.removeStorageSync('think_learning_events_v1_' + (anonId as string))
+    uni.removeStorageSync('think_learning_owner_v1_' + (anonId as string))
+  }
+  clearProgressLocal() // 登录身份域（think_progress_<uid>_*）
+  logout() // token/user/同步位/匿名 id 清理 + 进度身份切游客
+  clearProgressLocal() // 游客域遗留（含未加前缀的 legacy 键）
+  uni.removeStorageSync(KEY_LOCAL_AVATAR)
+  uni.removeStorageSync(KEY_LOCAL_NAME)
 }
 
 export interface SmsResult {

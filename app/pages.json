@@ -113,6 +113,22 @@
       }
     },
     {
+      "path": "pages/account-settings/account-settings",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "账号设置",
+        "disableScroll": true
+      }
+    },
+    {
+      "path": "pages/privacy/privacy",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "隐私政策",
+        "disableScroll": true
+      }
+    },
+    {
       "path": "pages/submit/submit",
       "style": {
         "disableScroll": true

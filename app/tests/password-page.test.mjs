@@ -40,14 +40,16 @@ test('auth.ts 提供 changePassword 与 fetchProfile，AppUser 带 hasPassword',
   assert.match(auth, /export function fetchProfile/, '缺少 fetchProfile（GET /api/me 刷新登录资料）')
 })
 
-test('个人中心登录态展示设置/修改密码入口并正确分发', () => {
+test('个人中心登录态展示账号设置入口并正确分发（密码入口移入账号设置页）', () => {
   const profile = read('app/pages/profile/profile.uvue')
   const template = profile.match(/<template>([\s\S]*?)<\/template>/)[1]
   // 账号区只在登录态出现
-  assert.match(template, /v-if="user != null"[^>]*@click="goPassword"|@click="goPassword"[^>]*v-if="user != null"/, '设置/修改密码入口应限登录态')
+  assert.match(template, /v-if="user != null"[^>]*@click="goAccountSettings"|@click="goAccountSettings"[^>]*v-if="user != null"/, '账号设置入口应限登录态')
   const script = profile.match(/<script[\s\S]*?<\/script>/)[0]
-  assert.match(script, /function goPassword\(\)/, '缺少 goPassword 分发')
-  assert.match(script, /pages\/password\/password/, 'goPassword 应跳密码页')
-  // 入口文案由 hasPassword 驱动
-  assert.match(script, /hasPassword/, '入口文案应依赖 hasPassword 字段')
+  assert.match(script, /function goAccountSettings\(\)/, '缺少 goAccountSettings 分发')
+  assert.match(script, /pages\/account-settings\/account-settings/, 'goAccountSettings 应跳账号设置页')
+  // 密码入口下沉到账号设置页继续可达
+  const settings = read('app/pages/account-settings/account-settings.uvue')
+  assert.match(settings, /function goPassword\(\)/, '账号设置页缺少 goPassword 分发')
+  assert.match(settings, /pages\/password\/password/, 'goPassword 应跳密码页')
 })

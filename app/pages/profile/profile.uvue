@@ -69,9 +69,9 @@
         <text class="row__value">{{ row.value }}</text>
         <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
       </view>
-      <!-- 账号：密码入口（登录态） -->
-      <view v-if="user != null" class="row" @click="goPassword">
-        <text class="row__label">{{ passwordLabel }}</text>
+      <!-- 账号：账号设置入口（登录态；密码与注销账号在子页内） -->
+      <view v-if="user != null" class="row" @click="goAccountSettings">
+        <text class="row__label">账号设置</text>
         <text class="row__value"></text>
         <image class="row__chevron" src="/static/icons/arrowr-coral.png" mode="aspectFit"></image>
       </view>
@@ -121,7 +121,6 @@ const displayName = ref('')
 const avatarSrc = ref('')
 const dailyTitle = ref('')
 const dailyIsDone = ref(false)
-const passwordLabel = ref('设置 / 修改密码')
 // 学习提醒：开关状态 / picker 初值（HH:mm）/ 行内展示文案
 const reminderOn = ref(false)
 const reminderTime = ref('21:30')
@@ -131,15 +130,6 @@ function refresh() {
   const cases = getEffectiveCases()
   user.value = getStoredUser()
   displayName.value = getDisplayName()
-  // 密码入口文案：登录响应不带 hasPassword，fetchProfile 刷新后才准确
-  const pu = user.value
-  if (pu != null && pu.hasPassword == true) {
-    passwordLabel.value = '修改密码'
-  } else if (pu != null && pu.hasPassword == false) {
-    passwordLabel.value = '设置密码'
-  } else {
-    passwordLabel.value = '设置 / 修改密码'
-  }
   avatarSrc.value = resolveAvatar()
   const dc = dailyCase()
   dailyTitle.value = dc.title
@@ -187,7 +177,7 @@ onShow(() => {
   pullServerProgress((r) => {
     if (r.error.length === 0) refresh()
   })
-  // 刷新登录资料（含 hasPassword）→ 密码入口文案准确切换
+  // 刷新登录资料：会话在别端改动（昵称/头像/注销）回到本页即校正
   fetchProfile((r) => {
     if (r.error.length === 0) refresh()
   })
@@ -221,8 +211,8 @@ function goAbout() {
   uni.navigateTo({ url: '/pages/about/about' })
 }
 
-function goPassword() {
-  uni.navigateTo({ url: '/pages/password/password' })
+function goAccountSettings() {
+  uni.navigateTo({ url: '/pages/account-settings/account-settings' })
 }
 
 function pad2(n: number): string {

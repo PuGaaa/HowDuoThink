@@ -20,7 +20,7 @@ test('个人中心移除「检查单云同步」手动入口（同步由写穿�
 test('忘记密码入口从个人中心迁移到登录页', () => {
   assert.ok(!profileTpl.includes('忘记密码'), '个人中心不应再有忘记密码入口')
   assert.ok(!/goForgot/.test(profile), '个人中心不应再有 goForgot 分发')
-  assert.match(profile, /goPassword/, '设置/修改密码入口应保留')
+  assert.match(profile, /goAccountSettings/, '账号设置入口应保留（密码/注销移入账号设置页）')
   assert.match(loginTpl, /忘记密码/, '登录页应有忘记密码入口')
   const loginScript = login.match(/<script[\s\S]*?<\/script>/)[0]
   assert.match(loginScript, /function onForgot\(\)/, '登录页缺少 onForgot')
