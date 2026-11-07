@@ -1,0 +1,38 @@
+/**
+ * iOS 端：每日重复本地通知（UNUserNotificationCenter 日程触发，系统托管调度）。
+ * 参考《iOS 平台 UTS 开发指南》：系统框架用 import { 类 } from "框架" 引入；
+ * 调用原生带标签参数的方法时标签用 = 赋值；闭包用完整箭头函数（不支持简写）；
+ * UTS 的 Number 覆盖 Swift Int/Float/Double 场景。
+ */
+import { UNUserNotificationCenter, UNAuthorizationOptions, UNMutableNotificationContent, UNCalendarNotificationTrigger, UNNotificationRequest } from "UserNotifications"
+
+const reminderIdentifier = "howduo_daily_reminder"
+
+/**
+ * 申请通知授权，并注册每日重复的本地通知。
+ * 调度由 iOS 系统托管：app 被杀掉/重启/断网，到点系统均会弹出。
+ * 换时间：直接再次调用（内部先移除旧的待发通知再注册新的）。
+ */
+export function scheduleDailyReminder(hour: Number, minute: Number, title: String, body: String) {
+  let center = UNUserNotificationCenter.current()
+  center.requestAuthorization(options = UNAuthorizationOptions.alert.union(UNAuthorizationOptions.sound), completionHandler = (granted: Bool, error: Error?):void => {
+    if (granted == false) return
+    let content = UNMutableNotificationContent()
+    content.title = title
+    content.body = body
+    let comps = DateComponents()
+    comps.hour = Int(hour)
+    comps.minute = Int(minute)
+    let trigger = UNCalendarNotificationTrigger(dateMatching = comps, repeats = true)
+    let request = UNNotificationRequest(identifier = reminderIdentifier, content = content, trigger = trigger)
+    center.removePendingNotificationRequests(withIdentifiers = [reminderIdentifier])
+    center.add(request, withCompletionHandler = (addError: Error?):void => {})
+  })
+}
+
+/**
+ * 取消已注册的每日提醒（开关关闭时调用）。
+ */
+export function cancelDailyReminder() {
+  UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers = [reminderIdentifier])
+}

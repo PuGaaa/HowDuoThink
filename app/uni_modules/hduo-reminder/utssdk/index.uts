@@ -1,5 +1,5 @@
 // #ifdef APP-IOS
-export { scheduleDailyReminder, cancelDailyReminder } from './app-ios/index.swift'
+export { scheduleDailyReminder, cancelDailyReminder } from './app-ios/index.uts'
 // #endif
 
 // #ifdef WEB

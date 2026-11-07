@@ -11,9 +11,9 @@ const manifest = JSON.parse(readFileSync(resolve(root, 'app/manifest.json'), 'ut
 const profile = read('app/pages/profile/profile.uvue')
 
 test('iOS 本地通知 UTS 插件存在且用系统日程触发器（app 被杀也弹）', () => {
-  const swift = read('app/uni_modules/hduo-reminder/utssdk/app-ios/index.swift')
+  const swift = read('app/uni_modules/hduo-reminder/utssdk/app-ios/index.uts')
   assert.match(swift, /UNUserNotificationCenter/, '应使用 UNUserNotificationCenter')
-  assert.match(swift, /UNCalendarNotificationTrigger[\s\S]*repeats:\s*true/, '应用每日重复日程触发器')
+  assert.match(swift, /UNCalendarNotificationTrigger[\s\S]*repeats\s*=\s*true/, '应用每日重复日程触发器')
   assert.match(swift, /removePendingNotificationRequests/, '换时间应先移除旧通知再注册')
 })
 
