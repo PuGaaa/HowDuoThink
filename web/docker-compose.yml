@@ -1,0 +1,22 @@
+services:
+  web:
+    image: ghcr.io/pugaaa/howduothink-web:${HDX_IMAGE_TAG:-main}
+    restart: unless-stopped
+    environment:
+      # Nuxt runtimeConfig 运行时覆盖约定（NUXT_PUBLIC_<键>）；浏览器与 SSR 共用同一地址
+      NUXT_PUBLIC_API_BASE: ${NUXT_PUBLIC_API_BASE}
+    healthcheck:
+      # alpine 镜像无 curl，用 Node 20 自带的全局 fetch 自探首页
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"

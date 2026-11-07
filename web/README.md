@@ -13,6 +13,13 @@ npm run dev    # localhost:3000；需先起 server（../server/dev.sh，:8000）
 后端地址：环境变量 `API_BASE`（默认 `http://localhost:8000`）。
 构建与预览：`npm run build` / `npm run preview`。
 
+## 部署
+
+独立镜像 `ghcr.io/pugaaa/howduothink-web`（CI 构建，Dockerfile 在本目录）。Nuxt SSR 容器内监听
+3000，默认绑 `127.0.0.1:${WEB_PORT:-3000}`；`NUXT_PUBLIC_API_BASE` 运行时注入，填浏览器可达的
+完整 origin（同域反代场景填站点 origin）。完整步骤与 nginx 同域路由示例见
+`../server/部署与运维说明文档.md` 的「Web 社区站部署」。
+
 ## 页面
 
 | 路由 | 说明 |
