@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NInput, NModal } from 'naive-ui'
-import { BarChart3, Bot, HeartPulse, ImagePlus, Inbox, LayoutGrid, Settings, Users } from 'lucide-vue-next'
+import { BarChart3, Bot, FileText, HeartPulse, ImagePlus, Inbox, LayoutGrid, Settings, Users } from 'lucide-vue-next'
 import { api } from '@/api/client'
 import { useAuth } from '@/composables/useAuth'
 import logoMark from '@/assets/logo-sm.png'
@@ -21,6 +21,7 @@ const NAV = [
   { to: '/ai-usage', name: 'ai-usage', icon: Bot, label: 'AI 用量' },
   { to: '/ops', name: 'ops', icon: HeartPulse, label: '服务健康' },
   { to: '/settings', name: 'settings', icon: Settings, label: '系统设置', adminOnly: true },
+  { to: '/privacy-policy', name: 'privacy-policy', icon: FileText, label: '隐私政策', adminOnly: true },
 ]
 
 const navItems = computed(() => NAV.filter((n) => !n.adminOnly || user.value?.role === 'admin'))

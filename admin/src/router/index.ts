@@ -69,6 +69,12 @@ const router = createRouter({
           component: () => import('@/features/settings/pages/SettingsPage.vue'),
           meta: { title: '系统设置' },
         },
+        {
+          path: 'privacy-policy',
+          name: 'privacy-policy',
+          component: () => import('@/features/docs/pages/PrivacyPolicyPage.vue'),
+          meta: { title: '隐私政策' },
+        },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },

@@ -1,0 +1,181 @@
+<template>
+  <view class="page">
+    <safe-top></safe-top>
+    <navbar></navbar>
+    <scroll-view class="pagesv" direction="vertical" :show-scrollbar="false">
+      <view class="content">
+        <view v-if="updatedAt.length > 0" class="meta">
+          <text class="meta__text">更新于 {{ updatedAt }}</text>
+        </view>
+        <view v-if="blocks.length > 0" class="doccard">
+          <view v-for="(b, i) in blocks" :key="'b' + i" class="blk">
+            <text v-if="b.kind == 'h1'" class="blk__h1">{{ b.text }}</text>
+            <text v-else-if="b.kind == 'h2'" class="blk__h2">{{ b.text }}</text>
+            <text v-else-if="b.kind == 'li'" class="blk__li">{{ b.text }}</text>
+            <text v-else class="blk__p">{{ b.text }}</text>
+          </view>
+        </view>
+        <view v-if="loadFailed" class="failcard" @click="reload">
+          <text class="failcard__text">加载失败，点击重试</text>
+        </view>
+        <text class="foot">—— 多想一步，星就多一颗 ——</text>
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script setup lang="uts">
+import safeTop from '../../components/safe-top/safe-top.uvue'
+import navbar from '../../components/navbar/navbar.uvue'
+import { ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import { fetchPrivacyDoc, readCachedPrivacyDoc } from '../../utils/privacy-doc'
+
+interface DocBlock {
+  kind: string
+  text: string
+}
+
+const blocks = ref<Array<DocBlock>>([])
+const updatedAt = ref('')
+const loadFailed = ref(false)
+
+/** 纯文本块解析：'# '标题、'## '小节、'- '条目、空行分段；行内 ** 加粗标记直接去除 */
+function parseBlocks(content: string): Array<DocBlock> {
+  const lines = content.split('\n')
+  const out: Array<DocBlock> = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (line.length == 0) continue
+    if (line.startsWith('## ')) {
+      out.push({ kind: 'h2', text: line.substring(3) })
+    } else if (line.startsWith('# ')) {
+      out.push({ kind: 'h1', text: line.substring(2) })
+    } else if (line.startsWith('- ')) {
+      out.push({ kind: 'li', text: '· ' + line.substring(2).split('**').join('') })
+    } else {
+      out.push({ kind: 'p', text: line.split('**').join('') })
+    }
+  }
+  return out
+}
+
+function render() {
+  const doc = readCachedPrivacyDoc()
+  if (doc != null) {
+    blocks.value = parseBlocks(doc.content)
+    updatedAt.value = doc.updatedAt
+  }
+}
+
+function reload() {
+  fetchPrivacyDoc((ok) => {
+    render()
+    loadFailed.value = !ok && blocks.value.length == 0
+  })
+}
+
+onShow(() => {
+  render()
+  reload()
+})
+</script>
+
+<style>
+.page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #FFF9F4;
+  width: 100%;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.content {
+  padding-top: 112rpx;
+  padding-bottom: 60rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  display: flex;
+  flex-direction: column;
+}
+.meta {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  margin-bottom: 12rpx;
+}
+.meta__text {
+  font-size: 20rpx;
+  color: #AFA8BD;
+}
+.doccard {
+  display: flex;
+  flex-direction: column;
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 32rpx 28rpx;
+  border-bottom-width: 6rpx;
+  border-bottom-style: solid;
+  border-bottom-color: #EFE5D6;
+}
+.blk {
+  display: flex;
+  flex-direction: column;
+}
+.blk__h1 {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-top: 10rpx;
+  margin-bottom: 10rpx;
+}
+.blk__h2 {
+  font-size: 26rpx;
+  font-weight: bold;
+  color: #4A4458;
+  margin-top: 22rpx;
+  margin-bottom: 8rpx;
+}
+.blk__p {
+  font-size: 23rpx;
+  color: #7A7290;
+  line-height: 38rpx;
+  margin-top: 6rpx;
+}
+.blk__li {
+  font-size: 23rpx;
+  color: #7A7290;
+  line-height: 38rpx;
+  margin-top: 6rpx;
+  padding-left: 10rpx;
+}
+.failcard {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  background-color: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 30rpx;
+  margin-top: 24rpx;
+  border-bottom-width: 6rpx;
+  border-bottom-style: solid;
+  border-bottom-color: #EFE5D6;
+}
+.failcard__text {
+  font-size: 23rpx;
+  color: #FF8A5C;
+}
+.foot {
+  font-size: 19rpx;
+  color: #AFA8BD;
+  text-align: center;
+  margin-top: 26rpx;
+}
+
+/* 页面滚动区：包住内容滚动，页面本体不再滚（iOS 指示条由 show-scrollbar 关闭） */
+.pagesv {
+  flex: 1;
+}
+</style>

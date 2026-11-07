@@ -17,6 +17,7 @@ from features.ai.router import router as ai_router
 from features.assets.router import router as assets_router
 from features.auth.router import router as auth_router
 from features.cases.router import router as cases_router
+from features.docs.router import router as docs_router
 from features.ops.router import router as ops_router
 from features.progress.router import router as progress_router
 from features.settings.router import router as settings_router
@@ -142,6 +143,7 @@ def create_app() -> FastAPI:
     app.include_router(ops_router)
     app.include_router(settings_router)
     app.include_router(assets_router)
+    app.include_router(docs_router)
 
     @app.get("/api/health")
     def health():

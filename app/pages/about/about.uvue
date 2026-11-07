@@ -22,7 +22,11 @@
 
       <view class="card">
         <text class="card__title">数据与隐私</text>
-        <text class="card__text">闯关进度实时保存在本机；登录后检查单云同步到社区站账号。仅在保存传播海报时申请相册写入权限，不收集与学习无关的数据。</text>
+        <text class="card__text">闯关进度默认保存在本机；登录后进度与学习记录云同步到社区站账号。仅在保存传播海报时申请相册写入权限，不收集与学习无关的数据。</text>
+        <view class="privacyrow" @click="openPrivacy">
+          <text class="privacyrow__label">隐私政策</text>
+          <text class="privacyrow__arrow">›</text>
+        </view>
       </view>
 
       <text class="foot">—— 多想一步，星就多一颗 ——</text>
@@ -37,6 +41,10 @@ import navbar from '../../components/navbar/navbar.uvue'
 import { APP_VERSION } from '../../utils/version'
 
 const appVersion = APP_VERSION
+
+function openPrivacy() {
+  uni.navigateTo({ url: '/pages/privacy/privacy' })
+}
 </script>
 
 <style>
@@ -133,6 +141,26 @@ const appVersion = APP_VERSION
 }
 .linkrow__v {
   font-size: 21rpx;
+  color: #FF8A5C;
+}
+.privacyrow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14rpx 0 2rpx;
+  margin-top: 8rpx;
+  border-top-width: 1rpx;
+  border-top-style: solid;
+  border-top-color: #EFE5D6;
+}
+.privacyrow__label {
+  font-size: 23rpx;
+  color: #4A4458;
+  font-weight: bold;
+}
+.privacyrow__arrow {
+  font-size: 26rpx;
   color: #FF8A5C;
 }
 .foot {
