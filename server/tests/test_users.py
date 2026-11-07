@@ -154,9 +154,7 @@ def test_delete_account_visible_in_admin_list():
         with make_client() as user_client:
             r = user_client.post("/api/auth/login", json={"login": phone, "password": password})
             token = r.json()["token"]
-            assert user_client.post(
-                "/api/me/delete", headers={"Authorization": "Bearer " + token}
-            ).status_code == 200
+            assert user_client.post("/api/me/delete", headers={"Authorization": "Bearer " + token}).status_code == 200
 
         # 管理员列表可见匿名化结果：按昵称占位可搜到，条目不再含手机号痕迹
         r = client.get("/api/admin/users", params={"query": "已注销"})
