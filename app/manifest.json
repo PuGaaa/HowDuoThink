@@ -12,11 +12,6 @@
 		"styleIsolationVersion": "2",
 		"vapor-default-script-lang": "ts"
 	},
-	"app": {
-		"modules": {
-			"Push": {}
-		}
-	},
 	"web": {
 		"title": "好多星 HowDuoThink",
 		"router": {

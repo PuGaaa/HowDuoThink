@@ -1,0 +1,13 @@
+{
+  "id": "hduo-reminder",
+  "displayName": "hduo 学习提醒本地通知",
+  "version": "1.0.0",
+  "description": "iOS 本地通知：UNUserNotificationCenter 每日日程重复触发（app 被杀/重启/断网系统均按时弹），零第三方依赖，无需 APNs/推送证书",
+  "keywords": ["本地通知", "提醒"],
+  "uni_modules": {
+    "dependencies": [],
+    "uni-app-x": {
+      "dependencies": []
+    }
+  }
+}

@@ -1,0 +1,6 @@
+/**
+ * Web 桩：App 端走系统本地通知（app-ios/index.swift），
+ * Web 端提醒由 reminder.ts 的浏览器通知通道负责，插件实现为空。
+ */
+export function scheduleDailyReminder(hour: number, minute: number, title: string, body: string) {}
+export function cancelDailyReminder() {}

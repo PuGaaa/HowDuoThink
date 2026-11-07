@@ -99,6 +99,7 @@ import { openConfirmDialog, ConfirmDialogOptions } from '../../utils/confirm-dia
 import { getAvatar as resolveAvatar, getDisplayName } from '../../utils/auth'
 import { dailyCase, dailyDone, todayKey } from '../../utils/daily'
 import { getReminder, setReminder, reminderLabel, startReminderPolling, requestNotifyPermission } from '../../utils/reminder'
+import { scheduleDailyReminder, cancelDailyReminder } from '../../uni_modules/hduo-reminder'
 import { pullServerProgress } from '../../utils/sync-progress'
 import { APP_VERSION } from '../../utils/version'
 
@@ -228,8 +229,9 @@ function pad2(n: number): string {
   return n < 10 ? '0' + n : String(n)
 }
 
-/** 开启提醒的共享逻辑：权限申请 → 偏好落库 → 轮询 → 刷新提示（时间选择与开关共用） */
+/** 开启提醒的共享逻辑：Web 走浏览器通知授权；App 注册系统每日本地通知（调度由 iOS 系统托管，app 被杀也弹） */
 function applyReminder(hh: number, mm: number) {
+  // #ifdef WEB
   requestNotifyPermission().then((permission: string) => {
     if (permission === 'granted') {
       setReminder({ on: true, hh: hh, mm: mm })
@@ -238,14 +240,20 @@ function applyReminder(hh: number, mm: number) {
       uni.showToast({ title: '学习提醒已开启', icon: 'none' })
       return
     }
-    // 权限未授予：保留所选时间，仅置为关闭，下次开启不用重选
-    setReminder({ on: false, hh: hh, mm: mm })
+    setReminder({ on: false, hh: 21, mm: 30 })
     refresh()
     uni.showToast({
       title: permission === 'denied' ? '浏览器已拒绝通知权限，提醒未开启' : '当前环境不支持浏览器通知',
       icon: 'none',
     })
   })
+  // #endif
+  // #ifndef WEB
+  scheduleDailyReminder(hh, mm, '好多星', '今天的学习时间到了，来破一案吧 🔍')
+  setReminder({ on: true, hh: hh, mm: mm })
+  refresh()
+  uni.showToast({ title: '学习提醒已开启', icon: 'none' })
+  // #endif
 }
 
 /** 点时间 → 系统时间选择器选定即开启 */
@@ -255,13 +263,14 @@ function onReminderTime(e: UniPickerChangeEvent) {
   applyReminder(parseInt(parts[0]), parseInt(parts[1]))
 }
 
-/** 开关：开 → 按当前时间开启；关 → 保留时间仅关闭 */
+/** 开关：开 → 按当前时间开启；关 → 取消系统调度并保留时间（再开不用重选） */
 function onReminderToggle(e: UniSwitchChangeEvent) {
   const rp = getReminder()
   if (e.detail.value) {
     applyReminder(rp.hh, rp.mm)
     return
   }
+  cancelDailyReminder()
   setReminder({ on: false, hh: rp.hh, mm: rp.mm })
   refresh()
   uni.showToast({ title: '学习提醒已关闭', icon: 'none' })

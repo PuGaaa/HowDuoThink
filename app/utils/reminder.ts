@@ -1,8 +1,8 @@
-/** 学习提醒：偏好存 storage，页面打开时 60s 轮询，当日去重。
- *  H5 = 浏览器通知（授权后）；App = 系统本地通知 uni.createPushMessage
- *  （需 manifest 启用 Push 模块 + DCloud 开通 uniPush；打包需自定义基座，
- *  标准基座不含 push 模块。app 进程被杀掉后不到点不弹——每日定时触发
- *  的系统级方案 UNUserNotificationCenter 待后续接入）。 */
+/** 学习提醒：偏好存 storage，当日去重。
+ *  H5 = 浏览器通知（授权后；无授权降级应用内弹窗），60s 轮询驱动。
+ *  App = 系统本地通知（uni_modules/hduo-reminder，UNUserNotificationCenter
+ *  每日日程重复触发，app 被杀/重启/断网系统都按时弹，零第三方依赖）。
+ *  本文件轮询仅服务 H5；App 端设置提醒时即向系统注册调度，无需轮询。 */
 const KEY = 'think_reminder_v1'
 const KEY_SENT = 'think_reminder_sent_v1'
 
@@ -61,7 +61,8 @@ export function requestNotifyPermission(): Promise<string> {
   // #endif
 }
 
-/** 到点提醒（当日去重）：H5 走浏览器通知；App 走系统本地通知 */
+/** 到点提醒（当日去重，仅 H5）：浏览器通知；未授权降级应用内弹窗。
+ *  App 端到点弹系统通知由 uni_modules/hduo-reminder 的系统调度负责。 */
 function fireReminder() {
   const today = new Date()
   const day = today.getFullYear() + '-' + today.getMonth() + '-' + today.getDate()
@@ -83,30 +84,15 @@ function fireReminder() {
     },
   })
   // #endif
-  // #ifndef WEB
-  // App：系统本地通知（前台展示由 onPushMessage 呈现）
-  uni.createPushMessage({
-    title: '好多星',
-    content: '今天的学习时间到了，来破一案吧 🔍',
-    cover: true,
-  })
-  // #endif
 }
 
-/** 启动轮询（profile onShow 时调用，重复调用安全；App/H5 都生效） */
+/** 启动轮询（profile onShow 时调用，重复调用安全；仅 H5，App 由系统调度无需轮询） */
 let polling: boolean = false
 
 export function startReminderPolling() {
+  // #ifdef WEB
   if (polling) return
   polling = true
-  // #ifndef WEB
-  // 前台收到本地通知：iOS 前台默认不展示横幅，用应用内 toast 呈现
-  uni.onPushMessage((res) => {
-    if (res.type === 'receive') {
-      uni.showToast({ title: '今天的学习时间到了，来破一案吧 🔍', icon: 'none' })
-    }
-  })
-  // #endif
   setInterval(() => {
     const p = getReminder()
     if (!p.on) return
@@ -115,4 +101,5 @@ export function startReminderPolling() {
       fireReminder()
     }
   }, 60000)
+  // #endif
 }
