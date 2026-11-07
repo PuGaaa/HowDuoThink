@@ -79,11 +79,9 @@
         v-show="drawerTab === 'board'"
         :hyps="hyps"
         :selected="selected"
-        :free-notes="freeNotes"
         :locked="hypothesesLocked"
         :timeline="timeline"
         @toggle="toggleHypothesis"
-        @add-note="addNote"
         @start="submitHypotheses"
       ></drawer-board>
 
@@ -227,7 +225,6 @@ const expertCost = ref(1)
 const restartActionId = ref('')
 
 const selected = ref<string[]>([])
-const freeNotes = ref<string[]>([])
 const hypothesesLocked = ref(false)
 
 const taken = ref<string[]>([])
@@ -490,14 +487,8 @@ function toggleHypothesis(id: string) {
   }
 }
 
-function addNote(n: string) {
-  const t = n.trim()
-  if (t.length === 0) return
-  freeNotes.value.push(t)
-}
-
 function submitHypotheses() {
-  if (selected.value.length === 0 && freeNotes.value.length === 0) {
+  if (selected.value.length === 0) {
     uni.showToast({ title: '至少先立一个假设', icon: 'none' })
     return
   }
@@ -519,9 +510,6 @@ function submitHypotheses() {
     if (h != null) {
       pushEvent('hypothesis', '', '', 0, '怀疑：' + h.text, false)
     }
-  }
-  for (let i = 0; i < freeNotes.value.length; i++) {
-    pushEvent('hypothesis', '', '', 0, '备注：' + freeNotes.value[i], false)
   }
   hypothesesLocked.value = true
   drawerOpen.value = false
