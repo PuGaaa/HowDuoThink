@@ -29,7 +29,7 @@
 	"app-ios": {
 		"distribute": {
 			"icons": {
-				"appstore": "/Users/bucida/Desktop/moooooz/think/design/app logo.png"
+				"appstore": "/Users/bucida/Desktop/moooooz/think/design/app_logo.png"
 			},
 			"privacyDescription": {
 				"NSPhotoLibraryAddUsageDescription": "需要您的同意，才能保存传播海报到相册"
