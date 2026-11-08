@@ -1,5 +1,7 @@
 """articles 三段式投影（detail）与 solutions 展示域测试。"""
 
+import pytest
+
 import db
 from features.cases.models import CasePayload
 from tests.case_fixtures import community_payload
@@ -70,3 +72,14 @@ def test_rebuild_restores_detail_and_keeps_published_at():
     row = db.q("SELECT detail, published_at FROM articles WHERE id=?", (article_id,))[0]
     assert db.jload(row["detail"], None) is not None
     assert row["published_at"] == before
+
+
+def test_rebuild_parse_error_carries_case_id():
+    """payload 解析失败（schema 漂移）也要带案例 id 重抛，与派生错误同一契约。"""
+    payload = _publish()
+    cid = payload["id"]
+    db.ex("UPDATE cases SET payload=? WHERE id=?", ("{}", cid))
+    from ops.rebuild_articles import rebuild_all
+
+    with pytest.raises(RuntimeError, match=cid):
+        rebuild_all()

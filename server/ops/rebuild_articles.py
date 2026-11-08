@@ -50,9 +50,11 @@ def rebuild_all() -> tuple[int, int]:
     rebuilt = 0
     for row in rows:
         cid = row["id"]
-        payload = CasePayload.model_validate(db.jload(row["payload"], {}))
         article_id = "a-" + cid
         try:
+            # 解析也在 try 内：payload JSON 损坏 / 历史 payload 与当前 schema 漂移时，
+            # 异常同样带案例 id 重抛（与下方派生错误同一处理）。
+            payload = CasePayload.model_validate(db.jload(row["payload"], {}))
             with db.tx() as conn:
                 # 先读原行：author 沿用 + published_at 原值（save_article 冲突分支会刷新时间）
                 existing = conn.execute(
