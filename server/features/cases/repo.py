@@ -103,7 +103,7 @@ def publish(
 
 def save_article(conn: Any, article: ArticleProjection) -> None:
     conn.execute(
-        "INSERT INTO articles(id,source_type,source_id,title,layer,domain,steps,lessons,author) VALUES(?,'case',?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,layer=excluded.layer,domain=excluded.domain,steps=excluded.steps,lessons=excluded.lessons,author=excluded.author,published_at=datetime('now')",
+        "INSERT INTO articles(id,source_type,source_id,title,layer,domain,steps,lessons,author,detail) VALUES(?,'case',?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,layer=excluded.layer,domain=excluded.domain,steps=excluded.steps,lessons=excluded.lessons,author=excluded.author,detail=excluded.detail,published_at=datetime('now')",
         (
             article.id,
             article.id.removeprefix("a-"),
@@ -113,6 +113,7 @@ def save_article(conn: Any, article: ArticleProjection) -> None:
             db.jdump([step.model_dump() for step in article.steps]),
             db.jdump(article.lessons),
             article.author,
+            db.jdump(article.detail.model_dump(by_alias=True)) if article.detail else None,
         ),
     )
 
