@@ -56,3 +56,17 @@ def test_solution_list_carries_problem():
     body = client.get("/api/solutions?page=1&size=20").json()
     item = next(i for i in body["items"] if i["id"] == "a-" + payload["id"])
     assert item["problem"]["intro"] == payload["intro"]
+
+
+def test_rebuild_restores_detail_and_keeps_published_at():
+    payload = _publish()
+    article_id = "a-" + payload["id"]
+    before = db.q("SELECT published_at FROM articles WHERE id=?", (article_id,))[0]["published_at"]
+    db.ex("UPDATE articles SET detail=NULL WHERE id=?", (article_id,))
+    from ops.rebuild_articles import rebuild_all
+
+    rebuilt, total = rebuild_all()
+    assert rebuilt >= 1 and total >= 1
+    row = db.q("SELECT detail, published_at FROM articles WHERE id=?", (article_id,))[0]
+    assert db.jload(row["detail"], None) is not None
+    assert row["published_at"] == before
