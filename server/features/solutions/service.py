@@ -3,7 +3,7 @@
 from fastapi import HTTPException
 
 import db
-from features.solutions.models import ArticleOut, StepOut
+from features.solutions.models import ArticleOut, ProblemOut, StepOut
 
 
 def article_view(r) -> dict:
@@ -11,6 +11,10 @@ def article_view(r) -> dict:
         StepOut(no=i + 1, observe=s["observe"], act=s["act"], found=s["found"])
         for i, s in enumerate(db.jload(r["steps"], []))
     ]
+    detail = db.jload(r["detail"], None)
+    problem = ProblemOut(**detail["problem"]) if detail else None
+    root_cause = detail["root_cause"] if detail else None
+    principles = detail["principles"] if detail else []
     return ArticleOut(
         id=r["id"],
         title=r["title"],
@@ -20,7 +24,10 @@ def article_view(r) -> dict:
         lessons=db.jload(r["lessons"], []),
         author=r["author"],
         published_at=r["published_at"],
-    ).model_dump()
+        problem=problem,
+        root_cause=root_cause,
+        principles=principles,
+    ).model_dump(by_alias=True)
 
 
 def list_solutions(layer: str | None, page: int, size: int) -> dict:

@@ -29,3 +29,30 @@ def test_publish_writes_detail_projection():
     correct = next(rc["text"] for rc in payload["rootCauses"] if rc["correct"])
     assert detail["root_cause"] == correct
     assert detail["principles"] == [lesson["principle"] for lesson in payload["lessons"]]
+
+
+def test_solution_detail_api_has_three_sections():
+    payload = _publish()
+    body = client.get("/api/solutions/a-" + payload["id"]).json()
+    assert body["problem"]["impactHint"] == payload["scene"]["impactHint"]
+    assert body["problem"]["symptoms"][0]["type"] == payload["scene"]["symptoms"][0]["type"]
+    assert body["root_cause"]
+    assert len(body["principles"]) == len(payload["lessons"])
+    assert set(body["steps"][0]) == {"no", "observe", "act", "found"}
+    assert isinstance(body["lessons"], list)
+
+
+def test_solution_detail_degrades_when_detail_null():
+    payload = _publish()
+    db.ex("UPDATE articles SET detail=NULL WHERE id=?", ("a-" + payload["id"],))
+    body = client.get("/api/solutions/a-" + payload["id"]).json()
+    assert body["problem"] is None
+    assert body["root_cause"] is None
+    assert body["principles"] == []
+
+
+def test_solution_list_carries_problem():
+    payload = _publish()
+    body = client.get("/api/solutions?page=1&size=20").json()
+    item = next(i for i in body["items"] if i["id"] == "a-" + payload["id"])
+    assert item["problem"]["intro"] == payload["intro"]
