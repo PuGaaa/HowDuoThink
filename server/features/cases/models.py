@@ -182,6 +182,26 @@ class ArticleStep(BaseModel):
     found: str
 
 
+class ArticleProblem(BaseModel):
+    """三段式文章第一段「问题现场」；键镜像 scene，impactHint 沿用 camelCase。"""
+
+    model_config = ConfigDict(populate_by_name=True)
+    intro: str
+    role: str
+    architecture: str
+    symptoms: list[EvidenceIn]
+    timeline: str
+    impact_hint: str = Field(alias="impactHint")
+
+
+class ArticleDetail(BaseModel):
+    """articles.detail 三段式投影：问题现场 / 根因 / 层契约（顶层键 snake）。"""
+
+    problem: ArticleProblem
+    root_cause: str
+    principles: list[str]
+
+
 class ArticleProjection(BaseModel):
     id: str
     title: str
@@ -190,6 +210,7 @@ class ArticleProjection(BaseModel):
     author: str
     steps: list[ArticleStep]
     lessons: list[str]
+    detail: ArticleDetail | None = None
 
 
 class CaseAdminRow(BaseModel):

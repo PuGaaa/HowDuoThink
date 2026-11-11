@@ -63,6 +63,13 @@ def make_client() -> TestClient:
     return TestClient(main.app)
 
 
+# 模块级 client（不进 with 上下文）不会触发 lifespan，seed_admin 不落库会让
+# login_admin 401。引导期先手动跑一次 startup（幂等），此后模块级实例即可登录；
+# 既有用例里的 with make_client() 重复执行 startup 也无害。
+with TestClient(main.app):
+    pass
+
+
 def login_admin(client: TestClient) -> None:
     r = client.post("/api/auth/login", json={"login": "admin", "password": "test-admin-pw"})
     assert r.status_code == 200, r.text

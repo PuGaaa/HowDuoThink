@@ -24,6 +24,7 @@ const layers = ['网络/接入', '数据/缓存', '构建/依赖', '运行时', 
       <NuxtLink :to="'/solutions/' + a.id" style="text-decoration: none">
         <div style="font-weight: 700; color: var(--ink); margin-bottom: 6px">{{ a.title }}</div>
       </NuxtLink>
+      <p v-if="a.problem?.intro" class="muted" style="margin: 0 0 8px; line-height: 1.6">{{ a.problem.intro }}</p>
       <span class="chip">{{ a.layer.slice(0, 20) }}</span>
       <span class="chip">作者 {{ a.author }}</span>
     </div>

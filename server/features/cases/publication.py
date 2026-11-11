@@ -4,7 +4,14 @@ from fastapi import HTTPException
 
 import db
 from features.cases import content, gate, repo
-from features.cases.models import ArticleProjection, ArticleStep, CasePayload, OfficialRelease
+from features.cases.models import (
+    ArticleDetail,
+    ArticleProblem,
+    ArticleProjection,
+    ArticleStep,
+    CasePayload,
+    OfficialRelease,
+)
 
 
 def publish_case(uid: str, payload: CasePayload) -> dict:
@@ -171,4 +178,21 @@ def _article(payload: CasePayload, author: str) -> ArticleProjection:
             for step in payload.expert_chain
         ],
         lessons=[lesson.text for lesson in payload.lessons],
+        detail=ArticleDetail(
+            problem=ArticleProblem(
+                intro=payload.intro,
+                role=payload.scene.role,
+                architecture=payload.scene.architecture,
+                symptoms=payload.scene.symptoms,
+                timeline=payload.scene.timeline,
+                impact_hint=payload.scene.impact_hint,
+            ),
+            # 门禁保证恰好 1 个 correct 根因；0 个时 StopIteration 直接崩（fail-fast，数据异常宁崩不默）
+            root_cause=next(rc.text for rc in payload.root_causes if rc.correct),
+            principles=[lesson.principle for lesson in payload.lessons],
+        ),
     )
+
+
+# 公开别名：重建脚本等外部消费方从本模块导入派生逻辑，防止与 _article 双源漂移
+derive_article = _article

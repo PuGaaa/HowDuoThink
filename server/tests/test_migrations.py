@@ -294,3 +294,21 @@ def test_0009_preserves_existing_casepack_cursor(new_database):
             assert cursor == "19"
     finally:
         engine.dispose()
+
+
+def test_article_detail_column(new_database):
+    new_database()
+    migrate.upgrade_head()
+    engine = sa.create_engine(config.mysql_database_url())
+    try:
+        inspector = sa.inspect(engine)
+        assert "detail" in {c["name"] for c in inspector.get_columns("articles")}
+    finally:
+        engine.dispose()
+    command.downgrade(migrate._cfg(), "0011_app_docs")
+    engine = sa.create_engine(config.mysql_database_url())
+    try:
+        inspector = sa.inspect(engine)
+        assert "detail" not in {c["name"] for c in inspector.get_columns("articles")}
+    finally:
+        engine.dispose()
