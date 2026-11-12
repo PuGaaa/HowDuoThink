@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UserAvatar from '~/components/account/UserAvatar.vue'
+import { normalizeLoginResponse } from '~/composables/useCurrentUser'
 import type { User } from '~/composables/useCurrentUser'
 
 const api = useApi()
@@ -53,7 +54,8 @@ async function phoneLogin() {
   loginErr.value = ''
   loginBusy.value = true
   try {
-    set(await api.post('/api/auth/login/phone', phoneForm) as User)
+    // 登录响应是 userId 线格式（手机登录连 avatar 都不含），必须归一化，禁止 as User 直断言
+    set(normalizeLoginResponse(await api.post('/api/auth/login/phone', phoneForm)))
     closeLoginPrompt()
   } catch (e: any) {
     loginErr.value = e?.data?.detail || '登录失败'
@@ -66,7 +68,7 @@ async function passwordLogin() {
   loginErr.value = ''
   loginBusy.value = true
   try {
-    set(await api.post('/api/auth/login', { login: loginForm.login, password: loginForm.password }) as User)
+    set(normalizeLoginResponse(await api.post('/api/auth/login', { login: loginForm.login, password: loginForm.password })))
     closeLoginPrompt()
   } catch (e: any) {
     loginErr.value = e?.data?.detail || '登录失败'
