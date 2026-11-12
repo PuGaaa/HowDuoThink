@@ -105,7 +105,7 @@ def test_chat_degrades_without_key(monkeypatch):
     assert r.status_code == 200
     d = r.json()
     assert d["aiAvailable"] is False
-    assert "未配置" in d["error"]
+    assert "暂未开放" in d["error"]
 
 
 def test_search_degrades_to_keyword(monkeypatch):

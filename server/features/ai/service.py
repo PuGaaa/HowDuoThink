@@ -5,13 +5,21 @@
 """
 
 import json
+import logging
 import math
 import threading
 import time
 
+from fastapi import HTTPException
+
 import db
 from core import settings
-from features.ai import client
+from features.ai import client, repo
+
+logger = logging.getLogger("server")
+
+CONVERSATION_KEEP = 100  # 单用户保留的会话数上限，提问后超出即淘汰最旧
+HISTORY_ROUNDS = 3  # 注入模型的多轮上文轮数（每轮 user+assistant 两条）
 
 SYSTEM_PROMPT = (
     "你是「好多星 HowDuoThink」的排错助手，面向工程师回答真实故障问题。"
@@ -237,13 +245,19 @@ def node_retrieve(query: str, k: int = 4) -> list[dict]:
 # ────────────────────────── 节点：应答 ──────────────────────────
 
 
-def node_answer(question: str, chunks: list[dict], uid: str | None = None) -> str:
-    """应答节点：检索结果 → system prompt → GLM 回答。调用即审计（token/耗时/成败）。"""
+def node_answer(
+    question: str,
+    chunks: list[dict],
+    uid: str | None = None,
+    history: list[tuple[str, str]] | None = None,
+) -> str:
+    """应答节点：检索结果 → system →（多轮上文，按序插在 system 与最终提问之间）→ GLM 回答。调用即审计。"""
     from features.ai import usage
 
     context = "\n\n────────\n".join(c["content"] for c in chunks) if chunks else "（案例库检索无结果）"
     messages = [
         ("system", SYSTEM_PROMPT),
+        *(history or []),
         ("human", f"【案例库上下文】\n{context}\n\n【工程师的问题】\n{question}"),
     ]
     t0 = time.perf_counter()
@@ -257,17 +271,41 @@ def node_answer(question: str, chunks: list[dict], uid: str | None = None) -> st
     return resp.content
 
 
-def chat(question: str, uid: str) -> dict:
-    """RAG 对话入口：限速 → 日配额 → 检索 → 应答 → 组装引用。"""
+def _conversation_context(conv_id: str) -> tuple[list[tuple[str, str]], str | None]:
+    """取最近 HISTORY_ROUNDS 轮上文：LangChain 消息元组（升序）+ 上一条 user 提问（供检索拼接）。"""
+    msgs = repo.recent_messages(conv_id, HISTORY_ROUNDS * 2)
+    history = [("human" if m["role"] == "user" else "ai", m["content"]) for m in msgs]
+    prev_question = next((text for role, text in reversed(history) if role == "human"), None)
+    return history, prev_question
+
+
+def chat(question: str, uid: str, conversation_id: str | None = None) -> dict:
+    """RAG 对话入口：限速 → 日配额 → 会话校验 → 检索（拼上一问）→ 应答 → 落库 → 组装引用。
+
+    业务错误走 200 + error 字段；conversation_id 查无/非本人 → HTTPException(404)。
+    限速/配额判断在落库前，保证拒绝时不产生空会话；落库只在应答成功后进行（失败不落库）。
+    """
     if not client.available():
-        return {"error": "AI 未配置（DEEPSEEK_API_KEY 缺失），对话不可用；检索可走关键词模式", "aiAvailable": False}
+        return {"error": "AI 服务暂未开放，稍后再试", "aiAvailable": False}
     if not _rate_ok(uid):
         return {"error": "提问太频繁，稍后再试", "aiAvailable": True}
     if _daily_used(uid) >= int(settings.get("ai.daily_limit")):
         # 窗口限流之外的日硬顶：并发绕过窗口限流时，成本仍有每日上限兜底
         return {"error": "今日提问次数已达上限，明天再来", "aiAvailable": True}
-    chunks = node_retrieve(question, k=4)
-    answer = node_answer(question, chunks, uid=uid)
+    history: list[tuple[str, str]] = []
+    prev_question: str | None = None
+    if conversation_id is not None:
+        # append_messages 无属主校验：必须先用 get_conversation 验存在与属主（查无/非本人一律 404）再继续
+        if not repo.get_conversation(conversation_id, uid):
+            raise HTTPException(status_code=404, detail="会话不存在或无权访问")
+        history, prev_question = _conversation_context(conversation_id)
+    query = f"{prev_question} {question}" if prev_question else question
+    try:
+        chunks = node_retrieve(query, k=4)
+        answer = node_answer(question, chunks, uid=uid, history=history)
+    except Exception:
+        logger.warning("[ai-chat] 应答失败 uid=%s conversation=%s", uid, conversation_id, exc_info=True)
+        return {"error": "服务暂时不可用，请稍后再试", "aiAvailable": True}
     sources = []
     seen = set()
     for c in chunks:
@@ -277,7 +315,18 @@ def chat(question: str, uid: str) -> dict:
         rows = db.q("SELECT id, title FROM cases WHERE id=?", (c["caseId"],))
         if rows:
             sources.append({"caseId": rows[0]["id"], "title": rows[0]["title"]})
-    return {"answer": answer, "sources": sources, "aiAvailable": True}
+    # 落库：user+assistant 两条成对写入（append_messages 不收空列表），再按上限淘汰最旧会话
+    if conversation_id is None:
+        conversation_id = repo.create_conversation(uid, question[:30])
+    repo.append_messages(
+        conversation_id,
+        [
+            {"role": "user", "content": question, "sources": None},
+            {"role": "assistant", "content": answer, "sources": sources},
+        ],
+    )
+    repo.prune_conversations(uid, CONVERSATION_KEEP)
+    return {"answer": answer, "sources": sources, "aiAvailable": True, "conversationId": conversation_id}
 
 
 # ────────────────────────── 节点：AI 起草管线 ──────────────────────────
