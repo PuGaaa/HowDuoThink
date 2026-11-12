@@ -67,7 +67,8 @@ watch(() => props.avatar, () => { imgFailed.value = false })
 </template>
 
 <style scoped>
-.user-avatar { border-radius: 50%; object-fit: cover; display: block; flex: none; }
+/* mint 占位背景：img 首帧位图在途时不再呈全透明空白（资料弹窗预览空白缺陷的根因） */
+.user-avatar { border-radius: 50%; object-fit: cover; display: block; flex: none; background: var(--mint-soft); }
 .user-avatar--initial {
   display: flex; align-items: center; justify-content: center;
   background: var(--mint-soft); color: var(--mint-deep);

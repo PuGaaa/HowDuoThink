@@ -57,9 +57,11 @@ function openPassword() {
     <button class="btn profilemodal__submit" :disabled="editBusy" @click="saveProfile">{{ editBusy ? '保存中…' : '保存' }}</button>
     <button class="lmodal__back" @click="emit('close')">取消</button>
     <button class="lmodal__back lmodal__back--accent" @click="openPassword">{{ pwLabel }} →</button>
-
-    <AvatarPicker v-if="pickerOpen" :name="editName || user?.name || ''" @close="pickerOpen = false" />
   </BaseModal>
+
+  <!-- 必须与 BaseModal 平级挂在组件根：放进 slot 会成为 .lmodal（transform 祖先）的
+       fixed 后代，遮罩/卡片退化为相对弹窗盒定位（发现 1 的根因） -->
+  <AvatarPicker v-if="pickerOpen" :name="editName || user?.name || ''" @close="pickerOpen = false" />
 </template>
 
 <style scoped>
