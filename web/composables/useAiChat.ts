@@ -64,6 +64,11 @@ export function useAiChat(): {
    * 兼作列表高亮键（打开哪个会话，右侧就在哪个会话里继续）。 */
   const conversationId = ref<string | null>(null)
   const conversations = ref<ConversationSummary[]>([])
+  /** 对话视图代次：每次整体重置视图（新对话 / 回放历史 / 删除激活会话）自增。
+   * 发送在途时「新对话」与「删除激活会话」不像 openConversation 那样有 thinking 守卫，
+   * 是未设防的视图重置路径——发送时捕获代次快照，应答到达时比对，代次已变即整体丢弃：
+   * 应答不得落进重置后的新视图，也不得把 conversationId 绑回旧会话。 */
+  let viewEpoch = 0
 
   /** 会话列表（limit 取接口上限 50）：发送成功与删除后由调用链重拉，不做轮询。 */
   async function loadConversations(): Promise<void> {
@@ -77,17 +82,23 @@ export function useAiChat(): {
     }
   }
 
-  /** 提问：body 带 conversationId 接前文；应答成功后重拉列表（新会话/排序更新）。 */
+  /** 提问：body 带 conversationId 接前文；应答成功后重拉列表（新会话/排序更新）。
+   * 在途期间视图被重置（新对话/删除激活会话）→ 应答整体丢弃（含错误气泡）。 */
   async function send(q: string): Promise<void> {
     const text = q.trim()
     if (text.length < 2 || thinking.value) return
     messages.value.push({ role: 'user', text })
     thinking.value = true
+    const epoch = viewEpoch
     try {
       const r = (await api.post('/api/ai/chat', {
         question: text,
         ...(conversationId.value ? { conversationId: conversationId.value } : {}),
       })) as ChatResponse
+      if (epoch !== viewEpoch) {
+        console.warn('[ai] 应答到达时对话视图已重置，丢弃本次应答')
+        return
+      }
       if (r.answer) {
         if (typeof r.conversationId === 'string' && r.conversationId) {
           conversationId.value = r.conversationId
@@ -98,6 +109,10 @@ export function useAiChat(): {
         messages.value.push({ role: 'assistant', text: r.error ?? ERR_NETWORK, error: true })
       }
     } catch (e: unknown) {
+      if (epoch !== viewEpoch) {
+        console.warn('[ai] 请求失败时对话视图已重置，丢弃本次错误提示')
+        return
+      }
       const status = (e as { status?: number } | null)?.status
       console.warn('[ai] 提问失败', status, e)
       messages.value.push({
@@ -122,6 +137,7 @@ export function useAiChat(): {
         text: m.content,
         sources: m.sources ?? [],
       }))
+      viewEpoch++
     } catch (e) {
       console.warn('[ai] 会话详情加载失败', e)
     }
@@ -139,10 +155,12 @@ export function useAiChat(): {
     }
   }
 
-  /** 新对话：右侧清空并解绑会话，下一问由服务端新建会话（列表无需重拉）。 */
+  /** 新对话：右侧清空并解绑会话，下一问由服务端新建会话（列表无需重拉）。
+   * 发送在途时同样可用：代次自增使在途应答到达后被丢弃，不污染新视图。 */
   function newConversation(): void {
     conversationId.value = null
     messages.value = []
+    viewEpoch++
   }
 
   return {

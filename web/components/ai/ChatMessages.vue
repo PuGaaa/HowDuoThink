@@ -38,7 +38,8 @@ watch(
 
 <template>
   <div ref="listEl" class="list">
-    <div v-if="props.messages.length === 0" class="empty">
+    <!-- 思考态不与空态同屏：发送在途时点「新对话」，旧应答丢弃后只留干净空态 -->
+    <div v-if="props.messages.length === 0 && !props.thinking" class="empty">
       <div class="empty__star" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="30" height="30">
           <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="currentColor" />
