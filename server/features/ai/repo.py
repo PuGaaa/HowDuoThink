@@ -77,6 +77,23 @@ def recent_messages(conv_id: str, limit: int) -> list[dict]:
     ]
 
 
+def all_messages(conv_id: str) -> list[dict]:
+    """会话全部消息（详情用）：按 id 升序，sources 经 jload 还原，created_at 保持 snake_case（camelCase 组装归 service）。"""
+    rows = db.q(
+        "SELECT role, content, sources, created_at FROM ai_messages WHERE conversation_id=? ORDER BY id ASC",
+        (conv_id,),
+    )
+    return [
+        {
+            "role": r["role"],
+            "content": r["content"],
+            "sources": db.jload(r["sources"], []),
+            "created_at": r["created_at"],
+        }
+        for r in rows
+    ]
+
+
 def count_conversations(uid: str) -> int:
     rows = db.q("SELECT COUNT(*) AS n FROM ai_conversations WHERE uid=?", (uid,))
     return int(rows[0]["n"])

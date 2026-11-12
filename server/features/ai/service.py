@@ -331,8 +331,6 @@ def chat(question: str, uid: str, conversation_id: str | None = None) -> dict:
 
 # ────────────── 会话 HTTP 包装（路由只做参数接收与响应，业务与出参组装在此层） ──────────────
 
-DETAIL_MESSAGE_LIMIT = 1000  # 详情单次返回的消息条数上限：可绑定安全大数，防止无界读取
-
 
 def list_conversations(uid: str, limit: int, offset: int) -> dict:
     """当前用户的会话分页列表（camelCase 出参由 repo 钉死）+ 总数。"""
@@ -342,26 +340,19 @@ def list_conversations(uid: str, limit: int, offset: int) -> dict:
 def conversation_detail(conv_id: str, uid: str) -> dict:
     """会话详情：查无/非本人 → HTTPException(404)；消息按 id 升序、出参 camelCase。
 
-    消息的 createdAt 需要透出 ai_messages.created_at，repo.recent_messages 不含该列
-    （本任务不得改 repo），故此处直接读消息表（同 chat 读 cases 的既有先例）；
-    后续若放开 repo 白名单，应把这条读挪进 repo 层。
+    消息经 repo.all_messages 读取（含 created_at，snake_case），本层只做 camelCase 组装。
     """
     conv = repo.get_conversation(conv_id, uid)
     if conv is None:
         raise HTTPException(status_code=404, detail="会话不存在或无权访问")
-    rows = db.q(
-        "SELECT role, content, sources, created_at FROM ai_messages WHERE conversation_id=? "
-        "ORDER BY id DESC LIMIT ?",
-        (conv_id, DETAIL_MESSAGE_LIMIT),
-    )
     messages = [
         {
-            "role": r["role"],
-            "content": r["content"],
-            "sources": db.jload(r["sources"], []),
-            "createdAt": r["created_at"],
+            "role": m["role"],
+            "content": m["content"],
+            "sources": m["sources"],
+            "createdAt": m["created_at"],
         }
-        for r in reversed(rows)
+        for m in repo.all_messages(conv_id)
     ]
     return {
         "id": conv["id"],

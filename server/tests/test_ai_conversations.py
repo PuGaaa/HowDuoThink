@@ -329,3 +329,23 @@ def test_http_foreign_detail_404(monkeypatch):
     # A 的会话完好；B 名下仍无任何会话
     assert ca.get(f"/api/ai/conversations/{conv_id}").status_code == 200
     assert cb.get("/api/ai/conversations").json()["total"] == 0
+
+
+def test_http_detail_returns_all_messages():
+    """详情返回会话全部消息：8 条（超出 chat 注入的 3 轮=6 条历史窗口）全量按序在列且每条带 createdAt。"""
+    _make_user("u-http-full")
+    c = TestClient(main.app)
+    _login(c, "u-http-full")
+    conv_id = repo.create_conversation("pw-u-http-full", "全量消息会话")
+    msgs = [
+        {"role": "user" if i % 2 == 0 else "assistant", "content": f"消息{i}", "sources": None if i % 2 == 0 else [{"caseId": f"c{i}", "title": f"案例{i}"}]}
+        for i in range(8)
+    ]
+    repo.append_messages(conv_id, msgs)
+
+    d = c.get(f"/api/ai/conversations/{conv_id}").json()
+    assert [m["content"] for m in d["messages"]] == [f"消息{i}" for i in range(8)]
+    assert [m["role"] for m in d["messages"]] == ["user", "assistant"] * 4
+    assert d["messages"][1]["sources"] == [{"caseId": "c1", "title": "案例1"}]
+    for m in d["messages"]:
+        assert m["createdAt"]
