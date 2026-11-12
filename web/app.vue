@@ -29,21 +29,26 @@ function backToProfile() {
 </script>
 
 <template>
-  <div class="shell">
-    <header class="topbar">
-      <NuxtLink to="/" class="topbar__brand">
-        <span class="topbar__brand-full">好多星 HowDuoThink · 社区</span>
-        <span class="topbar__brand-short">好多星 · 社区</span>
-      </NuxtLink>
-      <nav class="topbar__nav">
-        <NuxtLink to="/ai" class="topbar__link topbar__link--ai">AI 排错</NuxtLink>
-        <NuxtLink to="/solutions" class="topbar__link">解决逻辑</NuxtLink>
-        <NuxtLink to="/submit" class="topbar__link">投稿</NuxtLink>
-        <UserMenu @open-profile="profileOpen = true" @open-password="openPassword" />
-      </nav>
+  <div>
+    <!-- 通栏吸顶顶栏：背景全宽，内容行走 1280px 容器（.topbar--full 样式在 main.css） -->
+    <header class="topbar topbar--full">
+      <div class="topbar__inner">
+        <NuxtLink to="/" class="topbar__brand">
+          <span class="topbar__brand-full">好多星 HowDuoThink · 社区</span>
+          <span class="topbar__brand-short">好多星 · 社区</span>
+        </NuxtLink>
+        <nav class="topbar__nav">
+          <NuxtLink to="/ai" class="topbar__link topbar__link--ai">AI 排错</NuxtLink>
+          <NuxtLink to="/solutions" class="topbar__link">解决逻辑</NuxtLink>
+          <NuxtLink to="/submit" class="topbar__link">投稿</NuxtLink>
+          <UserMenu @open-profile="profileOpen = true" @open-password="openPassword" />
+        </nav>
+      </div>
     </header>
-    <main class="main"><NuxtPage /></main>
-    <footer class="footer">好多星 HowDuoThink · 多想，多星。—— Web 社区（投稿与解决逻辑展示，闯关在 App）· <NuxtLink to="/privacy" class="footer__link">隐私政策</NuxtLink></footer>
+    <div class="shell">
+      <main class="main"><NuxtPage /></main>
+      <footer class="footer">好多星 HowDuoThink · 多想，多星。—— Web 社区（投稿与解决逻辑展示，闯关在 App）· <NuxtLink to="/privacy" class="footer__link">隐私政策</NuxtLink></footer>
+    </div>
 
     <!-- 账号弹窗群：登录（useLoginPrompt 自接线）/ 个人信息 → 设置·修改密码 -->
     <LoginModal />

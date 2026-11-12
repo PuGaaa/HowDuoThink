@@ -1,18 +1,21 @@
 
 :root {
-  --bg: #FFF9F4; --card: #FFFFFF; --line: #F5E6DA; --well: #FBF3EB;
+  --bg: #FAFAFA; --card: #FFFFFF; --line: #E9E9EE; --well: #F4F4F6;
   --coral: #FF8A5C; --coral-deep: #E06B38; --coral-soft: #FFF1E7;
   --ink: #4A4458; --ink2: #7A7290; --ink3: #AFA8BD;
   --mint: #5FC9A5; --mint-soft: #E9F7F1; --mint-deep: #2E7D5B;
   --sky: #6FB8E8; --sky-soft: #EAF4FC;
   --lemon: #FFC94D; --lemon-soft: #FFF6DE; --lemon-deep: #8A6D1F;
   --red: #E86A6A; --red-soft: #FDEDED;
-  --edge-cream: #EFE5D6;
+  --edge-cream: #D9D9E0;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
-.shell { max-width: 760px; margin: 0 auto; padding: 0 20px 60px; }
-.topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.shell { max-width: 1280px; margin: 0 auto; padding: 0 32px 60px; }
+.topbar { background: #FFFFFF; border-bottom: 1px solid var(--line); }
+/* 通栏吸顶顶栏：背景与底边全宽铺满，内部内容行仍走 1280px 容器对齐（任务 11 再覆玻璃材质） */
+.topbar--full { position: sticky; top: 0; z-index: 40; }
+.topbar__inner { max-width: 1280px; margin: 0 auto; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; }
 .topbar__brand { font-weight: 800; color: var(--ink); text-decoration: none; }
 .topbar__nav { display: flex; gap: 18px; }
 .topbar__link { color: var(--ink2); text-decoration: none; font-size: 14px; }
@@ -45,7 +48,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-
 .lesson { background: var(--mint-soft); color: var(--mint-deep); border-radius: 10px; padding: 10px 14px; font-size: 13px; margin: 8px 0; }
 @media (max-width: 600px) {
   .shell { padding-left: 16px; padding-right: 16px; }
-  .topbar { gap: 12px; }
+  .topbar__inner { padding-left: 16px; padding-right: 16px; gap: 12px; }
   .topbar__brand { min-width: 0; font-size: 13px; white-space: nowrap; }
   .topbar__brand-full { display: none; }
   .topbar__brand-short { display: inline; }
