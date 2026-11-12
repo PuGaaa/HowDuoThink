@@ -21,7 +21,7 @@ CONTENT_TYPES = {
     "gif": "image/gif",
     "svg": "image/svg+xml",
 }
-ALLOWED_CATEGORIES = {"mascot", "avatar", "banner", "misc"}
+ALLOWED_CATEGORIES = {"mascot", "avatar", "banner", "misc", "user-avatar"}
 
 # 资源位注册表：key 固定（App 端按此引用），绑定哪张图由管理端随时更换。
 # 头像池不需要槽位：category='avatar' 的全部素材即池子，App 按 URL 列表取用。
@@ -134,6 +134,36 @@ def db_q_by_sha(sha: str, category: str) -> list:
     return db.q("SELECT * FROM assets WHERE sha256=? AND category=?", (sha, category))
 
 
+# 普通用户头像：独立 user-avatar 分类（公开清单 manifest 不派发，app_resources 的
+# avatar 池按 category='avatar' 查询，天然不受影响）；类型/大小/日限比管理端上传更紧。
+USER_AVATAR_CATEGORY = "user-avatar"
+USER_AVATAR_EXTS = {"png", "jpg", "jpeg", "webp"}
+USER_AVATAR_MAX_BYTES = 2 * 1024 * 1024
+USER_AVATAR_DAILY_LIMIT = 10
+
+
+def upload_user_avatar(data: bytes, filename: str, uid: str) -> str:
+    """普通用户上传自己的头像：ext ∈ {png,jpg,jpeg,webp}、≤2MB、该分类日限 10 次
+    （日限只按 user-avatar 分类行计数，与管理端 UPLOAD_DAILY_LIMIT 的总量限额互不影响）。
+    复用 upload()（category='user-avatar'、note=f'user:{uid}'），返回图片 URL。
+    异常沿用本模块三态：AssetError→400 / RateLimitError→429 /
+    NotConfiguredError→503 / AssetUnavailableError→502。"""
+    ext = _ext_of(filename)
+    if ext not in USER_AVATAR_EXTS:
+        raise AssetError(f"不支持的图片类型 .{ext or '（无后缀）'}")
+    if len(data) > USER_AVATAR_MAX_BYTES:
+        raise AssetError("头像超过上限 2MB")
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    rows = db.q(
+        "SELECT COUNT(*) AS n FROM assets WHERE uploaded_by=? AND category=? AND substr(created_at,1,10)=?",
+        (uid, USER_AVATAR_CATEGORY, today),
+    )
+    if int(rows[0]["n"] or 0) >= USER_AVATAR_DAILY_LIMIT:
+        raise RateLimitError("今日头像上传次数已达上限")
+    item = upload(data, filename, USER_AVATAR_CATEGORY, f"user:{uid}", uid)
+    return item["url"]
+
+
 def list_rows(category: str | None = None) -> list[dict]:
     if category:
         rows = db.q("SELECT * FROM assets WHERE category=? ORDER BY id DESC", (category,))
@@ -216,8 +246,12 @@ def app_resources() -> dict:
 
 
 def manifest() -> dict:
-    """公开清单：App 启动拉取后按 url 取用。version 随内容集变化，供客户端做缓存判断。"""
-    rows = db.q("SELECT object_key, category, size_bytes, sha256, created_at FROM assets ORDER BY id")
+    """公开清单：App 启动拉取后按 url 取用。version 随内容集变化，供客户端做缓存判断。
+    user-avatar 是普通用户的私人头像，不进公开清单。"""
+    rows = db.q(
+        "SELECT object_key, category, size_bytes, sha256, created_at FROM assets "
+        "WHERE category != 'user-avatar' ORDER BY id"
+    )
     items = [
         {
             "key": r["object_key"],
