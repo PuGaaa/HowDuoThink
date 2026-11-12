@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import SubmissionCard from '~/components/submissions/SubmissionCard.vue'
+// components/<dir>/ 下的自动注册名带目录前缀（LayoutCardGrid），裸名解析不到——沿用项目显式导入惯例
+import CardGrid from '~/components/layout/CardGrid.vue'
 import UserAvatar from '~/components/account/UserAvatar.vue'
 import type { Submission } from '~/components/submissions/types'
 
@@ -38,7 +40,7 @@ onMounted(async () => {
 
 <template>
   <div>
-    <h1 style="font-size: 22px">我的投稿</h1>
+    <h1 class="page-title">我的投稿</h1>
     <div v-if="!loaded" class="muted">加载中……</div>
     <div v-else-if="!user" class="card">
       <p style="margin-top: 0">登录后可查看投稿进度、补充事实和确认脱敏素材。</p>
@@ -51,16 +53,23 @@ onMounted(async () => {
         <NuxtLink to="/submit" class="btn btn--ghost">新投稿</NuxtLink>
       </div>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <p class="muted">已收到 → 待补充 / 制作中 → 已发布或未采用。请以每份投稿的反馈为准，收到或制作中不承诺发表。</p>
-      <SubmissionCard v-for="s in subs" :key="s.id" :submission="s" @refreshed="loadSubmissions" />
+      <p class="muted me-note">已收到 → 待补充 / 制作中 → 已发布或未采用。请以每份投稿的反馈为准，收到或制作中不承诺发表。</p>
+      <CardGrid v-if="subs.length">
+        <SubmissionCard v-for="s in subs" :key="s.id" :submission="s" @refreshed="loadSubmissions" />
+      </CardGrid>
       <p v-if="!error && subs.length === 0" class="muted">还没有投稿。<NuxtLink to="/submit">去投稿 →</NuxtLink></p>
     </template>
   </div>
 </template>
 
 <style scoped>
+.page-title {
+  font-size: 22px;
+  margin: 0 0 16px;
+}
 .profile { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
 .profile p { margin: 5px 0 0; }
 .profile .btn { margin-left: auto; }
+.me-note { margin: 0 0 14px; }
 .error { color: var(--red); }
 </style>
