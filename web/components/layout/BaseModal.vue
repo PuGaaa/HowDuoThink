@@ -8,20 +8,21 @@ defineEmits<{ (e: 'close'): void }>()
 
 <template>
   <div class="lmask" @click="$emit('close')"></div>
-  <div class="lmodal" role="dialog" aria-modal="true">
+  <!-- 玻璃卡片：材质与入场回弹动画走全局 .glass / .glass-pop（glass.css），
+       本组件只管定位与尺寸；类名沿用 .lmask/.lmodal（各弹窗经 :deep 引用 .lmodal__back） -->
+  <div class="lmodal glass glass-pop" role="dialog" aria-modal="true">
     <h2 v-if="title" class="lmodal__title">{{ title }}</h2>
     <slot />
   </div>
 </template>
 
 <style scoped>
-.lmask { position: fixed; inset: 0; background: rgba(42, 39, 51, 0.45); backdrop-filter: blur(3px); z-index: 98; }
+.lmask { position: fixed; inset: 0; background: rgba(42, 39, 51, 0.32); backdrop-filter: blur(3px); z-index: 98; }
 .lmodal {
   position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
   width: calc(100% - 40px); max-width: 440px; margin: 0;
-  background: var(--bg); border-radius: 18px; padding: 26px 28px;
+  border-radius: 18px; padding: 26px 28px;
   max-height: 86vh; overflow-y: auto;
-  box-shadow: 0 24px 64px rgba(42, 39, 51, 0.28);
   z-index: 99;
 }
 .lmodal__title { font-size: 19px; margin: 0 0 20px; text-align: center; font-weight: 800; }

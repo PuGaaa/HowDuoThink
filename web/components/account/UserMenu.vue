@@ -49,7 +49,7 @@ async function logout() {
       <button class="usermenu__trigger" @click="menuOpen = !menuOpen">
         <UserAvatar class="usermenu__avatar" :name="user.name || user.login" :avatar="user.avatar" :size="32" />
       </button>
-      <div v-if="menuOpen" class="usermenu__drop">
+      <div v-if="menuOpen" class="usermenu__drop glass glass-pop">
         <div class="usermenu__who">
           <div class="usermenu__name">{{ user.name }}</div>
           <div class="usermenu__login">@{{ user.login }} · {{ user.role }}</div>
@@ -70,7 +70,8 @@ async function logout() {
 .usermenu__trigger { background: none; border: 0; padding: 0; cursor: pointer; display: block; }
 .usermenu__drop {
   position: absolute; right: 0; top: 42px; min-width: 200px;
-  background: #fff; border-radius: 14px; box-shadow: 0 6px 0 var(--edge-cream); padding: 8px;
+  border-radius: 14px; padding: 8px;
+  transform-origin: top right; /* 下拉从触发头像一侧展开 */
   z-index: 50;
 }
 .usermenu__who { padding: 10px 12px 12px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }

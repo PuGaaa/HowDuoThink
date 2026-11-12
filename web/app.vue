@@ -4,6 +4,7 @@ import ProfileModal from '~/components/account/ProfileModal.vue'
 import SetPasswordModal from '~/components/account/SetPasswordModal.vue'
 import ChangePasswordModal from '~/components/account/ChangePasswordModal.vue'
 import UserMenu from '~/components/account/UserMenu.vue'
+import LiquidBackdrop from '~/components/layout/LiquidBackdrop.vue'
 
 /** 应用外壳：顶栏（UserMenu）+ 路由出口 + 页脚 + 账号弹窗挂载。
  * 登录态走 useCurrentUser（ensure 拉权威资料）；登录弹窗开关由 useLoginPrompt 全局承载、
@@ -30,7 +31,9 @@ function backToProfile() {
 
 <template>
   <div>
-    <!-- 通栏吸顶顶栏：背景全宽，内容行走 1280px 容器（.topbar--full 样式在 main.css） -->
+    <!-- 底层漂移色团：玻璃材质的透底，最优先挂载（z-index: -1，压在内容之下） -->
+    <LiquidBackdrop />
+    <!-- 通栏吸顶顶栏：玻璃材质（.topbar--full 样式在 main.css，引用 glass.css 变量） -->
     <header class="topbar topbar--full">
       <div class="topbar__inner">
         <NuxtLink to="/" class="topbar__brand">

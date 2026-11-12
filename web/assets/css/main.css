@@ -1,7 +1,11 @@
+@import './glass.css';
 
 :root {
   --bg: #FAFAFA; --card: #FFFFFF; --line: #E9E9EE; --well: #F4F4F6;
   --coral: #FF8A5C; --coral-deep: #E06B38; --coral-soft: #FFF1E7;
+  /* 珊瑚文字色：--coral-deep 在玻璃底上实测仅 3.3:1（白底 2.6:1 的 #ff7a50 更差），
+     4.5:1 要求需更深一档；#A94E24 在玻璃/色团所有组合下 ≥4.5:1（见任务 11 报告） */
+  --coral-ink: #A94E24;
   --ink: #4A4458; --ink2: #7A7290; --ink3: #AFA8BD;
   --mint: #5FC9A5; --mint-soft: #E9F7F1; --mint-deep: #2E7D5B;
   --sky: #6FB8E8; --sky-soft: #EAF4FC;
@@ -13,14 +17,23 @@
 body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
 .shell { max-width: 1280px; margin: 0 auto; padding: 0 32px 60px; }
 .topbar { background: #FFFFFF; border-bottom: 1px solid var(--line); }
-/* 通栏吸顶顶栏：背景与底边全宽铺满，内部内容行仍走 1280px 容器对齐（任务 11 再覆玻璃材质） */
-.topbar--full { position: sticky; top: 0; z-index: 40; }
+/* 通栏吸顶顶栏（玻璃材质，任务 11）：变量与 .glass 同源（glass.css），
+ * backdrop-filter 降级由 glass.css 的 :root 变量切换自动生效。
+ * 玻璃柔影补足任务 10 遗留的「仅 1px 分隔」，与内容分层更清晰。 */
+.topbar--full {
+  position: sticky; top: 0; z-index: 40;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.6);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.6);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: 0 10px 28px rgba(42, 39, 51, 0.12), var(--glass-inset);
+}
 .topbar__inner { max-width: 1280px; margin: 0 auto; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; }
 .topbar__brand { font-weight: 800; color: var(--ink); text-decoration: none; }
 .topbar__nav { display: flex; gap: 18px; }
 .topbar__link { color: var(--ink2); text-decoration: none; font-size: 14px; }
 .topbar__link--ai {
-  color: #ff7a50;
+  color: var(--coral-ink);
   font-weight: 700;
 }
 .topbar__link:hover { color: var(--coral); }
