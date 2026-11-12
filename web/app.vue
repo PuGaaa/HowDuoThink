@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import UserAvatar from '~/components/account/UserAvatar.vue'
+import type { User } from '~/composables/useCurrentUser'
+
 const api = useApi()
-const user = ref<any>(null)
+const { user, ensure, set } = useCurrentUser()
 const menuOpen = ref(false)
 const menuRef = ref<HTMLElement | null>(null)
 
-// 登录弹窗
-const showLogin = ref(false)
+// 登录弹窗（开关状态由 useLoginPrompt 全局承载，弹窗本体下一任务拆出）
+const { visible: showLogin, open: openLoginPrompt, close: closeLoginPrompt } = useLoginPrompt()
 const loginMode = ref<'phone' | 'password'>('phone')
 const loginForm = reactive({ login: '', password: '' })
 const phoneForm = reactive({ phone: '', code: '' })
@@ -25,8 +28,8 @@ const pwErr = ref('')
 const pwBusy = ref(false)
 const pwOk = ref(false)
 
-onMounted(async () => {
-  try { user.value = await api.get('/api/me') } catch { user.value = null }
+onMounted(() => {
+  void ensure()
   document.addEventListener('click', onDocClick)
 })
 onUnmounted(() => document.removeEventListener('click', onDocClick))
@@ -34,14 +37,10 @@ function onDocClick(e: MouseEvent) {
   if (menuRef.value && !menuRef.value.contains(e.target as Node)) menuOpen.value = false
 }
 
-async function refreshMe() {
-  try { user.value = await api.get('/api/me') } catch { user.value = null }
-}
-
 function openLogin() {
-  showLogin.value = true
   loginErr.value = ''
   smsSent.value = false
+  openLoginPrompt()
 }
 
 async function sendSmsCode() {
@@ -54,8 +53,8 @@ async function phoneLogin() {
   loginErr.value = ''
   loginBusy.value = true
   try {
-    user.value = await api.post('/api/auth/login/phone', phoneForm)
-    showLogin.value = false
+    set(await api.post('/api/auth/login/phone', phoneForm) as User)
+    closeLoginPrompt()
   } catch (e: any) {
     loginErr.value = e?.data?.detail || '登录失败'
   } finally {
@@ -67,8 +66,8 @@ async function passwordLogin() {
   loginErr.value = ''
   loginBusy.value = true
   try {
-    user.value = await api.post('/api/auth/login', { login: loginForm.login, password: loginForm.password })
-    showLogin.value = false
+    set(await api.post('/api/auth/login', { login: loginForm.login, password: loginForm.password }) as User)
+    closeLoginPrompt()
   } catch (e: any) {
     loginErr.value = e?.data?.detail || '登录失败'
   } finally {
@@ -77,8 +76,10 @@ async function passwordLogin() {
 }
 
 async function logout() {
-  await api.post('/api/auth/logout', null)
-  user.value = null
+  // 服务端 302 到 WEB_ORIGIN，跨域重定向 fetch 无法跟随读取 → 必然 reject；
+  // 会话 cookie 已随该响应清除，本地态照常清空
+  await api.post('/api/auth/logout', null).catch(() => {})
+  set(null)
   menuOpen.value = false
   await navigateTo('/')
 }
@@ -98,7 +99,7 @@ async function saveProfile() {
   editErr.value = ''
   editBusy.value = true
   try {
-    user.value = await api.patch('/api/me', { name: editName.value, avatarUrl: editAvatar.value })
+    set(await api.patch('/api/me', { name: editName.value, avatarUrl: editAvatar.value }) as User)
     editOpen.value = false
   } catch (e: any) {
     editErr.value = e?.data?.detail || '保存失败'
@@ -151,7 +152,7 @@ async function savePassword() {
         <div ref="menuRef" class="usermenu">
           <template v-if="user">
             <button class="usermenu__trigger" @click="menuOpen = !menuOpen">
-              <img :src="user.avatar || 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2228%22 height=%2228%22%3E%3Crect fill=%22%23E9F7F1%22 width=%2228%22 height=%2228%22 rx=%2214%22/%3E%3C/svg%3E'" class="topbar__avatar" :title="user.name || user.login" />
+              <UserAvatar class="topbar__avatar" :name="user.name || user.login" :avatar="user.avatar" :size="32" />
             </button>
             <div v-if="menuOpen" class="usermenu__drop">
               <div class="usermenu__who">
@@ -171,7 +172,7 @@ async function savePassword() {
     <footer class="footer">好多星 HowDuoThink · 多想，多星。—— Web 社区（投稿与解决逻辑展示，闯关在 App）· <NuxtLink to="/privacy" class="footer__link">隐私政策</NuxtLink></footer>
 
     <!-- 登录弹窗 -->
-    <div v-if="showLogin" class="lmask" @click="showLogin = false"></div>
+    <div v-if="showLogin" class="lmask" @click="closeLoginPrompt"></div>
     <div v-if="showLogin" class="lmodal">
       <h2 class="lmodal__title">登录</h2>
 
@@ -203,7 +204,7 @@ async function savePassword() {
         </div>
       </template>
       <p v-if="loginErr" style="color: var(--red); font-size: 13px; margin: 0 0 10px">{{ loginErr }}</p>
-      <button class="btn" style="width: 100%" :disabled="loginBusy" @click="loginMode === 'phone' ? phoneLogin() : passwordLogin">{{ loginBusy ? '登录中…' : '登录' }}</button>
+      <button class="btn" style="width: 100%" :disabled="loginBusy" @click="loginMode === 'phone' ? phoneLogin() : passwordLogin()">{{ loginBusy ? '登录中…' : '登录' }}</button>
       <p class="hint" style="margin-top: 10px">手机号首次登录会自动建立账号；已有账号也可继续用密码登录</p>
     </div>
 
