@@ -1,6 +1,6 @@
-"""ai 路由：RAG 检索/对话（登录）、索引重建与 AI 起草（editor/admin）。"""
+"""ai 路由：RAG 检索/对话与会话历史（登录）、索引重建与 AI 起草（editor/admin）。"""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from core.deps import current_user, require_editor
 from features.ai import models, service, usage
@@ -10,7 +10,26 @@ router = APIRouter(tags=["ai"])
 
 @router.post("/api/ai/chat")
 def ai_chat(body: models.ChatRequest, uid: str = Depends(current_user)):
-    return service.chat(body.question.strip(), uid)
+    return service.chat(body.question.strip(), uid, body.conversation_id)
+
+
+@router.get("/api/ai/conversations")
+def ai_conversations(
+    limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    uid: str = Depends(current_user),
+):
+    return service.list_conversations(uid, limit, offset)
+
+
+@router.get("/api/ai/conversations/{cid}")
+def ai_conversation_detail(cid: str, uid: str = Depends(current_user)):
+    return service.conversation_detail(cid, uid)
+
+
+@router.delete("/api/ai/conversations/{cid}")
+def ai_conversation_delete(cid: str, uid: str = Depends(current_user)):
+    return service.delete_conversation(cid, uid)
 
 
 @router.get("/api/ai/search")

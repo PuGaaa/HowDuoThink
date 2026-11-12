@@ -5,12 +5,17 @@
 """
 
 import json
+import os
 
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 import db
+import main
 from features.ai import repo, service
+
+_PW = os.environ["ADMIN_PASSWORD"] + "-conv"
 
 
 def test_create_and_get_owned():
@@ -222,3 +227,105 @@ def test_prune_on_chat(monkeypatch):
     remaining = {row["id"] for row in repo.list_conversations(uid, 500, 0)}
     assert r["conversationId"] in remaining
     assert len(remaining & ids) == 99
+
+
+# ────────────── HTTP 层：会话列表/详情/删除（TestClient，登录后走真实路由） ──────────────
+
+
+def _make_user(login_name: str) -> None:
+    from core import security
+
+    db.ex(
+        "INSERT INTO users(id, login, name, role, password_hash) VALUES(?,?,?,?,?) "
+        "ON CONFLICT(id) DO UPDATE SET role=excluded.role, password_hash=excluded.password_hash",
+        (f"pw-{login_name}", login_name, login_name, "user", security.hash_password(_PW)),
+    )
+
+
+def _login(c: TestClient, login_name: str) -> None:
+    r = c.post("/api/auth/login", json={"login": login_name, "password": _PW})
+    assert r.status_code == 200, r.text
+
+
+def test_http_list_pagination_cap(monkeypatch):
+    """列表接口：默认 limit=20、出 items/total；limit>50 / limit<1 / offset<0 → 422。"""
+    _mock_ai(monkeypatch)
+    _make_user("u-http-list")
+    uid = "pw-u-http-list"
+    c = TestClient(main.app)
+    _login(c, "u-http-list")
+    r = c.post("/api/ai/chat", json={"question": "连接池耗尽导致接口大面积超时应该怎么排查"})
+    assert r.status_code == 200, r.text
+    conv_id = r.json()["conversationId"]
+    # 再补 20 个会话凑成 21 个；补的拨回过去，保证新提问的会话排最前（排序契约确定性）
+    for i in range(20):
+        repo.create_conversation(uid, f"补充会话{i}")
+    db.ex("UPDATE ai_conversations SET updated_at='2026-01-01 00:00:00' WHERE uid=? AND id<>?", (uid, conv_id))
+
+    d = c.get("/api/ai/conversations").json()
+    assert d["total"] == 21
+    assert len(d["items"]) == 20  # 默认 limit=20
+    assert d["items"][0]["id"] == conv_id
+    # 列表出参字段名钉死 id/title/updatedAt（camelCase）
+    assert set(d["items"][0].keys()) == {"id", "title", "updatedAt"}
+
+    # 分页边界：51 超上限、0 低于下限、offset 为负 → 422；合法分页正常
+    assert c.get("/api/ai/conversations", params={"limit": 51}).status_code == 422
+    assert c.get("/api/ai/conversations", params={"limit": 0}).status_code == 422
+    assert c.get("/api/ai/conversations", params={"offset": -1}).status_code == 422
+    r = c.get("/api/ai/conversations", params={"limit": 1, "offset": 1})
+    assert r.status_code == 200
+    assert [i["id"] for i in r.json()["items"]] == [d["items"][1]["id"]]
+
+
+def test_http_detail_and_delete_flow(monkeypatch):
+    """提问 → 列表含该会话 → 详情出 messages 结构（camelCase createdAt）→ DELETE → 详情 404。"""
+    _mock_ai(monkeypatch)
+    _make_user("u-http-flow")
+    uid = "pw-u-http-flow"
+    c = TestClient(main.app)
+    _login(c, "u-http-flow")
+    r = c.post("/api/ai/chat", json={"question": "缓存雪崩怎么预防"})
+    assert r.status_code == 200, r.text
+    conv_id = r.json()["conversationId"]
+
+    assert conv_id in [i["id"] for i in c.get("/api/ai/conversations").json()["items"]]
+
+    r = c.get(f"/api/ai/conversations/{conv_id}")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["id"] == conv_id
+    assert d["title"] == "缓存雪崩怎么预防"
+    assert d["createdAt"] and d["updatedAt"]
+    msgs = d["messages"]
+    assert [m["role"] for m in msgs] == ["user", "assistant"]
+    assert msgs[0]["content"] == "缓存雪崩怎么预防"
+    assert msgs[1]["content"] == "模拟回答"
+    assert msgs[0]["sources"] == []
+    for m in msgs:
+        assert m["createdAt"]
+    # 消息出参字段名钉死 role/content/sources/createdAt
+    assert set(msgs[0].keys()) == {"role", "content", "sources", "createdAt"}
+
+    assert c.delete(f"/api/ai/conversations/{conv_id}").json() == {"ok": True}
+    assert c.get(f"/api/ai/conversations/{conv_id}").status_code == 404
+    assert conv_id not in [i["id"] for i in c.get("/api/ai/conversations").json()["items"]]
+    assert repo.count_conversations(uid) == 0
+
+
+def test_http_foreign_detail_404(monkeypatch):
+    """他人会话：详情/删除一律 404，本人不受影响，对方不产生会话。"""
+    _mock_ai(monkeypatch)
+    _make_user("u-http-a")
+    _make_user("u-http-b")
+    ca = TestClient(main.app)
+    _login(ca, "u-http-a")
+    cb = TestClient(main.app)
+    _login(cb, "u-http-b")
+    conv_id = ca.post("/api/ai/chat", json={"question": "A 的第一个问题足够长"}).json()["conversationId"]
+
+    assert cb.get(f"/api/ai/conversations/{conv_id}").status_code == 404
+    assert cb.delete(f"/api/ai/conversations/{conv_id}").status_code == 404
+    # A 的会话完好；B 名下仍无任何会话
+    assert ca.get(f"/api/ai/conversations/{conv_id}").status_code == 200
+    assert cb.get("/api/ai/conversations").json()["total"] == 0
