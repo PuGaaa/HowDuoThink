@@ -93,7 +93,7 @@ useHead({ title: 'AI 排错 · 好多星社区' })
 
     <div v-else class="ai__layout">
       <div v-if="drawerOpen" class="ai__mask" @click="drawerOpen = false"></div>
-      <aside :class="['ai__side', { 'ai__side--open': drawerOpen }]">
+      <aside :class="['ai__side', 'glass', { 'ai__side--open': drawerOpen }]">
         <ConversationList
           :items="conversations"
           :active-id="conversationId"
@@ -182,14 +182,14 @@ useHead({ title: 'AI 排错 · 好多星社区' })
   display: flex;
   gap: 14px;
 }
+/* 侧栏玻璃材质（任务 13）：背景/边框/阴影全部交给全局 .glass（glass.css），
+ * 桌面栏与 <900px 抽屉是同一元素，材质天然一致；此处只留布局与圆角 */
 .ai__side {
   flex: none;
   width: 260px;
   min-height: 0;
-  background: var(--card);
   border-radius: 16px;
   padding: 12px;
-  box-shadow: 0 5px 0 var(--edge-cream);
 }
 .ai__chat {
   flex: 1;
@@ -224,7 +224,8 @@ useHead({ title: 'AI 排错 · 好多星社区' })
   }
   .ai__side--open {
     transform: translateX(0);
-    box-shadow: 8px 0 24px rgba(74, 68, 88, 0.18);
+    /* 抽屉推开时的方向性投影 + 玻璃内高光（覆盖 .glass 外阴影，内高光保留材质感） */
+    box-shadow: 8px 0 24px rgba(74, 68, 88, 0.18), var(--glass-inset);
   }
 }
 @media (max-width: 560px) {

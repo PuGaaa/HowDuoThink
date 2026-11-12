@@ -86,7 +86,8 @@ function relTime(iso: string): string {
   padding: 9px 12px;
   font-size: 13.5px;
   font-weight: 700;
-  color: var(--coral);
+  /* 玻璃侧栏上的文字（任务 13）：--coral 仅 2.3:1，用任务 11 验证过的 --coral-ink（≥4.79:1） */
+  color: var(--coral-ink);
   cursor: pointer;
   box-shadow: 0 3px 0 var(--edge-cream);
   transition: border-color 0.15s, transform 0.1s;
@@ -115,7 +116,7 @@ function relTime(iso: string): string {
 .conv__empty {
   margin: 18px 4px;
   font-size: 12.5px;
-  color: var(--ink3);
+  color: var(--ink2); /* 玻璃底上 --ink3 仅 2.3:1，次级文字统一 --ink2（4.5:1） */
   text-align: center;
   line-height: 1.8;
 }
@@ -155,12 +156,13 @@ function relTime(iso: string): string {
   text-overflow: ellipsis;
 }
 .conv__item--active .conv__title {
-  color: var(--coral-deep);
+  /* --coral-deep 在玻璃上 3.3:1 不达标，同任务 11 收紧到 --coral-ink */
+  color: var(--coral-ink);
   font-weight: 700;
 }
 .conv__time {
   font-size: 11.5px;
-  color: var(--ink3);
+  color: var(--ink2); /* 玻璃底可读性（任务 13） */
 }
 .conv__del {
   flex: none;
@@ -170,7 +172,7 @@ function relTime(iso: string): string {
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--ink3);
+  color: var(--ink2); /* 玻璃底图形对比（非文本 3:1） */
   cursor: pointer;
   display: flex;
   align-items: center;

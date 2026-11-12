@@ -41,7 +41,7 @@ onMounted(() => inputEl.value?.focus())
 </script>
 
 <template>
-  <div class="composer">
+  <div class="composer glass">
     <textarea
       ref="inputEl"
       v-model="text"
@@ -63,16 +63,14 @@ onMounted(() => inputEl.value?.focus())
 </template>
 
 <style scoped>
+/* 输入框玻璃材质（任务 13）：背景/边框/阴影交给 .glass；聚焦态保留珊瑚描边提示 */
 .composer {
   display: flex;
   align-items: flex-end;
   gap: 10px;
   margin-top: 14px;
-  background: var(--card);
-  border: 2px solid var(--line);
   border-radius: 18px;
   padding: 10px 10px 10px 18px;
-  box-shadow: 0 5px 0 var(--edge-cream);
   transition: border-color 0.15s;
 }
 .composer:focus-within {
@@ -92,7 +90,7 @@ onMounted(() => inputEl.value?.focus())
   max-height: 132px;
 }
 .composer__input::placeholder {
-  color: var(--ink3);
+  color: var(--ink2); /* 玻璃底可读性（任务 13） */
 }
 .composer__input:disabled {
   opacity: 0.6;

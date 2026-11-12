@@ -64,7 +64,14 @@ watch(
           <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="currentColor" />
         </svg>
       </div>
-      <div :class="['bubble', m.role === 'user' ? 'bubble--user' : 'bubble--bot', { 'bubble--err': m.error }]">
+      <!-- 助手气泡走玻璃材质（任务 13）；错误气泡不上玻璃，保持既有错误态视觉 -->
+      <div
+        :class="[
+          'bubble',
+          m.role === 'user' ? 'bubble--user' : 'bubble--bot',
+          { glass: m.role !== 'user' && !m.error, 'bubble--err': m.error },
+        ]"
+      >
         <p v-if="m.role === 'assistant' && !m.error" class="bubble__text bubble__text--md" v-html="renderMarkdownLite(m.text)"></p>
         <p v-else class="bubble__text">{{ m.text }}</p>
         <div v-if="m.sources && m.sources.length > 0" class="bubble__sources">
@@ -82,8 +89,13 @@ watch(
           <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="currentColor" />
         </svg>
       </div>
-      <div class="bubble bubble--bot bubble--typing">
-        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <div class="bubble bubble--bot bubble--typing glass">
+        <!-- 液滴流动思考态（任务 13）：三滴交错相位沿轨道滑行并拉伸变形 -->
+        <span class="flow" aria-hidden="true">
+          <span class="flow__drop"></span>
+          <span class="flow__drop"></span>
+          <span class="flow__drop"></span>
+        </span>
         <span class="typing-label">检索案例库中…</span>
       </div>
     </div>
@@ -146,11 +158,11 @@ watch(
   border-radius: 18px 18px 4px 18px;
   box-shadow: 0 4px 14px rgba(255, 122, 80, 0.25);
 }
+/* 助手气泡玻璃材质（任务 13）：背景/边框/阴影交给 .glass，阴影体系冲突以 .glass 为准；
+ * 错误气泡不上 glass，其红底/红边在 .bubble--err 里保持原样 */
 .bubble--bot {
-  background: var(--card);
   color: var(--ink);
   border-radius: 4px 18px 18px 18px;
-  box-shadow: 0 4px 0 var(--edge-cream);
 }
 .bubble--err {
   background: var(--red-soft);
@@ -198,7 +210,7 @@ watch(
 }
 .bubble__sources-label {
   font-size: 12px;
-  color: var(--ink3);
+  color: var(--ink2); /* 玻璃底可读性（任务 13） */
 }
 .bubble__source {
   font-size: 12.5px;
@@ -213,35 +225,72 @@ watch(
   filter: brightness(0.95);
 }
 
-/* ---- 思考态 ---- */
+/* ---- 思考态：液滴流动（任务 13）---- */
 .bubble--typing {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 12px;
   padding: 14px 16px;
 }
-.dot {
-  width: 7px;
-  height: 7px;
+/* 三滴沿 64px 轨道左→右滑行，途中非均匀缩放模拟液滴拉伸/表面张力，
+ * 交错 1/3 周期相位形成连续液流；只动画 transform/opacity（合成器路径），不动画 filter */
+.flow {
+  position: relative;
+  flex: none;
+  width: 64px;
+  height: 12px;
+}
+.flow::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: rgba(224, 107, 56, 0.16);
+}
+.flow__drop {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  margin-top: -4.5px;
   border-radius: 50%;
-  background: var(--coral);
-  opacity: 0.4;
-  animation: dot-bounce 1.2s infinite ease-in-out;
+  /* --coral-deep 玻璃底 3.3:1，满足非文本图形 ≥3:1；--coral 仅 2.3:1 不用 */
+  background: var(--coral-deep);
+  opacity: 0;
+  animation: droplet-flow 1.6s infinite cubic-bezier(0.45, 0.05, 0.55, 0.95);
 }
-.dot:nth-child(2) {
-  animation-delay: 0.15s;
+.flow__drop:nth-child(2) {
+  animation-delay: 0.53s;
 }
-.dot:nth-child(3) {
-  animation-delay: 0.3s;
+.flow__drop:nth-child(3) {
+  animation-delay: 1.06s;
 }
-@keyframes dot-bounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-  30% { transform: translateY(-4px); opacity: 1; }
+@keyframes droplet-flow {
+  0% { transform: translateX(0) scale(0.55, 0.55); opacity: 0; }
+  12% { opacity: 1; }
+  50% { transform: translateX(27.5px) scale(1.35, 0.75); opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateX(55px) scale(0.55, 0.55); opacity: 0; }
+}
+/* reduced-motion：液滴静止，等距停在轨道上（退化为静态点） */
+@media (prefers-reduced-motion: reduce) {
+  .flow__drop {
+    animation: none;
+    opacity: 1;
+    transform: scale(0.8);
+  }
+  .flow__drop:nth-child(1) { transform: translateX(9px) scale(0.8); }
+  .flow__drop:nth-child(2) { transform: translateX(23px) scale(0.8); }
+  .flow__drop:nth-child(3) { transform: translateX(37px) scale(0.8); }
 }
 .typing-label {
-  margin-left: 6px;
   font-size: 12.5px;
-  color: var(--ink3);
+  color: var(--ink2); /* 玻璃底可读性（任务 13） */
 }
 
 /* ---- 空状态 ---- */
