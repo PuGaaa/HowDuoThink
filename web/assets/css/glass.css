@@ -1,0 +1,50 @@
+/* 液态玻璃材质系统（任务 11）：变量是唯一权威来源。
+ * .glass 工具类与 main.css 的 .topbar--full 都引用同一组变量；
+ * 降级（不支持 backdrop-filter / 用户要求降低透明度）通过改 :root 变量值生效，
+ * 因此无论样式写在哪一层、级联顺序如何，引用方都会自动跟随降级。
+ * AI 页玻璃属于任务 13，此处不涉及。 */
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.58);
+  --glass-bg-fallback: rgba(255, 255, 255, 0.94);
+  --glass-border: rgba(255, 255, 255, 0.72);
+  --glass-blur: 18px;
+  --glass-shadow: 0 24px 64px rgba(42, 39, 51, 0.16);
+  --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+/* 不支持 backdrop-filter：退回高不透明实底（可读性优先） */
+@supports not ((backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px))) {
+  :root { --glass-bg: var(--glass-bg-fallback); }
+}
+
+/* 用户系统级要求降低透明度：同样退回实底 */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --glass-bg: var(--glass-bg-fallback); }
+}
+
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.6);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.6);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), var(--glass-inset);
+}
+
+/* 弹层入场：回弹缩放淡入（overshoot 缓动）。
+ * 用独立 scale 属性而非 transform：不覆盖 .lmodal 的居中 translate(-50%,-50%)，
+ * 对绝对定位的下拉菜单同样适用。 */
+@keyframes glass-pop-in {
+  from { opacity: 0; scale: 0.88; }
+  to { opacity: 1; scale: 1; }
+}
+.glass-pop {
+  animation: glass-pop-in 340ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 弹层入场退回「不动画」：直接呈现终态 */
+  .glass-pop { animation: none; }
+  /* 背景色团漂移停止（静止在初始位置） */
+  .liquid-backdrop__blob { animation: none !important; }
+}

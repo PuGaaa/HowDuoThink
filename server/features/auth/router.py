@@ -1,11 +1,17 @@
 """auth 路由：账密登录、手机验证码、dev 绕行、个人信息、密码。只做 参数→service→响应。"""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import logging
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from core import config, security
 from core.deps import current_user
+from features.assets import oss
+from features.assets import service as assets_service
 from features.auth import models, service
+
+logger = logging.getLogger("server")
 
 router = APIRouter(tags=["auth"])
 
@@ -75,6 +81,31 @@ def update_me(body: models.ProfileUpdate, uid: str = Depends(current_user)):
 def change_password(body: models.PasswordChange, uid: str = Depends(current_user)):
     service.change_password(uid, body.old_password, body.new_password)
     return {"ok": True}
+
+
+@router.post("/api/me/avatar")
+def upload_my_avatar(file: UploadFile = File(...), uid: str = Depends(current_user)):
+    """普通用户上传自己的头像：写 OSS（user-avatar 分类）→ 更新 users.avatar → 返回全量资料。"""
+    # 读文件前的两道闸（同 assets 路由）：未配置先 503（不吃一次内存）；声明大小超限先 413
+    if not oss.configured():
+        raise HTTPException(503, "OSS 未配置：部署环境需补齐 OSS_* 环境变量")
+    if file.size is not None and file.size > assets_service.USER_AVATAR_MAX_BYTES:
+        raise HTTPException(413, "头像超过上限 2MB")
+    # 整条同步路由在线程池执行：鉴权DB、读文件、OSS SDK和落库都不占事件循环。
+    data = file.file.read()
+    try:
+        url = assets_service.upload_user_avatar(data, file.filename or "", uid)
+    except assets_service.NotConfiguredError:
+        raise HTTPException(503, "OSS 未配置：部署环境需补齐 OSS_* 环境变量")
+    except assets_service.RateLimitError as e:
+        raise HTTPException(429, str(e))
+    except assets_service.AssetError as e:
+        raise HTTPException(400, str(e))
+    except assets_service.AssetUnavailableError as e:
+        logger.warning("用户头像上传 OSS 写入失败：%s", e)
+        raise HTTPException(502, "OSS 暂不可用，请稍后重试")
+    profile = service.get_profile(uid)
+    return service.update_profile(uid, profile["name"], url)
 
 
 @router.post("/api/auth/sms/send")

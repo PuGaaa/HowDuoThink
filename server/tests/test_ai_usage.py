@@ -65,7 +65,9 @@ def test_llm_failure_logged_as_not_ok(monkeypatch):
     with TestClient(main.app, raise_server_exceptions=False) as c:
         login_admin(c)
         r = c.post("/api/ai/chat", json={"question": "会触发异常的问题"})
-        assert r.status_code == 500  # 全局兜底
+        # 模型失败走友好报错（200 + error），不再裸 500
+        assert r.status_code == 200
+        assert r.json()["error"] == "服务暂时不可用，请稍后再试"
         import db
 
         rows = db.q("SELECT * FROM ai_usage WHERE kind='chat' AND ok=0")

@@ -53,68 +53,104 @@ async function submit() {
 
 <template>
   <div>
-    <h1 style="font-size: 22px">投稿你的故障</h1>
-    <p class="muted">必填 3 项：一句话症状、现象描述、最终解决逻辑。编辑会核实证据并整理脱敏素材，公开或交给 AI 整理前会请你确认具体版本。收到不代表一定发表。</p>
-    <p v-if="error && !user" class="error" role="alert">{{ error }}</p>
-    <div v-if="!loaded" class="muted">加载中……</div>
-    <div v-else-if="signedOut" class="card">
-      <p style="margin-top: 0">投稿需要先登录，用于署名与跟踪状态。</p>
-      <a class="btn" href="/">去首页登录</a>
+    <h1 class="page-title">投稿你的故障</h1>
+    <div class="submit-grid">
+      <div class="submit-grid__main">
+        <p v-if="error && !user" class="error" role="alert">{{ error }}</p>
+        <div v-if="!loaded" class="muted">加载中……</div>
+        <div v-else-if="signedOut" class="card">
+          <p style="margin-top: 0">投稿需要先登录，用于署名与跟踪状态。</p>
+          <a class="btn" href="/">去首页登录</a>
+        </div>
+        <div v-else-if="submitted" class="card" role="status">
+          <h2 style="margin-top: 0">✓ {{ submitted.duplicate ? '已找到这份投稿' : '已收到' }}</h2>
+          <p class="receipt">凭证：<code>{{ submitted.id }}</code></p>
+          <p class="muted">{{ submitted.duplicate ? '重复提交已关联到原投稿，不会再收一份。' : '接下来由编辑核对事实与证据。' }}你可以继续补充事实、查看反馈和确认脱敏素材；内容发布后才会出现阅读与关卡入口。</p>
+          <NuxtLink to="/me" class="btn btn--ghost">查看我的投稿</NuxtLink>
+        </div>
+        <form v-else-if="user" class="card" @submit.prevent="submit">
+          <fieldset :disabled="busy">
+            <div class="field">
+              <label for="submission-title">一句话症状 *</label>
+              <input id="submission-title" v-model="form.title" required minlength="4" maxlength="40" placeholder="例：线上图片全部裂图" />
+              <div class="hint">4–40 字，会被用作标题</div>
+            </div>
+            <button class="btn btn--ghost similar-button" type="button" :disabled="similarBusy || form.title.length < 4" @click="findSimilar">{{ similarBusy ? '查询中…' : '看看已有的相似内容' }}</button>
+            <p class="muted">这里只查已公开内容。症状或根因相似仍可投稿，编辑会判断是新题、补证还是同一事件，不会按相似度自动拒稿。</p>
+            <p v-if="similarError" class="error" role="alert">{{ similarError }}</p>
+            <section v-if="similarChecked" class="similar" aria-label="相似公开内容">
+              <p v-if="!similar.length" class="muted">暂未找到相似公开内容，不代表不存在重复。</p>
+              <article v-for="item in similar" :key="item.key">
+                <a v-if="item.url" :href="item.url" target="_blank" rel="noopener">{{ item.title }}</a><strong v-else>{{ item.title }}</strong>
+                <p>{{ item.excerpt }}</p>
+              </article>
+            </section>
+            <div class="field">
+              <label for="submission-symptom">现象描述 *</label>
+              <textarea id="submission-symptom" v-model="form.symptom" required minlength="10" rows="5" maxlength="1200" placeholder="谁受影响、什么现象、范围多大、有没有规律……"></textarea>
+            </div>
+            <div class="field">
+              <label for="submission-resolution">最终解决逻辑 *</label>
+              <textarea id="submission-resolution" v-model="form.resolution" required minlength="10" rows="7" maxlength="2400" placeholder="先看了什么 → 哪些证据 → 排除什么 → 根因 → 怎样修复与复验"></textarea>
+              <div class="hint">请区分亲历事实、推测和事后验证；不要填写密钥、个人信息或无权公开的内部资料。</div>
+            </div>
+            <details>
+              <summary>选填：报错原文 / 时间线 / 经验 / 标签</summary>
+              <div class="field"><label for="submission-error">关键报错原文</label><textarea id="submission-error" v-model="form.keyError" rows="3" maxlength="600"></textarea></div>
+              <div class="field"><label for="submission-timeline">时间线</label><input id="submission-timeline" v-model="form.timeline" maxlength="300" /></div>
+              <div class="field">
+                <label>经验教训（最多 3 条）</label>
+                <div v-for="(_, i) in form.lessons" :key="i" class="lesson-input"><input v-model="form.lessons[i]" :aria-label="'经验教训' + (i + 1)" maxlength="80" /></div>
+                <button class="btn btn--ghost" type="button" :disabled="form.lessons.length === 3" @click="form.lessons.push('')">＋ 加一条</button>
+              </div>
+              <div class="field"><label for="submission-tags">技术栈标签（最多 6 个）</label><input id="submission-tags" v-model="form.stackTags" placeholder="Nginx, CDN, TLS（逗号分隔）" /></div>
+              <div class="field"><label for="submission-domain">所属层（可猜）</label>
+                <select id="submission-domain" v-model="form.domainHint"><option value="">不确定</option><option value="network">网络/接入</option><option value="data">数据/缓存</option><option value="build">构建/依赖</option><option value="runtime">运行时</option><option value="deploy">部署</option><option value="concurrency">并发</option></select>
+              </div>
+            </details>
+          </fieldset>
+          <p v-if="error" class="error" role="alert">{{ error }}</p>
+          <button class="btn" type="submit" :disabled="busy">{{ busy ? '提交中…' : '提交投稿' }}</button>
+        </form>
+      </div>
+
+      <aside class="submit-grid__side">
+        <div class="card submit-guide">
+          <p class="muted submit-guide__text">必填 3 项：一句话症状、现象描述、最终解决逻辑。编辑会核实证据并整理脱敏素材，公开或交给 AI 整理前会请你确认具体版本。收到不代表一定发表。</p>
+        </div>
+      </aside>
     </div>
-    <div v-else-if="submitted" class="card" role="status">
-      <h2 style="margin-top: 0">✓ {{ submitted.duplicate ? '已找到这份投稿' : '已收到' }}</h2>
-      <p class="receipt">凭证：<code>{{ submitted.id }}</code></p>
-      <p class="muted">{{ submitted.duplicate ? '重复提交已关联到原投稿，不会再收一份。' : '接下来由编辑核对事实与证据。' }}你可以继续补充事实、查看反馈和确认脱敏素材；内容发布后才会出现阅读与关卡入口。</p>
-      <NuxtLink to="/me" class="btn btn--ghost">查看我的投稿</NuxtLink>
-    </div>
-    <form v-else-if="user" class="card" @submit.prevent="submit">
-      <fieldset :disabled="busy">
-        <div class="field">
-          <label for="submission-title">一句话症状 *</label>
-          <input id="submission-title" v-model="form.title" required minlength="4" maxlength="40" placeholder="例：线上图片全部裂图" />
-          <div class="hint">4–40 字，会被用作标题</div>
-        </div>
-        <button class="btn btn--ghost similar-button" type="button" :disabled="similarBusy || form.title.length < 4" @click="findSimilar">{{ similarBusy ? '查询中…' : '看看已有的相似内容' }}</button>
-        <p class="muted">这里只查已公开内容。症状或根因相似仍可投稿，编辑会判断是新题、补证还是同一事件，不会按相似度自动拒稿。</p>
-        <p v-if="similarError" class="error" role="alert">{{ similarError }}</p>
-        <section v-if="similarChecked" class="similar" aria-label="相似公开内容">
-          <p v-if="!similar.length" class="muted">暂未找到相似公开内容，不代表不存在重复。</p>
-          <article v-for="item in similar" :key="item.key">
-            <a v-if="item.url" :href="item.url" target="_blank" rel="noopener">{{ item.title }}</a><strong v-else>{{ item.title }}</strong>
-            <p>{{ item.excerpt }}</p>
-          </article>
-        </section>
-        <div class="field">
-          <label for="submission-symptom">现象描述 *</label>
-          <textarea id="submission-symptom" v-model="form.symptom" required minlength="10" rows="5" maxlength="1200" placeholder="谁受影响、什么现象、范围多大、有没有规律……"></textarea>
-        </div>
-        <div class="field">
-          <label for="submission-resolution">最终解决逻辑 *</label>
-          <textarea id="submission-resolution" v-model="form.resolution" required minlength="10" rows="7" maxlength="2400" placeholder="先看了什么 → 哪些证据 → 排除什么 → 根因 → 怎样修复与复验"></textarea>
-          <div class="hint">请区分亲历事实、推测和事后验证；不要填写密钥、个人信息或无权公开的内部资料。</div>
-        </div>
-        <details>
-          <summary>选填：报错原文 / 时间线 / 经验 / 标签</summary>
-          <div class="field"><label for="submission-error">关键报错原文</label><textarea id="submission-error" v-model="form.keyError" rows="3" maxlength="600"></textarea></div>
-          <div class="field"><label for="submission-timeline">时间线</label><input id="submission-timeline" v-model="form.timeline" maxlength="300" /></div>
-          <div class="field">
-            <label>经验教训（最多 3 条）</label>
-            <div v-for="(_, i) in form.lessons" :key="i" class="lesson-input"><input v-model="form.lessons[i]" :aria-label="'经验教训' + (i + 1)" maxlength="80" /></div>
-            <button class="btn btn--ghost" type="button" :disabled="form.lessons.length === 3" @click="form.lessons.push('')">＋ 加一条</button>
-          </div>
-          <div class="field"><label for="submission-tags">技术栈标签（最多 6 个）</label><input id="submission-tags" v-model="form.stackTags" placeholder="Nginx, CDN, TLS（逗号分隔）" /></div>
-          <div class="field"><label for="submission-domain">所属层（可猜）</label>
-            <select id="submission-domain" v-model="form.domainHint"><option value="">不确定</option><option value="network">网络/接入</option><option value="data">数据/缓存</option><option value="build">构建/依赖</option><option value="runtime">运行时</option><option value="deploy">部署</option><option value="concurrency">并发</option></select>
-          </div>
-        </details>
-      </fieldset>
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-      <button class="btn" type="submit" :disabled="busy">{{ busy ? '提交中…' : '提交投稿' }}</button>
-    </form>
   </div>
 </template>
 
 <style scoped>
+/* 表单主列 + 右侧说明栏；≤900px 单栏（说明栏在上，与原阅读顺序一致） */
+.page-title {
+  font-size: 22px;
+  margin: 0 0 16px;
+}
+.submit-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-areas: 'main side';
+  gap: 28px;
+  align-items: start;
+}
+.submit-grid__main {
+  grid-area: main;
+}
+.submit-grid__side {
+  grid-area: side;
+  position: sticky;
+  top: 88px;
+}
+.submit-guide {
+  padding: 18px;
+}
+.submit-guide__text {
+  margin: 0;
+  line-height: 1.7;
+}
 fieldset { padding: 0; margin: 0; border: 0; min-width: 0; }
 .error { color: var(--red); font-size: 13px; }
 .receipt { overflow-wrap: anywhere; }
@@ -127,4 +163,14 @@ fieldset { padding: 0; margin: 0; border: 0; min-width: 0; }
 summary { cursor: pointer; margin-bottom: 14px; color: var(--ink2); font-size: 13px; }
 .lesson-input { margin-bottom: 8px; }
 button:disabled { cursor: default; opacity: .55; }
+@media (max-width: 900px) {
+  .submit-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'side' 'main';
+    gap: 18px;
+  }
+  .submit-grid__side {
+    position: static;
+  }
+}
 </style>
