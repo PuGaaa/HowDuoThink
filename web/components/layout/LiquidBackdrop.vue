@@ -43,7 +43,7 @@
   height: clamp(320px, 46vw, 640px);
   bottom: -8%;
   right: -5%;
-  background: rgba(95, 201, 165, 0.30);
+  background: rgba(95, 201, 165, 0.3);
   animation: liquid-drift-b 58s ease-in-out infinite alternate;
 }
 .liquid-backdrop__blob--sky {
@@ -56,15 +56,27 @@
 }
 /* 漂移路径刻意互相错开（分别向右下/左上/左下），避免三团同向「平移感」 */
 @keyframes liquid-drift-a {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(9vw, 7vh, 0) scale(1.12); }
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(9vw, 7vh, 0) scale(1.12);
+  }
 }
 @keyframes liquid-drift-b {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(-8vw, -9vh, 0) scale(1.08); }
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-8vw, -9vh, 0) scale(1.08);
+  }
 }
 @keyframes liquid-drift-c {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(-10vw, 8vh, 0) scale(1.15); }
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-10vw, 8vh, 0) scale(1.15);
+  }
 }
 </style>
