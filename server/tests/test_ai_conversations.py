@@ -338,7 +338,11 @@ def test_http_detail_returns_all_messages():
     _login(c, "u-http-full")
     conv_id = repo.create_conversation("pw-u-http-full", "全量消息会话")
     msgs = [
-        {"role": "user" if i % 2 == 0 else "assistant", "content": f"消息{i}", "sources": None if i % 2 == 0 else [{"caseId": f"c{i}", "title": f"案例{i}"}]}
+        {
+            "role": "user" if i % 2 == 0 else "assistant",
+            "content": f"消息{i}",
+            "sources": None if i % 2 == 0 else [{"caseId": f"c{i}", "title": f"案例{i}"}],
+        }
         for i in range(8)
     ]
     repo.append_messages(conv_id, msgs)

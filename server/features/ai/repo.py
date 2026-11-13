@@ -40,9 +40,7 @@ def list_conversations(uid: str, limit: int, offset: int) -> list[dict]:
 
 def delete_conversation(conv_id: str, uid: str) -> bool:
     with db.tx() as conn:
-        owned = conn.execute(
-            "SELECT id FROM ai_conversations WHERE id=? AND uid=?", (conv_id, uid)
-        ).fetchall()
+        owned = conn.execute("SELECT id FROM ai_conversations WHERE id=? AND uid=?", (conv_id, uid)).fetchall()
         if not owned:
             return False
         conn.execute("DELETE FROM ai_messages WHERE conversation_id=?", (conv_id,))
@@ -71,10 +69,7 @@ def recent_messages(conv_id: str, limit: int) -> list[dict]:
         (conv_id, limit),
     )
     rows.reverse()  # 倒序取最后 limit 条，翻回 id 升序
-    return [
-        {"role": r["role"], "content": r["content"], "sources": db.jload(r["sources"], [])}
-        for r in rows
-    ]
+    return [{"role": r["role"], "content": r["content"], "sources": db.jload(r["sources"], [])} for r in rows]
 
 
 def all_messages(conv_id: str) -> list[dict]:
