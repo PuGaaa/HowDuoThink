@@ -156,8 +156,9 @@ function relTime(iso: string): string {
   text-overflow: ellipsis;
 }
 .conv__item--active .conv__title {
-  /* --coral-deep 在玻璃上 3.3:1 不达标，同任务 11 收紧到 --coral-ink */
-  color: var(--coral-ink);
+  /* 激活态强调靠 soft 珊瑚底 + 加粗；标题文字保持中性 --ink（coral-ink 橙棕被反馈为配色不佳，
+   * 对比度也更优：ink on coral-soft ≈ 8:1） */
+  color: var(--ink);
   font-weight: 700;
 }
 .conv__time {

@@ -86,24 +86,41 @@ watch(
 // 正文/思维链开合的单一决策源：拆成两个 watch 存在注册顺序竞态——answer 首包与 reasoning
 // 增量落在同一网络 chunk（readSse 同批分派 → 同一次 Vue flush）时，折叠 watch 先注册先执行，
 // 展开 watch 随后执行且其自身 prev 仍是上一批的空串而复燃 open，「已完成思考」标题下面板仍展开。
-// 合并后同一次回调内基于同一组新旧值决策，answer 到达语义优先：text 空转非空必折叠，
-// 同批无论 reasoning 怎么变都不复燃。
+// 合并后同一次回调内基于同一组新旧值决策，answer 到达语义优先：text 一旦非空，折叠保持不放。
+//
+// 折叠时机：DeepSeek 思考结束到正文首帧之间有一段静默间隙（长思考可达数秒），期间面板
+// 敞着展示全部思维链很吵——reasoning 停止增量 800ms 即提前收起；若思考恢复吐字（增量重启）
+// 且正文未到，下一批回调会重新展开，不会漏看。
+const FOLD_IDLE_MS = 800
+let foldTimer: ReturnType<typeof setTimeout> | null = null
+function clearFoldTimer() {
+  if (foldTimer) {
+    clearTimeout(foldTimer)
+    foldTimer = null
+  }
+}
 watch(
   () => {
     const m = lastMsg()
     return [m?.text ?? '', m?.reasoning ?? ''] as const
   },
   ([text, reasoning], [prevText, prevReasoning]) => {
-    if (text && !prevText) {
-      // 首个 answer 帧：自动折叠让位答案正文（同批 reasoning 变化到此为止，不再进入展开分支）
+    clearFoldTimer()
+    if (text) {
+      // 正文在场：折叠保持（answer 语义优先，同批/后续 reasoning 变化都不到展开分支）
       reasoningOpen.value = false
-    } else if (reasoning && !prevReasoning && !text) {
-      // 新回合首个 reasoning 帧（正文未到）：重新展开面板
-      reasoningOpen.value = true
+      return
     }
-    if (reasoning !== prevReasoning && reasoningOpen.value) scrollPanelBottom() // 展开期间思维链增长跟随滚到底
+    if (reasoning) {
+      reasoningOpen.value = true // 思考流（含折叠后恢复吐字）：展开跟随
+      if (reasoning !== prevReasoning) scrollPanelBottom()
+      foldTimer = setTimeout(() => {
+        if (!lastMsg()?.text) reasoningOpen.value = false // 思考静默：提前收起
+      }, FOLD_IDLE_MS)
+    }
   },
 )
+onBeforeUnmount(clearFoldTimer)
 </script>
 
 <template>
