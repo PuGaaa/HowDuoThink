@@ -250,21 +250,47 @@ watch(
 .bubble__text--md {
   white-space: normal;
 }
-.bubble__text--md p {
+/* v-html 生成的 DOM 不带 scoped data-v 属性——不经 :deep() 穿透，下面整组规则
+ * 从未命中过（列表缩进/code 底色/段距一直被浏览器 UA 默认兜底）。 */
+.bubble__text--md :deep(p) {
   margin: 0 0 10px;
 }
-.bubble__text--md p:last-child {
+.bubble__text--md :deep(p:last-child) {
   margin-bottom: 0;
 }
-.bubble__text--md ol,
-.bubble__text--md ul {
+.bubble__text--md :deep(ol),
+.bubble__text--md :deep(ul) {
   margin: 0 0 10px;
   padding-left: 22px;
 }
-.bubble__text--md li {
+.bubble__text--md :deep(li) {
   margin: 3px 0;
 }
-.bubble__text--md code {
+/* markdown-lite 标题（# ~ ###）与分隔线：视觉层级用字号/字重区分，深级并入 md-h3；
+ * 首个标题顶掉默认下边距，避免气泡开头多出一段空隙 */
+.bubble__text--md :deep(.md-h) {
+  margin: 14px 0 8px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.bubble__text--md :deep(.md-h:first-child) {
+  margin-top: 0;
+}
+.bubble__text--md :deep(.md-h1) {
+  font-size: 16px;
+}
+.bubble__text--md :deep(.md-h2) {
+  font-size: 15.5px;
+}
+.bubble__text--md :deep(.md-h3) {
+  font-size: 14.5px;
+}
+.bubble__text--md :deep(hr) {
+  border: none;
+  border-top: 1px dashed var(--line);
+  margin: 12px 0;
+}
+.bubble__text--md :deep(code) {
   background: var(--well);
   border-radius: 6px;
   padding: 1px 6px;
