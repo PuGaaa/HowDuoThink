@@ -158,6 +158,9 @@ useHead({ title: 'AI 排错 · 好多星社区' })
   min-height: 0;
   border-radius: 0;
   padding: 0 12px;
+  /* 贴边面板不要 .glass 的悬浮外阴影（0 24px 64px）——直角贴边形态下投影只会糊在内容区上；
+   * 仅保留玻璃底与 blur。<900px 抽屉态的方向性投影另在媒体块保留（浮层层级需要） */
+  box-shadow: none;
 }
 .ai__chat {
   flex: 1;
