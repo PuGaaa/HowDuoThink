@@ -172,6 +172,7 @@ jobs:
           context: ./server
           file: ./server/Dockerfile
           push: true
+          provenance: false # ACR 个人版不认 attestation 的 oci.empty manifest，双推必须关
           tags: |
             ghcr.io/pugaaa/howduothink-api:main
             ghcr.io/pugaaa/howduothink-api:sha-${{ github.sha }}
@@ -204,6 +205,7 @@ jobs:
           context: ./admin
           file: ./admin/Dockerfile
           push: true
+          provenance: false # ACR 个人版不认 attestation 的 oci.empty manifest，双推必须关
           build-args: |
             VITE_SENTRY_DSN=${{ secrets.ADMIN_SENTRY_DSN }}
             VITE_SENTRY_ENV=prod
@@ -239,6 +241,7 @@ jobs:
           context: ./web
           file: ./web/Dockerfile
           push: true
+          provenance: false # ACR 个人版不认 attestation 的 oci.empty manifest，双推必须关
           tags: |
             ghcr.io/pugaaa/howduothink-web:main
             ghcr.io/pugaaa/howduothink-web:sha-${{ github.sha }}
