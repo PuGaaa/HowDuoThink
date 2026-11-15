@@ -188,7 +188,8 @@ export function useAiChat(): {
   }
 
   /** 打开历史会话：详情消息与实时消息同构（role/content/sources → role/text/sources）；
-   * 思考中不切换，避免在途应答串进别的会话视图。 */
+   * 思考中不切换，避免在途应答串进别的会话视图。
+   * 加载失败：右侧视图整体换为错误气泡——静默无反馈会被当成「点击无反应」。 */
   async function openConversation(id: string): Promise<void> {
     if (thinking.value) return
     try {
@@ -202,6 +203,7 @@ export function useAiChat(): {
       viewEpoch++
     } catch (e) {
       console.warn('[ai] 会话详情加载失败', e)
+      messages.value = [{ role: 'assistant', text: ERR_NETWORK, error: true }]
     }
   }
 

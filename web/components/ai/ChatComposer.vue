@@ -59,7 +59,6 @@ onMounted(() => inputEl.value?.focus())
       </svg>
     </button>
   </div>
-  <p class="composer__hint">Enter 发送 · Shift + Enter 换行 · 回答基于案例库检索，请以出处为准</p>
 </template>
 
 <style scoped>
@@ -121,11 +120,5 @@ onMounted(() => inputEl.value?.focus())
   background: #ddd3c5;
   box-shadow: none;
   cursor: not-allowed;
-}
-.composer__hint {
-  margin: 10px 0 0;
-  text-align: center;
-  font-size: 12px;
-  color: var(--ink3);
 }
 </style>
