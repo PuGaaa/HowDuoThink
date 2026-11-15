@@ -6,6 +6,7 @@ LangChain 只负责模型 I/O——132 案例量级上 VectorStore 抽象是负�
 
 供应商分工：
 - 对话/起草 = DeepSeek（deepseek-chat，OpenAI 兼容端点，DEEPSEEK_API_KEY）
+- 对话思维链 = DeepSeek（deepseek-reasoner，同端点同 key，流式带用量）
 - 向量化 = fastembed 本地 BGE-M3（默认，ONNX CPU 推理）/ 智谱 embedding-3 / 内置字符 bigram 兜底
   （DeepSeek 无 embedding 端点，向量与生成按业界惯例分开选型）
 """
@@ -60,6 +61,24 @@ def chat_model():
         api_key=config.DEEPSEEK_API_KEY,
         temperature=0.3,
         timeout=60,
+    )
+
+
+@lru_cache(maxsize=1)
+def reasoner_model():
+    """DeepSeek 推理模型：对话走思维链（deepseek-reasoner），起草保持 chat_model 结构化输出。
+
+    stream_usage=True 让流式调用也回报 token 用量（审计不丢）；timeout=300 容纳推理长思考。
+    key 未配置时以占位串构造——openai SDK 在构造期即校验 key 非空，而调用方一律先过
+    available() 门，占位串永远不真正发起请求；dev/prod 配置真实 key 时原值直传。
+    """
+    return ChatOpenAI(
+        model=config.AI_REASONER_MODEL,
+        base_url=config.AI_BASE_URL,
+        api_key=config.DEEPSEEK_API_KEY or "unset-deepseek-key",
+        temperature=0.3,
+        timeout=300,
+        stream_usage=True,
     )
 
 

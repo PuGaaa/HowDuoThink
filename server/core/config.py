@@ -31,6 +31,7 @@ ALIYUN_PNVS_TEMPLATE_CODE = os.environ.get("ALIYUN_PNVS_TEMPLATE_CODE", "")
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.deepseek.com")
 AI_CHAT_MODEL = os.environ.get("AI_CHAT_MODEL", "deepseek-chat")
+AI_REASONER_MODEL = os.environ.get("AI_REASONER_MODEL", "deepseek-reasoner")
 
 # 数据库：所有环境统一 MySQL 8，MYSQL_* 仅配置连接与容量。
 DB_PROVIDER = "mysql"
