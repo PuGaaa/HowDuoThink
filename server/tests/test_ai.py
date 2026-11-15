@@ -190,10 +190,11 @@ def test_index_case_does_not_overwrite_newer_revision(monkeypatch):
 
 
 def test_cosine_ranking(monkeypatch):
-    """余弦排序：同向排前（mock embedding 避免触网）。"""
+    """余弦排序：同向排前（mock embedding 避免触网；可用性另测，此处显式钉 True 走向量路径）。"""
     from features.ai import service
 
     monkeypatch.setattr("features.ai.client.available", lambda: True)
+    monkeypatch.setattr("features.ai.client.embed_available", lambda: True)
 
     class FakeEmbeddings:
         model = "fake"
