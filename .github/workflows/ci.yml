@@ -53,6 +53,8 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # action 只自动探测不带点的 gitleaks.toml，我们的配置带点，必须显式指定
+          GITLEAKS_CONFIG: .gitleaks.toml
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip, cache-dependency-path: server/requirements-dev.lock }
       - run: pip install pip-audit && pip-audit -r server/requirements.lock
