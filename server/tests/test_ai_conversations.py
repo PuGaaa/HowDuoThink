@@ -104,12 +104,7 @@ def test_prune_keeps_latest():
         assert db.q("SELECT * FROM ai_messages WHERE conversation_id=?", (cid,)) == []
 
 
-# ────────────── service 层：chat 接入会话历史（LangChain 调用 monkeypatch，不触网） ──────────────
-
-
-class _FakeResp:
-    content = "模拟回答"
-    response_metadata = {"token_usage": {"prompt_tokens": 1, "completion_tokens": 1}}
+# ────────────── service 层：chat_stream 接入会话历史（LangChain 调用 monkeypatch，不触网） ──────────────
 
 
 class _FakeEmbed:
@@ -119,32 +114,37 @@ class _FakeEmbed:
         return [1.0, 0.0]
 
 
-def _mock_ai(monkeypatch, capture: list | None = None, invoke=None) -> None:
-    """patch service.client 三件套；capture 收集 invoke 的 messages，invoke 可注入失败。"""
+def _mock_ai(monkeypatch, capture: list | None = None, error: Exception | None = None) -> None:
+    """patch service.client 四件套；capture 收集 stream() 的 messages，error 注入流中失败。
+
+    假模型与 tests/test_ai_stream.py 的 _FakeStreamModel 同形状：单块 answer 增量带 usage_metadata。
+    """
+    from langchain_core.messages import AIMessageChunk
+
     from features.ai import client
+    from tests.test_ai_stream import _FakeStreamModel
 
-    class _FakeModel:
-        def invoke(self, messages):
-            if capture is not None:
-                capture.append(list(messages))
-            if invoke is not None:
-                invoke(messages)
-            return _FakeResp()
-
+    chunk = AIMessageChunk(
+        content="模拟回答", usage_metadata={"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
+    )
     monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "chat_model", lambda: _FakeModel())
+    monkeypatch.setattr(client, "reasoner_model", lambda: _FakeStreamModel([chunk], capture, error))
     monkeypatch.setattr(client, "embed_available", lambda: True)
     monkeypatch.setattr(client, "embeddings_model", lambda: _FakeEmbed())
 
 
+def _conv_id(evs: list[dict]) -> str:
+    """从事件流取 conversationId（sources 事件承载）。"""
+    return next(e for e in evs if e["type"] == "sources")["conversationId"]
+
+
 def test_chat_creates_conversation(monkeypatch):
-    """无 id 提问：创建会话，出参带 conversationId；落 user+assistant 两条，标题取问题前 30 字。"""
+    """无 id 提问：创建会话，sources 事件带 conversationId；落 user+assistant 两条，标题取问题前 30 字。"""
     _mock_ai(monkeypatch)
     uid = "u-svc-create"
     question = "连接池耗尽导致接口大面积超时应该怎么排查，请给出可执行的检查单"
-    r = service.chat(question, uid)
-    assert r["aiAvailable"] is True
-    conv_id = r["conversationId"]
+    evs = list(service.chat_stream(question, uid))
+    conv_id = _conv_id(evs)
     conv = repo.get_conversation(conv_id, uid)
     assert conv is not None
     assert conv["title"] == question[:30]
@@ -154,13 +154,13 @@ def test_chat_creates_conversation(monkeypatch):
 
 
 def test_chat_continuation_passes_history(monkeypatch):
-    """同会话第二问：invoke 的 messages 在最终 human 之前带第一问的 human/ai 对，历史至多 6 条。"""
+    """同会话第二问：stream 的 messages 在最终 human 之前带第一问的 human/ai 对，历史至多 6 条。"""
     captured: list[list] = []
     _mock_ai(monkeypatch, capture=captured)
     uid = "u-svc-hist"
-    r1 = service.chat("第一问：什么是缓存雪崩", uid)
-    r2 = service.chat("第二问：怎么预防雪崩", uid, conversation_id=r1["conversationId"])
-    assert r2["answer"] == "模拟回答"
+    evs1 = list(service.chat_stream("第一问：什么是缓存雪崩", uid))
+    evs2 = list(service.chat_stream("第二问：怎么预防雪崩", uid, conversation_id=_conv_id(evs1)))
+    assert "".join(e["text"] for e in evs2 if e["type"] == "answer") == "模拟回答"
     assert len(captured) == 2
     msgs = captured[1]
     assert msgs[0][0] == "system"
@@ -182,36 +182,34 @@ def test_chat_retrieval_query_concatenates_prev(monkeypatch):
     _mock_ai(monkeypatch)
     monkeypatch.setattr(service, "node_retrieve", fake_retrieve)
     uid = "u-svc-query"
-    r1 = service.chat("什么是缓存雪崩", uid)
-    service.chat("怎么预防雪崩", uid, conversation_id=r1["conversationId"])
+    evs1 = list(service.chat_stream("什么是缓存雪崩", uid))
+    list(service.chat_stream("怎么预防雪崩", uid, conversation_id=_conv_id(evs1)))
     assert queries[0] == "什么是缓存雪崩"
     assert "什么是缓存雪崩" in queries[1] and "怎么预防雪崩" in queries[1]
 
 
 def test_chat_foreign_conversation_404(monkeypatch):
-    """B 用户拿 A 的 conversationId 提问 → 404，B 不产生新会话，A 会话完好。"""
+    """B 用户拿 A 的 conversationId 提问 → chat_validate 404，B 不产生新会话，A 会话完好。"""
     _mock_ai(monkeypatch)
     uid_a, uid_b = "u-svc-a", "u-svc-b"
-    r = service.chat("A 的问题", uid_a)
+    evs = list(service.chat_stream("A 的问题", uid_a))
+    conv_id = _conv_id(evs)
     with pytest.raises(HTTPException) as ei:
-        service.chat("B 借会话提问", uid_b, conversation_id=r["conversationId"])
+        service.chat_validate("B 借会话提问", uid_b, conv_id)
     assert ei.value.status_code == 404
     assert repo.count_conversations(uid_b) == 0
-    assert repo.get_conversation(r["conversationId"], uid_a) is not None
+    assert repo.get_conversation(conv_id, uid_a) is not None
 
 
 def test_chat_model_failure_leaves_no_trace(monkeypatch):
-    """模型调用失败：返回固定文案（不泄露异常细节），该 uid 不产生任何会话。"""
-
-    def boom(messages):
-        raise RuntimeError("网络中断")
-
-    _mock_ai(monkeypatch, invoke=boom)
+    """模型流中途失败：error 事件固定文案（不泄露异常细节），该 uid 不产生任何会话。"""
+    _mock_ai(monkeypatch, error=RuntimeError("网络中断"))
     uid = "u-svc-fail"
-    r = service.chat("这个问题会失败", uid)
-    assert r["error"] == "服务暂时不可用，请稍后再试"
-    assert "RuntimeError" not in json.dumps(r, ensure_ascii=False)
-    assert r["aiAvailable"] is True
+    evs = list(service.chat_stream("这个问题会失败", uid))
+    err = next(e for e in evs if e["type"] == "error")
+    assert err["error"] == "服务暂时不可用，请稍后再试"
+    assert "RuntimeError" not in json.dumps(evs, ensure_ascii=False)
+    assert err["aiAvailable"] is True
     assert repo.count_conversations(uid) == 0
 
 
@@ -222,10 +220,10 @@ def test_prune_on_chat(monkeypatch):
     ids = {repo.create_conversation(uid, f"旧会话{i}") for i in range(100)}
     # 旧会话整体拨回过去，避免与本次提问产生的会话同秒并列导致淘汰不确定
     db.ex("UPDATE ai_conversations SET updated_at='2020-01-01 00:00:00' WHERE uid=?", (uid,))
-    r = service.chat("触发淘汰的提问", uid)
+    evs = list(service.chat_stream("触发淘汰的提问", uid))
     assert repo.count_conversations(uid) == 100
     remaining = {row["id"] for row in repo.list_conversations(uid, 500, 0)}
-    assert r["conversationId"] in remaining
+    assert _conv_id(evs) in remaining
     assert len(remaining & ids) == 99
 
 

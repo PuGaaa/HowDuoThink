@@ -1,7 +1,8 @@
 """ai 域业务逻辑：案例库 RAG 索引/检索/对话 + 投稿 AI 起草管线。
 
-纯节点设计（LangGraph 演进预留）：node_retrieve / node_answer / node_draft 各自独立、
-无隐藏状态——将来引入 LangGraph 时按图组装即可。检索层自研（SQLite+余弦）。
+纯节点设计（LangGraph 演进预留）：node_retrieve / node_answer_stream / node_draft 各自独立、
+无隐藏状态——将来引入 LangGraph 时按图组装即可。检索层自研（SQLite+余弦）；
+对话产出 SSE 事件流（status/reasoning/answer/sources/done），同步生成器由路由层在线程池迭代。
 """
 
 import json
@@ -9,6 +10,7 @@ import logging
 import math
 import threading
 import time
+from collections.abc import Generator
 
 from fastapi import HTTPException
 
@@ -245,13 +247,18 @@ def node_retrieve(query: str, k: int = 4) -> list[dict]:
 # ────────────────────────── 节点：应答 ──────────────────────────
 
 
-def node_answer(
+def node_answer_stream(
     question: str,
     chunks: list[dict],
     uid: str | None = None,
     history: list[tuple[str, str]] | None = None,
-) -> str:
-    """应答节点：检索结果 → system →（多轮上文，按序插在 system 与最终提问之间）→ GLM 回答。调用即审计。"""
+) -> Generator[dict]:
+    """应答节点（流式）：检索结果 → system →（多轮上文，按序插在 system 与最终提问之间）→ reasoner 思维链。
+
+    只 yield {"type": "reasoning"|"answer", "text": <增量>}；reasoning_content 与 answer 增量原样透传。
+    审计单点在 finally：ok 仅在 chunk 循环正常耗尽后置 True——成功/异常/GeneratorExit 三条路径
+    都恰好落一行 ai_usage（kind='chat'），末块 usage_metadata 的后包覆盖前包；思维链不落任何表。
+    """
     from features.ai import usage
 
     context = "\n\n────────\n".join(c["content"] for c in chunks) if chunks else "（案例库检索无结果）"
@@ -261,14 +268,23 @@ def node_answer(
         ("human", f"【案例库上下文】\n{context}\n\n【工程师的问题】\n{question}"),
     ]
     t0 = time.perf_counter()
+    ok = False
+    pin = pout = 0
     try:
-        resp = client.chat_model().invoke(messages)
-    except Exception:
-        usage.log_usage(uid, "chat", duration_ms=int((time.perf_counter() - t0) * 1000), ok=False)
-        raise
-    pin, pout = usage.extract_tokens(resp)
-    usage.log_usage(uid, "chat", pin, pout, int((time.perf_counter() - t0) * 1000))
-    return resp.content
+        for chunk in client.reasoner_model().stream(messages):
+            reasoning = (chunk.additional_kwargs or {}).get("reasoning_content")
+            if reasoning:
+                yield {"type": "reasoning", "text": reasoning}
+            content = chunk.content
+            if isinstance(content, str) and content:
+                yield {"type": "answer", "text": content}
+            usage_md = getattr(chunk, "usage_metadata", None)
+            if usage_md:
+                pin = int(usage_md.get("input_tokens") or 0)
+                pout = int(usage_md.get("output_tokens") or 0)
+        ok = True
+    finally:
+        usage.log_usage(uid, "chat", pin, pout, int((time.perf_counter() - t0) * 1000), ok=ok)
 
 
 def _conversation_context(conv_id: str) -> tuple[list[tuple[str, str]], str | None]:
@@ -279,33 +295,60 @@ def _conversation_context(conv_id: str) -> tuple[list[tuple[str, str]], str | No
     return history, prev_question
 
 
-def chat(question: str, uid: str, conversation_id: str | None = None) -> dict:
-    """RAG 对话入口：限速 → 日配额 → 会话校验 → 检索（拼上一问）→ 应答 → 落库 → 组装引用。
+def chat_validate(question: str, uid: str, conversation_id: str | None) -> None:
+    """会话属主校验（HTTP 404 出口，必须在 SSE 首字节前完成）：conversation_id 查无/非本人 → 404。
 
-    业务错误走 200 + error 字段；conversation_id 查无/非本人 → HTTPException(404)。
-    限速/配额判断在落库前，保证拒绝时不产生空会话；落库只在应答成功后进行（失败不落库）。
+    question 参数仅为与 chat_stream 保持统一调用形状；校验本身只用 uid + conversation_id。
+    """
+    if conversation_id is not None and not repo.get_conversation(conversation_id, uid):
+        raise HTTPException(status_code=404, detail="会话不存在或无权访问")
+
+
+def chat_stream(question: str, uid: str, conversation_id: str | None = None) -> Generator[dict]:
+    """RAG 对话流式入口：限速 → 日配额 → 检索（拼上一问）→ 思维链/答案增量透传 → 落库 → sources → done。
+
+    业务错误（可用性/限速/配额/模型失败）一律 yield error 事件（等价旧 200+error 字段），文案固定不泄露细节。
+    前置条件：本生成器不做会话属主校验——调用方必须先过 chat_validate（404 要以 HTTP 状态码在开流前返回）。
+    限速/配额判断在落库前，拒绝时不产生空会话；落库只在全量答案到手后进行（中断/失败不落库）。
     """
     if not client.available():
-        return {"error": "AI 服务暂未开放，稍后再试", "aiAvailable": False}
+        yield {"type": "error", "error": "AI 服务暂未开放，稍后再试", "aiAvailable": False}
+        return
     if not _rate_ok(uid):
-        return {"error": "提问太频繁，稍后再试", "aiAvailable": True}
+        yield {"type": "error", "error": "提问太频繁，稍后再试", "aiAvailable": True}
+        return
     if _daily_used(uid) >= int(settings.get("ai.daily_limit")):
         # 窗口限流之外的日硬顶：并发绕过窗口限流时，成本仍有每日上限兜底
-        return {"error": "今日提问次数已达上限，明天再来", "aiAvailable": True}
+        yield {"type": "error", "error": "今日提问次数已达上限，明天再来", "aiAvailable": True}
+        return
     history: list[tuple[str, str]] = []
     prev_question: str | None = None
     if conversation_id is not None:
-        # append_messages 无属主校验：必须先用 get_conversation 验存在与属主（查无/非本人一律 404）再继续
-        if not repo.get_conversation(conversation_id, uid):
-            raise HTTPException(status_code=404, detail="会话不存在或无权访问")
         history, prev_question = _conversation_context(conversation_id)
     query = f"{prev_question} {question}" if prev_question else question
+    yield {"type": "status", "phase": "retrieving"}
+    chunks = node_retrieve(query, k=4)
+    stream_gen = node_answer_stream(question, chunks, uid=uid, history=history)
+    answer_parts: list[str] = []
     try:
-        chunks = node_retrieve(query, k=4)
-        answer = node_answer(question, chunks, uid=uid, history=history)
+        # 先拉起模型流（首个增量缓存到 thinking 帧之后透传）：保证客户端断开（GeneratorExit）
+        # 发生在任何事件消费之前时，node_answer_stream 的 finally 审计依然可达、不丢台账
+        pending = next(stream_gen, None)
+        yield {"type": "status", "phase": "thinking", "hits": len(chunks)}
+        while pending is not None:
+            if pending["type"] == "answer":
+                answer_parts.append(pending["text"])
+            yield pending
+            pending = next(stream_gen, None)
     except Exception:
+        # 不捕 GeneratorExit（BaseException）：客户端断开沿生成器链传播，由内层 finally 审计
         logger.warning("[ai-chat] 应答失败 uid=%s conversation=%s", uid, conversation_id, exc_info=True)
-        return {"error": "服务暂时不可用，请稍后再试", "aiAvailable": True}
+        yield {"type": "error", "error": "服务暂时不可用，请稍后再试", "aiAvailable": True}
+        return
+    finally:
+        # 中断/异常路径显式关闭内层生成器，触发其 finally 审计；正常耗尽后 close() 为 no-op
+        stream_gen.close()
+    answer = "".join(answer_parts)
     sources = []
     seen = set()
     for c in chunks:
@@ -326,7 +369,8 @@ def chat(question: str, uid: str, conversation_id: str | None = None) -> dict:
         ],
     )
     repo.prune_conversations(uid, CONVERSATION_KEEP)
-    return {"answer": answer, "sources": sources, "aiAvailable": True, "conversationId": conversation_id}
+    yield {"type": "sources", "sources": sources, "conversationId": conversation_id}
+    yield {"type": "done"}
 
 
 # ────────────── 会话 HTTP 包装（路由只做参数接收与响应，业务与出参组装在此层） ──────────────
