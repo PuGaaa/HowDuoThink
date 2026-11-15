@@ -255,9 +255,10 @@ def node_answer_stream(
 ) -> Generator[dict]:
     """应答节点（流式）：检索结果 → system →（多轮上文，按序插在 system 与最终提问之间）→ reasoner 思维链。
 
-    只 yield {"type": "reasoning"|"answer", "text": <增量>}；reasoning_content 与 answer 增量原样透传。
-    审计单点在 finally：ok 仅在 chunk 循环正常耗尽后置 True——成功/异常/GeneratorExit 三条路径
-    都恰好落一行 ai_usage（kind='chat'），末块 usage_metadata 的后包覆盖前包；思维链不落任何表。
+    消费 client.reasoner_stream（OpenAI SDK 直连：LangChain 不透传 reasoning_content，理由见 client.py），
+    只 yield {"type": "reasoning"|"answer", "text": <增量>}；思维链与答案增量原样透传。
+    审计单点在 finally：ok 仅在事件循环正常耗尽后置 True——成功/异常/GeneratorExit 三条路径
+    都恰好落一行 ai_usage（kind='chat'），末包 usage 的后包覆盖前包；思维链不落任何表。
     """
     from features.ai import usage
 
@@ -271,17 +272,17 @@ def node_answer_stream(
     ok = False
     pin = pout = 0
     try:
-        for chunk in client.reasoner_model().stream(messages):
-            reasoning = (chunk.additional_kwargs or {}).get("reasoning_content")
+        for ev in client.reasoner_stream(messages):
+            reasoning = ev.get("reasoning")
             if reasoning:
                 yield {"type": "reasoning", "text": reasoning}
-            content = chunk.content
-            if isinstance(content, str) and content:
+            content = ev.get("content")
+            if content:
                 yield {"type": "answer", "text": content}
-            usage_md = getattr(chunk, "usage_metadata", None)
+            usage_md = ev.get("usage")
             if usage_md:
-                pin = int(usage_md.get("input_tokens") or 0)
-                pout = int(usage_md.get("output_tokens") or 0)
+                pin = int(usage_md.get("prompt_tokens") or 0)
+                pout = int(usage_md.get("completion_tokens") or 0)
         ok = True
     finally:
         usage.log_usage(uid, "chat", pin, pout, int((time.perf_counter() - t0) * 1000), ok=ok)

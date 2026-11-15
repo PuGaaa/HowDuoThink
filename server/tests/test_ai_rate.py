@@ -4,19 +4,9 @@ import datetime
 import threading
 
 from fastapi.testclient import TestClient
-from langchain_core.messages import AIMessageChunk
 
 import main  # noqa: F401
 from tests.conftest import login_admin, sse_events
-
-
-class _FakeModel:
-    """reasoner 流式形状：单块 answer 增量带 usage_metadata（与 chat_stream 消费形状一致）。"""
-
-    def stream(self, messages):
-        yield AIMessageChunk(
-            content="模拟回答", usage_metadata={"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
-        )
 
 
 class _FakeEmbed:
@@ -28,9 +18,10 @@ class _FakeEmbed:
 
 def _mock_ai(monkeypatch) -> None:
     from features.ai import client
+    from tests.test_ai_stream import _ans, _FakeReasonerStream, _usage
 
     monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "reasoner_model", lambda: _FakeModel())
+    monkeypatch.setattr(client, "reasoner_stream", _FakeReasonerStream([_ans("模拟回答"), _usage(1, 1)]))
     monkeypatch.setattr(client, "embed_available", lambda: True)
     monkeypatch.setattr(client, "embeddings_model", lambda: _FakeEmbed())
 

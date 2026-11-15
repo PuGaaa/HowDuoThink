@@ -2,52 +2,110 @@
 
 import json
 import os
+from types import SimpleNamespace
 
 import pytest
-from langchain_core.messages import AIMessageChunk
 
 import db
 
 
-def test_reasoner_model_binds_deepseek_streaming():
-    """对话模型：默认 deepseek-reasoner，流式带用量（审计不丢），300s 超时容纳长思考。"""
+def test_reasoner_client_binds_deepseek_direct(monkeypatch):
+    """直连客户端（原 reasoner_model 契约平移）：OpenAI SDK 构造参数同 base_url/key、timeout=300 容纳推理长思考。"""
     from core import config
     from features.ai import client
 
-    m = client.reasoner_model()
+    captured = {}
+
+    class _FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setattr("openai.OpenAI", _FakeOpenAI)
+    client._reasoner_client.cache_clear()
+    try:
+        client._reasoner_client()
+    finally:
+        client._reasoner_client.cache_clear()  # 防假客户端残留在 lru_cache 毒化其他用例
     assert config.AI_REASONER_MODEL == "deepseek-reasoner"
-    assert m.model_name == "deepseek-reasoner"
-    assert m.stream_usage is True
-    assert m.request_timeout == 300
+    assert captured["base_url"] == config.AI_BASE_URL
+    assert captured["api_key"] == (config.DEEPSEEK_API_KEY or "unset-deepseek-key")
+    assert captured["timeout"] == 300
 
 
-# ────────────── service 层：chat_stream 事件生成器（模型流 monkeypatch，不触网） ──────────────
+def test_reasoner_stream_maps_roles_and_emits_delta_events(monkeypatch):
+    """适配器契约：LangChain 角色元组映射 OpenAI dicts；逐 chunk 产 reasoning/content 事件，
+    末包 usage（include_usage）产 {"usage": {prompt_tokens, completion_tokens}}。"""
+    from core import config
+    from features.ai import client
+
+    captured = {}
+    chunks = [
+        SimpleNamespace(
+            usage=None, choices=[SimpleNamespace(delta=SimpleNamespace(reasoning_content="先想", content=None))]
+        ),
+        SimpleNamespace(
+            usage=None, choices=[SimpleNamespace(delta=SimpleNamespace(reasoning_content=None, content="答"))]
+        ),
+        # include_usage 末包：无 choices，仅带 usage
+        SimpleNamespace(usage=SimpleNamespace(prompt_tokens=11, completion_tokens=7), choices=[]),
+    ]
+
+    class _FakeCompletions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return iter(chunks)
+
+    fake_client = SimpleNamespace(chat=SimpleNamespace(completions=_FakeCompletions()))
+    monkeypatch.setattr(client, "_reasoner_client", lambda: fake_client)
+
+    evs = list(client.reasoner_stream([("system", "s"), ("human", "q"), ("ai", "a"), ("human", "q2")]))
+    assert evs == [{"reasoning": "先想"}, {"content": "答"}, {"usage": {"prompt_tokens": 11, "completion_tokens": 7}}]
+    assert captured["model"] == config.AI_REASONER_MODEL == "deepseek-reasoner"
+    assert captured["stream"] is True
+    assert captured["stream_options"] == {"include_usage": True}
+    assert captured["temperature"] == 0.3
+    assert captured["messages"] == [
+        {"role": "system", "content": "s"},
+        {"role": "user", "content": "q"},
+        {"role": "assistant", "content": "a"},
+        {"role": "user", "content": "q2"},
+    ]
 
 
-def _rc(text):  # reasoning 增量块
-    return AIMessageChunk(content="", additional_kwargs={"reasoning_content": text})
+# ────────────── service 层：chat_stream 事件生成器（reasoner_stream monkeypatch，不触网） ──────────────
 
 
-def _ans(text, usage=None):  # answer 增量块；末块带 usage_metadata
-    kw = {"usage_metadata": usage} if usage else {}
-    return AIMessageChunk(content=text, **kw)
+def _rc(text):  # reasoning 增量事件（SDK delta.reasoning_content 直传形状）
+    return {"reasoning": text}
 
 
-class _FakeStreamModel:
-    """按预设 chunk 序列逐个吐出；capture 收 stream() 收到的 messages；error 注入失败。"""
+def _ans(text):  # answer 增量事件
+    return {"content": text}
 
-    def __init__(self, chunks, capture=None, error=None):
-        self._chunks, self._capture, self._error = chunks, capture, error
 
-    def stream(self, messages):
+def _usage(pin, pout):  # 末包用量事件（stream_options.include_usage）
+    return {"usage": {"prompt_tokens": pin, "completion_tokens": pout}}
+
+
+class _FakeReasonerStream:
+    """按预设事件序列逐个吐出；capture 收 reasoner_stream() 收到的 messages；error 注入失败。"""
+
+    def __init__(self, events, capture=None, error=None):
+        self._events, self._capture, self._error = events, capture, error
+
+    def __call__(self, messages):
         if self._capture is not None:
             self._capture.append(list(messages))
-        yield from self._chunks
-        if self._error is not None:
-            raise self._error
+
+        def gen():
+            yield from self._events
+            if self._error is not None:
+                raise self._error
+
+        return gen()
 
 
-def _mock_stream(monkeypatch, chunks, capture=None, error=None):
+def _mock_stream(monkeypatch, events, capture=None, error=None):
     from features.ai import client
 
     class _FakeEmbed:
@@ -57,7 +115,7 @@ def _mock_stream(monkeypatch, chunks, capture=None, error=None):
             return [1.0, 0.0]
 
     monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "reasoner_model", lambda: _FakeStreamModel(chunks, capture, error))
+    monkeypatch.setattr(client, "reasoner_stream", _FakeReasonerStream(events, capture, error))
     monkeypatch.setattr(client, "embed_available", lambda: True)
     monkeypatch.setattr(client, "embeddings_model", lambda: _FakeEmbed())
 
@@ -67,11 +125,9 @@ def test_stream_event_sequence_and_persistence(monkeypatch):
     import db
     from features.ai import repo, service
 
-    # langchain UsageMetadata 必含 total_tokens（库 schema 钉死），其余取值与计划一致
-    usage_md = {"input_tokens": 11, "output_tokens": 7, "total_tokens": 18}
     _mock_stream(
         monkeypatch,
-        [_rc("先想"), _rc("后想"), _ans("答"), _ans("案"), _ans("", usage_md)],
+        [_rc("先想"), _rc("后想"), _ans("答"), _ans("案"), _usage(11, 7)],
     )
     monkeypatch.setattr(service, "node_retrieve", lambda q, k=4: [
         {"caseId": "case-src", "kind": "overview", "content": "c", "score": 0.9}])
@@ -95,7 +151,7 @@ def test_stream_event_sequence_and_persistence(monkeypatch):
             ("user", "连接池耗尽导致接口大面积超时怎么排查"), ("assistant", "答案")]
         all_content = json.dumps([dict(m) for m in repo.all_messages(src["conversationId"])], ensure_ascii=False)
         assert "先想" not in all_content
-        # usage 审计：末块 usage_metadata 进台账（kind='chat'，ok=1）
+        # usage 审计：末包 usage 进台账（kind='chat'，ok=1）
         row = db.q("SELECT prompt_tokens, completion_tokens, ok FROM ai_usage WHERE uid=? AND kind='chat'", (uid,))[-1]
         assert (row["prompt_tokens"], row["completion_tokens"], row["ok"]) == (11, 7, 1)
     finally:

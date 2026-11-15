@@ -6,7 +6,8 @@ LangChain 只负责模型 I/O——132 案例量级上 VectorStore 抽象是负�
 
 供应商分工：
 - 对话/起草 = DeepSeek（deepseek-chat，OpenAI 兼容端点，DEEPSEEK_API_KEY）
-- 对话思维链 = DeepSeek（deepseek-reasoner，同端点同 key，流式带用量）
+- 对话思维链 = DeepSeek（deepseek-reasoner，同端点同 key，OpenAI SDK 直连——
+  langchain-openai 1.7.3 会丢弃 delta.reasoning_content，LangChain 侧拿不到思维链，见 reasoner_stream）
 - 向量化 = fastembed 本地 BGE-M3（默认，ONNX CPU 推理）/ 智谱 embedding-3 / 内置字符 bigram 兜底
   （DeepSeek 无 embedding 端点，向量与生成按业界惯例分开选型）
 """
@@ -15,6 +16,7 @@ import hashlib
 import math
 import os
 import tempfile
+from collections.abc import Generator
 from functools import lru_cache
 from pathlib import Path
 
@@ -64,22 +66,66 @@ def chat_model():
     )
 
 
-@lru_cache(maxsize=1)
-def reasoner_model():
-    """DeepSeek 推理模型：对话走思维链（deepseek-reasoner），起草保持 chat_model 结构化输出。
+# ─────────────── 对话思维链：deepseek-reasoner（OpenAI SDK 直连） ───────────────
 
-    stream_usage=True 让流式调用也回报 token 用量（审计不丢）；timeout=300 容纳推理长思考。
+_REASONER_TIMEOUT = 300  # 容纳推理长思考（秒），与原 reasoner_model 契约一致
+_REASONER_TEMPERATURE = 0.3
+_ROLE_MAP = {"system": "system", "human": "user", "ai": "assistant"}  # LangChain 角色名 → OpenAI 角色名
+
+
+@lru_cache(maxsize=1)
+def _reasoner_client():
+    """DeepSeek 直连客户端（OpenAI SDK，同 AI_BASE_URL / DEEPSEEK_API_KEY）。
+
     key 未配置时以占位串构造——openai SDK 在构造期即校验 key 非空，而调用方一律先过
     available() 门，占位串永远不真正发起请求；dev/prod 配置真实 key 时原值直传。
     """
-    return ChatOpenAI(
-        model=config.AI_REASONER_MODEL,
+    from openai import OpenAI
+
+    return OpenAI(
         base_url=config.AI_BASE_URL,
         api_key=config.DEEPSEEK_API_KEY or "unset-deepseek-key",
-        temperature=0.3,
-        timeout=300,
-        stream_usage=True,
+        timeout=_REASONER_TIMEOUT,
     )
+
+
+def reasoner_stream(messages: list[tuple[str, str]]) -> Generator[dict]:
+    """推理模型流式适配器：LangChain 消息元组 → OpenAI SDK 直连 → 统一事件 dict。
+
+    LangChain 不透传 reasoning_content：langchain-openai 1.7.3 的 ChatOpenAI().stream() 会丢弃
+    delta.reasoning_content（additional_kwargs 全空），思维链只有裸 SDK 能拿到——此为本适配器存在理由。
+    事件 dict 键互斥、逐 chunk 产出：
+    - {"reasoning": <delta>}  思维链增量（delta.reasoning_content）
+    - {"content": <delta>}    答案增量（delta.content）
+    - {"usage": {"prompt_tokens": N, "completion_tokens": M}}  用量包（stream_options.include_usage，
+      DeepSeek 末包无 choices 仅带 usage；审计不丢，取代原 ChatOpenAI stream_usage=True）
+    """
+    payload = [{"role": _ROLE_MAP[role], "content": content} for role, content in messages]
+    stream = _reasoner_client().chat.completions.create(
+        model=config.AI_REASONER_MODEL,
+        messages=payload,
+        temperature=_REASONER_TEMPERATURE,
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+    for chunk in stream:
+        usage = getattr(chunk, "usage", None)
+        if usage:
+            yield {
+                "usage": {
+                    "prompt_tokens": int(usage.prompt_tokens or 0),
+                    "completion_tokens": int(usage.completion_tokens or 0),
+                }
+            }
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        reasoning = getattr(delta, "reasoning_content", None)
+        if reasoning:
+            yield {"reasoning": reasoning}
+        content = getattr(delta, "content", None)
+        if content:
+            yield {"content": content}
 
 
 # ─────────────── 向量化：fastembed BGE-M3（默认） ───────────────

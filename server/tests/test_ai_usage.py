@@ -3,21 +3,8 @@
 import datetime
 
 from fastapi.testclient import TestClient
-from langchain_core.messages import AIMessageChunk
 
 from tests.conftest import login_admin, make_client, sse_events
-
-
-class _FakeStreamModel:
-    """reasoner 流式形状：按预设 chunk 序列吐出；error 注入流中失败。"""
-
-    def __init__(self, chunks, error=None):
-        self._chunks, self._error = chunks, error
-
-    def stream(self, messages):
-        yield from self._chunks
-        if self._error is not None:
-            raise self._error
 
 
 class _FakeEmbed:
@@ -29,25 +16,22 @@ class _FakeEmbed:
         return [1.0, 0.0]
 
 
-def _mock_ai(monkeypatch, model):
-    """打桩 reasoner 流式模型与检索向量（node_retrieve 先于 node_answer_stream 执行）。"""
+def _mock_ai(monkeypatch, events, error: Exception | None = None):
+    """打桩 reasoner_stream 适配器（SDK 直连事件形状）与检索向量（node_retrieve 先于 node_answer_stream 执行）。"""
     from features.ai import client
+    from tests.test_ai_stream import _FakeReasonerStream
 
     monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "reasoner_model", lambda: model())
+    monkeypatch.setattr(client, "reasoner_stream", _FakeReasonerStream(events, None, error))
     monkeypatch.setattr(client, "embed_available", lambda: True)
     monkeypatch.setattr(client, "embeddings_model", lambda: _FakeEmbed())
 
 
 def test_chat_logs_token_usage(monkeypatch):
     import main
+    from tests.test_ai_stream import _ans, _usage
 
-    _mock_ai(
-        monkeypatch,
-        lambda: _FakeStreamModel(
-            [AIMessageChunk(content="模拟回答", usage_metadata={"input_tokens": 100, "output_tokens": 50, "total_tokens": 150})]
-        ),
-    )
+    _mock_ai(monkeypatch, [_ans("模拟回答"), _usage(100, 50)])
     with TestClient(main.app) as c:
         login_admin(c)
         r = c.post("/api/ai/chat", json={"question": "连接池耗尽怎么排查"})
@@ -66,7 +50,7 @@ def test_chat_logs_token_usage(monkeypatch):
 def test_llm_failure_logged_as_not_ok(monkeypatch):
     import main
 
-    _mock_ai(monkeypatch, lambda: _FakeStreamModel([], error=RuntimeError("上游超时")))
+    _mock_ai(monkeypatch, [], error=RuntimeError("上游超时"))
     with TestClient(main.app, raise_server_exceptions=False) as c:
         login_admin(c)
         r = c.post("/api/ai/chat", json={"question": "会触发异常的问题"})

@@ -116,20 +116,15 @@ class _FakeEmbed:
 
 
 def _mock_ai(monkeypatch, capture: list | None = None, error: Exception | None = None) -> None:
-    """patch service.client 四件套；capture 收集 stream() 的 messages，error 注入流中失败。
+    """patch service.client 四件套；capture 收集 reasoner_stream() 的 messages，error 注入流中失败。
 
-    假模型与 tests/test_ai_stream.py 的 _FakeStreamModel 同形状：单块 answer 增量带 usage_metadata。
+    假适配器与 tests/test_ai_stream.py 的 _FakeReasonerStream 同形状：单块 answer 增量 + 末包 usage。
     """
-    from langchain_core.messages import AIMessageChunk
-
     from features.ai import client
-    from tests.test_ai_stream import _FakeStreamModel
+    from tests.test_ai_stream import _ans, _FakeReasonerStream, _usage
 
-    chunk = AIMessageChunk(
-        content="模拟回答", usage_metadata={"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
-    )
     monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "reasoner_model", lambda: _FakeStreamModel([chunk], capture, error))
+    monkeypatch.setattr(client, "reasoner_stream", _FakeReasonerStream([_ans("模拟回答"), _usage(1, 1)], capture, error))
     monkeypatch.setattr(client, "embed_available", lambda: True)
     monkeypatch.setattr(client, "embeddings_model", lambda: _FakeEmbed())
 
