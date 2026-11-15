@@ -175,6 +175,7 @@ export function useAiChat(): {
       const status = (e as { status?: number } | null)?.status
       console.warn('[ai] 提问失败', status, e)
       if ((e as { name?: string } | null)?.name === 'AbortError') return // 主动中断（卸载/重置），不出气泡
+      if (gotError) return // error 帧已收（占位收尾+错误气泡已做）：其后连接硬断不再追加第二条兜底气泡
       finalizePlaceholder()
       messages.value.push({
         role: 'assistant',

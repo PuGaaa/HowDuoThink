@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { ChatMessage } from '~/composables/useAiChat'
 
-/** 右侧对话区：空态建议、消息气泡（含出处）、思考态。
- * 视觉沿用原单栏版；滚动逻辑随列表走——消息增删或思考态切换都滚到底。 */
+/** 右侧对话区：空态建议、消息气泡（含出处与思考折叠面板）、流式过程态液滴。
+ * 视觉沿用原单栏版；滚动逻辑随列表走——消息增删、正文/思维链增量都滚到底，
+ * 面板展开时思维链增长还会让面板内容区自身跟随到底。 */
 const props = defineProps<{
   messages: ChatMessage[]
   thinking: boolean
@@ -12,6 +13,9 @@ const emit = defineEmits<{
 }>()
 
 const listEl = ref<HTMLElement | null>(null)
+/** 思考面板开合：组件内单份状态（同一时刻只有一条流式消息持有 reasoning）。
+ * 默认展开跟流；新回合首个 reasoning 帧重新展开；首个正文增量自动折叠让位答案。 */
+const reasoningOpen = ref(true)
 
 const suggestions = [
   '连接池耗尽怎么排查？',
@@ -29,10 +33,71 @@ function scrollBottom() {
   })
 }
 
+/** 面板内容区滚到底：复用列表的瞬时滚动 + rAF 手法。面板随消息列表重排而重挂载，
+ * 不用 template ref（v-for 下会收成数组），取 DOM 序最后的面板——即持有 reasoning 的最后一条消息。 */
+function scrollPanelBottom() {
+  nextTick(() => {
+    const bodies = listEl.value?.querySelectorAll<HTMLElement>('.reasoning__body')
+    const el = bodies?.[bodies.length - 1]
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight })
+    requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight }))
+  })
+}
+
+/** 标题点击开合；手动展开时直接看到最新思维链 */
+function toggleReasoning() {
+  reasoningOpen.value = !reasoningOpen.value
+  if (reasoningOpen.value) scrollPanelBottom()
+}
+
+/** 过程态文案映射：retrieving→检索案例库中…（现行文案）、thinking→思考中…；
+ * answering 起液滴不再渲染，无文案。 */
+function phaseText(phase: ChatMessage['phase']): string {
+  if (phase === 'retrieving') return '检索案例库中…'
+  if (phase === 'thinking') return '思考中…'
+  return ''
+}
+
+/** 面板标题：流式中（无正文）「思考过程」；正文到达且结算出耗时 → 「已完成思考（N 秒）」；
+ * 有 reasoning 但无 answer 帧（如思考后连接中断）thoughtSeconds 缺省，保持「思考过程」。 */
+function reasoningTitle(m: ChatMessage): string {
+  if (m.text && m.thoughtSeconds !== undefined) return `已完成思考（${m.thoughtSeconds} 秒）`
+  return '思考过程'
+}
+
+const lastMsg = (): ChatMessage | undefined => props.messages[props.messages.length - 1]
+
 watch(
   () => [props.messages.length, props.thinking] as const,
   () => scrollBottom(),
   { immediate: true },
+)
+
+// 正文增量（气泡长高）与面板展开时的思维链增量都把列表滚到底；面板收起时思维链增长不打扰滚动
+watch(
+  () => {
+    const m = lastMsg()
+    return [(m?.text ?? '').length, reasoningOpen.value ? (m?.reasoning ?? '').length : 0] as const
+  },
+  () => scrollBottom(),
+)
+
+// 最后一条消息正文空→非空（首个 answer 帧）：自动折叠思考面板，让位给答案正文
+watch(
+  () => lastMsg()?.text ?? '',
+  (text, prev) => {
+    if (text && !prev) reasoningOpen.value = false
+  },
+)
+
+// 最后一条消息思维链空→非空（新回合首个 reasoning 帧）：重新展开面板；展开期间内容增长跟随滚到底
+watch(
+  () => lastMsg()?.reasoning ?? '',
+  (reasoning, prev) => {
+    if (reasoning && !prev) reasoningOpen.value = true
+    if (reasoningOpen.value) scrollPanelBottom()
+  },
 )
 </script>
 
@@ -72,6 +137,25 @@ watch(
           { glass: m.role !== 'user' && !m.error, 'bubble--err': m.error },
         ]"
       >
+        <!-- 过程态液滴：仅流式占位消息无正文时显示（retrieving/thinking），answering 起不再显示 -->
+        <div v-if="(m.phase === 'retrieving' || m.phase === 'thinking') && !m.text" class="bubble__phase">
+          <span class="flow" aria-hidden="true">
+            <span class="flow__drop"></span>
+            <span class="flow__drop"></span>
+            <span class="flow__drop"></span>
+          </span>
+          <span class="typing-label">{{ phaseText(m.phase) }}</span>
+        </div>
+        <!-- 思考折叠面板：仅 assistant 且持有 reasoning（流式占位及其完结形态；历史回放无此字段不渲染） -->
+        <div v-if="m.role === 'assistant' && m.reasoning" class="reasoning">
+          <button class="reasoning__head" type="button" :aria-expanded="reasoningOpen" @click="toggleReasoning">
+            <svg class="reasoning__caret" :class="{ 'reasoning__caret--open': reasoningOpen }" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+              <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span>{{ reasoningTitle(m) }}</span>
+          </button>
+          <div v-show="reasoningOpen" class="reasoning__body">{{ m.reasoning }}</div>
+        </div>
         <p v-if="m.role === 'assistant' && !m.error" class="bubble__text bubble__text--md" v-html="renderMarkdownLite(m.text)"></p>
         <p v-else class="bubble__text">{{ m.text }}</p>
         <div v-if="m.sources && m.sources.length > 0" class="bubble__sources">
@@ -80,23 +164,6 @@ watch(
             {{ s.title }}
           </NuxtLink>
         </div>
-      </div>
-    </div>
-
-    <div v-if="props.thinking" class="row">
-      <div class="row__avatar" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="16" height="16">
-          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="currentColor" />
-        </svg>
-      </div>
-      <div class="bubble bubble--bot bubble--typing glass">
-        <!-- 液滴流动思考态（任务 13）：三滴交错相位沿轨道滑行并拉伸变形 -->
-        <span class="flow" aria-hidden="true">
-          <span class="flow__drop"></span>
-          <span class="flow__drop"></span>
-          <span class="flow__drop"></span>
-        </span>
-        <span class="typing-label">检索案例库中…</span>
       </div>
     </div>
   </div>
@@ -225,12 +292,57 @@ watch(
   filter: brightness(0.95);
 }
 
-/* ---- 思考态：液滴流动（任务 13）---- */
-.bubble--typing {
+/* ---- 思考折叠面板（置于正文之上）：标题按钮 + pre-wrap 内容区 ---- */
+.reasoning {
+  margin-bottom: 10px;
+}
+.reasoning__head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12.5px;
+  color: var(--ink2); /* 玻璃底可读性（任务 13） */
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.reasoning__head:hover {
+  color: var(--ink);
+}
+.reasoning__caret {
+  transition: transform 0.15s;
+}
+.reasoning__caret--open {
+  transform: rotate(90deg);
+}
+/* 内容区：pre-wrap 保留思维链原始换行；2px 竖线锚定层级；限高内部滚动 */
+.reasoning__body {
+  margin-top: 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  color: var(--ink2);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.reasoning__body::-webkit-scrollbar {
+  width: 6px;
+}
+.reasoning__body::-webkit-scrollbar-thumb {
+  background: var(--edge-cream);
+  border-radius: 999px;
+}
+
+/* ---- 过程态：流式占位无正文时的液滴+阶段文案（原独立思考气泡并入占位气泡）---- */
+.bubble__phase {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  margin-bottom: 6px;
 }
 /* 三滴沿 64px 轨道左→右滑行，途中非均匀缩放模拟液滴拉伸/表面张力，
  * 交错 1/3 周期相位形成连续液流；只动画 transform/opacity（合成器路径），不动画 filter */
