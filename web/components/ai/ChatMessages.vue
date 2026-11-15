@@ -191,7 +191,10 @@ onBeforeUnmount(clearFoldTimer)
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 6px 4px 18px;
+  /* 负 margin 把滚动容器顶到视口顶（吃掉页面的 69px 顶栏让位），padding-top 在容器内
+   * 补回首条消息的位置——滚动时文字经过 0~69px 被顶栏磨砂盖住，而不是被容器边缘硬裁 */
+  margin-top: -69px;
+  padding: 75px 4px 18px;
   overflow-y: auto;
 }
 /* 全屏布局：滚动容器贴窗口右缘（滚动条贴边），内容列居中限宽保证可读性 */

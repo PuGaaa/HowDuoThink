@@ -40,13 +40,14 @@ function relTime(iso: string): string {
 
 <template>
   <div class="conv">
-    <button class="conv__new" @click="emit('create')">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
-        <path d="M12 5v14M5 12h14" />
-      </svg>
-      新对话
-    </button>
     <div class="conv__scroll">
+      <!-- sticky 钉在顶栏下缘（69px）：列表滚入顶栏磨砂区时按钮保持可见（AI 页全屏化布局） -->
+      <button class="conv__new" @click="emit('create')">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        新对话
+      </button>
       <p v-if="props.items.length === 0" class="conv__empty">还没有历史会话，提问后自动保存</p>
       <div
         v-for="c in props.items"
@@ -75,6 +76,9 @@ function relTime(iso: string): string {
   min-height: 0;
 }
 .conv__new {
+  position: sticky;
+  top: 69px;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -86,8 +90,8 @@ function relTime(iso: string): string {
   padding: 9px 12px;
   font-size: 13.5px;
   font-weight: 700;
-  /* 玻璃侧栏上的文字（任务 13）：--coral 仅 2.3:1，用任务 11 验证过的 --coral-ink（≥4.79:1） */
-  color: var(--coral-ink);
+  /* 中性深字（coral-ink 橙棕被反馈配色不佳）；hover 描边保留珊瑚做交互点缀 */
+  color: var(--ink);
   cursor: pointer;
   box-shadow: 0 3px 0 var(--edge-cream);
   transition: border-color 0.15s, transform 0.1s;
@@ -120,6 +124,13 @@ function relTime(iso: string): string {
   text-align: center;
   line-height: 1.8;
 }
+/* sticky 顶值 69px = AI 页顶栏实高（顶栏变化时与 ai.vue 的 :has 块同步）；
+ * 按钮自带上底色，滚过的列表文字被其遮住。窄幅抽屉盖住顶栏（z-50），钉回抽屉顶部 */
+@media (max-width: 899px) {
+  .conv__new {
+    top: 12px;
+  }
+}
 .conv__item {
   display: flex;
   align-items: center;
@@ -132,7 +143,8 @@ function relTime(iso: string): string {
   background: var(--well);
 }
 .conv__item--active {
-  background: var(--coral-soft);
+  /* 激活态与 hover 同中性底，靠标题加粗区分（coral-soft 橙底被反馈配色不佳） */
+  background: var(--well);
 }
 .conv__main {
   flex: 1;

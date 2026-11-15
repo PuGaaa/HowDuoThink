@@ -149,21 +149,24 @@ useHead({ title: 'AI 排错 · 好多星社区' })
   display: flex;
 }
 /* 侧栏玻璃材质：背景/边框/阴影交给全局 .glass（glass.css）；
- * 全屏化后贴左全高直角面板（GPT 侧栏同构），桌面与 <900px 抽屉是同一元素 */
+ * 贴左全高直角面板（GPT 侧栏同构）。滚动容器上移进顶栏区（margin 负值技巧），
+ * 列表文字滚过 0~69px 时透过顶栏磨砂可见，而不是被容器边缘硬裁；
+ * 「新对话」按钮 sticky 钉在顶栏下缘（ConversationList 内） */
 .ai__side {
   flex: none;
   width: 260px;
   min-height: 0;
   border-radius: 0;
-  padding: 12px;
+  padding: 0 12px;
 }
 .ai__chat {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  /* 右侧 padding 收窄到 8px：滚动条贴窗口右缘；内容列本身居中，与滚动条天然有距离 */
-  padding: 12px 8px 0 20px;
+  /* 顶部让位由 .list 的负 margin + padding 承担（滚动容器顶到视口顶，内容穿顶栏磨砂）；
+   * 右侧 padding 收窄到 8px：滚动条贴窗口右缘；内容列本身居中，与滚动条天然有距离 */
+  padding: 0 8px 0 20px;
 }
 .composer-col {
   flex: none;
@@ -222,18 +225,22 @@ useHead({ title: 'AI 排错 · 好多星社区' })
     box-shadow: 8px 0 24px rgba(74, 68, 88, 0.18), var(--glass-inset);
   }
   .ai__chat {
-    padding: 12px 16px 0 14px;
+    /* 移动端顶栏同样悬浮：消息区避开 69px 顶垫，滚过时被磨砂透出 */
+    padding: 69px 16px 0 14px;
   }
 }
 </style>
 
 <!-- 非 scoped：/ai 全屏化需穿透壳层（.shell/.main/.footer 不带本页 data-v 属性）。
-     仅全站顶栏保留，内容撑满视口、页脚隐藏；69px 为顶栏实高（顶栏高度变化时同步此值）。 -->
+     69px 为顶栏实高（顶栏高度变化时同步所有出现处）。内容上移 69px 钻到顶栏底下：
+     顶栏是 backdrop-filter 磨砂玻璃，列表/消息滚过时被模糊透出（ChatGPT 同款），
+     故 shell 从视口顶开始占满 100dvh，顶栏悬浮其上。 -->
 <style>
 .shell:has(.ai) {
   max-width: none;
   padding: 0;
-  height: calc(100dvh - 69px);
+  margin-top: -69px;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -244,5 +251,10 @@ useHead({ title: 'AI 排错 · 好多星社区' })
 }
 .shell:has(.ai) .footer {
   display: none;
+}
+/* AI 页顶栏更透（全局 0.58 太实，透出感弱）：本页内容穿过顶栏的磨砂阅读感是布局的一部分，
+   兄弟 :has 仅命中 AI 页，不影响其他页面的顶栏 */
+.topbar--full:has(~ .shell .ai) {
+  background: rgba(255, 255, 255, 0.32);
 }
 </style>
