@@ -12,7 +12,10 @@ LangChain 只负责模型 I/O——132 案例量级上 VectorStore 抽象是负�
 
 import hashlib
 import math
+import os
+import tempfile
 from functools import lru_cache
+from pathlib import Path
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
@@ -22,6 +25,30 @@ import core.config as config
 def available() -> bool:
     """是否具备对话/起草能力（DEEPSEEK_API_KEY 已配置）。"""
     return len(config.DEEPSEEK_API_KEY) > 0
+
+
+def _fastembed_cache_dir() -> Path:
+    """fastembed 实际使用的缓存目录（对齐其自身解析顺序：显式配置 > FASTEMBED_CACHE_PATH > 系统临时目录）。"""
+    if config.FASTEMBED_CACHE_DIR:
+        return Path(config.FASTEMBED_CACHE_DIR)
+    env_dir = os.environ.get("FASTEMBED_CACHE_PATH")
+    if env_dir:
+        return Path(env_dir)
+    return Path(tempfile.gettempdir()) / "fastembed_cache"
+
+
+def _fastembed_hf_repo() -> str | None:
+    """EMBED_MODEL 在 fastembed 模型表里的真实 HF 源仓库（静态表，离线可查）。
+
+    不能按 EMBED_MODEL 字面量拼缓存目录名：如 bge-small-zh-v1.5 字面量是 BAAI/...，
+    实际源是 Qdrant/...——缓存目录 models--<源仓库> 只跟源走。惰性导入避免启动加载 onnxruntime。
+    """
+    from fastembed.text.text_embedding import TextEmbedding
+
+    for desc in TextEmbedding.list_supported_models():
+        if desc["model"] == config.EMBED_MODEL:
+            return (desc.get("sources") or {}).get("hf")
+    return None
 
 
 @lru_cache(maxsize=1)
@@ -105,9 +132,19 @@ class LocalEmbeddings:
 
 
 def embed_available() -> bool:
-    """向量供应商是否就绪（fastembed/local 恒真；zhipu 需 key）。"""
+    """向量供应商是否就绪（fastembed 要求模型已在本地缓存，缓存缺失→检索走 LIKE 降级；
+    local 恒真；zhipu 需 key）。判定门 = fastembed 离线加载的同一文件：
+    缓存目录下 models--<HF源仓库>/files_metadata.json；运行时禁止外网下载
+    （生产服务器直连 HF 不通，首用下载会挂 50~60s 后抛异常 → search 500 / chat 504，
+    2026-11-15 事故）。"""
     if config.EMBED_PROVIDER == "zhipu":
         return len(config.ZHIPU_API_KEY) > 0
+    if config.EMBED_PROVIDER == "fastembed":
+        repo = _fastembed_hf_repo()
+        if not repo:
+            return False
+        metadata = _fastembed_cache_dir() / ("models--" + repo.replace("/", "--")) / "files_metadata.json"
+        return metadata.is_file()
     return True
 
 
