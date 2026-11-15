@@ -40,14 +40,14 @@ function relTime(iso: string): string {
 
 <template>
   <div class="conv">
+    <!-- 「新对话」绝对定位钉在顶栏左端空白区（视口最顶），不随列表滚动——顶部固定，非浮动 -->
+    <button class="conv__new" @click="emit('create')">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      新对话
+    </button>
     <div class="conv__scroll">
-      <!-- sticky 钉在顶栏下缘（69px）：列表滚入顶栏磨砂区时按钮保持可见（AI 页全屏化布局） -->
-      <button class="conv__new" @click="emit('create')">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        新对话
-      </button>
       <p v-if="props.items.length === 0" class="conv__empty">还没有历史会话，提问后自动保存</p>
       <div
         v-for="c in props.items"
@@ -103,11 +103,16 @@ function relTime(iso: string): string {
   transform: translateY(2px);
   box-shadow: 0 1px 0 var(--edge-cream);
 }
+.conv {
+  position: relative;
+}
 .conv__scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  margin-top: 12px;
+  /* 顶部让出「新对话」按钮高度（81 + 40 + 16）：列表首项从按钮下方开始，
+   * 滚动时文字向上滚出、消失在按钮后方——不再穿入顶栏磨砂区（0~69px 仍保留该效果） */
+  padding-top: 137px;
   padding-right: 2px;
 }
 .conv__scroll::-webkit-scrollbar {
@@ -124,12 +129,30 @@ function relTime(iso: string): string {
   text-align: center;
   line-height: 1.8;
 }
-/* sticky 顶值 69px = AI 页顶栏实高（顶栏变化时与 ai.vue 的 :has 块同步）；
- * 按钮自带上底色，滚过的列表文字被其遮住。窄幅抽屉盖住顶栏（z-50），钉回抽屉顶部 */
-@media (max-width: 899px) {
-  .conv__new {
-    top: 12px;
-  }
+/* absolute 恒定钉在顶栏下缘（69px 顶栏 + 12px 间距 = top 81）：
+ * 「一直在顶部」且不随列表滚动——sticky 方案会让按钮浮在滚动的列表文字上，被否掉；
+ * 81 > 顶栏 69，不在磨砂区内，文字清晰。列表滚动容器 padding-top 让出按钮高度 */
+.conv__new {
+  position: absolute;
+  top: 81px;
+  left: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1.5px solid var(--line);
+  background: var(--well);
+  border-radius: 12px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  /* 中性深字（coral-ink 橙棕被反馈配色不佳）；hover 描边保留珊瑚做交互点缀 */
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--edge-cream);
+  transition: border-color 0.15s, transform 0.1s;
 }
 .conv__item {
   display: flex;
