@@ -83,20 +83,25 @@ watch(
   () => scrollBottom(),
 )
 
-// 最后一条消息正文空→非空（首个 answer 帧）：自动折叠思考面板，让位给答案正文
+// 正文/思维链开合的单一决策源：拆成两个 watch 存在注册顺序竞态——answer 首包与 reasoning
+// 增量落在同一网络 chunk（readSse 同批分派 → 同一次 Vue flush）时，折叠 watch 先注册先执行，
+// 展开 watch 随后执行且其自身 prev 仍是上一批的空串而复燃 open，「已完成思考」标题下面板仍展开。
+// 合并后同一次回调内基于同一组新旧值决策，answer 到达语义优先：text 空转非空必折叠，
+// 同批无论 reasoning 怎么变都不复燃。
 watch(
-  () => lastMsg()?.text ?? '',
-  (text, prev) => {
-    if (text && !prev) reasoningOpen.value = false
+  () => {
+    const m = lastMsg()
+    return [m?.text ?? '', m?.reasoning ?? ''] as const
   },
-)
-
-// 最后一条消息思维链空→非空（新回合首个 reasoning 帧）：重新展开面板；展开期间内容增长跟随滚到底
-watch(
-  () => lastMsg()?.reasoning ?? '',
-  (reasoning, prev) => {
-    if (reasoning && !prev) reasoningOpen.value = true
-    if (reasoningOpen.value) scrollPanelBottom()
+  ([text, reasoning], [prevText, prevReasoning]) => {
+    if (text && !prevText) {
+      // 首个 answer 帧：自动折叠让位答案正文（同批 reasoning 变化到此为止，不再进入展开分支）
+      reasoningOpen.value = false
+    } else if (reasoning && !prevReasoning && !text) {
+      // 新回合首个 reasoning 帧（正文未到）：重新展开面板
+      reasoningOpen.value = true
+    }
+    if (reasoning !== prevReasoning && reasoningOpen.value) scrollPanelBottom() // 展开期间思维链增长跟随滚到底
   },
 )
 </script>
