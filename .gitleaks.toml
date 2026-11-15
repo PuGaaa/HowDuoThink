@@ -1,20 +1,19 @@
 # gitleaks 自定义配置——默认规则全部保留，只对已人工核实的误报做精准豁免。
-# 核验记录（2026-11-15，run #37 全量扫描 9 条，逐条过目，无真实密钥）：
+# 核验记录（2026-11-15，dispatch 全量扫描 9 条，逐条过目，无真实密钥）：
 #   app/utils/storage.ts、app/utils/reminder.ts
 #     —— H5 前端 localStorage 键名常量（KEY_* = 'think_*_v1' 及清缓存比对），非凭据
 #   server/features/cases/official_ids.json
 #     —— 官方案例的内容寻址 ID（64 位十六进制指纹，公开教学数据，非凭据）
-# 再遇新误报：先人工核验内容，确认非密钥后在此追加 allowlist；不许全局关规则。
+# ⚠️ gitleaks-action@v2 当前锁定 gitleaks 8.24.3：只认旧版单数 [allowlist] 表；
+#    复数 [[allowlists]] + targetRules 是 8.25.0 新语法，会被静默忽略（已踩坑验证）。
+# 再遇新误报：先人工核验内容，确认非密钥后在此追加路径；不许全局关规则。
 
 [extend]
 useDefault = true
 
-[[allowlists]]
-description = "H5 前端 storage 键名常量被 generic-api-key 误报"
-paths = ['''^app/utils/(storage|reminder)\.ts$''']
-targetRules = ["generic-api-key"]
-
-[[allowlists]]
-description = "官方案例内容 ID 被 generic-api-key 误报"
-paths = ['''^server/features/cases/official_ids\.json$''']
-targetRules = ["generic-api-key"]
+[allowlist]
+description = "已核实的 generic-api-key 误报：前端 storage 键名常量与官方案例内容 ID"
+paths = [
+  '''^app/utils/(storage|reminder)\.ts$''',
+  '''^server/features/cases/official_ids\.json$''',
+]
