@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 import db
 import main
 from features.ai import repo, service
+from tests.conftest import sse_events
 
 _PW = os.environ["ADMIN_PASSWORD"] + "-conv"
 
@@ -245,6 +246,11 @@ def _login(c: TestClient, login_name: str) -> None:
     assert r.status_code == 200, r.text
 
 
+def _http_conv_id(resp) -> str:
+    """HTTP SSE 响应 → conversationId（sources 帧承载；等价旧 r.json()["conversationId"]）。"""
+    return next(d for e, d in sse_events(resp) if e == "sources")["conversationId"]
+
+
 def test_http_list_pagination_cap(monkeypatch):
     """列表接口：默认 limit=20、出 items/total；limit>50 / limit<1 / offset<0 → 422。"""
     _mock_ai(monkeypatch)
@@ -254,7 +260,7 @@ def test_http_list_pagination_cap(monkeypatch):
     _login(c, "u-http-list")
     r = c.post("/api/ai/chat", json={"question": "连接池耗尽导致接口大面积超时应该怎么排查"})
     assert r.status_code == 200, r.text
-    conv_id = r.json()["conversationId"]
+    conv_id = _http_conv_id(r)
     # 再补 20 个会话凑成 21 个；补的拨回过去，保证新提问的会话排最前（排序契约确定性）
     for i in range(20):
         repo.create_conversation(uid, f"补充会话{i}")
@@ -285,7 +291,7 @@ def test_http_detail_and_delete_flow(monkeypatch):
     _login(c, "u-http-flow")
     r = c.post("/api/ai/chat", json={"question": "缓存雪崩怎么预防"})
     assert r.status_code == 200, r.text
-    conv_id = r.json()["conversationId"]
+    conv_id = _http_conv_id(r)
 
     assert conv_id in [i["id"] for i in c.get("/api/ai/conversations").json()["items"]]
 
@@ -320,7 +326,7 @@ def test_http_foreign_detail_404(monkeypatch):
     _login(ca, "u-http-a")
     cb = TestClient(main.app)
     _login(cb, "u-http-b")
-    conv_id = ca.post("/api/ai/chat", json={"question": "A 的第一个问题足够长"}).json()["conversationId"]
+    conv_id = _http_conv_id(ca.post("/api/ai/chat", json={"question": "A 的第一个问题足够长"}))
 
     assert cb.get(f"/api/ai/conversations/{conv_id}").status_code == 404
     assert cb.delete(f"/api/ai/conversations/{conv_id}").status_code == 404

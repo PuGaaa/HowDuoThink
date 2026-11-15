@@ -4,19 +4,19 @@ import datetime
 import threading
 
 from fastapi.testclient import TestClient
+from langchain_core.messages import AIMessageChunk
 
 import main  # noqa: F401
-from tests.conftest import login_admin
-
-
-class _FakeResp:
-    content = "模拟回答"
-    response_metadata = {"token_usage": {"prompt_tokens": 1, "completion_tokens": 1}}
+from tests.conftest import login_admin, sse_events
 
 
 class _FakeModel:
-    def invoke(self, messages):
-        return _FakeResp()
+    """reasoner 流式形状：单块 answer 增量带 usage_metadata（与 chat_stream 消费形状一致）。"""
+
+    def stream(self, messages):
+        yield AIMessageChunk(
+            content="模拟回答", usage_metadata={"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
+        )
 
 
 class _FakeEmbed:
@@ -30,7 +30,7 @@ def _mock_ai(monkeypatch) -> None:
     from features.ai import client
 
     monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "chat_model", lambda: _FakeModel())
+    monkeypatch.setattr(client, "reasoner_model", lambda: _FakeModel())
     monkeypatch.setattr(client, "embed_available", lambda: True)
     monkeypatch.setattr(client, "embeddings_model", lambda: _FakeEmbed())
 
@@ -95,7 +95,8 @@ def test_daily_quota_blocks_after_limit(monkeypatch):
             login_admin(c)
             r = c.post("/api/ai/chat", json={"question": "额度用完了还能问吗"})
             assert r.status_code == 200
-            assert "上限" in r.json()["error"]
+            evs = sse_events(r)
+            assert evs[0][0] == "error" and "上限" in evs[0][1]["error"]
             rows = db.q("SELECT COUNT(*) AS n FROM ai_usage WHERE uid='pw-admin' AND kind='chat'")
             assert rows[0]["n"] == 2  # 未新增模型调用
     finally:

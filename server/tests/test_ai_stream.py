@@ -1,6 +1,7 @@
 """AI 对话流式化测试：事件序列/审计/契约迁移。"""
 
 import json
+import os
 
 import pytest
 from langchain_core.messages import AIMessageChunk
@@ -187,3 +188,113 @@ def test_chat_validate_raises_404_for_foreign(monkeypatch):
     service.chat_validate("问", "u-validate-a", conv_id)  # 本人 → 不抛
     service.chat_validate("问", "u-validate-b", None)  # 首问 → 不抛
     db.ex("DELETE FROM ai_conversations WHERE uid='u-validate-a'")
+
+
+# ────────────── HTTP 层：SSE 流式契约（TestClient，建号+登录拿 cookie，复用任务 2 的 mock 搭法） ──────────────
+
+_PW = os.environ["ADMIN_PASSWORD"] + "-stream"
+
+
+def make_user(login_name: str) -> None:
+    """测试库直接建号（bcrypt 密码），再走标准登录拿 cookie（与 tests/test_ai_conversations.py 同款）。"""
+    from core import security
+
+    db.ex(
+        "INSERT INTO users(id, login, name, role, password_hash) VALUES(?,?,?,?,?) "
+        "ON CONFLICT(id) DO UPDATE SET role=excluded.role, password_hash=excluded.password_hash",
+        (f"pw-{login_name}", login_name, login_name, "user", security.hash_password(_PW)),
+    )
+
+
+def login(c, login_name: str) -> None:
+    r = c.post("/api/auth/login", json={"login": login_name, "password": _PW})
+    assert r.status_code == 200, r.text
+
+
+def test_http_sse_contract(monkeypatch):
+    """HTTP 契约：content-type/响应头/帧序（评审聚焦点 3、4）。
+
+    最小假模型（无 reasoning/answer 增量）→ 帧序恰为 status,status,sources,done；
+    答案完整性的断言面由 service 级用例守。"""
+    from fastapi.testclient import TestClient
+
+    import main
+    from features.ai import service
+    from tests.conftest import sse_events
+
+    _mock_stream(monkeypatch, [])
+    monkeypatch.setattr(service, "node_retrieve", lambda q, k=4: [])
+    c = TestClient(main.app)
+    make_user("u-http-sse")
+    login(c, "u-http-sse")
+    r = c.post("/api/ai/chat", json={"question": "缓存雪崩怎么预防"})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/event-stream")
+    assert r.headers["cache-control"] == "no-cache"
+    assert r.headers["x-accel-buffering"] == "no"
+    evs = sse_events(r)
+    assert [e for e, _ in evs] == ["status", "status", "sources", "done"]
+    # data 不携带 type 键（类型在 event 行）
+    assert all("type" not in d for _, d in evs)
+
+
+def test_http_foreign_conversation_404_before_stream(monkeypatch):
+    """他人会话 id：404 且响应不是 event-stream（校验发生在首字节前）。"""
+    from fastapi.testclient import TestClient
+
+    import main
+    from features.ai import repo, service
+    from tests.conftest import sse_events
+
+    _mock_stream(monkeypatch, [])
+    monkeypatch.setattr(service, "node_retrieve", lambda q, k=4: [])
+    make_user("u-http-404a")
+    make_user("u-http-404b")
+    ca = TestClient(main.app)
+    cb = TestClient(main.app)
+    login(ca, "u-http-404a")
+    login(cb, "u-http-404b")
+    r = ca.post("/api/ai/chat", json={"question": "A 的开场问题足够长"})
+    conv_id = next(d for e, d in sse_events(r) if e == "sources")["conversationId"]
+    rb = cb.post("/api/ai/chat", json={"question": "B 借用他人会话提问", "conversationId": conv_id})
+    assert rb.status_code == 404
+    assert "event-stream" not in rb.headers["content-type"]
+    # B 不产生新会话，A 的会话完好
+    assert repo.count_conversations("pw-u-http-404b") == 0
+    assert repo.get_conversation(conv_id, "pw-u-http-404a") is not None
+
+
+def test_http_401_without_login():
+    """未登录：401 在开流前以 HTTP 状态码返回。"""
+    from fastapi.testclient import TestClient
+
+    import main
+
+    r = TestClient(main.app).post("/api/ai/chat", json={"question": "未登录提问足够长"})
+    assert r.status_code == 401
+
+
+def test_http_retrieval_crash_still_yields_error_frame(monkeypatch):
+    """检索在 chat_stream 的 try 块之外裸抛（任务 2 评审契约）：HTTP 层必须收到
+    error 帧（固定文案）而非 500/断流；异常细节不外泄。"""
+    from fastapi.testclient import TestClient
+
+    import main
+    from features.ai import service
+    from tests.conftest import sse_events
+
+    _mock_stream(monkeypatch, [])
+
+    def boom(q, k=4):
+        raise RuntimeError("索引库炸了")
+
+    monkeypatch.setattr(service, "node_retrieve", boom)
+    c = TestClient(main.app)
+    make_user("u-http-retr")
+    login(c, "u-http-retr")
+    r = c.post("/api/ai/chat", json={"question": "检索崩了也要有 error 帧"})
+    assert r.status_code == 200
+    evs = sse_events(r)
+    assert [e for e, _ in evs] == ["status", "error"]
+    assert evs[1][1] == {"error": "服务暂时不可用，请稍后再试", "aiAvailable": True}
+    assert "RuntimeError" not in r.text

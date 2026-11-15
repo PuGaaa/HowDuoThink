@@ -3,18 +3,21 @@
 import datetime
 
 from fastapi.testclient import TestClient
+from langchain_core.messages import AIMessageChunk
 
-from tests.conftest import login_admin, make_client
-
-
-class _FakeResp:
-    content = "模拟回答"
-    response_metadata = {"token_usage": {"prompt_tokens": 100, "completion_tokens": 50}}
+from tests.conftest import login_admin, make_client, sse_events
 
 
-class _FakeModel:
-    def invoke(self, messages):
-        return _FakeResp()
+class _FakeStreamModel:
+    """reasoner 流式形状：按预设 chunk 序列吐出；error 注入流中失败。"""
+
+    def __init__(self, chunks, error=None):
+        self._chunks, self._error = chunks, error
+
+    def stream(self, messages):
+        yield from self._chunks
+        if self._error is not None:
+            raise self._error
 
 
 class _FakeEmbed:
@@ -27,11 +30,11 @@ class _FakeEmbed:
 
 
 def _mock_ai(monkeypatch, model):
-    """同时打桩对话模型与检索向量（node_retrieve 先于 node_answer 执行）。"""
+    """打桩 reasoner 流式模型与检索向量（node_retrieve 先于 node_answer_stream 执行）。"""
     from features.ai import client
 
     monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "chat_model", lambda: model())
+    monkeypatch.setattr(client, "reasoner_model", lambda: model())
     monkeypatch.setattr(client, "embed_available", lambda: True)
     monkeypatch.setattr(client, "embeddings_model", lambda: _FakeEmbed())
 
@@ -39,14 +42,20 @@ def _mock_ai(monkeypatch, model):
 def test_chat_logs_token_usage(monkeypatch):
     import main
 
-    _mock_ai(monkeypatch, _FakeModel)
+    _mock_ai(
+        monkeypatch,
+        lambda: _FakeStreamModel(
+            [AIMessageChunk(content="模拟回答", usage_metadata={"input_tokens": 100, "output_tokens": 50, "total_tokens": 150})]
+        ),
+    )
     with TestClient(main.app) as c:
         login_admin(c)
         r = c.post("/api/ai/chat", json={"question": "连接池耗尽怎么排查"})
         assert r.status_code == 200, r.text
+        assert [e for e, _ in sse_events(r)] == ["status", "status", "answer", "sources", "done"]
         import db
 
-        rows = db.q("SELECT * FROM ai_usage WHERE kind='chat'")
+        rows = db.q("SELECT * FROM ai_usage WHERE kind='chat' AND uid='pw-admin'")
         assert len(rows) == 1
         assert rows[0]["prompt_tokens"] == 100
         assert rows[0]["completion_tokens"] == 50
@@ -57,20 +66,17 @@ def test_chat_logs_token_usage(monkeypatch):
 def test_llm_failure_logged_as_not_ok(monkeypatch):
     import main
 
-    class Boom:
-        def invoke(self, messages):
-            raise RuntimeError("上游超时")
-
-    _mock_ai(monkeypatch, Boom)
+    _mock_ai(monkeypatch, lambda: _FakeStreamModel([], error=RuntimeError("上游超时")))
     with TestClient(main.app, raise_server_exceptions=False) as c:
         login_admin(c)
         r = c.post("/api/ai/chat", json={"question": "会触发异常的问题"})
-        # 模型失败走友好报错（200 + error），不再裸 500
+        # 模型失败走友好报错（200 + error 帧），不再裸 500
         assert r.status_code == 200
-        assert r.json()["error"] == "服务暂时不可用，请稍后再试"
+        evs = sse_events(r)
+        assert evs[-1][0] == "error" and evs[-1][1]["error"] == "服务暂时不可用，请稍后再试"
         import db
 
-        rows = db.q("SELECT * FROM ai_usage WHERE kind='chat' AND ok=0")
+        rows = db.q("SELECT * FROM ai_usage WHERE kind='chat' AND ok=0 AND uid='pw-admin'")
         assert len(rows) == 1
 
 
