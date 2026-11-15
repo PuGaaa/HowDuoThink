@@ -19,7 +19,9 @@ services:
       - "127.0.0.1:${MYSQL_PORT:-13306}:3306"
 
   api:
-    image: ghcr.io/pugaaa/howduothink-api:${HDX_IMAGE_TAG:-main}
+    # 镜像源整体覆盖：部署机 .env 设 HDX_API_IMAGE=ACR VPC 内网全引用（国内拉取秒级）；
+    # 留空/不设 = 回退 GHCR（HDX_IMAGE_TAG 仍可选标签，回滚填 sha-<commit>）
+    image: ${HDX_API_IMAGE:-ghcr.io/pugaaa/howduothink-api:${HDX_IMAGE_TAG:-main}}
     restart: unless-stopped
     env_file: .env
     depends_on:
