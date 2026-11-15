@@ -308,7 +308,7 @@ watch(
 }
 .bubble__sources-label {
   font-size: 12px;
-  color: var(--ink2); /* 玻璃底可读性（任务 13） */
+  color: var(--ink2); /* 「出处」是信息性标签，需 ≥4.5:1——ink3 装饰级不够 */
 }
 .bubble__source {
   font-size: 12.5px;

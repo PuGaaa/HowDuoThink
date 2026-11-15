@@ -12,11 +12,13 @@
      4.5:1 要求需更深一档；#A94E24 在玻璃/色团所有组合下 ≥4.5:1（见任务 11 报告） */
   --coral-ink: #a94e24;
   --ink: #4a4458;
-  --ink2: #7a7290;
-  --ink3: #afa8bd;
-  --mint: #fafafa;
+  --ink2: #6e6686;
+  --ink3: #9d95b0;
+  --mint: #5fc9a5;
   --mint-soft: #e9f7f1;
-  --mint-deep: #fafafa;
+  /* 薄荷文字色：改版时误写成 #fafafa——mint-soft 底上仅 ~1.05:1（出处胶囊/案例标签/教训块
+     文字全部不可见）；#2e7d5b 是改版前旧值，mint-soft 上 4.57:1、白底 5.05:1，≥4.5:1 达标 */
+  --mint-deep: #2e7d5b;
   --sky: #6fb8e8;
   --sky-soft: #eaf4fc;
   --lemon: #ffc94d;
@@ -93,7 +95,7 @@ body {
   padding: 26px 0;
 }
 .footer {
-  color: var(--ink3);
+  color: var(--ink2);
   font-size: 12px;
   text-align: center;
   padding: 30px 0;
@@ -184,12 +186,12 @@ body {
   border-color: var(--coral);
 }
 .field .hint {
-  color: var(--ink3);
+  color: var(--ink2);
   font-size: 12px;
   margin-top: 4px;
 }
 .muted {
-  color: var(--ink3);
+  color: var(--ink2);
   font-size: 13px;
 }
 .step {
