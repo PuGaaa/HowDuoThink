@@ -179,6 +179,14 @@ watch(
   padding: 6px 4px 18px;
   overflow-y: auto;
 }
+/* 全屏布局：滚动容器贴窗口右缘（滚动条贴边），内容列居中限宽保证可读性 */
+.list > .row,
+.list > .empty {
+  max-width: 52rem;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
 .list::-webkit-scrollbar {
   width: 6px;
 }

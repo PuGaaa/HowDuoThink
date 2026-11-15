@@ -71,18 +71,12 @@ useHead({ title: 'AI 排错 · 好多星社区' })
 
 <template>
   <div class="ai">
-    <header class="ai__head">
-      <div>
-        <h1 class="ai__title">AI 排错</h1>
-        <p class="ai__sub">基于 132 个真实故障案例 · 可能原因 / 排查步骤 / 出处引用</p>
-      </div>
-      <button class="ai__sessions" @click="drawerOpen = true">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
-          <path d="M4 6h16M4 12h16M4 18h10" />
-        </svg>
-        会话
-      </button>
-    </header>
+    <!-- 「会话」触发器：≥900px 侧栏常驻隐藏；<900px 侧栏为抽屉，左上浮动按钮开合 -->
+    <button class="ai__sessions" aria-label="打开会话列表" @click="drawerOpen = true">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+        <path d="M4 6h16M4 12h16M4 18h10" />
+      </svg>
+    </button>
 
     <div v-if="!loaded" class="ai__loading muted">加载中……</div>
     <div v-else-if="!user" class="card ai__gate">
@@ -104,53 +98,25 @@ useHead({ title: 'AI 排错 · 好多星社区' })
       </aside>
       <section class="ai__chat">
         <ChatMessages :messages="messages" :thinking="thinking" @suggest="onSuggest" />
-        <ChatComposer v-model="draft" :thinking="thinking" @send="onSend" />
+        <div class="composer-col">
+          <ChatComposer v-model="draft" :thinking="thinking" @send="onSend" />
+        </div>
       </section>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* 全屏化布局：.ai 撑满 .main（其高度由本页非 scoped :has 规则钉死为视口余量），
+ * 页面级 chrome 只剩全站顶栏——页头/页脚/壳层内边距全部退场 */
 .ai {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 210px);
-  min-height: 480px;
-}
-.ai__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 12px;
-}
-.ai__title {
-  font-size: 25px;
-  font-weight: 800;
-  margin: 0;
-}
-.ai__sub {
-  margin: 5px 0 0;
-  color: var(--ink2);
-  font-size: 13.5px;
+  height: 100%;
+  min-height: 0;
 }
 .ai__sessions {
   display: none;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  border: 1.5px solid var(--line);
-  background: #fff;
-  border-radius: 999px;
-  padding: 6px 16px;
-  font-size: 13px;
-  color: var(--ink2);
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-.ai__sessions:hover {
-  color: var(--coral);
-  border-color: var(--coral);
 }
 .ai__loading {
   padding: 40px 0;
@@ -159,6 +125,7 @@ useHead({ title: 'AI 排错 · 好多星社区' })
 
 /* ---- 登录引导 ---- */
 .ai__gate {
+  margin: auto;
   text-align: center;
   padding: 40px 20px;
 }
@@ -175,20 +142,19 @@ useHead({ title: 'AI 排错 · 好多星社区' })
   line-height: 1.9;
 }
 
-/* ---- 双栏编排 ---- */
+/* ---- 双栏编排：侧栏贴左全高，聊天区撑满余量；内容列（消息/输入框）居中限宽 ---- */
 .ai__layout {
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 14px;
 }
-/* 侧栏玻璃材质（任务 13）：背景/边框/阴影全部交给全局 .glass（glass.css），
- * 桌面栏与 <900px 抽屉是同一元素，材质天然一致；此处只留布局与圆角 */
+/* 侧栏玻璃材质：背景/边框/阴影交给全局 .glass（glass.css）；
+ * 全屏化后贴左全高直角面板（GPT 侧栏同构），桌面与 <900px 抽屉是同一元素 */
 .ai__side {
   flex: none;
   width: 260px;
   min-height: 0;
-  border-radius: 16px;
+  border-radius: 0;
   padding: 12px;
 }
 .ai__chat {
@@ -196,11 +162,39 @@ useHead({ title: 'AI 排错 · 好多星社区' })
   min-width: 0;
   display: flex;
   flex-direction: column;
+  /* 右侧 padding 收窄到 8px：滚动条贴窗口右缘；内容列本身居中，与滚动条天然有距离 */
+  padding: 12px 8px 0 20px;
+}
+.composer-col {
+  flex: none;
+  max-width: 52rem;
+  width: 100%;
+  margin: 14px auto 14px;
 }
 
 @media (max-width: 899px) {
+  /* 抽屉触发器：<900px 侧栏收进抽屉，左上浮动钮开合（桌面侧栏常驻不显示）；
+   * z-index 低于抽屉遮罩(40)：抽屉开着时点遮罩关闭，按钮不截胡 */
   .ai__sessions {
     display: inline-flex;
+    position: fixed;
+    top: 82px;
+    left: 14px;
+    z-index: 30;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1.5px solid var(--line);
+    background: var(--card);
+    border-radius: 10px;
+    color: var(--ink2);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .ai__sessions:hover {
+    color: var(--coral);
+    border-color: var(--coral);
   }
   .ai__mask {
     position: fixed;
@@ -227,10 +221,28 @@ useHead({ title: 'AI 排错 · 好多星社区' })
     /* 抽屉推开时的方向性投影 + 玻璃内高光（覆盖 .glass 外阴影，内高光保留材质感） */
     box-shadow: 8px 0 24px rgba(74, 68, 88, 0.18), var(--glass-inset);
   }
-}
-@media (max-width: 560px) {
-  .ai {
-    height: calc(100vh - 180px);
+  .ai__chat {
+    padding: 12px 16px 0 14px;
   }
+}
+</style>
+
+<!-- 非 scoped：/ai 全屏化需穿透壳层（.shell/.main/.footer 不带本页 data-v 属性）。
+     仅全站顶栏保留，内容撑满视口、页脚隐藏；69px 为顶栏实高（顶栏高度变化时同步此值）。 -->
+<style>
+.shell:has(.ai) {
+  max-width: none;
+  padding: 0;
+  height: calc(100dvh - 69px);
+  display: flex;
+  flex-direction: column;
+}
+.shell:has(.ai) .main {
+  padding: 0;
+  flex: 1;
+  min-height: 0;
+}
+.shell:has(.ai) .footer {
+  display: none;
 }
 </style>
