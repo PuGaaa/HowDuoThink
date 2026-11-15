@@ -129,17 +129,12 @@ watch(
     </div>
 
     <div v-for="(m, i) in props.messages" :key="i" :class="m.role === 'user' ? 'row row--user' : 'row'">
-      <div v-if="m.role === 'assistant'" class="row__avatar" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="16" height="16">
-          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" fill="currentColor" />
-        </svg>
-      </div>
-      <!-- 助手气泡走玻璃材质（任务 13）；错误气泡不上玻璃，保持既有错误态视觉 -->
+      <!-- AI 回答走文档流（无容器无头像），只有用户消息保留气泡——不对称本身就是信息层级 -->
       <div
         :class="[
           'bubble',
           m.role === 'user' ? 'bubble--user' : 'bubble--bot',
-          { glass: m.role !== 'user' && !m.error, 'bubble--err': m.error },
+          { 'bubble--err': m.error },
         ]"
       >
         <!-- 过程态液滴：仅流式占位消息无正文时显示（retrieving/thinking），answering 起不再显示 -->
@@ -199,25 +194,9 @@ watch(
 .row--user {
   justify-content: flex-end;
 }
-.row__avatar {
-  flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--lemon-soft);
-  color: var(--coral);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 3px 0 var(--edge-cream);
-}
-.row__avatar svg {
-  margin-top: 1px;
-}
 
-/* ---- 气泡 ---- */
+/* ---- 气泡：AI 回答 = 文档流（无容器无头像，宽度整栏）；用户消息 = 气泡 ---- */
 .bubble {
-  max-width: 82%;
   padding: 11px 15px;
   font-size: 14.5px;
   line-height: 1.8;
@@ -225,17 +204,22 @@ watch(
   word-break: break-word;
 }
 .bubble--user {
+  max-width: 82%;
   background: linear-gradient(135deg, var(--coral), #f97043);
   color: #fff;
   border-radius: 18px 18px 4px 18px;
   box-shadow: 0 4px 14px rgba(255, 122, 80, 0.25);
 }
-/* 助手气泡玻璃材质（任务 13）：背景/边框/阴影交给 .glass，阴影体系冲突以 .glass 为准；
- * 错误气泡不上 glass，其红底/红边在 .bubble--err 里保持原样 */
+/* AI 回答无边界感：透明无框无阴影、零内边距，靠排版与留白阅读（对齐 ChatGPT 文档流范式）；
+ * 出处行下虚线继续充当「回答结束」的视觉标记 */
 .bubble--bot {
+  max-width: 100%;
+  padding: 2px 0;
   color: var(--ink);
-  border-radius: 4px 18px 18px 18px;
+  background: transparent;
+  border-radius: 0;
 }
+/* 错误是告警不是内容：保留容器感（红底红边 + 内边距），与文档流形成反差 */
 .bubble--err {
   background: var(--red-soft);
   box-shadow: none;
@@ -504,7 +488,7 @@ watch(
 }
 
 @media (max-width: 560px) {
-  .bubble {
+  .bubble--user {
     max-width: 88%;
   }
 }
