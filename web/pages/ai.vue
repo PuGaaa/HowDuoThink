@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import ConversationList from '~/components/ai/ConversationList.vue'
-import ChatMessages from '~/components/ai/ChatMessages.vue'
-import ChatComposer from '~/components/ai/ChatComposer.vue'
+import ConversationList from "~/components/ai/ConversationList.vue";
+import ChatMessages from "~/components/ai/ChatMessages.vue";
+import ChatComposer from "~/components/ai/ChatComposer.vue";
 
 /** AI 排错页：双栏会话编排。左栏会话列表（服务端持久化），右栏对话区；
  * <900px 左栏收进抽屉，顶栏「会话」按钮开合。气泡/出处/空态视觉在子组件内沿用原版。
  * 登录门禁：未登录只渲染引导面板并弹登录弹窗，绝不请求会话列表（与 /me 页同一模式）。 */
-const { user, ensure } = useCurrentUser()
-const { open: openLogin } = useLoginPrompt()
+const { user, ensure } = useCurrentUser();
+const { open: openLogin } = useLoginPrompt();
 const {
   messages,
   thinking,
@@ -18,62 +18,75 @@ const {
   openConversation,
   removeConversation,
   newConversation,
-} = useAiChat()
+} = useAiChat();
 
-const loaded = ref(false)
-const drawerOpen = ref(false)
-const draft = ref('')
+const loaded = ref(false);
+const drawerOpen = ref(false);
+const draft = ref("");
 
 // 登录态就绪即拉会话列表：以用户 id 为触发键（与 /me 页一致），
 // 未登录时本 watch 不触发，列表请求一次都不会发出
 watch(
   () => user.value?.id,
   (id) => {
-    if (!id) return
-    loaded.value = true
-    void loadConversations()
+    if (!id) return;
+    loaded.value = true;
+    void loadConversations();
   },
   { immediate: true },
-)
+);
 
 onMounted(async () => {
-  await ensure()
+  await ensure();
   // 未登录（或权威资料拉取失败）：停止加载态，展示登录引导面板
-  if (!user.value) loaded.value = true
-})
+  if (!user.value) loaded.value = true;
+});
 
 function onSend() {
-  const q = draft.value
-  draft.value = ''
-  void send(q)
+  const q = draft.value;
+  draft.value = "";
+  void send(q);
 }
 
 function onSuggest(s: string) {
-  void send(s)
+  void send(s);
 }
 
 function onSelect(id: string) {
-  drawerOpen.value = false
-  void openConversation(id)
+  drawerOpen.value = false;
+  void openConversation(id);
 }
 
 function onRemove(id: string) {
-  void removeConversation(id)
+  void removeConversation(id);
 }
 
 function onCreate() {
-  drawerOpen.value = false
-  newConversation()
+  drawerOpen.value = false;
+  newConversation();
 }
 
-useHead({ title: 'AI 排错 · 好多星社区' })
+useHead({ title: "AI 排错 · 好多星社区" });
 </script>
 
 <template>
   <div class="ai">
     <!-- 「会话」触发器：≥900px 侧栏常驻隐藏；<900px 侧栏为抽屉，左上浮动按钮开合 -->
-    <button class="ai__sessions" aria-label="打开会话列表" @click="drawerOpen = true">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+    <button
+      class="ai__sessions"
+      aria-label="打开会话列表"
+      @click="drawerOpen = true"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        width="15"
+        height="15"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.2"
+        stroke-linecap="round"
+        aria-hidden="true"
+      >
         <path d="M4 6h16M4 12h16M4 18h10" />
       </svg>
     </button>
@@ -81,7 +94,9 @@ useHead({ title: 'AI 排错 · 好多星社区' })
     <div v-if="!loaded" class="ai__loading muted">加载中……</div>
     <div v-else-if="!user" class="card ai__gate">
       <p class="ai__gate-title">登录后开始提问</p>
-      <p class="ai__gate-sub">与 AI 排错助手多轮对话，历史会话自动保存，随时回看。</p>
+      <p class="ai__gate-sub">
+        与 AI 排错助手多轮对话，历史会话自动保存，随时回看。
+      </p>
       <button class="btn" @click="openLogin">去登录</button>
     </div>
 
@@ -97,7 +112,11 @@ useHead({ title: 'AI 排错 · 好多星社区' })
         />
       </aside>
       <section class="ai__chat">
-        <ChatMessages :messages="messages" :thinking="thinking" @suggest="onSuggest" />
+        <ChatMessages
+          :messages="messages"
+          :thinking="thinking"
+          @suggest="onSuggest"
+        />
         <div class="composer-col">
           <ChatComposer v-model="draft" :thinking="thinking" @send="onSend" />
         </div>
@@ -159,7 +178,9 @@ useHead({ title: 'AI 排错 · 好多星社区' })
   border-radius: 0;
   padding: 0 12px;
   /* 贴边面板不要 .glass 的悬浮外阴影（0 24px 64px）——直角贴边形态下投影只会糊在内容区上；
-   * 仅保留玻璃底与 blur。<900px 抽屉态的方向性投影另在媒体块保留（浮层层级需要） */
+   * 仅保留玻璃底与 blur。<900px 抽屉态的方向性投影另在媒体块保留（浮层层级需要）。
+   * 顶部让位不在此处垫 padding：滚动容器已负 margin 顶到视口顶（内容穿顶栏磨砂），
+   * 「新对话」按钮由 sticky top 钉在顶栏下缘——这里再垫 padding 会双重偏移 */
   box-shadow: none;
 }
 .ai__chat {
@@ -169,7 +190,7 @@ useHead({ title: 'AI 排错 · 好多星社区' })
   flex-direction: column;
   /* 顶部让位由 .list 的负 margin + padding 承担（滚动容器顶到视口顶，内容穿顶栏磨砂）；
    * 右侧 padding 收窄到 8px：滚动条贴窗口右缘；内容列本身居中，与滚动条天然有距离 */
-  padding: 0 8px 0 20px;
+  padding: 100px 8px 0 20px;
 }
 .composer-col {
   flex: none;
@@ -196,7 +217,9 @@ useHead({ title: 'AI 排错 · 好多星社区' })
     border-radius: 10px;
     color: var(--ink2);
     cursor: pointer;
-    transition: color 0.15s, border-color 0.15s;
+    transition:
+      color 0.15s,
+      border-color 0.15s;
   }
   .ai__sessions:hover {
     color: var(--coral);
@@ -225,7 +248,9 @@ useHead({ title: 'AI 排错 · 好多星社区' })
   .ai__side--open {
     transform: translateX(0);
     /* 抽屉推开时的方向性投影 + 玻璃内高光（覆盖 .glass 外阴影，内高光保留材质感） */
-    box-shadow: 8px 0 24px rgba(74, 68, 88, 0.18), var(--glass-inset);
+    box-shadow:
+      8px 0 24px rgba(74, 68, 88, 0.18),
+      var(--glass-inset);
   }
   .ai__chat {
     /* 移动端顶栏同样悬浮：消息区避开 69px 顶垫，滚过时被磨砂透出 */
