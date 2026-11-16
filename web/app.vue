@@ -39,7 +39,7 @@ function backToProfile() {
     <header class="topbar topbar--full">
       <div class="topbar__inner">
         <NuxtLink to="/" class="topbar__brand">
-          <span class="topbar__brand-full">好多星 HowDuoThink · 社区</span>
+          <span class="topbar__brand-full">好多星 HowDuoThink</span>
           <span class="topbar__brand-short">好多星 · 社区</span>
         </NuxtLink>
         <nav class="topbar__nav">

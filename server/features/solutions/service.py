@@ -30,12 +30,16 @@ def article_view(r) -> dict:
     ).model_dump(by_alias=True)
 
 
-def list_solutions(layer: str | None, page: int, size: int) -> dict:
+def list_solutions(domain: str | None, page: int, size: int) -> dict:
+    """domain 是六个枚举分类（network/data/build/runtime/deploy/concurrency）；
+    layer 存的是每案例一句的经验文案，只做展示不做过滤。"""
     where, params = "1=1", []
-    if layer:
-        where, params = "layer=?", [layer]
+    if domain:
+        where, params = "domain=?", [domain]
     rows = db.q(
-        f"SELECT * FROM articles WHERE {where} ORDER BY published_at DESC LIMIT ? OFFSET ?",
+        # id 作 tiebreaker：published_at 是秒级时间戳，同秒批量种入时全并列，
+        # 各页 OFFSET 窗口会因并列排序不稳定而跨页重复/漏行——必须构成全序
+        f"SELECT * FROM articles WHERE {where} ORDER BY published_at DESC, id LIMIT ? OFFSET ?",
         tuple(params) + (size, (page - 1) * size),
     )
     total = db.q(f"SELECT COUNT(*) AS n FROM articles WHERE {where}", tuple(params))[0]["n"]

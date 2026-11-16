@@ -14,4 +14,7 @@ if [ -z "${JWT_SECRET:-}" ]; then
   exit 1
 fi
 export ENV=dev
-exec "$(dirname "$0")/.venv/bin/uvicorn" main:app --port 8000
+# 走 python -m 而不是 .venv/bin/uvicorn：console 脚本的内核 shebang 无法容纳含空格的
+# 路径（项目目录带空格时 uvicorn 脚本会 bad interpreter）；python 解释器本体不受限。
+# （venv 里的 console 脚本已另行改为 sh polyglot 跳板，见 .venv/bin/uvicorn 首两行）
+exec .venv/bin/python -m uvicorn main:app --port 8000
