@@ -65,6 +65,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* AI 页进出时顶栏内容「向两边展开/收拢」的过渡（:has 规则在 pages/ai.vue 全局块翻转
+   * max-width 1280px↔100vw）。声明必须放全站常驻样式：页面级样式块离开 /ai 时会被
+   * Nuxt 移除，transition 随之消失，跳变就发生在无 transition 的瞬间（动画必失） */
+  transition: max-width 480ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar__inner {
+    transition: none;
+  }
 }
 .topbar__brand {
   font-weight: 800;

@@ -285,4 +285,13 @@ useHead({ title: "AI 排错 · 好多星社区" });
 .topbar--full:has(~ .shell .ai) {
   background: rgba(255, 255, 255, 0.32);
 }
+/* AI 页顶栏内容向两边撑满（普通页收在 1280 居中容器里，AI 页全屏化后 brand 贴左/nav 贴右）。
+   max-width 1280px↔100vw 都是可插值长度：:has 状态翻转时 CSS transition 自动双向播放
+   「向两边展开/向内收拢」；100vw 在本页成立——全屏化后页面无文档级滚动，无滚动条宽度误差 */
+.topbar--full:has(~ .shell .ai) .topbar__inner {
+  max-width: 100vw;
+  padding: 18px 24px;
+}
+/* 过渡声明放全站常驻 main.css——页面级样式块在离开 /ai 时会被 Nuxt 移除，
+   transition 声明随之消失，max-width 跳变就发生在无 transition 的瞬间（动画必失） */
 </style>
