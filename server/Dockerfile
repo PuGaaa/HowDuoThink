@@ -11,6 +11,9 @@ RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='BA
 # 镜像内禁 HF 联网（fastembed download_model 读取该变量）：缓存命中秒级加载；万一缓存缺失
 # 也秒级报错（retries=1），不再挂 60s——可用性判定见 features/ai/client.py embed_available
 ENV HF_HUB_OFFLINE=1
+# 嵌入推理限单线程，压内存峰值（2026-11-16 事故：1.8G 小内存宿主机上批量嵌入触发
+# 全局 OOM，内核挑 RSS 最大的 mysqld 杀掉——见部署与运维说明文档「内存红线」节）
+ENV OMP_NUM_THREADS=1
 COPY . .
 EXPOSE 8001
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
