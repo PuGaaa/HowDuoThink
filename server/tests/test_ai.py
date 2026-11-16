@@ -96,16 +96,17 @@ def _client() -> TestClient:
 
 
 def test_chat_degrades_without_key(monkeypatch):
-    """无 key：chat 返回降级提示（不做关键词兜底应答）。"""
+    """无 key：chat 开流即吐降级 error 帧（不做关键词兜底应答）。"""
+    from tests.conftest import sse_events
+
     monkeypatch.setattr("features.ai.client.available", lambda: False)
     c = _client()
     make_user(c, "u1")
     login(c, "u1")
     r = c.post("/api/ai/chat", json={"question": "连接池耗尽怎么排查"})
     assert r.status_code == 200
-    d = r.json()
-    assert d["aiAvailable"] is False
-    assert "暂未开放" in d["error"]
+    evs = sse_events(r)
+    assert evs[0] == ("error", {"error": "AI 服务暂未开放，稍后再试", "aiAvailable": False})
 
 
 def test_search_degrades_to_keyword(monkeypatch):

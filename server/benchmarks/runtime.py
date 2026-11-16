@@ -165,7 +165,7 @@ def serve():
     instrument(coredb, "_mysql_conn", "mysql_connect")
     instrument(coredb, "connect", "db_checkout")
     instrument(ai, "node_retrieve", "retrieve_with_embedding")
-    instrument(ai, "node_answer", "deepseek_and_audit")
+    instrument(ai, "node_answer_stream", "deepseek_and_audit")
     instrument(ai, "_embed", "index_embedding")
     import main
 

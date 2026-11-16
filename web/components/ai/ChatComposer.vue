@@ -2,42 +2,44 @@
 /** 输入区：v-model 文本 + 发送/Enter 逻辑（原单栏版迁移）。
  * 只负责编辑与触发：文本合法性守卫后上报 send 事件，真正发问在 useAiChat.send。 */
 const props = defineProps<{
-  modelValue: string
-  thinking: boolean
-}>()
+  modelValue: string;
+  thinking: boolean;
+}>();
 const emit = defineEmits<{
-  'update:modelValue': [value: string]
-  send: []
-}>()
+  "update:modelValue": [value: string];
+  send: [];
+}>();
 
-const inputEl = ref<HTMLTextAreaElement | null>(null)
+const inputEl = ref<HTMLTextAreaElement | null>(null);
 
 const text = computed({
   get: () => props.modelValue,
-  set: (v: string) => emit('update:modelValue', v),
-})
-const canSend = computed(() => !props.thinking && text.value.trim().length >= 2)
+  set: (v: string) => emit("update:modelValue", v),
+});
+const canSend = computed(
+  () => !props.thinking && text.value.trim().length >= 2,
+);
 
 function resizeInput() {
-  const el = inputEl.value
-  if (!el) return
-  el.style.height = 'auto'
-  el.style.height = Math.min(el.scrollHeight, 132) + 'px'
+  const el = inputEl.value;
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 132) + "px";
 }
 
 function trySend() {
-  if (!canSend.value) return
-  emit('send')
+  if (!canSend.value) return;
+  emit("send");
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    trySend()
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    trySend();
   }
 }
 
-onMounted(() => inputEl.value?.focus())
+onMounted(() => inputEl.value?.focus());
 </script>
 
 <template>
@@ -53,20 +55,33 @@ onMounted(() => inputEl.value?.focus())
       @keydown="onKeydown"
       @input="resizeInput"
     ></textarea>
-    <button class="composer__send" :disabled="!canSend" aria-label="发送" @click="trySend">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <button
+      class="composer__send"
+      :disabled="!canSend"
+      aria-label="发送"
+      @click="trySend"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        width="18"
+        height="18"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.4"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
         <path d="M5 12h14M13 6l6 6-6 6" />
       </svg>
     </button>
   </div>
-  <p class="composer__hint">Enter 发送 · Shift + Enter 换行 · 回答基于案例库检索，请以出处为准</p>
 </template>
 
 <style scoped>
 /* 输入框玻璃材质（任务 13）：背景/边框/阴影交给 .glass；聚焦态保留珊瑚描边提示 */
 .composer {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 10px;
   margin-top: 14px;
   border-radius: 18px;
@@ -108,7 +123,9 @@ onMounted(() => inputEl.value?.focus())
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 0 var(--coral-deep);
-  transition: filter 0.15s, transform 0.1s;
+  transition:
+    filter 0.15s,
+    transform 0.1s;
 }
 .composer__send:hover:not(:disabled) {
   filter: brightness(1.06);
@@ -121,11 +138,5 @@ onMounted(() => inputEl.value?.focus())
   background: #ddd3c5;
   box-shadow: none;
   cursor: not-allowed;
-}
-.composer__hint {
-  margin: 10px 0 0;
-  text-align: center;
-  font-size: 12px;
-  color: var(--ink3);
 }
 </style>

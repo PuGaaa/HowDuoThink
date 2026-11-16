@@ -6,17 +6,7 @@ import threading
 from fastapi.testclient import TestClient
 
 import main  # noqa: F401
-from tests.conftest import login_admin
-
-
-class _FakeResp:
-    content = "模拟回答"
-    response_metadata = {"token_usage": {"prompt_tokens": 1, "completion_tokens": 1}}
-
-
-class _FakeModel:
-    def invoke(self, messages):
-        return _FakeResp()
+from tests.conftest import login_admin, sse_events
 
 
 class _FakeEmbed:
@@ -28,9 +18,10 @@ class _FakeEmbed:
 
 def _mock_ai(monkeypatch) -> None:
     from features.ai import client
+    from tests.test_ai_stream import _ans, _FakeReasonerStream, _usage
 
     monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "chat_model", lambda: _FakeModel())
+    monkeypatch.setattr(client, "reasoner_stream", _FakeReasonerStream([_ans("模拟回答"), _usage(1, 1)]))
     monkeypatch.setattr(client, "embed_available", lambda: True)
     monkeypatch.setattr(client, "embeddings_model", lambda: _FakeEmbed())
 
@@ -95,7 +86,8 @@ def test_daily_quota_blocks_after_limit(monkeypatch):
             login_admin(c)
             r = c.post("/api/ai/chat", json={"question": "额度用完了还能问吗"})
             assert r.status_code == 200
-            assert "上限" in r.json()["error"]
+            evs = sse_events(r)
+            assert evs[0][0] == "error" and "上限" in evs[0][1]["error"]
             rows = db.q("SELECT COUNT(*) AS n FROM ai_usage WHERE uid='pw-admin' AND kind='chat'")
             assert rows[0]["n"] == 2  # 未新增模型调用
     finally:

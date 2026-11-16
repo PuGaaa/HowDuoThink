@@ -2,6 +2,7 @@
 用法：cd server && /tmp/pilvenv/bin/python -m pytest tests/ -q"""
 
 import atexit
+import json
 import os
 from pathlib import Path
 
@@ -75,6 +76,21 @@ def login_admin(client: TestClient) -> None:
     assert r.status_code == 200, r.text
 
 
+def sse_events(resp) -> list[tuple[str, dict]]:
+    """TestClient 收齐的 SSE 正文 → (event, data) 列表（测试专用解析）。"""
+    out: list[tuple[str, dict]] = []
+    for frame in resp.text.split("\n\n"):
+        ev, data = None, {}
+        for line in frame.splitlines():
+            if line.startswith("event: "):
+                ev = line[7:]
+            elif line.startswith("data: "):
+                data = json.loads(line[6:])
+        if ev is not None:
+            out.append((ev, data))
+    return out
+
+
 @pytest.fixture(autouse=True)
 def _reset_login_throttle():
     """用例间清空登录防爆破计数器：故意输错密码的用例（如 401 测试）会给
@@ -88,8 +104,6 @@ def _reset_login_throttle():
 
 
 def load_seed(case_id: str = "cache-drift") -> dict:
-    import json
-
     # 测试 fixture 独立提交（server/seed/*.json 是不入 git 的构建产物）
     p = Path(__file__).parent / "fixtures" / f"{case_id}.json"
     return json.loads(p.read_text())

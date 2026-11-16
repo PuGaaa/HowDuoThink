@@ -4,17 +4,7 @@ import datetime
 
 from fastapi.testclient import TestClient
 
-from tests.conftest import login_admin, make_client
-
-
-class _FakeResp:
-    content = "模拟回答"
-    response_metadata = {"token_usage": {"prompt_tokens": 100, "completion_tokens": 50}}
-
-
-class _FakeModel:
-    def invoke(self, messages):
-        return _FakeResp()
+from tests.conftest import login_admin, make_client, sse_events
 
 
 class _FakeEmbed:
@@ -26,27 +16,30 @@ class _FakeEmbed:
         return [1.0, 0.0]
 
 
-def _mock_ai(monkeypatch, model):
-    """同时打桩对话模型与检索向量（node_retrieve 先于 node_answer 执行）。"""
+def _mock_ai(monkeypatch, events, error: Exception | None = None):
+    """打桩 reasoner_stream 适配器（SDK 直连事件形状）与检索向量（node_retrieve 先于 node_answer_stream 执行）。"""
     from features.ai import client
+    from tests.test_ai_stream import _FakeReasonerStream
 
     monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "chat_model", lambda: model())
+    monkeypatch.setattr(client, "reasoner_stream", _FakeReasonerStream(events, None, error))
     monkeypatch.setattr(client, "embed_available", lambda: True)
     monkeypatch.setattr(client, "embeddings_model", lambda: _FakeEmbed())
 
 
 def test_chat_logs_token_usage(monkeypatch):
     import main
+    from tests.test_ai_stream import _ans, _usage
 
-    _mock_ai(monkeypatch, _FakeModel)
+    _mock_ai(monkeypatch, [_ans("模拟回答"), _usage(100, 50)])
     with TestClient(main.app) as c:
         login_admin(c)
         r = c.post("/api/ai/chat", json={"question": "连接池耗尽怎么排查"})
         assert r.status_code == 200, r.text
+        assert [e for e, _ in sse_events(r)] == ["status", "status", "answer", "sources", "done"]
         import db
 
-        rows = db.q("SELECT * FROM ai_usage WHERE kind='chat'")
+        rows = db.q("SELECT * FROM ai_usage WHERE kind='chat' AND uid='pw-admin'")
         assert len(rows) == 1
         assert rows[0]["prompt_tokens"] == 100
         assert rows[0]["completion_tokens"] == 50
@@ -57,20 +50,17 @@ def test_chat_logs_token_usage(monkeypatch):
 def test_llm_failure_logged_as_not_ok(monkeypatch):
     import main
 
-    class Boom:
-        def invoke(self, messages):
-            raise RuntimeError("上游超时")
-
-    _mock_ai(monkeypatch, Boom)
+    _mock_ai(monkeypatch, [], error=RuntimeError("上游超时"))
     with TestClient(main.app, raise_server_exceptions=False) as c:
         login_admin(c)
         r = c.post("/api/ai/chat", json={"question": "会触发异常的问题"})
-        # 模型失败走友好报错（200 + error），不再裸 500
+        # 模型失败走友好报错（200 + error 帧），不再裸 500
         assert r.status_code == 200
-        assert r.json()["error"] == "服务暂时不可用，请稍后再试"
+        evs = sse_events(r)
+        assert evs[-1][0] == "error" and evs[-1][1]["error"] == "服务暂时不可用，请稍后再试"
         import db
 
-        rows = db.q("SELECT * FROM ai_usage WHERE kind='chat' AND ok=0")
+        rows = db.q("SELECT * FROM ai_usage WHERE kind='chat' AND ok=0 AND uid='pw-admin'")
         assert len(rows) == 1
 
 

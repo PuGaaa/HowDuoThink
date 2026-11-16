@@ -40,6 +40,7 @@ function relTime(iso: string): string {
 
 <template>
   <div class="conv">
+    <!-- 「新对话」绝对定位钉在顶栏左端空白区（视口最顶），不随列表滚动——顶部固定，非浮动 -->
     <button class="conv__new" @click="emit('create')">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
         <path d="M12 5v14M5 12h14" />
@@ -75,6 +76,9 @@ function relTime(iso: string): string {
   min-height: 0;
 }
 .conv__new {
+  position: sticky;
+  top: 69px;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -86,8 +90,8 @@ function relTime(iso: string): string {
   padding: 9px 12px;
   font-size: 13.5px;
   font-weight: 700;
-  /* 玻璃侧栏上的文字（任务 13）：--coral 仅 2.3:1，用任务 11 验证过的 --coral-ink（≥4.79:1） */
-  color: var(--coral-ink);
+  /* 中性深字（coral-ink 橙棕被反馈配色不佳）；hover 描边保留珊瑚做交互点缀 */
+  color: var(--ink);
   cursor: pointer;
   box-shadow: 0 3px 0 var(--edge-cream);
   transition: border-color 0.15s, transform 0.1s;
@@ -99,11 +103,16 @@ function relTime(iso: string): string {
   transform: translateY(2px);
   box-shadow: 0 1px 0 var(--edge-cream);
 }
+.conv {
+  position: relative;
+}
 .conv__scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  margin-top: 12px;
+  /* 顶部让出「新对话」按钮高度（81 + 40 + 16）：列表首项从按钮下方开始，
+   * 滚动时文字向上滚出、消失在按钮后方——不再穿入顶栏磨砂区（0~69px 仍保留该效果） */
+  padding-top: 137px;
   padding-right: 2px;
 }
 .conv__scroll::-webkit-scrollbar {
@@ -120,6 +129,31 @@ function relTime(iso: string): string {
   text-align: center;
   line-height: 1.8;
 }
+/* absolute 恒定钉在顶栏下缘（69px 顶栏 + 12px 间距 = top 81）：
+ * 「一直在顶部」且不随列表滚动——sticky 方案会让按钮浮在滚动的列表文字上，被否掉；
+ * 81 > 顶栏 69，不在磨砂区内，文字清晰。列表滚动容器 padding-top 让出按钮高度 */
+.conv__new {
+  position: absolute;
+  top: 81px;
+  left: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1.5px solid var(--line);
+  background: var(--well);
+  border-radius: 12px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  /* 中性深字（coral-ink 橙棕被反馈配色不佳）；hover 描边保留珊瑚做交互点缀 */
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--edge-cream);
+  transition: border-color 0.15s, transform 0.1s;
+}
 .conv__item {
   display: flex;
   align-items: center;
@@ -132,7 +166,8 @@ function relTime(iso: string): string {
   background: var(--well);
 }
 .conv__item--active {
-  background: var(--coral-soft);
+  /* 激活态与 hover 同中性底，靠标题加粗区分（coral-soft 橙底被反馈配色不佳） */
+  background: var(--well);
 }
 .conv__main {
   flex: 1;
@@ -156,8 +191,9 @@ function relTime(iso: string): string {
   text-overflow: ellipsis;
 }
 .conv__item--active .conv__title {
-  /* --coral-deep 在玻璃上 3.3:1 不达标，同任务 11 收紧到 --coral-ink */
-  color: var(--coral-ink);
+  /* 激活态强调靠 soft 珊瑚底 + 加粗；标题文字保持中性 --ink（coral-ink 橙棕被反馈为配色不佳，
+   * 对比度也更优：ink on coral-soft ≈ 8:1） */
+  color: var(--ink);
   font-weight: 700;
 }
 .conv__time {
