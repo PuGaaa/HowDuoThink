@@ -129,10 +129,15 @@ def test_stream_event_sequence_and_persistence(monkeypatch):
         monkeypatch,
         [_rc("先想"), _rc("后想"), _ans("答"), _ans("案"), _usage(11, 7)],
     )
-    monkeypatch.setattr(service, "node_retrieve", lambda q, k=4: [
-        {"caseId": "case-src", "kind": "overview", "content": "c", "score": 0.9}])
-    db.ex("INSERT INTO cases(id,title,domain,layer,difficulty,version,content_revision,status,payload) "
-          "VALUES('case-src','引用案例','runtime','运行时',1,1,1,'published','{}')")
+    monkeypatch.setattr(
+        service,
+        "node_retrieve",
+        lambda q, k=4: [{"caseId": "case-src", "kind": "overview", "content": "c", "score": 0.9}],
+    )
+    db.ex(
+        "INSERT INTO cases(id,title,domain,layer,difficulty,version,content_revision,status,payload) "
+        "VALUES('case-src','引用案例','runtime','运行时',1,1,1,'published','{}')"
+    )
     try:
         uid = "u-stream-seq"
         evs = list(service.chat_stream("连接池耗尽导致接口大面积超时怎么排查", uid))
@@ -148,7 +153,9 @@ def test_stream_event_sequence_and_persistence(monkeypatch):
         # 落库：两条消息，content 是完整答案；思维链文本不进任何消息内容
         msgs = repo.recent_messages(src["conversationId"], 10)
         assert [(m["role"], m["content"]) for m in msgs] == [
-            ("user", "连接池耗尽导致接口大面积超时怎么排查"), ("assistant", "答案")]
+            ("user", "连接池耗尽导致接口大面积超时怎么排查"),
+            ("assistant", "答案"),
+        ]
         all_content = json.dumps([dict(m) for m in repo.all_messages(src["conversationId"])], ensure_ascii=False)
         assert "先想" not in all_content
         # usage 审计：末包 usage 进台账（kind='chat'，ok=1）

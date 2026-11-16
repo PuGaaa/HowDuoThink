@@ -124,7 +124,9 @@ def _mock_ai(monkeypatch, capture: list | None = None, error: Exception | None =
     from tests.test_ai_stream import _ans, _FakeReasonerStream, _usage
 
     monkeypatch.setattr(client, "available", lambda: True)
-    monkeypatch.setattr(client, "reasoner_stream", _FakeReasonerStream([_ans("模拟回答"), _usage(1, 1)], capture, error))
+    monkeypatch.setattr(
+        client, "reasoner_stream", _FakeReasonerStream([_ans("模拟回答"), _usage(1, 1)], capture, error)
+    )
     monkeypatch.setattr(client, "embed_available", lambda: True)
     monkeypatch.setattr(client, "embeddings_model", lambda: _FakeEmbed())
 
