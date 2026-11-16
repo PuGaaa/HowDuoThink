@@ -13,10 +13,32 @@ import LiquidBackdrop from "~/components/layout/LiquidBackdrop.vue";
 const { ensure } = useCurrentUser();
 const profileOpen = ref(false);
 const pwMode = ref<"set" | "change" | null>(null);
+const topbarInner = ref<HTMLElement | null>(null);
 
 onMounted(() => {
   void ensure();
 });
+
+/** AI 页进出过渡：导航栏内容滑落归位（topbar__inner 静止态 margin:0 auto 居中，
+ * auto 不可插值，故以等效 transform+opacity 位移动画呈现归位过程）。
+ * WAAPI 直接驱动：播完自动回落静止态，快速连续切换天然无残留。
+ * prefers-reduced-motion 用户跳过（与全站 reduced-motion 习惯一致）。 */
+const route = useRoute();
+watch(
+  () => route.path,
+  (path, prev) => {
+    const touchesAi = path.startsWith("/ai") || !!prev?.startsWith("/ai");
+    if (!touchesAi || !topbarInner.value) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    topbarInner.value.animate(
+      [
+        { transform: "translateY(-14px)", opacity: 0.2 },
+        { transform: "translateY(0)", opacity: 1 },
+      ],
+      { duration: 360, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+    );
+  },
+);
 
 function openPassword(mode: "set" | "change") {
   pwMode.value = mode;
@@ -37,7 +59,7 @@ function backToProfile() {
     <!-- <LiquidBackdrop /> -->
     <!-- 通栏吸顶顶栏：玻璃材质（.topbar--full 样式在 main.css，引用 glass.css 变量） -->
     <header class="topbar topbar--full">
-      <div class="topbar__inner">
+      <div ref="topbarInner" class="topbar__inner">
         <NuxtLink to="/" class="topbar__brand">
           <span class="topbar__brand-full">好多星 HowDuoThink · 社区</span>
           <span class="topbar__brand-short">好多星 · 社区</span>
