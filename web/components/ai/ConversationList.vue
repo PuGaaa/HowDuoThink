@@ -150,8 +150,7 @@ function relTime(iso: string): string {
   padding-top: 137px;
   padding-right: 2px;
   /* 隐藏滚动条 */
-  scrollbar-width: thin;
-  scrollbar-color: var(--edge-cream) transparent;
+  scrollbar-width: none;
 }
 .conv__scroll::-webkit-scrollbar {
   width: 6px;
