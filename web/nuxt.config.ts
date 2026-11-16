@@ -11,6 +11,11 @@ export default defineNuxtConfig({
       meta: [
         { name: 'description', content: '好多星 HowDuoThink —— 多想，多星。How to think. 把真实故障变成一桩桩案件，多想一步，星就多一颗。' },
       ],
+      link: [
+        { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+        { rel: 'icon', type: 'image/png', sizes: '512x512', href: '/icon-512.png' },
+        { rel: 'apple-touch-icon', href: '/icon-512.png' },
+      ],
     },
   },
 })
