@@ -60,6 +60,17 @@ def test_solution_list_carries_problem():
     assert item["problem"]["intro"] == payload["intro"]
 
 
+def test_solution_list_filters_by_domain():
+    """列表页分类 chip 按 domain 过滤：夹具案例 domain=runtime，命它与不命它各验一次。"""
+    payload = _publish()
+    hit = client.get("/api/solutions?domain=runtime").json()
+    assert hit["total"] >= 1
+    assert all(i["domain"] == "runtime" for i in hit["items"])
+    assert any(i["id"] == "a-" + payload["id"] for i in hit["items"])
+    miss = client.get("/api/solutions?domain=network").json()
+    assert not any(i["id"] == "a-" + payload["id"] for i in miss["items"])
+
+
 def test_rebuild_restores_detail_and_keeps_published_at():
     payload = _publish()
     article_id = "a-" + payload["id"]
@@ -83,3 +94,32 @@ def test_rebuild_parse_error_carries_case_id():
 
     with pytest.raises(RuntimeError, match=cid):
         rebuild_all()
+
+
+def test_solution_list_pagination_is_stable_across_pages():
+    """同秒批量发布（published_at 全并列）时 OFFSET 翻页不得跨页重复/漏行：
+    排序键并列会让各页窗口重叠，必须带唯一 tiebreaker（id）构成全序。"""
+    ids = ["a-" + _publish()["id"] for _ in range(8)]
+    # 只冻结自己发布的 8 行为同一时间戳（制造排序键全并列）：全表 UPDATE 会污染
+    # 共享测试库，破坏后续用例（如 test_submission_review）的数据前提
+    marks = ",".join("?" * len(ids))
+    db.ex(f"UPDATE articles SET published_at='2026-01-01 00:00:00' WHERE id IN ({marks})", tuple(ids))
+    seen: list[str] = []
+    page = 1
+    while True:
+        body = client.get(f"/api/solutions?page={page}&size=3").json()
+        seen += [i["id"] for i in body["items"]]
+        if len(seen) >= body["total"] or not body["items"]:
+            break
+        page += 1
+    assert len(seen) == len(set(seen)), f"跨页重复: {[i for i in seen if seen.count(i) > 1]}"
+    assert set(ids) <= set(seen), "翻页漏行"
+    # 清场：本用例批量制造了 8 个同题已发布案例，会挤占 matching.candidates 的
+    # top-10 槽位（零分候选拼 id 字典序，a-c-test- 前缀极靠前），破坏共享库中
+    # 后续用例（test_submission_review）的相似候选前提——删干净自己造的数据。
+    case_ids = tuple(i.removeprefix("a-") for i in ids)
+    marks = ",".join("?" * len(ids))
+    db.ex(f"DELETE FROM articles WHERE id IN ({marks})", ids)
+    db.ex(f"DELETE FROM cases WHERE id IN ({marks})", case_ids)
+    db.ex(f"DELETE FROM index_tasks WHERE case_id IN ({marks})", case_ids)
+    db.ex(f"DELETE FROM case_revisions WHERE case_id IN ({marks})", case_ids)

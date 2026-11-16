@@ -13,6 +13,9 @@ import pytest
 os.environ["JWT_SECRET"] = "test-secret-for-pytest-only-32bytes!!"  # HS256 建议至少 32 字节
 os.environ["ADMIN_PASSWORD"] = "test-admin-pw"
 os.environ.pop("ENV", None)  # 确保 dev 绕行关闭
+# COOKIE_SECURE=1（HTTPS 部署用）会把会话 cookie 标 secure，httpx2 在 http 测试请求里
+# 不回传 → 登录态全 401。测试是纯 http 环境，显式摘掉，避免被本地 .env.dev.local 泄进来。
+os.environ.pop("COOKIE_SECURE", None)
 os.environ["DB_PROVIDER"] = "mysql"
 os.environ.setdefault("MYSQL_HOST", "127.0.0.1")
 os.environ.setdefault("MYSQL_PORT", "3306")
@@ -61,7 +64,10 @@ import main  # noqa: E402
 
 
 def make_client() -> TestClient:
-    return TestClient(main.app)
+    # starlette 1.10 的 TestClient 走 httpx2：其 cookie jar 会把单标签主机 testserver
+    # 归一化成 testserver.local 存域，回传时与请求域 testserver 不匹配 → 登录态全挂。
+    # base_url 换成带点的 testserver.local，两侧一致。
+    return TestClient(main.app, base_url="http://testserver.local")
 
 
 # 模块级 client（不进 with 上下文）不会触发 lifespan，seed_admin 不落库会让

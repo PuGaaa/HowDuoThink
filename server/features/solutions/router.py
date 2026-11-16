@@ -8,8 +8,8 @@ router = APIRouter(tags=["solutions"])
 
 
 @router.get("/api/solutions")
-def solutions(layer: str | None = None, page: int = Query(default=1, ge=1), size: int = Query(default=20, ge=1, le=50)):
-    return service.list_solutions(layer, page, size)
+def solutions(domain: str | None = None, page: int = Query(default=1, ge=1), size: int = Query(default=20, ge=1, le=50)):
+    return service.list_solutions(domain, page, size)
 
 
 @router.get("/api/solutions/{article_id}")

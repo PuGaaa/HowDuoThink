@@ -175,7 +175,9 @@ onBeforeUnmount(clearFoldTimer)
         <p v-else class="bubble__text">{{ m.text }}</p>
         <div v-if="m.sources && m.sources.length > 0" class="bubble__sources">
           <span class="bubble__sources-label">出处</span>
-          <NuxtLink v-for="s in m.sources" :key="s.caseId" :to="'/solutions/' + s.caseId" class="bubble__source">
+          <!-- sources 的 caseId 是 cases.id（如 cache-review），而 solutions 路由取
+               articles.id = "a-" + cases.id（publication._article），必须补前缀否则 404 -->
+          <NuxtLink v-for="s in m.sources" :key="s.caseId" :to="'/solutions/a-' + s.caseId" class="bubble__source">
             {{ s.title }}
           </NuxtLink>
         </div>
